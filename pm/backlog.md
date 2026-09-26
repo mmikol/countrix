@@ -6,6 +6,39 @@ keeps it current.
 
 ## Next
 
+- **Before the first heuristic.** The mechanics audit (2026-09-26) left
+  four open points that only bite once a heuristic ships; each is a
+  decision or a change too wide for its pass.
+  (a) *The share's zero.* The badge is score / best, clamped to 0..100,
+  and the base's zero is a coin-flip six. About half the reference sixes
+  on a board sit at or below it and read 0, and a heuristic adds
+  weight x norm >= 0 to every six (weight / 2 where its metric has no
+  spread), so the first one moves every badge with the argmax unchanged:
+  on the synthetic World one six against one optimal read 53 then 72
+  with a weight-4 team.size rule. Decide the zero first, for example
+  (score - floor) / (best - floor) with the floor the reference sample's
+  minimum or median on the frozen scale, which no constant offset moves.
+  (b) *A heuristic saturates at the scale's edge.* `_norm` clamps to
+  [0, 1] against the sample and the field, so every six past the highest
+  either saw reads 1: at weight 10 a maximise-hitscan rule on a real
+  board stopped at 5 hitscan where 6 was legal and would win read
+  linearly. The clamp is a stated guarantee (a rule moves a six by its
+  weight at most), so the fix is to widen the bounds with cheap attainable
+  extremes - a count metric's role-capped top six, or a greedy climb on
+  the metric from the field's best - drawn once per board after the
+  slices merge, so the pool and one process still agree bit for bit.
+  (c) *PARTNER_POINTS is in score points.* A locked partner adds 0.5 to a
+  hero's standing when ranking the pools, so scaling the objective
+  changes which heroes are pooled: at scale 0.1 two of 36 real boards
+  listed a different fifth alternative, never a different six. Put it on
+  the standing's own spread (a share of the role's standing range) and
+  re-record reach. SHAPE_REACH and PAIR_TRIES, the other two, are gone.
+  (d) *One state written two ways is two guards.* Needs share
+  NEED_BUDGET by the guard's text and params, so `team.supports <= 1` and
+  `team.supports < 2` get two budgets (docs/inference.md says so).
+  Normalising a guard - its compiled comparison, params resolved - would
+  make them one. Cost: (a) a morning and every share test; (b) a day;
+  (c) half a day and a reach re-record; (d) half a day.
 - **Tunings by map.** The user's request: each map carries its own tuning
   set - a weight per heuristic (and a params dial where a rule has one)
   that applies when that map is on the board, so a rule can matter on
@@ -49,12 +82,12 @@ keeps it current.
   standing, so a comp's score can be set against a modelled fight rather
   than trusted; deterministic, seeded where it must draw. (b) Proofs of
   the solver's properties, as tests where they can be and as derivations
-  on the math page where they cannot: the same board gives the same six;
-  scaling every weight by one factor leaves the argmax unchanged; a
-  normalised term stays within 0..1 and the reference sample bounds it;
-  fight odds split 100 exactly; the local search never lowers the score.
-  Cost: (a) three to four days, the kit model most of it; (b) a day for
-  the tests, a day for the page.
+  on the math page where they cannot. Scaling every weight by ten, the
+  weight response, the breakdown's sum and each seat against infer are
+  tests now (tests/inference/test_mechanics.py); left are a normalised
+  term within 0..1, fight odds that split 100 exactly and a local search
+  that never lowers the score. Cost: (a) three to four days, the kit
+  model most of it; (b) half a day for the tests, a day for the page.
 - **Weights that learn on their own.** The user wants them to, with the
   sliders as the manual override. The weights were fitted once to a
   benchmark of community comps; nothing refits them. The owner's played
