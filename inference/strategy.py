@@ -22,16 +22,17 @@ two takes an optional `when` guard. A HEURISTIC names a numeric fact key
 (`metric`), min-max normalised against the board's scale (inference.scale:
 a seeded reference sample of legal sixes and the board's field) and
 weighted; `direction`, maximize or minimize, says which end is good, and
-an optional `confidence` metric scales the weight by how strongly the
-premise holds. Guarded on the six's own state it is a need: weight x
+an optional `confidence` metric - the six's, the matchup's or the map's,
+never one a board fixes - scales the weight by how strongly the premise
+holds. Guarded on the six's own state it is a need: weight x
 (norm - 1). A CONSTRAINT takes one of two forms, read off its frontmatter
 (`form`):
 
     limit   `require: <expr>` must hold. Hard by default - a comp that
-            fails is discarded; `soft: true` with `penalty: <number>`
-            subtracts instead.
-    scored  `bonus: <expr>` and/or `penalty: <expr>`: the solver adds
-            `weight x (bonus - penalty)` while `when` holds.
+            fails is discarded; `soft: true` with `penalty: <number>`, 0
+            or more, subtracts instead.
+    scored  `bonus: <expr>` and/or `penalty: <expr>`, each a number: the
+            solver adds `weight x (bonus - penalty)` while `when` holds.
 
 An ASSUMPTION is prose: what the solver takes as given and the /comp
 session holds a comp to (players play optimally, say). It carries nothing
@@ -62,7 +63,7 @@ from collections.abc import Iterable, Mapping
 from typing import Literal, NamedTuple, TypedDict
 
 from facts import compute
-from inference.expr import ExprError, Section, compile_expr
+from inference.expr import Expr, ExprError, Section, compile_expr, scope
 from inference.frontmatter import Frontmatter, Scalar
 
 # a strategy's kind, as its frontmatter names it, and its form, as its fields make it
@@ -76,6 +77,13 @@ DIRECTIONS = ("maximize", "minimize")      # which end of a heuristic's metric i
 
 # the namespaces one board settles for every candidate six
 _BOARD_SECTIONS = ("enemy", "map", "world", "params")
+# the namespaces a confidence metric may read: a six's own and the matchup's
+# vary over the reference sixes, the map's over the other maps; red's and the
+# world's are one number on a board and have no population to be read against
+CONFIDENCE_SECTIONS = ("team", "matchup", "map")
+# what a text metric is probed with: an empty and a filled name, each of which
+# a number-valued expression over it must still turn into a number
+_TEXT_PROBES = ("", "probe")
 
 
 def settled_by_board(names: Iterable[str]) -> bool:
@@ -322,6 +330,7 @@ class Strategy:
         self._check_kind()
         self._check_limit()
         self._check_names(known)
+        self._check_amounts()
 
     def _check_heuristic(self, known: Mapping[str, str]) -> None:
         if self.kind != "heuristic" or not (self.metric or self.direction):
@@ -342,6 +351,11 @@ class Strategy:
         if self.confidence in compute.TEXT_METRICS:
             raise CatalogError("%s: confidence %r is text, not a number"
                                % (self.id, self.confidence))
+        if self.confidence.split(".", 1)[0] not in CONFIDENCE_SECTIONS:
+            raise CatalogError(
+                "%s: confidence %r is one number on every six of a board, so nothing"
+                " reads it against a population; name a team.*, matchup.* or map.* metric"
+                % (self.id, self.confidence))
         if self.form != "heuristic":
             raise CatalogError("%s: only a heuristic scales by a confidence" % self.id)
 
@@ -380,6 +394,44 @@ class Strategy:
                 elif name not in known:
                     raise CatalogError("%s: %r is not a registered fact key"
                                        % (self.id, name))
+
+    def _check_amounts(self) -> None:
+        """A bonus or penalty is a number on every six. One that reads a text
+        metric is evaluated on probes - each number 0 and 1, each text metric
+        empty and named - and refused where a probe gives a name or a list or
+        cannot be added: the solver would fail on every board. A soft limit
+        charges, so its penalty, a constant, is 0 or more."""
+        for label, expr in (("bonus", self.bonus), ("penalty", self.penalty)):
+            if expr is None:
+                continue
+            if any(name in compute.TEXT_METRICS for name in expr.names):
+                for number, text in zip((0, 1), _TEXT_PROBES, strict=True):
+                    if not self._numeric_on(expr, number, text):
+                        raise CatalogError(
+                            "%s: %s %r can read a name or a list, not a number"
+                            % (self.id, label, expr.source))
+        if self.soft and self.penalty is not None and not self.penalty.names:
+            charge = self.penalty.evaluate(scope({}))
+            if isinstance(charge, (int, float)) and charge < 0:
+                raise CatalogError("%s: a soft limit's penalty is a charge, 0 or more"
+                                   % self.id)
+
+    def _numeric_on(self, expr: Expr, number: int, text: str) -> bool:
+        """Whether `expr` gives a number where each metric it reads holds
+        `number`, or `text` where the metric is a name or a list."""
+        probe: dict[str, dict[str, object]] = {"params": dict(self.params)}
+        for name in expr.names:
+            section, _, key = name.partition(".")
+            if section != "params":
+                probe.setdefault(section, {})[key] = (
+                    text if name in compute.TEXT_METRICS else number)
+        try:
+            value = expr.evaluate(scope(probe))
+        except ExprError as error:         # a TypeError is a name in arithmetic
+            return not isinstance(error.__cause__, TypeError)
+        except ArithmeticError:            # a probe's own zero, not the metric's kind
+            return True
+        return isinstance(value, (int, float))       # a bool is an int
 
     @property
     def form(self) -> Form:

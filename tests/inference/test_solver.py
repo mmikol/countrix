@@ -151,6 +151,29 @@ def test_a_soft_limit_charges_its_penalty_and_never_prunes(synthetic_world):
     assert term["applies"] and term["ok"] is False and term["weighted"] == -2.5
 
 
+def test_a_soft_penalty_below_zero_charges_nothing_and_a_premise_never_seen_counts_nothing(
+        synthetic_world, tmp_path):
+    """A soft limit's penalty is a charge: an expression that falls below zero
+    charges 0 and never pays a six for breaking the limit. A confidence
+    metric whose population has no width reads the six alone: at zero the
+    premise is absent and the rule is worth nothing, above it in full."""
+    from inference import scoring
+    w = synthetic_world
+    (tmp_path / "soft.md").write_text(
+        "---\nname: soft\nkind: constraint\nrequire: team.supports >= 2\nsoft: true\n"
+        "penalty: team.supports - 5\n---\nx\n", "utf-8")
+    objective = scoring.Objective(w, w.map("Harbor Gate"), red=[],
+                                  catalog=catalog.load(str(tmp_path)), base=OFF)
+    cand = scoring.Candidate(
+        [w.hero(n) for n in ("Anvil", "Kite", "Mortar", "Needle", "Rook", "Balm")])
+    objective.score(objective.prepare(cand))
+    [term] = cand.contributions
+    assert term["ok"] is False and term["weighted"] == 0.0 and cand.score == 0.0
+    flat = scoring.Interval(0.0, 0.0)
+    assert scoring._certainty(flat, 0.0) == 0.0 and scoring._certainty(flat, 3.0) == 1.0
+    assert scoring._certainty(scoring.Interval(2.0, 2.0), 2.0) == 1.0     # anchored at 0
+
+
 def test_a_rule_guarded_on_the_six_itself_is_a_need_and_a_state_has_a_budget(
         synthetic_world, tmp_path):
     """"A solo healer needs an escape" must not pay a six for fielding one

@@ -79,8 +79,9 @@ def _not_a_number(value: MetricValue | None) -> float:
 
 
 def _amount(value: Value) -> float:
-    """A bonus or penalty expression's value, as the score adds it."""
-    if isinstance(value, (int, float, str)):          # a bool is an int
+    """A bonus or penalty expression's value, as the score adds it. The
+    catalog refuses one that can read a name (Strategy._check_amounts)."""
+    if isinstance(value, (int, float)):               # a bool is an int
         return float(value)
     raise TypeError("a bonus or penalty reads a number, got %r" % (value,))
 
@@ -114,7 +115,8 @@ def _certainty(scale: Interval, scale_raw: float) -> float:
     """How far a rule's confidence metric sits between its reference low and
     high, in [0, 1]. A rule that names one is worth its weight only where that
     metric is at its high, and nothing where it is at the low: a premise that
-    barely holds barely counts."""
+    barely holds barely counts. A population with no width reads the metric
+    alone: a premise above zero holds, one at or below it does not."""
     scale_lo, scale_hi = scale
     # anchor at zero where the metric never goes below it: the least certain
     # board seen is not the same as no certainty at all, and taking it as the
@@ -122,7 +124,9 @@ def _certainty(scale: Interval, scale_raw: float) -> float:
     if scale_lo >= 0.0:
         scale_lo = 0.0
     width = scale_hi - scale_lo
-    sure = 1.0 if width <= 0 else (scale_raw - scale_lo) / width
+    if width <= 0:
+        return 1.0 if scale_raw > 0 else 0.0
+    sure = (scale_raw - scale_lo) / width
     return 0.0 if sure < 0.0 else 1.0 if sure > 1.0 else sure
 
 
@@ -435,7 +439,9 @@ class Objective:
     def _score_limits(self, sc: Scope, held: list[bool | None], total: float,
                       out: list[Contribution] | None) -> float:
         """The limits' terms: a hard limit costs nothing here (prepare() has
-        pruned what breaks it), a soft one charges its penalty where it fails."""
+        pruned what breaks it), a soft one charges its penalty where it fails
+        - a charge, so a penalty expression below zero charges nothing and
+        never pays a six for breaking the limit."""
         for h, require, applies, slot in self._limits:
             if applies is None:
                 applies = _slot_gate(held, slot, h, sc)
@@ -444,7 +450,7 @@ class Objective:
                 sc["params"] = h.params_section
                 ok = bool(require.evaluate(sc))
                 if h.soft and not ok and h.penalty is not None:     # a soft limit has one
-                    penalty = _amount(h.penalty.evaluate(sc))
+                    penalty = max(0.0, _amount(h.penalty.evaluate(sc)))
             total -= penalty
             if out is not None:
                 out.append({"id": h.id, "kind": "constraint", "form": "limit",

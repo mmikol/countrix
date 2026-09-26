@@ -124,8 +124,8 @@ value.
 | kind | form | frontmatter | what the solver does |
 | --- | --- | --- | --- |
 | heuristic | | `metric`, `direction` (`maximize` or `minimize`), `weight`, optionally `confidence` | normalises the metric to [0, 1] on the board's scale (flipped for minimize) and adds `weight x norm` |
-| constraint | limit | `require: <expr>`, optionally `soft: true` and `penalty: <number>` | discards a candidate that fails; a soft one subtracts the penalty |
-| constraint | scored | `bonus: <expr>` and/or `penalty: <expr>` | adds `weight x (bonus - penalty)` |
+| constraint | limit | `require: <expr>`, optionally `soft: true` and `penalty: <number>` | discards a candidate that fails; a soft one subtracts the penalty, 0 or more |
+| constraint | scored | `bonus: <expr>` and/or `penalty: <expr>`, each a number | adds `weight x (bonus - penalty)` |
 | assumption | | nothing: prose by definition | nothing: the solver takes it as given and the agent holds a comp to it |
 | constraint or heuristic | draft | name, kind and prose only | nothing yet: shown and served until `/strategy` infers the rest or turns it into an assumption |
 
@@ -136,7 +136,12 @@ met it costs nothing and unmet it costs its weight, and the needs on one
 guard cost `NEED_BUDGET` (2) together at most. The scale is a seeded
 sample of 1200 legal sixes plus the field of each role's top six by the
 board's prior (`inference/scale.py`), and `confidence` names a second
-metric that scales the weight by how strongly the premise holds.
+metric that scales the weight by how strongly the premise holds: a
+`team.*` or `matchup.*` metric read against the reference sixes, or a
+`map.*` one read against every map. An `enemy.*` or `world.*` metric is
+one number on a board, so the catalog refuses it. A bonus or penalty
+that can read a name or a list is refused at load, as is a soft
+limit's penalty below zero.
 
 A strategy's prose is three sentences at most (`add_strategy` refuses
 more): the claim, why and when, what is measured.

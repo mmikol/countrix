@@ -252,6 +252,37 @@ def test_a_constraint_is_a_limit_or_scored_and_an_assumption_is_prose(tmp_path):
             load_one(bad)
 
 
+def test_every_term_the_solver_adds_is_a_number_and_a_soft_limit_only_charges(tmp_path):
+    """A bonus or penalty that can read a name loaded and then failed every
+    solve; a soft penalty below zero paid a six for breaking its limit; a
+    confidence on red or the world is one number on a board and scaled every
+    six by 1. The catalog refuses all three, and keeps what reads a name only
+    to compare it or count it."""
+    def load_one(text):
+        (tmp_path / "x.md").write_text(text, encoding="utf-8")
+        return catalog.load(str(tmp_path))[0]
+    for bad, rule in (
+            ("kind: constraint\nbonus: map.side\n", "can read a name or a list"),
+            ("kind: constraint\npenalty: team.style_top\n", "can read a name or a list"),
+            ("kind: constraint\nbonus: map.mode + 1\n", "can read a name or a list"),
+            ("kind: constraint\nbonus: team.tanks and map.side\n", "can read a name or a list"),
+            ("kind: constraint\nrequire: team.supports >= 2\nsoft: true\npenalty: -5\n",
+                "a charge, 0 or more"),
+            ("kind: heuristic\ndirection: maximize\nmetric: team.antiheal\n"
+                "confidence: enemy.hps_floor\n", "one number on every six of a board"),
+            ("kind: heuristic\ndirection: maximize\nmetric: team.antiheal\n"
+                "confidence: world.hps_bench\n", "one number on every six of a board")):
+        with pytest.raises(CatalogError, match=rule):
+            load_one("---\nname: b\n%s---\nx\n" % bad)
+    for good in ("kind: constraint\nbonus: 1 if map.side == 'attack' else 0\n",
+                 "kind: constraint\npenalty: len(team.pairs) * 0.5\n",
+                 "kind: constraint\nbonus: 0.5 if 'Ana' in team.squishies else 0\n",
+                 "kind: constraint\nrequire: team.supports >= 2\nsoft: true\npenalty: 2\n",
+                 "kind: heuristic\ndirection: maximize\nmetric: team.antiheal\n"
+                 "confidence: map.style_margin\n"):
+        assert load_one("---\nname: g\n%s---\nx\n" % good).solver_reads
+
+
 def test_a_draft_scores_nothing_whatever_its_kind(tmp_path):
     """A heuristic draft - a name, a kind and prose - is not a scoring term:
     with the engine off, a playbook of it and an assumption reads UNSCORED,

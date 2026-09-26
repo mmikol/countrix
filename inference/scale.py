@@ -117,10 +117,11 @@ def _confidence_bounds(objective: Objective, spec: MetricKey, index: int,
     key) is read against.
 
     A metric of the six varies across the reference sixes, so the reference
-    is its population. A metric of the board - the map, the world - is one
-    number here however the six changes, and normalising it against a sample
-    that cannot move it would call every board equally certain. Its
-    population is the other boards: the same metric over every map.
+    is its population. A metric of the map is one number here however the
+    six changes, and normalising it against a sample that cannot move it
+    would call every board equally certain. Its population is the other
+    boards: the same metric over every map. Red's and the world's have no
+    such population, and the catalog refuses them (CONFIDENCE_SECTIONS).
     """
     if spec.section == "map":
         ban_count = len(objective.banned)
