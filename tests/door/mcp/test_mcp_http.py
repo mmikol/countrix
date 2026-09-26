@@ -18,6 +18,7 @@ from urllib.parse import urlparse
 import pytest
 
 from db import ROOT
+from door.mcp import __main__ as door_main
 from door.mcp import tools
 from door.mcp.http import HttpServer
 from door.mcp.server import Server
@@ -122,12 +123,11 @@ def test_http_transport_guards_get_origin_and_health(http_server):
     assert delete("/nope") == 404
 
 
-def _http_server(tmp_path, token=None, rate_limit=120):
+def _http_server(tmp_path, token=None, rate_limit=120, status=lambda: {"status": "ok"}):
 
     ctx = tools.Context(dsn="postgresql://nowhere", client="test")
     mcp = Server(tools.REGISTRY.bind(ctx), None, audit_path=str(tmp_path / "audit.jsonl"))
-    httpd = HttpServer(("127.0.0.1", 0), mcp, lambda: {"status": "ok"}, token=token,
-                       rate_limit=rate_limit)
+    httpd = HttpServer(("127.0.0.1", 0), mcp, status, token=token, rate_limit=rate_limit)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     return httpd, "http://127.0.0.1:%d" % httpd.server_address[1]
 
@@ -214,3 +214,39 @@ def test_a_missing_content_length_is_refused_as_required(tmp_path):
     httpd.shutdown()
     assert [_refusal(line) for line in _audited(tmp_path)] == [
         ("http:127.0.0.1", None, "400 a positive Content-Length is required")] * 2
+
+
+def test_a_post_that_is_not_json_is_refused_and_audited(tmp_path):
+    """The door takes a POST only as application/json, as the board's write
+    does: anything else is 415 before the body is read, and a line."""
+    httpd, url = _http_server(tmp_path)
+    call = {"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+            "params": {"name": "list_sources", "arguments": {}}}
+    assert _knock(url, call, {"Content-Type": "text/plain"})[0] == 415
+    assert _knock(url, call)[0] == 200
+    httpd.shutdown()
+    assert _refusal(_audited(tmp_path)[0]) == ("http:127.0.0.1", None,
+                                               "415 a JSON body is required")
+
+
+def test_a_health_check_that_fails_answers_500_with_the_error(tmp_path):
+    """/health stands behind the request boundary its siblings have: a status
+    that raises is a JSON 500 naming the error, not a dropped connection."""
+    def broken():
+        raise KeyError("counts")
+    httpd, url = _http_server(tmp_path, status=broken)
+    with pytest.raises(urllib.error.HTTPError) as failed:
+        urllib.request.urlopen(url + "/health", timeout=10)
+    assert failed.value.code == 500 and "KeyError" in json.loads(failed.value.read())["error"]
+    httpd.shutdown()
+
+
+@pytest.mark.parametrize("argv", [["--http", "localhost"], ["--http", "127.0.0.1:0", "data"],
+                                  ["--http"]])
+def test_the_doors_command_line_refuses_what_its_siblings_would(argv):
+    """--http takes [HOST:]PORT and a name only after --allow-host, as the
+    board and the service do: a bare name or a port that is not a number is
+    the usage and exit 2, before anything serves."""
+    with pytest.raises(SystemExit) as refused:
+        door_main.main(argv)
+    assert refused.value.code == 2

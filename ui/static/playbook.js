@@ -2,16 +2,16 @@
    loaded before board.js, which calls into it. READ_ONLY comes from the inline
    script in the page shell (ui/pages.py) and is true unless the board was told
    it may write; everything below about *store* is the READ_ONLY=0 case. */
-/* a heuristic's weight is the user's to set: a slider under its card, 0 to 10
-   to the hundredth (0.25, 9.99), with a number box for the exact figure,
+/* a heuristic's weight is the user's to set: a slider under its card,
+   WEIGHT_MIN to WEIGHT_MAX (the shell's, from the Python) to the hundredth, with a number box for the exact figure,
    starting at the weight the file infers; a setting rides with every board
    request (weights=id:value) and never touches the file. Only heuristics have
    weights to set - a scored constraint's stays its own. */
 function weightRow(h) {
   var set = st.weights.hasOwnProperty(h.id), v = set ? st.weights[h.id] : h.weight;
   return "<div class='wrow' data-id='" + esc(h.id) + "' data-inferred='" + h.weight + "'>" +
-    "<span class='wlbl'>weight</span><input type='range' min='0' max='10' step='0.01' value='" + v + "' aria-label='weight of " + esc(h.name) + "'>" +
-    "<input type='number' class='wval' min='0' max='10' step='0.01' value='" + v + "' aria-label='exact weight of " + esc(h.name) + "'>" +
+    "<span class='wlbl'>weight</span><input type='range' min='" + WEIGHT_MIN + "' max='" + WEIGHT_MAX + "' step='0.01' value='" + v + "' aria-label='weight of " + esc(h.name) + "'>" +
+    "<input type='number' class='wval' min='" + WEIGHT_MIN + "' max='" + WEIGHT_MAX + "' step='0.01' value='" + v + "' aria-label='exact weight of " + esc(h.name) + "'>" +
     "<span class='wbreak'></span>" +
     "<button class='wreset' " + (set ? '' : 'disabled') + ">reset</button>" +
     (READ_ONLY ? '' : "<button class='wstore' " + (set ? '' : 'disabled') + " title='write this weight into the heuristic&#39;s file'>store</button>") + "</div>";
@@ -36,7 +36,7 @@ function storeWeight(id, value, button) {
     })
     .catch(function (e) { flash('not stored: ' + e); button.disabled = false; button.textContent = 'store'; });
 }
-function clampWeight(x) { x = Math.round(+x * 100) / 100; return isNaN(x) ? null : Math.min(10, Math.max(0, x)); }
+function clampWeight(x) { x = Math.round(+x * 100) / 100; return isNaN(x) ? null : Math.min(WEIGHT_MAX, Math.max(WEIGHT_MIN, x)); }
 function setWeight(id, value, inferred) {
   if (value === null || value === inferred) delete st.weights[id]; else st.weights[id] = value;
   save(); refresh();

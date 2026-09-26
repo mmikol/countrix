@@ -4,9 +4,10 @@ POSTs JSON-RPC to /mcp and gets the response as JSON (notifications get
 session. /health reports the database the tools are pointed at.
 
 db.web's guard refuses a request that does not name this server before any
-of it runs. The door then asks for the bearer token when one is set, caps a
-body at MAX_BODY and a batch at MAX_BATCH messages, and holds each client
-address to RATE_LIMIT tool calls a RATE_WINDOW. A tool call's audit line
+of it runs. The door then asks for the bearer token when one is set, takes
+a POST only as application/json, caps a body at MAX_BODY and a batch at
+MAX_BATCH messages, and holds each client address to RATE_LIMIT tool calls
+a RATE_WINDOW. A tool call's audit line
 names http and the client's address and session. A request to /mcp the
 door turns away leaves a line too, under the address alone, the key the
 rate limit counts by; the guard's 403 and the 404s and 405 for what the
@@ -56,7 +57,10 @@ class HttpHandler(web.Handler):
     def do_GET(self) -> None:
         path = urlsplit(self.path).path
         if path == "/health":
-            return self._json(self.server.status())
+            try:
+                return self._json(self.server.status())
+            except Exception as error:  # noqa: BLE001  # the request boundary
+                return self._json(*web.failure(error))
         if path == "/mcp":
             return self._json(
                 {"error": "this server has no server-initiated stream; POST JSON-RPC to /mcp"},
@@ -100,6 +104,9 @@ class HttpHandler(web.Handler):
             return self._json({"error": "nothing here"}, 404)
         try:
             self._check_token()
+            if not (self.headers.get("Content-Type") or "").startswith("application/json"):
+                self.close_connection = True        # the body stays unread
+                raise _RejectedError(415, "a JSON body is required")
             message = self._read_message()
             messages = message if isinstance(message, list) else [message]
             self._admit(messages)

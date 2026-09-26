@@ -133,7 +133,7 @@ def test_the_page_is_a_shell_over_static_files():
     assert "href='/tests'" in links            # the checks, beside the math
     assert links.rstrip().endswith("GitHub</a></span>")
     # the page hands the scripts the board's flag, and the counts they need
-    assert "var TEAM = 6, BANS = 5, READ_ONLY = true;" in body
+    assert "var TEAM = 6, BANS = 5, WEIGHT_MIN = 0, WEIGHT_MAX = 10, READ_ONLY = true;" in body
     assert "READ_ONLY = false" in pages.view_board(False)
     data, ctype = pages.static_file("board.js")
     assert ctype.startswith("application/javascript") and b"function paint" in data
@@ -190,10 +190,11 @@ def test_the_scripts_write_the_ids_and_read_the_globals_the_shell_holds():
         assert attribute in script and attribute in body, attribute
     shell = re.search(r"<script>var (.*?);</script>", body).group(1)
     names = [part.split(" = ")[0] for part in shell.split(", ")]
-    assert names == ["TEAM", "BANS", "READ_ONLY"]
+    assert names == ["TEAM", "BANS", "WEIGHT_MIN", "WEIGHT_MAX", "READ_ONLY"]
     for name in names:
         assert re.search(r"\b%s\b" % name, script), name
-    assert script.count("min='%g' max='%g' step='0.01'" % WEIGHT_RANGE) == 2
+    assert "WEIGHT_MIN = %g, WEIGHT_MAX = %g" % WEIGHT_RANGE in body
+    assert not re.search(r"min='\d|max='\d", script)          # no bound of its own
 
 
 def test_the_scripts_read_payload_keys_the_server_writes(synthetic_world, monkeypatch):

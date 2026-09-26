@@ -1,10 +1,11 @@
 """python -m door.mcp                        serve the tools over stdio
-python -m door.mcp --http [HOST:]PORT [NAME ...]
+python -m door.mcp --http [HOST:]PORT [--allow-host NAME ...]
                                           serve them over Streamable HTTP (/mcp, /health),
                                           answering to the local names and each NAME
 python -m door.mcp list                   list the tools
 python -m door.mcp call NAME [JSON-ARGS]  run one tool and print its text"""
 
+import argparse
 import json
 import sys
 from collections.abc import Callable
@@ -54,6 +55,22 @@ def _call(ctx: tools.Context, name: str, text: str) -> int:
     return 0
 
 
+def _serve_http(server: Server, ctx: tools.Context, argv: list[str]) -> int:
+    """`--http [HOST:]PORT [--allow-host NAME ...]`, the flags the board and
+    the inference service take for the same guard; anything else, a port
+    that is not a number included, is the usage and exit 2."""
+    parser = argparse.ArgumentParser(prog="python -m door.mcp", usage=__doc__)
+    parser.add_argument("--http", required=True, metavar="[HOST:]PORT")
+    parser.add_argument("--allow-host", action="append", default=[], metavar="NAME")
+    args = parser.parse_args(argv)
+    host, _, port = args.http.rpartition(":")
+    if not port.isdigit():
+        parser.error("--http takes [HOST:]PORT, got %r" % args.http)
+    http.serve(server, host or "127.0.0.1", int(port), _status(ctx),
+               allowed_hosts=args.allow_host)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     ctx = tools.Context(client="shell")
@@ -61,11 +78,8 @@ def main(argv: list[str] | None = None) -> int:
     if not argv:
         stdio.serve(server)
         return 0
-    if argv[0] == "--http" and len(argv) >= 2:
-        host, _, port = argv[1].rpartition(":")
-        http.serve(server, host or "127.0.0.1", int(port), _status(ctx),
-                   allowed_hosts=argv[2:])
-        return 0
+    if argv[0] == "--http":
+        return _serve_http(server, ctx, argv)
     if argv[0] == "list":
         for t in tools.REGISTRY.bind(ctx):
             print("%-16s %s" % (t.name, t.description.split(". ")[0]))

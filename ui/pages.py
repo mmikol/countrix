@@ -2,8 +2,9 @@
 files they load - the stylesheet, the scripts and the display font.
 
 The page is a shell over the static files: board.js loads last because it
-calls into comps.js, playbook.js and record.js, and TEAM and BANS come from
-the page so the scripts keep no constant in step with the Python; so do the
+calls into comps.js, playbook.js and record.js, and TEAM, BANS and the
+weight range come from the page so the scripts keep no constant in step
+with the Python; so do the
 record panel's result buttons and its note's limit, from the door's
 record_match. The math page's code numbers are filled in here too, from
 the modules that hold them, so math.html quotes no constant of its own.
@@ -19,6 +20,7 @@ from door.mcp.matches import NOTE_LIMIT, RESULTS
 from facts import compute, counters, scalars
 from facts.draft import MAX_BANS, TEAM_SIZE
 from inference import base, engine, scale, scoring, solver
+from inference.strategy import WEIGHT_RANGE
 
 GITHUB_MARK = (
     "<svg viewBox='0 0 16 16' width='15' height='15' aria-hidden='true'><path fill='currentColor' d='M8 0C3.58 0 0 3.58 0 8"  # noqa: E501
@@ -138,13 +140,14 @@ def view_board(read_only: bool) -> str:
             "<table class='facts'><tbody id='factbody'></tbody></table></section>"
             "<section class='panel' id='tab-playbook'><div id='playbook'></div></section>"
             "%s"
-            "</main><script>var TEAM = %d, BANS = %d, READ_ONLY = %s;</script>"
+            "</main><script>var TEAM = %d, BANS = %d, WEIGHT_MIN = %g, WEIGHT_MAX = %g,"
+            " READ_ONLY = %s;</script>"
             "<script src='/static/comps.js'></script>"
             "<script src='/static/playbook.js'></script>"
             "<script src='/static/record.js'></script>"
             "<script src='/static/board.js'></script>")
     return shell % (
-        repo_url(), GITHUB_MARK, record_panel(read_only), TEAM_SIZE, MAX_BANS,
+        repo_url(), GITHUB_MARK, record_panel(read_only), TEAM_SIZE, MAX_BANS, *WEIGHT_RANGE,
         "true" if read_only else "false")
 
 
