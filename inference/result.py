@@ -11,7 +11,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Literal, NotRequired, TypedDict
 
-from facts.draft import TEAM_SIZE
+from facts.draft import TEAM_SIZE, Seat, Side
 from facts.factset import Fact, FactSet
 from facts.model import ROLES
 from facts.team import SPECIALIST_DELTA, text
@@ -25,7 +25,6 @@ from inference.strategy import Strategy
 type Payload = dict[str, object]
 # what a result is, which its heading names, and the seat whose six it is
 type ResultKind = Literal["infer", "evaluate", "current", "countered", "fill", "expected"]
-type Seat = Literal["blue", "red"]
 
 
 class Pick(TypedDict):
@@ -133,7 +132,7 @@ class Result:
     catalog: list[Strategy]
     base: BaseWeights                  # the default engine's weights it was scored under
     bans: list[str] = field(default_factory=list)
-    side: str = ""
+    side: Side = ""
     seat: Seat = "blue"
     partial: bool = False
     score: float = 0.0
@@ -363,7 +362,7 @@ class Board:
     Carries the same to_dict()/rendered() pair as Result, so the shells hand a
     board to the caller the way they hand a single seat."""
     map_name: str | None
-    side: str
+    side: Side
     bans: list[str]
     blue: Result
     red: Result
@@ -405,7 +404,7 @@ def rates_queue(fs: FactSet) -> str:
     board holds none. The source publishes no Open Queue rates, so a pick's
     win rate says which queue it is."""
     for f in fs.find("meta.snapshot"):
-        queue = str(f.value.get("queue") or "")
+        queue = f.snapshot()["queue"] or ""
         if queue:
             return queue.removeprefix("competitive_").replace("_", " ").title()
     return ""
@@ -432,21 +431,21 @@ def _reasons(fs: FactSet, hero_name: str, locked: bool) -> tuple[str, list[str]]
             return True
         return False
 
-    cite("hero.vs_answers", lambda f: "answers %s" % ", ".join(f.value))
+    cite("hero.vs_answers", lambda f: "answers %s" % ", ".join(f.names()))
     partners = own("hero.with_ally")
     if partners:
-        why.append("partner of %s" % ", ".join(f.value for f in partners[:3]))
+        why.append("partner of %s" % ", ".join(f.name() for f in partners[:3]))
         evidence.extend(f.id for f in partners[:3])
-    cite("hero.map_win", lambda f: "wins %.1f%% here%s" % (f.value, rated))
+    cite("hero.map_win", lambda f: "wins %.1f%% here%s" % (f.number(), rated))
     for f in own("hero.map_delta"):
-        if f.value >= SPECIALIST_DELTA:
-            why.append("map specialist (%+.1f)" % f.value)
+        if f.number() >= SPECIALIST_DELTA:
+            why.append("map specialist (%+.1f)" % f.number())
             evidence.append(f.id)
-    cite("hero.map_style_fit", lambda f: "fits the %s style" % f.value)
-    cite("hero.home_map", lambda f: "top-%d map by rate" % f.value)
-    cite("hero.vs_answered_by", lambda f: "CAUTION: answered by %s" % ", ".join(f.value))
+    cite("hero.map_style_fit", lambda f: "fits the %s style" % f.name())
+    cite("hero.home_map", lambda f: "top-%d map by rate" % f.number())
+    cite("hero.vs_answered_by", lambda f: "CAUTION: answered by %s" % ", ".join(f.names()))
     if not evidence:
-        cite("hero.rate", lambda f: "wins %.1f%% across all ranks%s" % (f.value["win"], rated))
+        cite("hero.rate", lambda f: "wins %.1f%% across all ranks%s" % (f.rates()["win"], rated))
     if locked:
         why.insert(0, "locked")
     return "; ".join(why), evidence

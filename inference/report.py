@@ -12,6 +12,7 @@ report is for the owner's own use.
 
 from typing import NotRequired, TypedDict
 
+from facts.draft import Side
 from inference import predict, rescore
 from inference.fit import Estimate
 
@@ -76,7 +77,7 @@ class MatchRow(TypedDict):
     match_id: int
     played_on: str
     map: str
-    side: str
+    side: Side
     result: str
     digest: str
     note: str

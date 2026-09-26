@@ -11,6 +11,7 @@ these names from it.
 
 from collections.abc import Iterable, Mapping, Sequence, Sized
 from dataclasses import dataclass
+from typing import Literal
 
 from db import Refusal
 from facts.model import FIVE_V_FIVE, SIX_V_SIX, Hero, Map
@@ -19,7 +20,11 @@ TEAM_SIZE = 6             # 6v6 Open Queue
 MAX_TANKS = 2             # the queue's own limit, whatever the playbook holds
 MAX_BANS = 5              # each team's two and the lobby's
 SIDED_MODES = ("Escort", "Hybrid")   # modes with an attacking and a defending side
-SIDES = ("attack", "defense")
+# a seat at the board, and the side a seat plays on a sided map ('' on any other)
+type Seat = Literal["blue", "red"]
+type Side = Literal["", "attack", "defense"]
+SIDES: tuple[Side, ...] = ("attack", "defense")
+_SIDE: dict[str, Side] = {"": "", "attack": "attack", "defense": "defense"}
 EXPECTED_SHAPE = {"tank": 2, "damage": 2, "support": 2}   # what a lobby fields: two of each
 # The format the kit is read in. The shipped playbook's open-queue-ranked
 # assumption makes 6v6 Open Queue the target, so the load lays the wiki's 6v6
@@ -30,13 +35,13 @@ FORMATS = (SIX_V_SIX, FIVE_V_FIVE)
 KIT_FORMAT = SIX_V_SIX
 
 
-def check_team_size(picks: Sized, seat: str) -> None:
+def check_team_size(picks: Sized, seat: Seat) -> None:
     """Refuse a team of more picks than a lobby seats."""
     if len(picks) > TEAM_SIZE:
         raise Refusal("more than %d %s picks" % (TEAM_SIZE, seat))
 
 
-def check_tanks(heroes: Iterable[Hero], seat: str) -> None:
+def check_tanks(heroes: Iterable[Hero], seat: Seat) -> None:
     """Refuse a team the queue would not seat: more than MAX_TANKS tanks. The
     limit is the game's, so it binds whatever the playbook holds."""
     tanks = sum(1 for h in heroes if h.role == "tank")
@@ -55,15 +60,14 @@ class Draft:
     red: tuple[str, ...] = ()
     blue: tuple[str, ...] = ()
     bans: tuple[str, ...] = ()
-    side: str = ""
+    side: Side = ""
 
     def __post_init__(self) -> None:
         check_team_size(self.red, "red")
         check_team_size(self.blue, "blue")
         if len(self.bans) > MAX_BANS:
             raise Refusal("more than %d bans" % MAX_BANS)
-        if self.side not in ("", *SIDES):
-            raise Refusal("side must be attack or defense, got %r" % self.side)
+        as_side(self.side)
 
 
 # --- the board off the wire -----------------------------------------------------
@@ -87,7 +91,7 @@ def parse_board(query: Query) -> Draft:
                  red=tuple(x for x in query.get("red", ()) if x),
                  blue=tuple(x for x in query.get("blue", ()) if x),
                  bans=tuple(x for x in query.get("bans", ()) if x),
-                 side=sides[0] if sides else "")
+                 side=as_side(sides[0]) if sides else "")
 
 
 def is_sided(m: Map | None) -> bool:
@@ -95,11 +99,19 @@ def is_sided(m: Map | None) -> bool:
     return m is not None and (m.mode or "") in SIDED_MODES
 
 
-def board_side(m: Map | None, side: str) -> str:
+def as_side(value: object) -> Side:
+    """A side as a caller names it, or a Refusal: attack, defense, or none."""
+    side = _SIDE.get(value) if isinstance(value, str) else None
+    if side is None:
+        raise Refusal("side must be attack or defense, got %r" % (value,))
+    return side
+
+
+def board_side(m: Map | None, side: Side) -> Side:
     """The draft's side where the map has sides; none on any other map."""
     return side if is_sided(m) else ""
 
 
-def opposite(side: str) -> str:
+def opposite(side: Side) -> Side:
     """The other seat's side; no side stays none."""
-    return {"attack": "defense", "defense": "attack"}.get(side, "")
+    return "defense" if side == "attack" else "attack" if side == "defense" else ""

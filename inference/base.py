@@ -57,6 +57,7 @@ from dataclasses import dataclass
 from typing import NamedTuple, TypedDict
 
 from facts import compute, counters
+from facts.draft import Seat
 from facts.factset import Fact, FactSet
 from facts.model import Hero, Map, World
 from facts.records import DerivedEdge
@@ -234,7 +235,7 @@ class Base:
 # seat's own six as "blue", whichever seat it is, so the facts are filed there
 # too; their words name the sides as the seat sees them.
 
-def write_rates_fact(fs: FactSet, *, seat: str, map_name: str | None, rates: float) -> Fact:
+def write_rates_fact(fs: FactSet, *, seat: Seat, map_name: str | None, rates: float) -> Fact:
     """The fact the rate term cites: the six's trusted edge over a coin flip."""
     where = "on %s" % map_name if map_name else "across the maps"
     fs.add(
@@ -246,7 +247,7 @@ def write_rates_fact(fs: FactSet, *, seat: str, map_name: str | None, rates: flo
 
 
 def write_counters_fact(
-        fs: FactSet, *, seat: str, map_name: str | None, against: Sequence[str],
+        fs: FactSet, *, seat: Seat, map_name: str | None, against: Sequence[str],
         likely: bool, answers: int, exposures: int, derived: Sequence[str] = ()) -> Fact:
     """The fact the counter term cites: which of the other side's sixes it
     read - its picks, or its likely six - the graph's weight each way, and

@@ -14,6 +14,7 @@ from typing import NamedTuple
 import psycopg
 
 from db import psql
+from facts.draft import Side
 
 
 class Match(NamedTuple):
@@ -25,7 +26,7 @@ class Match(NamedTuple):
     match_id: int
     played_on: datetime.date
     map_name: str
-    side: str           # 'attack', 'defense' or '' on an unsided map
+    side: Side          # 'attack', 'defense' or '' on an unsided map
     result: str         # 'win', 'loss' or 'draw', blue's
     blue: tuple[str, ...]
     red: tuple[str, ...]

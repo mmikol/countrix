@@ -18,7 +18,7 @@ from collections import OrderedDict
 from collections.abc import Iterable, Sequence
 from typing import NamedTuple, TypedDict
 
-from facts.draft import EXPECTED_SHAPE, is_sided
+from facts.draft import EXPECTED_SHAPE, Side, is_sided
 from facts.model import ROLES, TERRAIN_FEATURES, Hero, Map, World
 from facts.team import TEAM_METRICS, VERSUS_METRICS, MetricBag, number, team_metrics
 
@@ -272,7 +272,7 @@ def stage_standouts(m: Map, stage: str) -> list[Standout]:
     return sorted(found, key=lambda s: (-s.z, s.feature))[:STAGE_FEATURES]
 
 
-def map_metrics(m: Map | None, side: str = "", *, ban_count: int) -> MetricBag:
+def map_metrics(m: Map | None, side: Side = "", *, ban_count: int) -> MetricBag:
     if m is None:
         return {"known": 0, "sided": 0, "side": "", "style_top": "",
                 "style_margin": 0, "mode": "", "stages": 0, "phases": 0, "bans": ban_count,
@@ -292,7 +292,7 @@ def world_metrics(world: World) -> MetricBag:
 
 def namespace(
         world: World, m: Map | None, red: Iterable[Hero], blue: Iterable[Hero],
-        side: str = "", *, ban_count: int) -> dict[str, MetricBag]:
+        side: Side = "", *, ban_count: int) -> dict[str, MetricBag]:
     """The whole evaluation namespace for a board: {team, enemy, matchup,
     map, world} - `team` is blue's seat, `enemy` is red's, `side` blue's."""
     blue_t = team_metrics(world, blue, m, red)

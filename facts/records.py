@@ -98,9 +98,8 @@ class StageTerrain(NamedTuple):
 
 class StyleScore(NamedTuple):
     """How much a map rewards one playstyle, in sd: the rates' lift plus the
-    terrain's lean. The load writes no note: it is always None."""
+    terrain's lean."""
     score: float
-    note: None
 
 
 # --- the World's ---------------------------------------------------------
@@ -110,6 +109,37 @@ class Synergy(NamedTuple):
     claims the pair and 2 when both, and its note."""
     score: int | None
     note: str | None
+
+
+class RateValue(TypedDict):
+    """hero.rate's value: the all-ranks win, pick and ban rates."""
+    win: float
+    pick: float | None
+    ban: float | None
+
+
+class TerrainValue(TypedDict):
+    """map.terrain's value: a feature, its z against the ordinary map, and its
+    mentions per thousand words of the map's article."""
+    feature: str
+    z: float
+    per_thousand: float
+
+
+class StageFeature(TypedDict):
+    """A feature a stage's own text stresses: map.terrain's fields and the
+    mentions they rest on."""
+    feature: str
+    z: float
+    per_thousand: float
+    mentions: int
+
+
+class StageTerrainValue(TypedDict):
+    """map.stage_terrain's value: the stage and its standout features, the
+    strongest first."""
+    stage: str
+    features: list[StageFeature]
 
 
 class Snapshot(TypedDict):

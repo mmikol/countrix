@@ -9,9 +9,10 @@ facts.board_facts writes a board's facts into one.
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import cast
 
-from facts.draft import Draft
+from facts.draft import Draft, Seat
+from facts.records import RateValue, Snapshot, StageTerrainValue, TerrainValue
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,15 +22,54 @@ class Fact:
     id: str
     scope: str
     subject: str
-    team: str | None
+    team: Seat | None
     key: str
     text: str
     # what the fact states - a number, a name, a list or a record of them -
-    # and JSON once _plain has read it; arbitrary JSON its readers know the
-    # shape of, so Any
-    value: Any
+    # and JSON once _plain has read it. A reader takes it through the
+    # accessor for its shape, which refuses any other
+    value: object
     unit: str | None
     source: str
+
+    def number(self) -> float:
+        """The value as a figure."""
+        if isinstance(self.value, (int, float)) and not isinstance(self.value, bool):
+            return float(self.value)
+        raise TypeError("%s holds %r, not a number" % (self.key, self.value))
+
+    def name(self) -> str:
+        """The value as a name."""
+        if isinstance(self.value, str):
+            return self.value
+        raise TypeError("%s holds %r, not a name" % (self.key, self.value))
+
+    def names(self) -> list[str]:
+        """The value as the names it lists."""
+        if isinstance(self.value, (list, tuple)) and all(isinstance(v, str) for v in self.value):
+            return [str(v) for v in self.value]
+        raise TypeError("%s holds %r, not names" % (self.key, self.value))
+
+    def _record(self) -> dict[str, object]:
+        if isinstance(self.value, dict):
+            return self.value
+        raise TypeError("%s holds %r, not a record" % (self.key, self.value))
+
+    def rates(self) -> RateValue:
+        """hero.rate's value."""
+        return cast(RateValue, self._record())
+
+    def terrain(self) -> TerrainValue:
+        """map.terrain's value."""
+        return cast(TerrainValue, self._record())
+
+    def stage_terrain(self) -> StageTerrainValue:
+        """map.stage_terrain's value."""
+        return cast(StageTerrainValue, self._record())
+
+    def snapshot(self) -> Snapshot:
+        """meta.snapshot's value."""
+        return cast(Snapshot, self._record())
 
     def to_dict(self) -> dict[str, object]:
         return {"id": self.id, "scope": self.scope, "subject": self.subject,
@@ -66,7 +106,7 @@ class FactSet:
 
     def add(
             self, scope: str, subject: str, key: str, text: str, *, source: str,
-            value: object = None, unit: str | None = None, team: str | None = None,
+            value: object = None, unit: str | None = None, team: Seat | None = None,
             also: Sequence[str] = ()) -> str:
         """`also` names the other metrics this one sentence states, so a caller
         looking for one of them finds the fact that carries it. The fact keeps

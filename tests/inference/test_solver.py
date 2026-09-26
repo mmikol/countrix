@@ -435,8 +435,8 @@ def test_a_rule_scales_by_the_metric_it_names(synthetic_world, tmp_path):
     world = synthetic_world
     # Salt Flats barely leans: poke over dive by a tenth of a point
     world.map("Salt Flats").styles = {
-        "poke": StyleScore(1.0, None), "dive": StyleScore(0.9, None),
-        "brawl": StyleScore(-1.0, None)}
+        "poke": StyleScore(1.0), "dive": StyleScore(0.9),
+        "brawl": StyleScore(-1.0)}
     shutil.copytree(FIXTURE_PLAYBOOK, tmp_path, dirs_exist_ok=True)
     (tmp_path / "fit-the-map-style.md").write_text(
         "---\nname: Pick into what the map rewards\nkind: heuristic\ncategory: map\n"
@@ -491,8 +491,8 @@ def test_style_ties_break_by_name_so_hash_order_cannot_reach_the_answer(syntheti
         assert forward[key] == backward[key], key
     ember = world.map("Ember Ruins")
     derived = dict(ember.styles)
-    ember.styles = {"poke": StyleScore(1.0, None), "dive": StyleScore(0.2, None),
-                    "brawl": StyleScore(1.0, None)}
+    ember.styles = {"poke": StyleScore(1.0), "dive": StyleScore(0.2),
+                    "brawl": StyleScore(1.0)}
     try:
         assert ember.style_top == "brawl" and ember.style_margin == 0
     finally:

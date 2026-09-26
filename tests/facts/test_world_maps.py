@@ -51,8 +51,8 @@ def test_a_maps_style_is_the_rates_lift_plus_the_terrains_lean(world):
         # on the rates' scale
         assert statistics.pstdev(m.terrain_lean[style] for m in read) == pytest.approx(1, abs=1e-2)
     for m in world.maps.values():
-        for style, (score, note) in m.styles.items():
-            assert note is None and score == pytest.approx(
+        for style, (score,) in m.styles.items():
+            assert score == pytest.approx(
                 m.rate_lift.get(style, 0.0) + m.terrain_lean.get(style, 0.0), abs=1e-3)
     # the wiki's chokes outweigh King's Row's rates: the terrain rectifies the style
     kings = world.map("King's Row")

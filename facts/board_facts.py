@@ -37,9 +37,10 @@ team's and the matchup's.
 
 from facts import compute, hero_facts, team_facts
 from facts.compute import TERRAIN_STANDOUT
-from facts.draft import MAX_BANS, Draft, board_side, is_sided, opposite
+from facts.draft import MAX_BANS, Draft, Side, board_side, is_sided, opposite
 from facts.factset import PLAYBOOK_SCOPE, FactSet
 from facts.model import TERRAIN_FEATURES, TERRAIN_LEAN, Map, Resolved, World
+from facts.records import StageFeature, StageTerrainValue, TerrainValue
 
 
 def _g(value: float) -> str:
@@ -115,7 +116,7 @@ def _ban_facts(fs: FactSet, world: World, board: Resolved) -> None:
 
 # --- the map ---------------------------------------------------------------
 
-def _map_facts(fs: FactSet, world: World, m: Map, side: str = "") -> None:
+def _map_facts(fs: FactSet, world: World, m: Map, side: Side = "") -> None:
     """The map's own facts - its mode and sides, its ground, the styles it
     rewards - then the heroes who do well on it."""
     _map_mode(fs, m, side)
@@ -124,7 +125,7 @@ def _map_facts(fs: FactSet, world: World, m: Map, side: str = "") -> None:
     _map_heroes(fs, world, m)
 
 
-def _map_mode(fs: FactSet, m: Map, side: str) -> None:
+def _map_mode(fs: FactSet, m: Map, side: Side) -> None:
     """The mode, who attacks, and the stages or phases in play order."""
     fs.add("map", m.name, "map.mode", "%s is a %s map" % (m.name, m.mode),
         value=m.mode, source="map_modes")
@@ -163,9 +164,11 @@ def _map_terrain(fs: FactSet, m: Map) -> None:
                     "%s, %.1f sd above the ordinary stage (%d mentions in the wiki's article)"
                     % (f.replace("_", " "), z, m.stage_terrain[stage][f].mentions)
                     for f, z in standouts)),
-                value={"stage": stage, "features": [
-                    {"feature": f, "z": z, "per_thousand": m.stage_terrain[stage][f].per_thousand,
-                        "mentions": m.stage_terrain[stage][f].mentions} for f, z in standouts]},
+                value=StageTerrainValue(stage=stage, features=[
+                    StageFeature(feature=f, z=z,
+                                 per_thousand=m.stage_terrain[stage][f].per_thousand,
+                                 mentions=m.stage_terrain[stage][f].mentions)
+                    for f, z in standouts]),
                 source="stage_terrain")
     if m.terrain:
         for feature in sorted(TERRAIN_FEATURES, key=lambda f: (-abs(m.terrain_z[f]), f)):
@@ -174,7 +177,7 @@ def _map_terrain(fs: FactSet, m: Map) -> None:
                 fs.add("map", m.name, "map.terrain", "%s: %s, %.1f sd %s the ordinary map (the"
                     " wiki's article)" % (m.name, feature.replace("_", " "), abs(z),
                         "below" if z < 0 else "above"),
-                    value={"feature": feature, "z": z, "per_thousand": m.terrain[feature]},
+                    value=TerrainValue(feature=feature, z=z, per_thousand=m.terrain[feature]),
                     source="map_terrain")
     else:
         fs.add("map", m.name, "map.terrain_unread", "%s: the wiki's article has too little on"

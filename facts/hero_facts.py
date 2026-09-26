@@ -8,8 +8,10 @@ teammates. facts.board_facts calls write() once per pick, red first.
 
 from facts import counters
 from facts.compute import TREND_POINTS
+from facts.draft import Seat
 from facts.factset import FactSet
 from facts.model import Hero, Map, Resolved, World
+from facts.records import RateValue
 from facts.team import RANK_SENSITIVE, SPECIALIST_DELTA
 
 # a kit trait as the fact states it - key, sentence, value, unit - or None
@@ -22,7 +24,7 @@ def _trim(text: str | None, limit: int = 110) -> str:
     return text if len(text) <= limit else text[:limit - 1] + "…"
 
 
-def write(fs: FactSet, world: World, board: Resolved, hero: Hero, team: str) -> None:
+def write(fs: FactSet, world: World, board: Resolved, hero: Hero, team: Seat) -> None:
     """Every independent fact about ONE hero, then the facts that only exist
     on this board: on this map, against these opponents, beside these
     teammates."""
@@ -45,7 +47,7 @@ def write(fs: FactSet, world: World, board: Resolved, hero: Hero, team: str) -> 
     _hero_versus(fs, world, hero, team, opponents, teammates)
 
 
-def _hero_identity(fs: FactSet, world: World, h: Hero, team: str) -> None:
+def _hero_identity(fs: FactSet, world: World, h: Hero, team: Seat) -> None:
     """Who the hero is: role, pool, styles, weapon and ultimate, whether it is
     playable yet, and its subrole's passive."""
     name = h.name
@@ -80,7 +82,7 @@ def _figure(value: float | None) -> str:
     return "%g" % value if value is not None else "?"
 
 
-def _hero_kit_format(fs: FactSet, world: World, h: Hero, team: str) -> None:
+def _hero_kit_format(fs: FactSet, world: World, h: Hero, team: Seat) -> None:
     """What the format in force changed in the hero's kit, as the wiki words
     it: the numbers that moved, then the lines that moved none."""
     name = h.name
@@ -168,7 +170,7 @@ def _save_traits(h: Hero) -> list[TraitRow]:
     ]
 
 
-def _hero_traits(fs: FactSet, h: Hero, team: str) -> None:
+def _hero_traits(fs: FactSet, h: Hero, team: Seat) -> None:
     """One fact per trait the kit carries, then one per playstyle."""
     name = h.name
     for trait in (*_output_traits(h), *_tool_traits(h), *_save_traits(h)):
@@ -183,7 +185,7 @@ def _hero_traits(fs: FactSet, h: Hero, team: str) -> None:
 
 # --- the kit piece by piece -------------------------------------------------
 
-def _hero_abilities(fs: FactSet, h: Hero, team: str) -> None:
+def _hero_abilities(fs: FactSet, h: Hero, team: Seat) -> None:
     name = h.name
     for a in h.abilities:
         fs.add("hero", name, "hero.ability", "%s - %s (%s): %s"
@@ -200,7 +202,7 @@ def _hero_abilities(fs: FactSet, h: Hero, team: str) -> None:
                     value=s.value, unit=s.unit_num, source="ability_stats", team=team)
 
 
-def _hero_weapons(fs: FactSet, h: Hero, team: str) -> None:
+def _hero_weapons(fs: FactSet, h: Hero, team: Seat) -> None:
     name = h.name
     for w in h.weapons:
         fs.add("hero", name, "hero.weapon", "%s weapon: %s%s%s%s"
@@ -217,7 +219,7 @@ def _hero_weapons(fs: FactSet, h: Hero, team: str) -> None:
                     value=s.value, unit=s.unit_num, source="weapon_stats", team=team)
 
 
-def _hero_perks(fs: FactSet, h: Hero, team: str) -> None:
+def _hero_perks(fs: FactSet, h: Hero, team: Seat) -> None:
     """The perks and their stats, what each alters, and every ability modifier."""
     name = h.name
     for p in h.perks:
@@ -243,7 +245,7 @@ def _hero_perks(fs: FactSet, h: Hero, team: str) -> None:
 
 # --- the rates ----------------------------------------------------------------
 
-def _hero_rates(fs: FactSet, world: World, h: Hero, team: str) -> None:
+def _hero_rates(fs: FactSet, world: World, h: Hero, team: Seat) -> None:
     """The all-ranks rates, then each tier's up the ladder, named as Blizzard
     names it."""
     name = h.name
@@ -251,7 +253,7 @@ def _hero_rates(fs: FactSet, world: World, h: Hero, team: str) -> None:
         fs.add("hero", name, "hero.rate", "%s across all ranks: wins %.1f%%, picked %.1f%%%s"
             % (name, h.win, h.pick or 0,
                 ", banned %.1f%%" % h.ban if h.ban is not None else ""),
-            value={"win": h.win, "pick": h.pick, "ban": h.ban}, source="hero_meta",
+            value=RateValue(win=h.win, pick=h.pick, ban=h.ban), source="hero_meta",
             team=team)
     for tier, (win, pick, ban) in h.by_tier.items():
         if win is not None:
@@ -261,7 +263,7 @@ def _hero_rates(fs: FactSet, world: World, h: Hero, team: str) -> None:
                 value={"tier": tier, "win": win}, source="hero_meta", team=team)
 
 
-def _hero_rate_flags(fs: FactSet, h: Hero, team: str) -> None:
+def _hero_rate_flags(fs: FactSet, h: Hero, team: Seat) -> None:
     """What the rates warn of: a rank-sensitive hero, a moving one, a likely ban."""
     name = h.name
     if h.rank_spread >= RANK_SENSITIVE:
@@ -279,7 +281,7 @@ def _hero_rate_flags(fs: FactSet, h: Hero, team: str) -> None:
             value=h.ban, source="hero_meta", team=team)
 
 
-def _hero_best_maps(fs: FactSet, world: World, h: Hero, team: str) -> None:
+def _hero_best_maps(fs: FactSet, world: World, h: Hero, team: Seat) -> None:
     """With no map on the board: one line of where the hero does best, not a
     line per map - with a map, the facts on it are the whole story."""
     name = h.name
@@ -312,7 +314,7 @@ def _by_basis(world: World, edges: list[tuple[int, int]], other: int) -> str:
     return said
 
 
-def _hero_derived(fs: FactSet, world: World, h: Hero, team: str) -> None:
+def _hero_derived(fs: FactSet, world: World, h: Hero, team: Seat) -> None:
     """The answers the kit derives where the wiki has no edge either way,
     each with the mechanism that fired strongest, labelled derived."""
     name = h.name
@@ -329,7 +331,7 @@ def _hero_derived(fs: FactSet, world: World, h: Hero, team: str) -> None:
                 value=names, source="derived:counters", team=team)
 
 
-def _hero_relations(fs: FactSet, world: World, h: Hero, team: str) -> None:
+def _hero_relations(fs: FactSet, world: World, h: Hero, team: Seat) -> None:
     """The wiki's counters - its match-up advice and its Strategy sections -
     and synergies, whoever else is picked."""
     name = h.name
@@ -354,7 +356,7 @@ def _hero_relations(fs: FactSet, world: World, h: Hero, team: str) -> None:
 
 # --- the board's own ----------------------------------------------------------
 
-def _hero_on_map(fs: FactSet, h: Hero, team: str, m: Map) -> None:
+def _hero_on_map(fs: FactSet, h: Hero, team: Seat, m: Map) -> None:
     """The hero on this map: its rates here, against its own, and whether the
     map is one of its best or rewards its style."""
     name = h.name
@@ -385,7 +387,7 @@ def _hero_on_map(fs: FactSet, h: Hero, team: str, m: Map) -> None:
 
 
 def _hero_versus(
-        fs: FactSet, world: World, h: Hero, team: str, opponents: list[Hero],
+        fs: FactSet, world: World, h: Hero, team: Seat, opponents: list[Hero],
         teammates: list[Hero]) -> None:
     """The hero against these opponents and beside these teammates."""
     name = h.name

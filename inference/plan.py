@@ -11,7 +11,7 @@ fit, and words the style from the roles the six holds.
 from collections.abc import Iterable, Mapping, Sequence
 from typing import NamedTuple
 
-from facts.draft import TEAM_SIZE
+from facts.draft import TEAM_SIZE, Side
 from facts.factset import FactSet
 from facts.model import ROLES, Hero, Map, World
 from facts.team import counted, team_metrics, text
@@ -280,7 +280,7 @@ def _family(world: World, m: Map | None, style: str, role: str,
 
 
 def plan(
-        world: World, m: Map | None, side: str, bans: Sequence[str],
+        world: World, m: Map | None, side: Side, bans: Sequence[str],
         red_h: Sequence[Hero], six: Result, likely: Sequence[str] = ()) -> str:
     """The game plan in prose for `six`, the six the comps tab shows for blue
     - blue's optimal before any blue pick, the fill around one to five, the
@@ -328,7 +328,7 @@ def _keeps(six: Result, yours: Sequence[str]) -> str | None:
     return None
 
 
-def _ground(m: Map | None, side: str, facts: FactSet | None, scoring: bool) -> list[str]:
+def _ground(m: Map | None, side: Side, facts: FactSet | None, scoring: bool) -> list[str]:
     """The ground: the map's mode, the terrain its facts stress, and the side;
     and, where nothing scores (`scoring` false: the default engine off and
     no scoring strategy), what the six is instead."""
@@ -353,16 +353,16 @@ def _terrain(m: Map, facts: FactSet) -> list[str]:
     the ordinary map - and the stages whose own text stresses a feature, the
     map.stage_terrain facts."""
     read = []
-    stressed = [f.value["feature"] for f in facts.find("map.terrain", m.name)
-                if f.value["z"] > 0][:TERRAIN_NAMED]
+    stressed = [f.terrain()["feature"] for f in facts.find("map.terrain", m.name)
+                if f.terrain()["z"] > 0][:TERRAIN_NAMED]
     if stressed:
         read.append("The wiki's article stresses %s."
                     % _and(TERRAIN_GROUND[f] for f in stressed))
-    stressing = sorted(facts.find("map.stage_terrain", m.name),
-                       key=lambda f: -f.value["features"][0]["z"])[:STAGES_NAMED]
+    stressing = sorted((f.stage_terrain() for f in facts.find("map.stage_terrain", m.name)),
+                       key=lambda v: -v["features"][0]["z"])[:STAGES_NAMED]
     staged = [
-        (f.value["stage"], _and(TERRAIN_GROUND[x["feature"]] for x in f.value["features"]))
-        for f in sorted(stressing, key=lambda f: m.stages.index(f.value["stage"]))]
+        (v["stage"], _and(TERRAIN_GROUND[x["feature"]] for x in v["features"]))
+        for v in sorted(stressing, key=lambda v: m.stages.index(v["stage"]))]
     if staged:
         read.append("; ".join(("%s has the %s" if i == 0 else "%s the %s") % pair
                               for i, pair in enumerate(staged)) + ".")
@@ -460,7 +460,7 @@ def _answered(six: Result) -> dict[str, list[str]]:
     for p in six.picks:
         for f in six.facts.find("hero.vs_answers", p["hero"]):
             if f.team == "blue":
-                for enemy in f.value:
+                for enemy in f.names():
                     answered.setdefault(enemy, []).append(p["hero"])
     return answered
 
@@ -515,7 +515,7 @@ def _above_all(blue_r: Result, lean: str) -> str | None:
 
 
 def _basis(
-        m: Map | None, side: str, bans: Sequence[str], red_h: Sequence[Hero],
+        m: Map | None, side: Side, bans: Sequence[str], red_h: Sequence[Hero],
         queue: str, yours: int) -> str:
     """What the plan rests on, the rates named by the queue they were
     captured in, and blue's picks where the six keeps them."""

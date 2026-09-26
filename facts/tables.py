@@ -130,7 +130,7 @@ def map_styles(w: World) -> None:
             w.maps[mid].rate_lift[style] = z
     for m in maps:
         m.styles = {
-            s: StyleScore(round(m.rate_lift.get(s, 0.0) + m.terrain_lean.get(s, 0.0), 3), None)
+            s: StyleScore(round(m.rate_lift.get(s, 0.0) + m.terrain_lean.get(s, 0.0), 3))
             for s in sorted(set(m.rate_lift) | set(m.terrain_lean))}
 
 

@@ -16,6 +16,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from typing import Literal, NamedTuple, NotRequired, TypedDict
 
 from facts import compute, counters
+from facts.draft import Side
 from facts.model import Hero, Map, World
 from facts.team import NUMBER_TYPES, MetricBag, MetricValue, number, team_metrics
 from inference.base import COUNTERS, RATES, READS, SYNERGY, Base, BaseWeights, Terms
@@ -247,7 +248,7 @@ class Objective:
     once frozen, turned into the norms the scoring loop reads."""
 
     def __init__(self, world: World, m: Map | None, *, red: Sequence[Hero],
-                 banned: Sequence[Hero] = (), side: str = "",
+                 banned: Sequence[Hero] = (), side: Side = "",
                  catalog: list[Strategy], base: BaseWeights) -> None:
         self.world, self.m, self.red = world, m, list(red)
         self.banned = {h.id for h in banned}

@@ -28,6 +28,8 @@ from facts.draft import (
     MAX_TANKS,
     TEAM_SIZE,
     Draft,
+    Seat,
+    Side,
     board_side,
     check_tanks,
     opposite,
@@ -38,7 +40,7 @@ from inference import catalog as catalog_module
 from inference import parallel, supersede
 from inference.base import DEFAULT, BaseWeights
 from inference.plan import Seats, momentum, plan
-from inference.result import Alternative, Board, Pick, Result, ResultKind, Seat
+from inference.result import Alternative, Board, Pick, Result, ResultKind
 from inference.scoring import Candidate
 from inference.shapes import legal_shapes
 from inference.solver import Infeasible, Solved, Solver, Swept, evaluate_comp
@@ -124,7 +126,7 @@ def _order(heroes: Iterable[Hero]) -> list[str]:
     return [h.name for h in sorted(heroes, key=lambda h: (ROLES.index(h.role), h.name))]
 
 
-def _board_facts(world: World, result: Result, side: str) -> FactSet:
+def _board_facts(world: World, result: Result, side: Side) -> FactSet:
     """The facts of the board a result stands on: its map, both sides as it
     names them, its bans, and the side."""
     return board_facts.generate(world, Draft(
@@ -140,7 +142,7 @@ class _Seated(NamedTuple):
     red: list[Hero]
     blue: list[Hero]
     bans: list[Hero]
-    side: str
+    side: Side
 
 
 def _seated(world: World, draft: Draft, seat: Seat) -> _Seated:

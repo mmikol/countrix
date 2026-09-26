@@ -25,7 +25,16 @@ from db.psql import now, register_source
 from door.mcp.registry import Context, tool
 from door.mcp.schema import Properties, Property, ToolReply
 from facts import tables
-from facts.draft import MAX_BANS, SIDES, TEAM_SIZE, Draft, check_tanks, is_sided
+from facts.draft import (
+    MAX_BANS,
+    SIDES,
+    TEAM_SIZE,
+    Draft,
+    Seat,
+    as_side,
+    check_tanks,
+    is_sided,
+)
 from facts.matches import Match, load_matches
 from facts.model import Hero, Map, World
 from inference import catalog
@@ -119,7 +128,8 @@ def check_match(world: World, draft: Draft) -> CheckedMatch:
     played = resolved.map
     if played is None:
         raise Refusal("a recorded match names its map")
-    for seat, heroes in (("blue", resolved.blue), ("red", resolved.red)):
+    sixes: tuple[tuple[Seat, list[Hero]], ...] = (("blue", resolved.blue), ("red", resolved.red))
+    for seat, heroes in sixes:
         if len(heroes) != TEAM_SIZE:
             raise Refusal("a recorded match holds both sixes, and %s names %d"
                           % (seat, len(heroes)))
@@ -181,7 +191,7 @@ def record_match(
     day = played_day(played_on, datetime.date.today())
     line = one_line(note)
     draft = Draft(map_name=map or None, red=tuple(red), blue=tuple(blue),
-                  bans=tuple(bans or ()), side=side)
+                  bans=tuple(bans or ()), side=as_side(side))
     with ctx.connect() as cx:
         _require_table(cx)
         checked = check_match(tables.load(cx), draft)
@@ -194,8 +204,9 @@ def record_match(
             red=tuple(h.id for h in checked.red), bans=tuple(h.id for h in checked.bans)),
             source_id)
     match = Match(
-        match_id=match_id, played_on=day, map_name=checked.map.name, side=side, result=result,
-        blue=tuple(h.name for h in checked.blue), red=tuple(h.name for h in checked.red),
+        match_id=match_id, played_on=day, map_name=checked.map.name, side=draft.side,
+        result=result, blue=tuple(h.name for h in checked.blue),
+        red=tuple(h.name for h in checked.red),
         bans=tuple(h.name for h in checked.bans), playbook_digest=digest, note=line)
     return ToolReply("recorded match %d: %s on %s\n%s" % (
         match_id, result, match.map_name, described(match)), record_of(match))

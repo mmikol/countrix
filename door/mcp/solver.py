@@ -12,7 +12,7 @@ from door.mcp.boards import board_tool
 from door.mcp.registry import Context, tool
 from door.mcp.schema import Property, ToolReply
 from facts import tables
-from facts.draft import Draft
+from facts.draft import Draft, Side
 from facts.matches import load_matches
 from inference import catalog, engine, reach, validate
 from inference.report import rendered
@@ -44,7 +44,7 @@ class CompactInfer(TypedDict):
     many of them do not apply here (idle), the applying heuristics whose
     metric does not vary on this board (silent), and the heaviest terms."""
     map: str | None
-    side: str
+    side: Side
     red: list[str]
     blue: list[str]
     score: float

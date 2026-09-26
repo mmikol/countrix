@@ -67,7 +67,6 @@ def test_the_rates_half_of_a_maps_style_is_derived_from_its_rates(world):
         mean, sd = statistics.fmean(lifts.values()), statistics.pstdev(lifts.values())
         for m in world.maps.values():
             assert m.rate_lift[style] == pytest.approx((lifts[m.id] - mean) / sd, abs=1e-3)
-            assert m.styles[style][1] is None
         assert statistics.fmean(m.rate_lift[style] for m in world.maps.values()) == \
             pytest.approx(0, abs=1e-3)
     m = world.map("King's Row")

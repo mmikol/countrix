@@ -24,7 +24,7 @@ is lost.
 
 from typing import NamedTuple, TypedDict
 
-from facts.draft import MAX_BANS, SIDES, Draft, is_sided
+from facts.draft import MAX_BANS, SIDES, Draft, Side, is_sided
 from facts.model import ROLES, Hero, Map, World
 from inference import engine
 from inference.solver import Infeasible
@@ -42,7 +42,7 @@ class Reach(TypedDict):
     hero: str
     seated: bool
     map: str
-    side: str
+    side: Side
     red: list[str]
     banned: list[str]
     six: list[str]
@@ -55,7 +55,7 @@ class _Near(NamedTuple):
     gap: float
     map_name: str
     red: list[str]
-    side: str
+    side: Side
 
 
 def maps(world: World, hero: Hero) -> list[Map]:
@@ -135,7 +135,8 @@ def search(world: World, name: str) -> Reach:
             "red": closest.red, "banned": [], "six": [], "gap": round(closest.gap, 3)}
 
 
-def _banning(world: World, hero: Hero, map_name: str, red: list[str], side: str) -> Reach | None:
+def _banning(
+        world: World, hero: Hero, map_name: str, red: list[str], side: Side) -> Reach | None:
     """One board's ban search: each round bans the first rival that holds the
     hero's seat, up to MAX_BANS -> the board once the hero seats, or None when
     it never does, no rival is left to ban or a ban leaves no six within the

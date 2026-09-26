@@ -100,7 +100,7 @@ def test_the_plan_names_every_maps_derived_style(synthetic_world, harbor_gate_bo
     world = synthetic_world
     blue_r = harbor_gate_board.blue
     for m in world.maps.values():
-        assert m.style_top and all(note is None for _, note in m.styles.values()), m.name
+        assert m.style_top, m.name
         said = (harbor_gate_board.plan if m.name == "Harbor Gate"
                 else plan.plan(world, m, "", [], [], blue_r))
         assert "The map rewards %s" % m.style_top in said, m.name
@@ -180,8 +180,8 @@ def test_the_plan_says_nothing_the_board_contradicts(synthetic_world):
     from inference.scoring import Contribution
     world = synthetic_world
     m = copy.copy(world.map("Harbor Gate"))
-    m.styles = {"brawl": StyleScore(1.0, None), "dive": StyleScore(-0.5, None),
-                "poke": StyleScore(0.0, None)}     # a brawl map
+    m.styles = {"brawl": StyleScore(1.0), "dive": StyleScore(-0.5),
+                "poke": StyleScore(0.0)}     # a brawl map
     rules = [
         Ns(
             id="two-supports-hold", name="Two supports hold a six", kind="constraint",
