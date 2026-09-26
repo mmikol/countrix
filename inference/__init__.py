@@ -1,22 +1,30 @@
 """The INFERENCE LAYER: facts in, the optimal composition out.
 
+The playbook: the files, their dialect, and the writers the door's tools
+call.
+
     strategies/   the playbook - STRATEGIES = CONSTRAINTS ∪ HEURISTICS ∪ ASSUMPTIONS:
                   one markdown file per strategy, and tuning-log.md, a line
-                  per change. A constraint is a limit
-                  (require: must hold) or a scored adjustment (bonus/penalty
-                  while a condition holds); a heuristic maximises or
-                  minimises a metric; an assumption is prose the agent holds
-                  a comp to
+                  per change. A constraint is a limit (require: must hold)
+                  or a scored adjustment (bonus/penalty while a condition
+                  holds); a heuristic maximises or minimises a metric; an
+                  assumption is prose the agent holds a comp to
     README.md     the citation record the playbook is rebuilt from: a line
                   per strategy id, shipped or removed, with the threads a
                   rule was drawn from or the user's word for an assumption
     frontmatter   the dialect a strategy file's frontmatter is written in
     strategy      one strategy: its fields, its kind and form, and the rules
                   every file keeps
+    expr          the safe expression language the frontmatter uses
     catalog       reads the playbook's files into strategies, orders, mirrors
                   and documents them; AUTHORED, the `sources` row the
                   mirror and the recorded matches carry
-    expr          the safe expression language the frontmatter uses
+    tune          one validated, logged edit to a strategy file; add and complete
+    derive        the engine asking the model for a draft's frontmatter
+
+The search: what a six scores and the argmax over the legal sixes. The
+pooled and in-process boards agree bit for bit.
+
     base          the default engine, always on: a six's win rates on the map,
                   the wiki's synergies and its counters against the other
                   side, the terms the playbook's sit on top of
@@ -35,9 +43,11 @@
     parallel      the process pool the board splits its searches across
     supersede     latest wins: a board a newer request replaced stops at its
                   next round
-    tune          one validated, logged edit to a strategy file; add and complete
-    derive        the engine asking the model for a draft's frontmatter
     reach         the board each released hero is optimal on, within a match's bans
+    serve         the engine over HTTP, for the compose stack's board
+
+The judgement: the playbook against the recorded matches.
+
     validate      the playbook against the recorded matches: the verdict from
                   rescore's maps and predict's models, and the data guard
                   that withholds it
@@ -53,5 +63,4 @@
     fit           the statistics validate reads, in pure Python: a ridge
                   logistic fit, log loss and Brier, the bootstrap over
                   sessions, the maps an effect needs
-    serve         the engine over HTTP, for the compose stack's board
 """

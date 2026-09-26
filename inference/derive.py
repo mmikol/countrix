@@ -1,5 +1,5 @@
 """Deriving a draft's frontmatter from its prose - the engine's own call to
-the model, on the subscription, with no key.
+the model.
 
 A draft is a strategy file with only a name, a kind and prose. This module
 asks Claude Code in print mode (`claude -p`) - headless, on the
@@ -11,13 +11,9 @@ at most MAX_PER_RUN drafts; the rest wait for the next, counted as deferred.
 
     derive()                 every draft in inference/strategies/
     derive(["heal-line"])    one
-    available()              whether the claude CLI is on this machine
-    require_cli()            the claude CLI, or CliUnavailableError
-    clean_env()              the environment a nested claude -p runs in
-    not_signed_in(said)      whether the CLI's output says it is signed out
 
-The last three are the headless recipe; orchestrator.py's agents run uses
-them too.
+require_cli, clean_env and not_signed_in are the headless recipe;
+orchestrator.py's agents run uses them too.
 
 Runs where the claude CLI is signed in - the host. `load_authored` and
 `orchestrator.py up` call it when drafts exist; inside the compose stack the CLI
