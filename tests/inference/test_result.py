@@ -113,6 +113,33 @@ def test_a_scoring_strategy_that_waits_on_its_board_reads_unscored_with_the_reas
     assert badges["red"] == {"label": "unscored", "tip": flying["red_current"]["unscored"]}
 
 
+def test_a_six_a_hard_limit_refuses_has_no_rank_and_no_share(synthetic_world, tmp_path):
+    """evaluate and the board's current comp used to score, rank and share a
+    six the search would discard: the badge read a share while the payload
+    listed the breach. A full six that breaks a hard limit now reads
+    unscored and names the limit; a half-drafted one is left to its fill."""
+    from inference import engine
+    (tmp_path / "two-supports.md").write_text(
+        "---\nname: two supports\nkind: constraint\nrequire: team.supports >= 2\n---\nx\n",
+        "utf-8")
+    shutil.copy(os.path.join(FIXTURE_PLAYBOOK, "meta-strength.md"), tmp_path)
+    playbook = catalog.load(str(tmp_path))
+    one_support = ("Anvil", "Kite", "Rook", "Needle", "Flint", "Balm")
+    result = engine.evaluate(synthetic_world, Draft("Harbor Gate", ("Gale",), one_support),
+                             catalog=playbook).to_dict()
+    assert result["violations"] == ["two-supports"]
+    assert result["rank"] is None and result["normalized"] is None and not result["scoring"]
+    assert "breaks two-supports, a hard limit" in result["unscored"]
+    b = engine.board(synthetic_world, Draft("Harbor Gate", ("Gale",), one_support),
+                     catalog=playbook, brief=engine.Brief(countered=False))
+    assert b.momentum["badges"]["blue"]["label"] == "unscored"
+    assert "two-supports" in b.momentum["badges"]["blue"]["tip"]
+    held = engine.board(synthetic_world, Draft("Harbor Gate", ("Gale",), ("Balm",)),
+                        catalog=playbook, brief=engine.Brief(countered=False))
+    assert held.current.violations == ["two-supports"] and held.current.partial
+    assert held.fill.unscored() is None
+
+
 def test_the_rendered_breakdown_marks_a_need():
     """A need reads at or below zero by design, so the breakdown says which
     terms are needs; the flag rides to_dict() on each contribution."""

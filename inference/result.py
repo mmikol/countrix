@@ -182,15 +182,20 @@ class Result:
         """Why the result carries no share of a best, or None when it does.
         The optimal six is 100 by definition - it is the reference, and scored
         always; red's likely six is a likelihood, never scored, and says so
-        while the default engine is on; any other comp reads unscored when
-        nothing can be a share of anything: the default engine is off and the
-        playbook holds no term that scores, or none of its terms applies to
-        this board (a heuristic waiting on its `when`), so the best six itself
-        sums to zero, or the best six scores at or below zero."""
+        while the default engine is on; a full six a hard limit refuses is
+        one the search discards, so it has no rank and no share, and names
+        the limits; any other comp reads unscored when nothing can be a share
+        of anything: the default engine is off and the playbook holds no term
+        that scores, or none of its terms applies to this board (a heuristic
+        waiting on its `when`), so the best six itself sums to zero, or the
+        best six scores at or below zero."""
         if self.kind == "infer":
             return None
         if self.kind == "expected" and self.base.on:
             return LIKELIHOOD
+        if self.violations and not self.partial:
+            return ("unscored - it breaks %s, a hard limit, and the search discards any six"
+                    " that does" % ", ".join(self.violations))
         return self.waiting()
 
     def waiting(self) -> str | None:

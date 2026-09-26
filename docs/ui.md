@@ -137,7 +137,8 @@ the page's boards always carry a share; a seat reads *unscored*, picks or
 not, the engine's reason in the tooltips, only where a caller turns the
 engine off and the playbook holds no heuristic, scored constraint or soft
 limit, or none applies to this board yet, or where the optimal scores at
-or below zero.
+or below zero, and on a full six that breaks a hard limit, which the
+search discards.
 
 **The suggestions.** Blue's empty slots carry the fill - the best six that
 keeps your locked picks, the optimal six before any pick - each a click
