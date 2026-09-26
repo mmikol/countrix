@@ -192,7 +192,7 @@ def _optimal(
                         catalog=catalog, base=base,
                         pool_size=pool_size).solve(top=max(top, 1) + 1)
     if not solved.ranked:
-        raise Infeasible("no composition satisfies the limits around the"
+        raise Infeasible("no composition the search reached satisfies the limits around the"
                          " locked %s picks - relax a constraint in inference/strategies/"
                          % seat)
     best = solved.ranked[0]

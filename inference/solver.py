@@ -12,7 +12,10 @@ A Solver is the board's Objective (inference.scoring) on the board's scale
                     slices partition the field, so the search splits across
                     processes.
     rank            sorted by score, then tie-break, then names - a total order, so
-                    the answer does not depend on how the sweep was split
+                    the answer does not depend on how the sweep was split; a
+                    field the hard limits refuse whole is repaired first: the
+                    swept sixes nearest the limits descend over the roster, one
+                    seat at a time, until a six meets them
     refine          local search from the best six sixes and the best of every
                     swept shape: swap any slot for any same-role hero on the
                     roster, keep improvements; bring each of the wiki's synergy
@@ -39,6 +42,7 @@ from inference.strategy import Strategy
 PARTNER_POINTS = 0.5              # a locked partner's worth when ranking a pool
 SEEDS = 6                         # the local search's starts, whatever `top` asks for
 RESTARTS = 24                     # in-shape random starts: the SEEDS are near-duplicates
+REPAIRS = 6                       # the refused sixes a repair descends from
 
 
 class Infeasible(Refusal):
@@ -191,6 +195,8 @@ class Solver(Objective):
         """The best sixes of a swept field, refined and hydrated. The order is
         the _rank_key's alone, so it does not depend on how the sweep was
         split."""
+        if not feasible and refine:
+            feasible = self.repair()
         if not feasible:
             return []
         feasible.sort(key=self._rank_key)
@@ -256,6 +262,60 @@ class Solver(Objective):
         out = list(known.values())
         out.sort(key=self._rank_key)
         return out
+
+    def repair(self) -> list[Candidate]:
+        """Sixes that meet the hard limits, found from a field that meets none
+        of them. The REPAIRS swept sixes nearest the limits - fewest broken,
+        then least short (Objective.shortfall), then best scored - each descend
+        one open seat at a time over the released roster, toward fewer and
+        nearer breaches, until one meets them all or no seat change brings it
+        nearer. A limit only heroes the pool cut can meet, or one the pool's
+        sixes all miss by a little, is met here; the refine then runs from what
+        this returns. -> the sixes met, slim, or [] where every descent stalls."""
+        nearest = heapq.nsmallest(REPAIRS, (
+            (self._miss(self.prepare(Candidate(heroes))), tuple(heroes))
+            for heroes in self.legal_sixes()))
+        roster = [h for h in sorted(self.world.heroes.values(), key=lambda h: h.id)
+                  if h.released and h.id not in self.banned]
+        met: dict[SixKey, Candidate] = {}
+        for _miss, heroes in nearest:
+            cand = self._descend(list(heroes), roster)
+            if cand is not None:
+                met.setdefault(cand.key, cand)
+        return list(met.values())
+
+    def _miss(self, cand: Candidate) -> tuple[int, float, float, float, list[str]]:
+        """How far a prepared six is from the hard limits: how many it breaks,
+        how far short it falls of them, then its rank - a total order."""
+        return (len(cand.violations), self.shortfall(cand),
+                *self._rank_key(self.score(cand, detail=False)))
+
+    def _descend(self, heroes: list[Hero], roster: Sequence[Hero]) -> Candidate | None:
+        """One six, one open seat at a time, toward the hard limits: the seat
+        change that leaves it nearest them, until it meets them all (-> that
+        six, scored and slim) or none brings it nearer (-> None)."""
+        locked_ids = {h.id for h in self.locked}
+        current = self.prepare(Candidate(heroes))
+        miss = self._miss(current)
+        while current.violations:
+            best, best_miss = current, miss
+            for index, hero in enumerate(current.heroes):
+                if hero.id in locked_ids:
+                    continue
+                for other in roster:
+                    if other.role != hero.role or other.id in current.key:
+                        continue
+                    seated = list(current.heroes)
+                    seated[index] = other
+                    cand = self.prepare(Candidate(seated))
+                    self.considered += 1
+                    cand_miss = self._miss(cand)
+                    if cand_miss < best_miss:
+                        best, best_miss = cand, cand_miss
+            if best is current:
+                return None
+            current, miss = best, best_miss
+        return self.slim(self.score(current, detail=False))
 
     def _try(self, heroes: Sequence[Hero],
                 known: dict[SixKey, Candidate]) -> Candidate | None:
@@ -432,13 +492,14 @@ def evaluate_comp(world: World, m: Map | None, heroes: Sequence[Hero], *,
         swept = solver.sweep()
     solver = swept.solver
     solver.considered = swept.size
-    if not swept.feasible:
-        raise Infeasible("no composition satisfies the limits on this board - relax a"
-                         " constraint in inference/strategies/")
+    feasible = swept.feasible or solver.repair()
+    if not feasible:
+        raise Infeasible("no composition the search reached satisfies the limits on this"
+                         " board - relax a constraint in inference/strategies/")
     target = solver.score(solver.prepare(Candidate(heroes)))
     # rank against the field the search actually ends on. Ranking against the raw
     # sweep alone called a six first that the refinement had already beaten, so a
     # comp and a strictly better one both read rank 1.
-    feasible = solver.refine(sorted(swept.feasible, key=Solver._rank_key))
+    feasible = solver.refine(sorted(feasible, key=Solver._rank_key))
     rank = 1 + sum(1 for c in feasible if c.score > target.score + 1e-9)
     return Evaluated(target, [solver.hydrate(c) for c in feasible[:5]], rank, solver)

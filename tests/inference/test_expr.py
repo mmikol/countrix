@@ -60,3 +60,20 @@ def test_the_sandbox_refuses_what_would_hang_or_exhaust_it():
     with pytest.raises(ExprError, match=r"OverflowError: \S"):
         Expr("team.big ** 2").evaluate({"team": {"big": 1e200}})
     assert Expr("team.style_lean == 'dive'").evaluate({"team": {"style_lean": "dive"}}) is True
+
+
+def test_a_shortfall_is_how_far_a_limit_is_from_holding():
+    """0 where the expression holds; each failed comparison of numbers in a
+    top-level `and` adds the distance between its sides, and any other
+    failed clause adds 1 - the gradient a repair descends where the verdict
+    alone is flat."""
+    from inference.expr import scope
+    limit = Expr("team.armor >= 10 and team.tanks == 2 and map.side == 'attack'")
+    held = limit.shortfall(scope({"team": {"armor": 12, "tanks": 2}, "map": {"side": "attack"}}))
+    assert held == 0
+    short = limit.shortfall(scope({"team": {"armor": 7, "tanks": 2}, "map": {"side": "attack"}}))
+    assert short == pytest.approx(3.0)
+    worse = limit.shortfall(scope({"team": {"armor": 4, "tanks": 1}, "map": {"side": "defense"}}))
+    assert worse == pytest.approx(6.0 + 1.0 + 1.0)
+    assert Expr("team.a < 2").shortfall(scope({"team": {"a": 2}})) > 0      # at the edge
+    assert Expr("not team.a").shortfall(scope({"team": {"a": 1}})) == 1.0

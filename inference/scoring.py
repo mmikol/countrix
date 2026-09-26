@@ -360,6 +360,19 @@ class Objective:
         cand.tiebreak = number(ns["team"]["map_win_mean"])
         return cand
 
+    def shortfall(self, cand: Candidate) -> float:
+        """How far a prepared six is from the hard limits it breaks: the sum
+        of each broken limit's Expr.shortfall, 0 on a six that breaks none."""
+        sc = cand.scope
+        if sc is None:
+            raise RuntimeError("shortfall() takes a prepared candidate")
+        total = 0.0
+        for h, require, _gate, _slot in self._hard_limits:
+            if h.id in cand.violations:
+                sc["params"] = h.params_section
+                total += require.shortfall(sc)
+        return total
+
     def _confidence_values(self, ns: Namespace,
                            raw: Sequence[float | None]) -> list[float | None]:
         """Each heuristic's confidence metric on this six, where it names one

@@ -16,8 +16,11 @@ so a metric that does not apply to a board never crashes a score, and a
 """
 
 import ast
+import copy
+import operator
 from collections.abc import Callable, Iterable, Mapping
 from types import CodeType
+from typing import NamedTuple
 
 FUNCTIONS: dict[str, Callable[..., object]] = {
     "min": min, "max": max, "abs": abs, "round": round,
@@ -75,6 +78,44 @@ class ExprError(ValueError):
     pass
 
 
+class _Clause(NamedTuple):
+    """One clause of an expression's top-level `and`, compiled for
+    Expr.shortfall: a comparison's operator and its two sides, or the clause
+    whole with no operator."""
+    op: Callable[..., object] | None
+    left: CodeType
+    right: CodeType | None
+
+
+# the comparisons a shortfall reads as a distance between two numbers
+_GAPS: dict[type[ast.cmpop], Callable[..., object]] = {
+    ast.Lt: operator.lt, ast.LtE: operator.le, ast.Gt: operator.gt, ast.GtE: operator.ge,
+    ast.Eq: operator.eq, ast.NotEq: operator.ne}
+# what a failed comparison of equal numbers is short by: a < b at a == b
+_EDGE = 1e-9
+
+
+def _compiled(node: ast.expr) -> CodeType:
+    """One subexpression compiled on its own, its divisions zero-safe; the
+    node is copied, so the tree it came from is left as it was."""
+    body = _ZeroDivisor().visit(copy.deepcopy(node))
+    return compile(ast.fix_missing_locations(ast.Expression(body=body)), "<strategy>", "eval")
+
+
+def _clauses(tree: ast.expr) -> list[_Clause]:
+    """The top-level `and`'s clauses, or the expression as one clause."""
+    parts = tree.values if isinstance(tree, ast.BoolOp) and isinstance(tree.op, ast.And) else [tree]
+    out = []
+    for part in parts:
+        if (isinstance(part, ast.Compare) and len(part.ops) == 1
+                and type(part.ops[0]) in _GAPS):
+            out.append(_Clause(_GAPS[type(part.ops[0])], _compiled(part.left),
+                               _compiled(part.comparators[0])))
+        else:
+            out.append(_Clause(None, _compiled(part), None))
+    return out
+
+
 NAMESPACES = ("team", "enemy", "matchup", "map", "world", "params")
 
 
@@ -126,6 +167,7 @@ class Expr:
                 raise ExprError("%r: underscore names are not allowed" % name)
         self._check(tree)
         self._guard(tree, 0)
+        self._clauses = _clauses(tree)
         # the code object is what a candidate is evaluated against, each
         # division in it zero-safe; the tree is dropped, so a playbook keeps
         # no syntax trees in any worker
@@ -255,6 +297,15 @@ class Expr:
 
     # --- evaluation ----------------------------------------------------------
 
+    def shortfall(self, scope: Scope) -> float:
+        """How far the expression is from holding on this scope, 0 where it
+        holds: over the clauses of a top-level `and`, the distance between
+        the two sides of each failed comparison of numbers, and 1 for each
+        other clause that fails. A search reads it to step toward a limit no
+        six it holds meets - an armor total short of its floor is that far
+        short - where the verdict alone is flat."""
+        return sum(_shortfall(clause, scope) for clause in self._clauses)
+
     def evaluate[V](self, namespace: Mapping[str, dict[str, V]] | Scope) -> Value:
         """Evaluate against {"team": {...}, ...}; a Scope is used as is."""
         scope = namespace if isinstance(namespace, Scope) else Scope(
@@ -276,6 +327,24 @@ _RULES: dict[type[ast.AST], Callable[..., Iterable[ast.AST]]] = {
 }
 
 _GLOBALS: dict[str, object] = dict(FUNCTIONS, __builtins__={})
+
+
+def _shortfall(clause: _Clause, scope: Scope) -> float:
+    """How far one clause is from holding: 0 where it holds, the distance
+    between the two sides of a failed comparison of numbers, and 1 for any
+    other clause that fails."""
+    try:
+        left = eval(clause.left, _GLOBALS, scope)  # nosec B307  # whitelisted AST, no builtins
+        if clause.op is None or clause.right is None:
+            return 0.0 if left else 1.0
+        right = eval(clause.right, _GLOBALS, scope)  # nosec B307  # the same
+        if clause.op(left, right):
+            return 0.0
+    except (TypeError, ArithmeticError, RecursionError, MemoryError):
+        return 1.0
+    if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+        return abs(float(left) - float(right)) + _EDGE
+    return 1.0
 
 
 def scope[V](namespace: Mapping[str, dict[str, V]]) -> Scope:

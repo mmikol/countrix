@@ -114,6 +114,36 @@ def test_the_search_reaches_the_enumerated_maximum(synthetic_world, catalog_copy
     assert reached_back                    # some board's best six holds a hero the pools cut
 
 
+@pytest.mark.parametrize("base", [OFF, DEFAULT], ids=["base-off", "base-on"])
+def test_a_hard_limit_no_pooled_six_meets_is_met_past_the_pool(synthetic_world, tmp_path, base):
+    """A limit only heroes the pool cut can meet used to refuse the board as
+    Infeasible: the sweep kept no six, so refine had nowhere to start. The
+    swept sixes nearest the limit now descend over the roster until one
+    meets it, and the search returns the enumerated best of the sixes that
+    do. Every pooled six at pool 2 fields no shield; one hero outside the
+    pools carries one."""
+    from inference import engine, scoring
+    from inference import solver as solver_module
+    shutil.copytree(FIXTURE_PLAYBOOK, tmp_path, dirs_exist_ok=True)
+    (tmp_path / "shielded.md").write_text(
+        "---\nname: shielded\nkind: constraint\nrequire: team.shield_total >= 200\n---\nx\n",
+        "utf-8")
+    playbook = catalog.load(str(tmp_path))
+    world = synthetic_world
+    m = world.map("Harbor Gate")
+    solver = solver_module.Solver(world, m, red=[], locked=[], side="attack", catalog=playbook,
+                                  base=base, pool_size=2)
+    solver.freeze_bounds()
+    assert not solver.sweep().feasible                    # the pools alone meet nothing
+    sixes = legal_sixes(world, playbook)
+    scored = [solver.score(solver.prepare(scoring.Candidate(six)), detail=False) for six in sixes]
+    best = min((c for c in scored if not c.violations), key=solver._rank_key)
+    got = engine.infer(world, Draft("Harbor Gate", side="attack"), catalog=playbook,
+                       pool_size=2, top=1, base=base)
+    assert sorted(got.blue) == sorted(best.names) and got.violations == []
+    assert abs(got.score - best.score) < 1e-9
+
+
 def test_shape_limits_bound_the_search_and_a_stricter_one_narrows_it(synthetic_world, tmp_path):
     from inference import engine
     world = synthetic_world
