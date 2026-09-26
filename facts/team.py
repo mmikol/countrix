@@ -187,6 +187,11 @@ def text(value: MetricValue) -> str:
     raise TypeError("a metric read as a name holds %r" % (value,))
 
 
+def counted(n: float, word: str = "pick") -> str:
+    """A count as words: one pick, two picks, never one pick(s)."""
+    return "%d %s%s" % (n, word, "" if n == 1 else "s")
+
+
 def names(value: MetricValue) -> list[str]:
     """A metric read as the names it lists: the subroles, the squishies."""
     if isinstance(value, list):

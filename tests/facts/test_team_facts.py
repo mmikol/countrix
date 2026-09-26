@@ -11,7 +11,7 @@ from facts import team_facts
 from facts.draft import Draft
 from facts.factset import FactSet
 from facts.model import Resolved
-from facts.team import team_metrics
+from facts.team import counted, team_metrics
 
 
 def _facts(world, map_name, red, blue):
@@ -253,5 +253,5 @@ def test_the_matchup_names_each_side_of_every_trade(synthetic_world):
 
 
 def test_a_count_reads_as_a_sentence():
-    assert team_facts._count(1) == "1 pick" and team_facts._count(0) == "0 picks"
-    assert team_facts._count(3, "flyer") == "3 flyers"
+    assert counted(1) == "1 pick" and counted(0) == "0 picks"
+    assert counted(3, "flyer") == "3 flyers"
