@@ -95,6 +95,11 @@ def is_sided(m: Map | None) -> bool:
     return m is not None and (m.mode or "") in SIDED_MODES
 
 
+def board_side(m: Map | None, side: str) -> str:
+    """The draft's side where the map has sides; none on any other map."""
+    return side if is_sided(m) else ""
+
+
 def opposite(side: str) -> str:
     """The other seat's side; no side stays none."""
     return {"attack": "defense", "defense": "attack"}.get(side, "")

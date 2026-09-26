@@ -36,7 +36,7 @@ import shutil
 
 import pytest
 
-from facts.draft import Draft, opposite
+from facts.draft import Draft, board_side, opposite
 from inference import catalog, engine, scale, scoring
 from inference import solver as solver_module
 from inference.base import DEFAULT, OFF, BaseWeights
@@ -80,7 +80,7 @@ def enumerated(world, rules, draft, base, pool_size=2):
     feasible ones in rank order, and that solver."""
     m, red, locked, banned = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
     solver = solver_module.Solver(world, m, red=red, locked=locked, banned=banned,
-                                  side=engine._side(m, draft.side), catalog=rules, base=base,
+                                  side=board_side(m, draft.side), catalog=rules, base=base,
                                   pool_size=pool_size)
     solver.freeze_bounds()
     shapes = set(legal_shapes(rules))
@@ -285,7 +285,7 @@ def test_each_seat_of_a_board_is_infer_on_that_seats_draft(synthetic_world, tmp_
         assert b.current.rank == evaluated.rank
     m, red_h, _, banned = w.resolve(draft.map_name, draft.red, (), draft.bans)
     fresh = solver_module.Solver(w, m, red=red_h, locked=[], banned=banned,
-                                 side=engine._side(m, draft.side), catalog=rules, base=DEFAULT)
+                                 side=board_side(m, draft.side), catalog=rules, base=DEFAULT)
     fresh.freeze_bounds()
     six = fresh.score(fresh.prepare(scoring.Candidate([w.hero(n) for n in b.blue.blue])))
     assert six.score == pytest.approx(b.blue.score, abs=1e-9)

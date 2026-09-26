@@ -15,7 +15,7 @@ import pytest
 
 from db import Refusal
 from db.data.names import name_key
-from facts.draft import Draft
+from facts.draft import Draft, board_side
 from facts.records import StyleScore, Synergy
 from facts.team import team_metrics
 from inference import catalog
@@ -451,11 +451,11 @@ def test_a_rule_scales_by_the_metric_it_names(synthetic_world, tmp_path):
     def points(map_name, strategy_id):
         m, red, _, _ = world.resolve(map_name, ["Anvil", "Gale"], [], [])
         solver = solver_module.Solver(world, m, red=red, locked=[],
-                                      side=engine._side(m, "attack"), catalog=playbook,
+                                      side=board_side(m, "attack"), catalog=playbook,
                                       base=OFF)
         solver.freeze_bounds()
         best = engine.infer(world, Draft(map_name, ("Anvil", "Gale"),
-                                         side=engine._side(m, "attack")),
+                                         side=board_side(m, "attack")),
                             top=1, catalog=playbook, base=OFF)
         cand = solver.prepare(scoring.Candidate([world.hero(n) for n in best.blue]))
         solver.score(cand, detail=True)

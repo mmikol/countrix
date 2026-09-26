@@ -28,8 +28,8 @@ from facts.draft import (
     MAX_TANKS,
     TEAM_SIZE,
     Draft,
+    board_side,
     check_tanks,
-    is_sided,
     opposite,
 )
 from facts.factset import FactSet
@@ -132,9 +132,39 @@ def _board_facts(world: World, result: Result, side: str) -> FactSet:
         bans=tuple(result.bans), side=side))
 
 
-def _side(m: Map | None, side: str) -> str:
-    """The draft's side where the map has sides; none on any other map."""
-    return side if is_sided(m) else ""
+class _Seated(NamedTuple):
+    """A draft resolved for one seat: the map, the other seat's revealed
+    picks (`red`), the seat's own (`blue`), the bans, and the side the map
+    keeps."""
+    m: Map | None
+    red: list[Hero]
+    blue: list[Hero]
+    bans: list[Hero]
+    side: str
+
+
+def _seated(world: World, draft: Draft, seat: Seat) -> _Seated:
+    """The draft resolved against the World, both teams checked for `seat`."""
+    m, red_h, blue_h, bans_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
+    _check_teams(red_h, blue_h, seat)
+    return _Seated(m, red_h, blue_h, bans_h, board_side(m, draft.side))
+
+
+def _seat_result(
+        board: _Seated, *, kind: ResultKind, seat: Seat, catalog: list[Strategy],
+        base: BaseWeights, blue: list[str], locked: list[str],
+        partial: bool = False) -> Result:
+    """A seat's Result on a resolved board, before a six is recorded on it."""
+    return Result(kind=kind, map_name=board.m.name if board.m else None,
+                  red=[h.name for h in board.red], blue=blue, locked=locked, catalog=catalog,
+                  base=base, bans=[h.name for h in board.bans], side=board.side, seat=seat,
+                  partial=partial)
+
+
+def _alternatives(ranked: Iterable[Candidate]) -> list[Alternative]:
+    """The runners-up as a Result lists them: each six in role order, its score."""
+    return [Alternative(blue=_order(c.heroes), score=round(c.score, 3), normalized=None)
+            for c in ranked]
 
 
 def infer(
@@ -181,15 +211,12 @@ def _optimal(
     time that search started, which the result's seconds run from; None
     times the search this call makes."""
     started = time.time() if began is None else began
-    m, red_h, blue_h, bans_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
-    side = _side(m, draft.side)
-    _check_teams(red_h, blue_h, seat)
-    result = Result(kind=kind, map_name=m.name if m else None, red=[h.name for h in red_h],
-                    blue=[], locked=[h.name for h in blue_h], catalog=catalog, base=base,
-                    bans=[h.name for h in bans_h], side=side, seat=seat)
+    board = _seated(world, draft, seat)
+    result = _seat_result(board, kind=kind, seat=seat, catalog=catalog, base=base, blue=[],
+                          locked=[h.name for h in board.blue])
     if solved is None:
-        solved = Solver(world, m, red=red_h, locked=blue_h, banned=bans_h, side=side,
-                        catalog=catalog, base=base,
+        solved = Solver(world, board.m, red=board.red, locked=board.blue, banned=board.bans,
+                        side=board.side, catalog=catalog, base=base,
                         pool_size=pool_size).solve(top=max(top, 1) + 1)
     if not solved.ranked:
         raise Infeasible("no composition the search reached satisfies the limits around the"
@@ -197,11 +224,9 @@ def _optimal(
                          % seat)
     best = solved.ranked[0]
     result.blue = _order(best.heroes)
-    fs = _board_facts(world, result, side)
+    fs = _board_facts(world, result, board.side)
     result.record_candidate(best, fs, solved.solver.considered)
-    result.alternatives = [Alternative(blue=_order(c.heroes), score=round(c.score, 3),
-                                       normalized=None)
-                           for c in solved.ranked[1:top + 1]]
+    result.alternatives = _alternatives(solved.ranked[1:top + 1])
     result.scale_to(result.score)
     result.seconds = time.time() - started
     return _Optimal(result, solved.solver)
@@ -214,23 +239,19 @@ def _evaluated(
     the solver would have searched, labelled `kind`. `swept` takes that field
     from a search the caller already ran on this board."""
     started = time.time()
-    m, red_h, blue_h, bans_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
-    side = _side(m, draft.side)
-    _check_teams(red_h, blue_h, seat)
-    if len(blue_h) != TEAM_SIZE:
+    board = _seated(world, draft, seat)
+    if len(board.blue) != TEAM_SIZE:
         raise Refusal("evaluate needs exactly %d %s picks (got %d)"
-                         % (TEAM_SIZE, seat, len(blue_h)))
-    result = Result(kind=kind, map_name=m.name if m else None, red=[h.name for h in red_h],
-                    blue=[h.name for h in blue_h], locked=[], catalog=catalog, base=base,
-                    bans=[h.name for h in bans_h], side=side, seat=seat)
-    evaluated = evaluate_comp(world, m, blue_h, red=red_h, banned=bans_h, side=side,
-                              catalog=catalog, base=base, pool_size=pool_size, swept=swept)
-    fs = _board_facts(world, result, side)
+                         % (TEAM_SIZE, seat, len(board.blue)))
+    result = _seat_result(board, kind=kind, seat=seat, catalog=catalog, base=base,
+                          blue=[h.name for h in board.blue], locked=[])
+    evaluated = evaluate_comp(world, board.m, board.blue, red=board.red, banned=board.bans,
+                              side=board.side, catalog=catalog, base=base, pool_size=pool_size,
+                              swept=swept)
+    fs = _board_facts(world, result, board.side)
     result.record_candidate(evaluated.target, fs, evaluated.solver.considered)
     result.rank = evaluated.rank
-    result.alternatives = [Alternative(blue=_order(c.heroes), score=round(c.score, 3),
-                                       normalized=None)
-                           for c in evaluated.field[:3]]
+    result.alternatives = _alternatives(evaluated.field[:3])
     result.seconds = time.time() - started
     # the board's best known six is the 100, not this comp's own best rival: a
     # beaten six must not read 100 because nothing it was compared against beat it
@@ -256,16 +277,15 @@ def _current(
         result.scale_to(best)
         return result
     started = time.time()
-    m, red_h, blue_h, bans_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
-    side = _side(m, draft.side)
-    result = Result(kind=kind, map_name=m.name if m else None, red=[h.name for h in red_h],
-                    blue=[h.name for h in blue_h], locked=[h.name for h in blue_h],
-                    catalog=catalog, base=base, bans=[h.name for h in bans_h], side=side,
-                    seat=seat, partial=True)
-    if blue_h:
-        cand = solver.prepare(Candidate(blue_h))
+    board = _seated(world, draft, seat)
+    picks = [h.name for h in board.blue]
+    result = _seat_result(board, kind=kind, seat=seat, catalog=catalog, base=base, blue=picks,
+                          locked=picks, partial=True)
+    if board.blue:
+        cand = solver.prepare(Candidate(board.blue))
         solver.score(cand)
-        result.record_candidate(cand, _board_facts(world, result, side), solver.considered)
+        result.record_candidate(cand, _board_facts(world, result, board.side),
+                                solver.considered)
     result.scale_to(best)
     result.seconds = time.time() - started
     return result
@@ -357,10 +377,9 @@ def _board_once(
     full: the two optimal seats rank their rosters and sweep, the fills sweep
     on their seats' scales, the seats merge and are solved, and the countered
     case, which needs red's six, sweeps while the fills merge."""
-    m, red_h, blue_h, bans_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
-    draft = dataclasses.replace(draft, side=_side(m, draft.side))
-    _check_teams(red_h, blue_h, "blue")
-    expected = _expected(world, m, bans_h, draft, catalog, brief.base)
+    board = _seated(world, draft, "blue")
+    draft = dataclasses.replace(draft, side=board.side)
+    expected = _expected(world, board.m, board.bans, draft, catalog, brief.base)
     # each seat's draft, from that seat's perspective: its own picks are `blue`,
     # the other side's revealed ones `red`. An unrevealed side is read as infer
     # reads it: the counter term alone takes its likely six (base.opponent)
@@ -403,7 +422,7 @@ def _board_once(
     return Board(map_name=expected.map_name, side=draft.side, bans=list(draft.bans),
                  blue=blue.result, red=red.result, current=cur, red_current=red_cur,
                  fill=fill, countered=countered, momentum=momentum(seats),
-                 plan=plan(world, m, draft.side, list(draft.bans), red_h, shown,
+                 plan=plan(world, board.m, draft.side, list(draft.bans), board.red, shown,
                            likely=expected.blue),
                  shapes=[list(s) for s in legal_shapes(catalog)], expected=expected)
 

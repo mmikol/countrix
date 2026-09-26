@@ -37,7 +37,7 @@ team's and the matchup's.
 
 from facts import compute, hero_facts, team_facts
 from facts.compute import TERRAIN_STANDOUT
-from facts.draft import MAX_BANS, Draft, is_sided, opposite
+from facts.draft import MAX_BANS, Draft, board_side, is_sided, opposite
 from facts.factset import PLAYBOOK_SCOPE, FactSet
 from facts.model import TERRAIN_FEATURES, TERRAIN_LEAN, Map, Resolved, World
 
@@ -55,7 +55,7 @@ def generate(world: World, draft: Draft) -> FactSet:
     cannot be recommended; every name World.resolve refuses is a Refusal. The
     FactSet's draft holds the resolved names and the side the map keeps."""
     board = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans, allow_announced=True)
-    side = draft.side if is_sided(board.map) else ""
+    side = board_side(board.map, draft.side)
     fs = FactSet(Draft(
         map_name=board.map.name if board.map else None,
         red=tuple(h.name for h in board.red), blue=tuple(h.name for h in board.blue),
