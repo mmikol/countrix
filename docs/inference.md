@@ -55,10 +55,10 @@ three terms favour, scored and explained:
   `p / (p + RATE_PICK_HALF)` for its pick rate `p` on the same footing,
   averaged over the six. A rarely picked hero's rate rests on few
   matches, so its edge is pulled toward a coin flip; `RATE_PICK_HALF` is set
-  so that only the rarest heroes lose more than half their edge. The term is centred on 50
-  and not on the reference sample's mean: the zero is the same on every
-  board and needs no sample, and a comp's share of the optimal is its
-  share of the optimal's edge over a coin flip.
+  so that only the rarest heroes lose more than half their edge. The term
+  is centred on 50 and not on the reference sample's mean: the zero is the
+  same on every board and needs no sample, and a comp's share of the
+  optimal is its share of the optimal's edge over a coin flip.
 - **synergy**: `team.synergy_score`, the wiki's synergy scores among the
   six.
 - **counters**: the counter graph between the six and the other side,
@@ -68,8 +68,9 @@ three terms favour, scored and explained:
   answers from the kits at load: thirteen mechanisms (anti-air, a flier,
   barrier piercing, anti-heal, burst, control, a projectile eater and a
   weapon it cannot take, armor, dive, saves, reach, tank-busting) score
-  every ordered pair of released heroes, and each loser's six best
-  answers, scoring 0.5 or more and more than the reverse, weigh 1 each.
+  every ordered pair of released heroes. Each loser keeps its six best
+  answers that score 0.5 or more and more than the reverse, and those on
+  a pair the wiki has no edge on weigh 1 each.
   The other side is its locked picks, or, with none, its likely six on
   this map past the bans (`compute.expected_picks`, the six the board's
   red panel shows); either seat reads the other the same way. Only this
@@ -313,8 +314,9 @@ charge    = 2 x shortfall                     heal-rate's weight
 The floor is there because parity alone asks less healing of a smaller
 six, and the race never rewards a smaller pool: its margin rises with
 P_b. Under parity alone the engine drops a tank to slip under the bar;
-the floor stops that. The margin also rises with every support added, so a rule
-that maximised healing would drive toward five supports; a floor does not.
+the floor stops that. The margin also rises with every support added, so
+a rule that maximised healing would drive toward five supports; a floor
+does not.
 
 **Red as read.** Red's locked picks, and each open slot a role the 2-2-2
 (`EXPECTED_SHAPE`) still misses: d_r = max(0, 2 - red's count in r),
@@ -567,7 +569,7 @@ the `team.*` metrics computed for the red side.
 | `team.dps_floor` | summed published per-second damage figures (a floor: misses and healing ignored) |
 | `team.dps_count` | picks whose kit publishes a per-second damage figure |
 | `team.burst_max` | the biggest single hit on the team, a headshot where one counts |
-| `team.one_shots` | picks whose biggest hit, not a melee swing, kills a 250-pool hero |
+| `team.one_shots` | picks with no melee weapon whose biggest hit kills a 250-pool hero |
 | `team.burst_hero` (text) | who holds the biggest single hit |
 | `team.burst_ranged` | the biggest single hit from a pick that is not melee-only |
 | `team.ult_damage_total` | summed max damage across the team's damage ultimates |

@@ -26,11 +26,10 @@ Only this term reads the kit's derived edges. The team.* counter metrics -
 coverage, exposed_count, net_edges and their family - read the wiki's
 graph alone: the playbook's counter rules are written and weighed against
 the wiki's judgement, and a derived edge is the kit's reading, at half a
-wiki edge's weight here. team.net_edges stays the wiki's edges counted once
-each against red's picks; this term is the weighted graph against the side
-it reads, another number under another name. The board says which edges
-are derived: this term's fact lists each one with the mechanism that fired,
-as do the heroes' facts (hero.vs_derived).
+wiki edge's weight here. team.net_edges counts the wiki's edges once each
+against red's picks; this term weighs the graph against the side it reads.
+The board says which edges are derived: this term's fact lists each one
+with the mechanism that fired, as do the heroes' facts (hero.vs_derived).
 
 The rate term is centred on 50, a coin flip, and not on the reference
 sample's mean: the zero is the same on every board, so a six's term needs no
@@ -129,7 +128,7 @@ def stamp(weights: BaseWeights) -> BaseStamp | None:
 
 class Opponent(NamedTuple):
     """The other side the counter term reads: its heroes, and whether they are
-    its likely six rather than picks it has made."""
+    its likely six."""
     heroes: tuple[Hero, ...]
     likely: bool
 
@@ -153,8 +152,8 @@ class Terms(NamedTuple):
     @property
     def counters(self) -> int:
         """Answer weight less exposure weight against the other side the
-        term reads. team.net_edges counts the wiki's edges alone, once each,
-        against red's picks alone."""
+        term reads. team.net_edges is another number: the wiki's edges, once
+        each, against red's picks."""
         return self.answers - self.exposures
 
 

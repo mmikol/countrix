@@ -69,7 +69,8 @@ TEAM_METRICS = OrderedDict([
         "summed published per-second damage figures (a floor: misses and healing ignored)"),
     ("dps_count", "picks whose kit publishes a per-second damage figure"),
     ("burst_max", "the biggest single hit on the team, a headshot where one counts"),
-    ("one_shots", "picks whose biggest hit, not a melee swing, kills a 250-pool hero"),
+    ("one_shots", "picks with no melee weapon whose biggest hit kills a %d-pool hero"
+                  % SQUISHY_POOL),
     ("burst_hero", "who holds the biggest single hit"),
     ("burst_ranged", "the biggest single hit from a pick that is not melee-only"),
     ("ult_damage_total", "summed max damage across the team's damage ultimates"),

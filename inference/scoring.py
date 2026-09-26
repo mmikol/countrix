@@ -114,7 +114,7 @@ def _slot_gate(held: list[bool | None], slot: int, strategy: Strategy, sc: Scope
 
 def _norm(raw: float, lo: float, span: float | None, minimize: bool, need: bool) -> float:
     """A heuristic's raw value on its reference scale, clamped to [0, 1] and
-    flipped where it minimises; with no spread, the middle."""
+    flipped where it minimises; with no spread, the middle, and a need 1."""
     if span is None:
         return 1.0 if need else 0.5    # a need nothing here can miss costs nothing
     norm = (raw - lo) / span
@@ -417,7 +417,8 @@ class Objective:
 
     def _freeze_norms(self) -> None:
         """One Norm per heuristic for the scoring loop. A spread of None -
-        the sample never moved - normalises everything to 0.5. A need whose
+        the sample never moved - normalises a heuristic to 0.5 and a need to
+        1.0, which costs nothing. A need whose
         guarded sixes never spread - none of the reference meets its guard,
         or all that do share one value - reads its metric over every
         reference six instead: a state the reference never met is not free

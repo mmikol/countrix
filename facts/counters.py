@@ -47,15 +47,17 @@ that publishes no reach is guessed at what it covers in PROJECTILE_WINDOW,
 or MAX_REACH for hitscan, only where the hero's primary fire publishes none
 either: where it does, the kit has said how far the hero fights, and a
 secondary fire's silence is unknown, not 57.5 m (Mei's Icicle beside the
-Endothermic Blaster's 12). A movement tool's hit (Reinhardt's Charge, 300
-pinned to a wall) is not burst: the dash is control, which the cc
-mechanism reads, and counting it twice made the charge a one-shot.
+Endothermic Blaster's 12). The matrix's burst leaves out a movement tool's
+hit (Reinhardt's Charge, 300 pinned to a wall): the dash is control, which
+the cc mechanism reads, and counting it twice made the charge a one-shot.
+Hero.burst, which the team metrics read, keeps it.
 
-The graph. The wiki decides every pair it has an edge on, either way. On a
-pair it has none on, the loser's TOP_ANSWERS best derived answers - score
-at least THRESHOLD, net above 0, ranked by score, then net, then name -
-count at DERIVED_WEIGHT against a wiki edge's WIKI_WEIGHT, so every tally
-stays an integer.
+The graph. The wiki decides every pair it has an edge on, either way. The
+matrix ranks each loser's answers - score at least THRESHOLD, net above 0,
+by score, then net, then name - and keeps the first TOP_ANSWERS; of those,
+each on a pair the wiki has no edge on counts at DERIVED_WEIGHT against a
+wiki edge's WIKI_WEIGHT, so every tally stays an integer. The cut comes
+first, so a loser the wiki answers often keeps fewer derived answers.
 """
 
 import math
@@ -76,7 +78,9 @@ FLOOR = 0.10            # a mechanism weaker than this does not fire
 THRESHOLD = 0.50        # a derived edge scores this or more
 ULT = 0.30              # an ultimate's tool, against an ability's 1: once a fight at best
 # --- the graph -------------------------------------------------------------------
-TOP_ANSWERS = 6         # each loser's derived answers, the wiki's 340 edges over 53 heroes
+# each loser's best answers kept: about as many as the wiki's 340 match-up edges
+# over 53 heroes give a loser
+TOP_ANSWERS = 6
 WIKI_WEIGHT = 2         # a wiki edge in a counter tally
 DERIVED_WEIGHT = 1      # a derived edge: half a wiki edge, so tallies stay integers
 # --- control and saves -----------------------------------------------------------
@@ -335,8 +339,9 @@ def _main(steady: Sequence[KitPiece]) -> KitPiece | None:
 
 
 def _burst(h: Hero) -> tuple[float, str]:
-    """The biggest single hit of a piece that is not a movement tool, a
-    headshot where one counts, and the piece."""
+    """The matrix's burst: the biggest single hit of a piece that is not a
+    movement tool or a pilot's gun, a headshot where one counts, and the
+    piece. Hero.burst counts both."""
     best, where = 0.0, ""
     for piece in (*h.weapons, *(a for a in h.abilities if a.kind != KIND_ULTIMATE)):
         if piece.name in PILOT_GUNS or (piece.kind == KIND_ABILITY and _movement(piece)):
@@ -703,9 +708,9 @@ def pairing(win: Features, lose: Features) -> Pairing:
 def derive(world: World) -> None:
     """The matrix over the released heroes (world.matrix, {(winner, loser):
     Pairing}) and the derived edges the graph fills with (world.derived,
-    {(loser, winner): DerivedEdge}): each loser's TOP_ANSWERS best answers
-    on the pairs the wiki has no edge on. Deterministic: heroes by id,
-    ties by name."""
+    {(loser, winner): DerivedEdge}): each loser's TOP_ANSWERS best answers,
+    less those on a pair the wiki has an edge on. Deterministic: heroes by
+    id, ties by name."""
     released = sorted((h for h in world.heroes.values() if h.released), key=lambda h: h.id)
     supports = [h.hps for h in released if h.role == "support"]
     feats = {h.id: features(h, max(supports, default=0.0)) for h in released}
