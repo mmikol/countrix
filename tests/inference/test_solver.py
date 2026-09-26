@@ -339,6 +339,46 @@ def test_a_ban_does_not_rescale_the_board(synthetic_world):
     assert abs(first - second) < 1e-9, (first, second)
 
 
+def test_a_team_metric_is_bounded_the_same_whatever_red_reveals(synthetic_world, tmp_path):
+    """The scale field ranks each role by the map's prior with red left out,
+    so a metric that reads only the six keeps its bounds when red reveals a
+    pick, and one six's norm on it holds still across reds. The field used
+    to rank against red, and moved them. Three twins a role widen the roster
+    past SCALE_POOL, so the field leaves heroes out and red could reorder it."""
+    from inference import scale
+    from inference import solver as solver_module
+    world = synthetic_world
+    next_id = max(world.heroes) + 1
+    for role in ("tank", "damage", "support"):
+        best = max((h for h in world.heroes.values() if h.role == role and h.released),
+                   key=lambda h: h.win)
+        for i in range(3):
+            twin = dataclasses.replace(best, id=next_id, name="%s %d" % (best.name, i + 2),
+                                       win=best.win + 0.5 * (i + 1), map_rates={})
+            world.heroes[twin.id] = twin
+            world.by_key[name_key(twin.name)] = twin.id
+            next_id += 1
+    (tmp_path / "damage.md").write_text(
+        "---\nname: damage\nkind: heuristic\ndirection: maximize\nmetric: team.dps_floor\n"
+        "---\nx\n", "utf-8")
+    playbook = catalog.load(str(tmp_path))
+    bounds, fields, ranked = [], [], []
+    for red in ((), ("Gale",), ("Mortar", "Gale", "Rook")):
+        m, red_h, _, _ = world.resolve("Harbor Gate", red, [], [])
+        solver = solver_module.Solver(world, m, red=red_h, locked=[], side="attack",
+                                      catalog=playbook, base=DEFAULT)
+        solver.freeze_bounds()
+        bounds.append(solver.bounds["damage"])
+        fields.append([h.name for r in ("tank", "damage", "support")
+                       for h in scale._board_pool(solver, r)])
+        ranked.append([h.name for r in ("tank", "damage", "support")
+                       for h in sorted((h for h in world.heroes.values() if h.role == r),
+                                       key=lambda h: (-scale.board_prior(solver, h), h.name))
+                       [:scale.SCALE_POOL]])
+    assert len(set(map(tuple, ranked))) > 1         # read against red, the field would move
+    assert fields[0] == fields[1] == fields[2] and bounds[0] == bounds[1] == bounds[2]
+
+
 def test_the_order_of_a_six_does_not_decide_the_ranking(synthetic_world):
     """_rank_key's third element breaks ties, so it has to be a property of the
     hero set - in seat order one set keys 720 ways."""

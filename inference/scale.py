@@ -170,44 +170,50 @@ def reference_bounds(objective: Objective, index: int = 0, count: int = 1) -> Bo
     return _bounds_over(objective, prepared)
 
 
-def board_prior(objective: Objective, h: Hero, partners: int = 0) -> float:
+def board_prior(objective: Objective, h: Hero, partners: int = 0, *,
+                versus: bool = True) -> float:
     """The ranking that cut the pools before the playbook ranked them itself:
     the hero's win rate here, three points for each enemy it answers less
     three for each that answers it, two for each locked pick it partners, one
     for the map's style and one for a map it is best on.
 
-    With no partners it is the board's own ranking. A point per partner is
-    right when ranking a pool to search and wrong when choosing the field that
-    fixes the scale - that field has to be the same for every seat and every
-    set of locks on this board."""
+    With no partners it is the board's ranking against red. A point per
+    partner or per enemy is right when ranking a pool to search and wrong
+    when choosing the field that fixes the scale - that field has to be the
+    same for every seat, every red and every set of locks on this map and
+    side - so the field reads it with no partners and `versus` off."""
     m, world = objective.m, objective.world
     here = h.map_win(m.id) if m is not None else None
     base = here if here is not None else (h.win if h.win is not None else 50.0)
-    answers = sum(1 for e in objective.red if world.is_countered_by(e.id, h.id))
-    exposed = sum(1 for e in objective.red if world.is_countered_by(h.id, e.id))
+    red = objective.red if versus else []
+    answers = sum(1 for e in red if world.is_countered_by(e.id, h.id))
+    exposed = sum(1 for e in red if world.is_countered_by(h.id, e.id))
     style = 1 if (m is not None and m.style_top in h.styles) else 0
     best = 1 if (m is not None and m.id in h.best_maps) else 0
     return base + 3.0 * answers - 3.0 * exposed + 2.0 * partners + style + best
 
 
 def _board_pool(objective: Objective, role: str) -> list[Hero]:
-    """One role's top SCALE_POOL released heroes by the board's own prior."""
+    """One role's top SCALE_POOL released heroes by the map's own prior, red
+    left out: a field that moved with red moved every team-only metric's
+    bounds with it, so one six's norm changed when red revealed a pick."""
     # not filtered by the bans, on purpose, exactly as sample() is not:
     # this field is half the population that fixes the scale, and a ban
     # that moved it would move the score of an unchanged six. Bans keep
     # banned heroes out of the CANDIDATE field in pools(); the measuring
     # stick has to hold still
     heroes = [h for h in objective.world.heroes.values() if h.role == role and h.released]
-    heroes.sort(key=lambda h: (-board_prior(objective, h), h.name))
+    heroes.sort(key=lambda h: (-board_prior(objective, h, versus=False), h.name))
     return heroes[:SCALE_POOL]
 
 
 def _board_field(objective: Objective) -> Iterator[list[Hero]]:
-    """The field this board would search with nothing locked: each role's
-    top SCALE_POOL by the board's own prior, over every legal shape.
+    """The field this map and side would search with nothing locked and no
+    red: each role's top SCALE_POOL by the map's own prior, over every legal
+    shape.
 
-    It must not read the locked picks, and it takes SCALE_POOL rather than
-    the pool this search happens to use. The bounds it feeds are the
+    It must not read the locked picks or red, and it takes SCALE_POOL rather
+    than the pool this search happens to use. The bounds it feeds are the
     board's one scale: `infer`, `evaluate`, `current` and the countered
     what-if run with different locks and different pool sizes on the same
     board, and a scale that moved with either would make a current comp and
