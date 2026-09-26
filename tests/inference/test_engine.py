@@ -29,31 +29,31 @@ def test_board_solves_both_seats_on_opposite_sides_and_scores_the_current(synthe
     assert blue.seat == "blue" and blue.side == "attack" and blue.locked == []
     absolute = engine.infer(world, Draft("Harbor Gate", ("Mortar", "Gale"), (), side="attack"),
                             catalog=fix)
-    assert blue.blue == absolute.blue                     # blue's optimal ignores your picks
-    assert red.seat == "red" and red.side == "defense" and len(red.blue) == 6
+    assert blue.six == absolute.six                     # blue's optimal ignores your picks
+    assert red.seat == "red" and red.side == "defense" and len(red.six) == 6
     # red's optimal: their best counter to ours
-    assert red.locked == [] and red.red == ["Balm"]
+    assert red.locked == [] and red.against == ["Balm"]
     theirs = engine.infer(world, Draft("Harbor Gate", ("Balm",), (), side="defense"), catalog=fix)
-    assert red.blue == theirs.blue
-    assert cur.kind == "current" and cur.partial and cur.blue == ["Balm"]
+    assert red.six == theirs.six
+    assert cur.kind == "current" and cur.partial and cur.six == ["Balm"]
     assert cur.contributions and cur.score is not None
     rc = b.red_current                                  # their comp as revealed, scored vs ours
     assert rc.seat == "red"
-    assert set(rc.blue) == {"Mortar", "Gale"}
-    assert rc.red == ["Balm"]
+    assert set(rc.six) == {"Mortar", "Gale"}
+    assert rc.against == ["Balm"]
     assert rc.partial
     assert rc.to_dict()["normalized"] is None        # a partial team has no share
     assert b.countered is not None and b.countered.kind == "countered"
     fill = b.fill                                       # the empty slots, filled around Balm
     assert fill.kind == "fill"
     assert fill.locked == ["Balm"]
-    assert len(fill.blue) == 6
-    assert "Balm" in fill.blue
+    assert len(fill.six) == 6
+    assert "Balm" in fill.six
     assert [p["locked"] for p in fill.picks].count(True) == 1
     assert 0 < fill.to_dict()["normalized"] <= 100
     around = engine.infer(world, Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm",),
                                        side="attack"), catalog=fix)
-    assert fill.blue == around.blue
+    assert fill.six == around.six
     mo = b.momentum
     assert set(mo) >= {"blue", "red", "countered", "verdict", "partial"} and mo["partial"]
     # each seat is half-drafted, so its share is read through its fill - the best
@@ -144,7 +144,7 @@ def test_legal_shapes_follow_the_playbook_and_the_board_carries_them(synthetic_w
     d = b.to_dict()
     assert d["shapes"] == b.shapes
     # red's likely six rides along - static: the map and the meta, not their reveal
-    assert d["expected"]["kind"] == "expected" and "Mortar" not in d["expected"]["blue"]
+    assert d["expected"]["kind"] == "expected" and "Mortar" not in d["expected"]["six"]
     assert len(d["expected"]["picks"]) == 6 and all(p["why"] for p in d["expected"]["picks"])
     assert not any(p["locked"] for p in d["expected"]["picks"])
 
@@ -166,7 +166,7 @@ def test_the_queue_caps_tanks_at_two_whatever_the_playbook_holds(synthetic_world
                            ("Harbor Gate", ["Anvil", "Kite"])):
         d = engine.board(world, Draft(map_name, (), tuple(blue)),
                          catalog=ASSUMPTIONS_ONLY).to_dict()
-        sixes = [d[seat]["blue"] for seat in ("blue", "red", "fill", "expected") if d[seat]]
+        sixes = [d[seat]["six"] for seat in ("blue", "red", "fill", "expected") if d[seat]]
         assert len(sixes) == (4 if blue else 3)
         for six in sixes:
             assert sum(world.hero(n).role == "tank" for n in six) <= MAX_TANKS, (map_name, six)
@@ -190,9 +190,9 @@ def test_an_empty_catalog_is_the_callers_and_loads_no_playbook(synthetic_world, 
         raise AssertionError("the playbook was loaded")
     monkeypatch.setattr(engine.catalog_module, "load", load)
     result = engine.infer(synthetic_world, Draft("Harbor Gate"), catalog=[], top=1)
-    assert len(result.blue) == 6 and result.catalog == []
+    assert len(result.six) == 6 and result.catalog == []
     b = engine.board(synthetic_world, Draft("Harbor Gate"), catalog=[])
-    assert len(b.blue.blue) == 6 and b.blue.catalog == []
+    assert len(b.blue.six) == 6 and b.blue.catalog == []
 
 
 def test_blue_counters_the_likely_six_until_red_reveals_a_pick(synthetic_world):
@@ -206,16 +206,16 @@ def test_blue_counters_the_likely_six_until_red_reveals_a_pick(synthetic_world):
     m = world.map("Harbor Gate")
     likely = [p["hero"] for p in compute.expected_picks(world, m)]
     b = engine.board(world, Draft("Harbor Gate", (), ("Balm",)), catalog=fix)
-    assert b.blue.red == [] and b.current.red == [] and b.fill.red == []
+    assert b.blue.against == [] and b.current.against == [] and b.fill.against == []
     for seat in (b.blue, b.current, b.fill):
         [c] = [c for c in seat.contributions if c["id"] == base.COUNTERS]
         assert c["likely"] and c["against"] == likely
-    assert b.expected.blue == likely and b.expected.kind == "expected"
+    assert b.expected.six == likely and b.expected.kind == "expected"
     assert [p["hero"] for p in b.expected.picks] == likely
     assert "their likely starting comp" in b.rendered()
     revealed = engine.board(world, Draft("Harbor Gate", ("Mortar",), ("Balm",)), catalog=fix)
-    assert revealed.blue.red == ["Mortar"] and revealed.current.red == ["Mortar"]
-    assert revealed.expected.blue == likely                      # static
+    assert revealed.blue.against == ["Mortar"] and revealed.current.against == ["Mortar"]
+    assert revealed.expected.six == likely                      # static
 
 
 def test_board_ranks_a_full_six_and_ignores_sides_on_control(synthetic_world):
@@ -227,18 +227,18 @@ def test_board_ranks_a_full_six_and_ignores_sides_on_control(synthetic_world):
                      catalog=fix)
     assert b.side == "" and b.blue.side == "" and b.red.side == ""
     assert b.current.kind == "evaluate" and b.current.rank >= 1
-    assert set(b.current.blue) == set(six)
+    assert set(b.current.six) == set(six)
     assert b.blue.locked == [] and b.blue.to_dict()["normalized"] == 100
     assert 0 <= b.current.to_dict()["normalized"] <= 100      # against the absolute optimal
     b = engine.board(world, Draft(), catalog=fix)
-    assert not b.current.blue and b.current.partial
+    assert not b.current.six and b.current.partial
     # nothing locked: the optimal is the fill
     assert b.countered is None and b.fill is None
     assert b.momentum["verdict"] == "no picks yet on either side"
     assert b.momentum["blue"] is None and b.momentum["red"] is None
     assert b.plan.startswith("No map yet, so this is the meta's best six")
     assert b.plan.endswith("Based on: the Role Queue rates and counters.")
-    assert len(b.blue.blue) == 6                      # the meta's best six, before any map
+    assert len(b.blue.six) == 6                      # the meta's best six, before any map
     b = engine.board(world, Draft("Ember Ruins", (), (), ("Needle",)), catalog=fix)
     assert b.plan.endswith("the map, 1 ban.") and b.plan.count("\n") >= 2
     assert b.plan.startswith("Ember Ruins is a Control map: one point in three arenas")
@@ -258,9 +258,9 @@ def test_a_board_on_the_synthetic_world_holds_every_seat(synthetic_world, scratc
                      catalog=scratch_playbook)
     assert b.blue.kind == "infer" and b.blue.side == "attack"
     assert b.red.seat == "red" and b.red.side == "defense"
-    assert b.current.partial and b.current.blue == ["Balm"]
-    assert b.fill.kind == "fill" and len(b.fill.picks) == 6 and "Balm" in b.fill.blue
-    assert b.countered.kind == "countered" and b.countered.red == b.red.blue
+    assert b.current.partial and b.current.six == ["Balm"]
+    assert b.fill.kind == "fill" and len(b.fill.picks) == 6 and "Balm" in b.fill.six
+    assert b.countered.kind == "countered" and b.countered.against == b.red.six
     assert set(b.momentum) == set(Momentum.__annotations__)
     assert b.plan.split("\n")[-1].startswith("Based on: ")
     assert b.shapes == [list(s) for s in legal_shapes(scratch_playbook)]
@@ -289,8 +289,8 @@ def test_a_newer_board_from_the_same_client_supersedes_the_older_one(
 
 def _shortfall(world, result):
     """matchup.heal_shortfall of a result's six against its red, as scored."""
-    six = [world.hero(n) for n in result.blue]
-    red = [world.hero(n) for n in result.red]
+    six = [world.hero(n) for n in result.six]
+    red = [world.hero(n) for n in result.against]
     return compute.matchup_metrics(world, team_metrics(world, six, None, red),
                                    team_metrics(world, red, None, ()))["heal_shortfall"]
 
@@ -337,7 +337,7 @@ def test_the_healing_floor_takes_kings_row_off_one_support(world, tmp_path):
     floored = engine.infer(world, draft, catalog=heal_rate(str(tmp_path)))
 
     def supports(result):
-        return sum(1 for n in result.blue if world.hero(n).role == "support")
+        return sum(1 for n in result.six if world.hero(n).role == "support")
 
     assert supports(plain) == 1 and _shortfall(world, plain) > 0.5
     assert supports(floored) >= 2 and _shortfall(world, floored) < 0.15

@@ -45,12 +45,12 @@ def test_the_pool_is_bounded_by_the_field_it_would_enumerate():
 def test_service_infers_evaluates_and_lists(db):
     data, code = serve.handle_infer(db, {"map": ["King's Row"], "red": ["Zarya"],
                                          "blue": ["Ana"]})
-    assert code == 200 and data["kind"] == "infer" and len(data["blue"]) == 6
+    assert code == 200 and data["kind"] == "infer" and len(data["six"]) == 6
     six = ["Reinhardt", "Zarya", "Widowmaker", "Bastion", "Ana", "Lúcio"]
     data, code = serve.handle_infer(db, {"blue": six})
     # /infer infers whatever blue holds; ranking a full six against the field is
     # /evaluate's question, and the MCP tool of the same name draws the line here too
-    assert code == 200 and data["kind"] == "infer" and sorted(data["blue"]) == sorted(six)
+    assert code == 200 and data["kind"] == "infer" and sorted(data["six"]) == sorted(six)
     with pytest.raises(Refusal, match="exactly 6"):     # the boundary answers it 400
         serve.handle_evaluate(db, {"blue": ["Ana"]})
     data, code = serve.handle_strategies()
@@ -67,9 +67,9 @@ def test_the_board_handler_serves_both_seats_and_the_current_comp(db):
         data, code = serve.handle_board(db, {
             "map": ["King's Row"], "red": ["Zarya"], "blue": ["Ana"], "side": [side]})
         assert code == 200 and data["side"] == side
-        assert data["blue"]["kind"] == "infer" and len(data["blue"]["blue"]) == 6
+        assert data["blue"]["kind"] == "infer" and len(data["blue"]["six"]) == 6
         assert data["red"]["seat"] == "red" and data["red"]["side"] == other
-        assert data["current"]["partial"] and data["current"]["blue"] == ["Ana"]
+        assert data["current"]["partial"] and data["current"]["six"] == ["Ana"]
         assert data["blue"]["cited"] and all(p["evidence"] for p in data["blue"]["picks"])
         assert data["countered"] is None                   # the page never reads it
     data, code = serve.handle_board(db, {
@@ -354,10 +354,10 @@ def test_a_broken_playbook_degrades_health_and_fails_the_strategies_route(
 def test_board_infer_and_evaluate_are_served(served, monkeypatch, dsn):
     monkeypatch.setattr(serve.psql, "default_dsn", lambda: dsn)
     code, data = _get(served + "/board?map=Ilios&blue=Ana&red=Zarya")
-    assert code == 200 and data["blue"]["blue"] and data["momentum"]["verdict"]
+    assert code == 200 and data["blue"]["six"] and data["momentum"]["verdict"]
     code, data = _get(served + "/infer?map=Ilios&red=Zarya")
-    assert code == 200 and len(data["blue"]) == 6
-    six = "&".join("blue=" + quote(h) for h in data["blue"])
+    assert code == 200 and len(data["six"]) == 6
+    six = "&".join("blue=" + quote(h) for h in data["six"])
     code, data = _get(served + "/evaluate?map=Ilios&red=Zarya&" + six)
     assert code == 200 and data["rank"] == (None if data["unscored"] else 1)
     code, data = _get(served + "/evaluate?map=Ilios&blue=Ana")

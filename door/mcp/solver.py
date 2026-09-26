@@ -95,7 +95,7 @@ def _compact(result: Result) -> tuple[str, CompactInfer]:
     largest = sorted((c for c in terms if c["weighted"]),
                      key=lambda c: (-abs(c["weighted"]), c["id"]))[:COMPACT_TERMS]
     payload = CompactInfer(
-        map=result.map_name, side=result.side, red=list(result.red), blue=list(result.blue),
+        map=result.map_name, side=result.side, red=list(result.against), blue=list(result.six),
         score=round(result.score, 3), terms=len(terms), idle=idle, silent=silent,
         largest=[WeightedTerm(id=c["id"], weighted=round(c["weighted"], 4)) for c in largest])
     lines = result.rendered().split("\n")[:2]

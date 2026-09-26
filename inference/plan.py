@@ -49,14 +49,14 @@ def momentum(seats: Seats) -> Momentum:
     page shows the engine's words and decides nothing."""
     cur, red_cur = seats.current, seats.red_current
     badges = Badges(blue=_badge(cur, seats.fill), red=_badge(red_cur, seats.red_fill))
-    blue_why = cur.unscored() if cur.blue or seats.blue is None else seats.blue.waiting()
-    red_why = red_cur.unscored() if red_cur.blue or seats.red is None else seats.red.waiting()
+    blue_why = cur.unscored() if cur.six or seats.blue is None else seats.blue.waiting()
+    red_why = red_cur.unscored() if red_cur.six or seats.red is None else seats.red.waiting()
     if blue_why and red_why:                       # neither seat can be a share of anything
         return Momentum(blue=None, red=None, countered=None, partial=False, odds=None,
                         verdict=blue_why, badges=badges)
     blue_share, red_share, countered_share = _shares(seats, blue_why, red_why)
     odds = _odds(blue_share, red_share)
-    partial = bool((cur.blue and cur.partial) or (red_cur.blue and red_cur.partial))
+    partial = bool((cur.six and cur.partial) or (red_cur.six and red_cur.partial))
     verdict = _verdict_line(cur, red_cur, blue_share, red_share, partial, odds,
                             blue_why, red_why)
     if countered_share is not None:
@@ -74,10 +74,10 @@ def _shares(
     solved, and the countered case is a fill of blue's picks too, so the
     three are measured the same way."""
     cur, red_cur, countered = seats.current, seats.red_current, seats.countered
-    blue_share = _now(cur, seats.fill).share() if cur.blue and not blue_why else None
-    red_share = _now(red_cur, seats.red_fill).share() if red_cur.blue and not red_why else None
+    blue_share = _now(cur, seats.fill).share() if cur.six and not blue_why else None
+    red_share = _now(red_cur, seats.red_fill).share() if red_cur.six and not red_why else None
     countered_share = None
-    if countered is not None and countered.blue and not countered.unscored():
+    if countered is not None and countered.six and not countered.unscored():
         countered_share = countered.share()
     return blue_share, red_share, countered_share
 
@@ -85,7 +85,7 @@ def _shares(
 def _now(current: Result, fill: Result | None) -> Result:
     """A seat as the verdict reads it: its fill while it is half-drafted and
     one was solved, else its current comp."""
-    return fill if fill is not None and current.partial and current.blue else current
+    return fill if fill is not None and current.partial and current.six else current
 
 
 def _badge(current: Result, fill: Result | None) -> Badge:
@@ -98,7 +98,7 @@ def _badge(current: Result, fill: Result | None) -> Badge:
     why = current.unscored()
     if why is not None:
         return Badge(label="unscored", tip=why)
-    if not current.blue:
+    if not current.six:
         return Badge(label="100 / 100", tip="no %s picks yet: the suggested six is this"
                                             " seat's optimal, 100" % current.seat)
     share = _now(current, fill).share()
@@ -123,7 +123,7 @@ def _verdict_line(
         cur: Result, red_cur: Result, blue_share: int | None, red_share: int | None,
         partial: bool, odds: Odds | None, blue_why: str | None, red_why: str | None) -> str:
     """The verdict in words, before the countered hedge."""
-    if (blue_why and cur.blue) or (red_why and red_cur.blue):   # one seat scores, the other waits
+    if (blue_why and cur.six) or (red_why and red_cur.six):   # one seat scores, the other waits
         return _one_seat_waits(cur, red_cur, blue_share, red_share, blue_why, red_why)
     if blue_share is not None and red_share is not None:
         return _gap_line(blue_share, red_share, partial, odds)
@@ -143,10 +143,10 @@ def _one_seat_waits(
     def waits(why: str | None) -> str:
         return "unscored: " + (why or "").split(": ", 1)[-1]
     sides = [
-        "no blue picks yet" if not cur.blue else
+        "no blue picks yet" if not cur.six else
         "blue %d / 100 of its optimal" % blue_share if blue_share is not None else
         "blue " + waits(blue_why),
-        "no red picks revealed yet" if not red_cur.blue else
+        "no red picks revealed yet" if not red_cur.six else
         "red %d / 100 of its best counter" % red_share if red_share is not None else
         "red " + waits(red_why)]
     return "; ".join(sides)
@@ -314,7 +314,7 @@ def _yours(six: Result) -> list[str]:
     none in the optimal, which blue's picks never constrain."""
     if six.kind == "fill":
         return list(six.locked)
-    return list(six.blue) if six.kind == "evaluate" else []
+    return list(six.six) if six.kind == "evaluate" else []
 
 
 def _keeps(six: Result, yours: Sequence[str]) -> str | None:

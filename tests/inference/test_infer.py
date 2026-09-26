@@ -21,13 +21,13 @@ def test_infer_keeps_locked_picks_and_the_open_queue_shape(synthetic_world):
     world = synthetic_world
     r = engine.infer(world, Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm",)),
                      catalog=catalog.load(FIXTURE_PLAYBOOK))
-    assert len(r.blue) == 6 and "Balm" in r.blue
-    roles = [world.hero(n).role for n in r.blue]
+    assert len(r.six) == 6 and "Balm" in r.six
+    roles = [world.hero(n).role for n in r.six]
     assert roles.count("tank") <= 2
     assert r.considered > 100 and r.score > 0
     assert any(p["hero"] == "Balm" and p["locked"] for p in r.picks)
     # every pick cites facts the board for (map, red, the five) shows
-    assert r.facts.draft.blue == tuple(r.blue)
+    assert r.facts.draft.blue == tuple(r.six)
     ids = {f.id for f in r.facts.facts}
     for p in r.picks:
         assert p["evidence"] and set(p["evidence"]) <= ids
@@ -42,7 +42,7 @@ def test_infer_honours_a_hitscan_answer_to_a_flier(synthetic_world):
     world = synthetic_world
     r = engine.infer(world, Draft("Harbor Gate", ("Gale", "Balm")),
                      catalog=catalog.load(FIXTURE_PLAYBOOK))
-    assert any(world.hero(n).hitscan for n in r.blue)
+    assert any(world.hero(n).hitscan for n in r.six)
     anti = next(c for c in r.contributions if c["id"] == "anti-air")
     assert anti["applies"] and anti["ok"]
 
@@ -83,7 +83,7 @@ def test_infer_never_drafts_a_banned_hero(synthetic_world):
     fix = catalog.load(FIXTURE_PLAYBOOK)
     r = engine.infer(world, Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm",),
                                   ("Needle", "Rook", "Anvil")), catalog=fix)
-    assert not {"Needle", "Rook", "Anvil"} & set(r.blue)
+    assert not {"Needle", "Rook", "Anvil"} & set(r.six)
     assert r.bans == ["Needle", "Rook", "Anvil"] and "banned" in r.rendered()
     assert r.facts.draft.bans == tuple(r.bans)
     with pytest.raises(Refusal, match="banned this match"):
@@ -100,24 +100,24 @@ def test_scores_share_one_scale_per_board(synthetic_world):
     # no lock: evaluate ranks a six against the whole unlocked field, and the best six
     # that keeps a locked pick need not be the best of that field
     r = engine.infer(world, Draft("Harbor Gate", red), catalog=fix)
-    e = engine.evaluate(world, Draft("Harbor Gate", red, tuple(r.blue)), catalog=fix)
+    e = engine.evaluate(world, Draft("Harbor Gate", red, tuple(r.six)), catalog=fix)
     assert abs(r.score - e.score) < 1e-9 and e.rank == 1
     held = engine.infer(world, Draft("Harbor Gate", red, ("Balm",)), catalog=fix)
-    again = engine.evaluate(world, Draft("Harbor Gate", red, tuple(held.blue)), catalog=fix)
-    assert "Balm" in held.blue and abs(held.score - again.score) < 1e-9
+    again = engine.evaluate(world, Draft("Harbor Gate", red, tuple(held.six)), catalog=fix)
+    assert "Balm" in held.six and abs(held.score - again.score) < 1e-9
     assert r.to_dict()["normalized"] == 100 and e.to_dict()["normalized"] == 100
     assert all(0 <= a["normalized"] <= 100 for a in r.alternatives)
     assert r.alternatives[0]["score"] < r.score        # below the optimum, if only by a hair
     assert r.alternatives[0]["normalized"] <= 100
     best = engine.infer(world, Draft("Harbor Gate", red), catalog=fix)
-    b = engine.board(world, Draft("Harbor Gate", red, tuple(best.blue)), catalog=fix)
-    assert abs(b.current.score - best.score) < 1e-9 and b.blue.blue == best.blue
+    b = engine.board(world, Draft("Harbor Gate", red, tuple(best.six)), catalog=fix)
+    assert abs(b.current.score - best.score) < 1e-9 and b.blue.six == best.six
     assert b.current.to_dict()["normalized"] == 100 and b.red.to_dict()["normalized"] == 100
     # around Balm
-    b = engine.board(world, Draft("Harbor Gate", red, tuple(r.blue)), catalog=fix)
-    assert b.blue.blue == best.blue and b.current.to_dict()["normalized"] <= 100
+    b = engine.board(world, Draft("Harbor Gate", red, tuple(r.six)), catalog=fix)
+    assert b.blue.six == best.six and b.current.to_dict()["normalized"] <= 100
     again = engine.infer(world, Draft("Harbor Gate", red, ("Balm",)), pool_size=4, catalog=fix)
-    rescored = engine.evaluate(world, Draft("Harbor Gate", red, tuple(again.blue)), catalog=fix)
+    rescored = engine.evaluate(world, Draft("Harbor Gate", red, tuple(again.six)), catalog=fix)
     assert abs(again.score - rescored.score) < 1e-9
 
 
@@ -135,13 +135,13 @@ def test_an_announced_hero_is_described_but_never_picked(synthetic_world):
     with pytest.raises(Refusal, match="announced"):
         engine.board(world, Draft(red=(h.name,)), catalog=fix)
     r = engine.infer(world, Draft(), catalog=fix)
-    assert h.name not in r.blue and all(a["blue"] for a in r.alternatives)
-    assert not any(h.name in a["blue"] for a in r.alternatives)   # nor does the field hold it
+    assert h.name not in r.six and all(a["six"] for a in r.alternatives)
+    assert not any(h.name in a["six"] for a in r.alternatives)   # nor does the field hold it
     # and under a playbook that ties most sixes, where the local search swaps freely:
     # the announced hero reached the alternatives through refine once
     limit_only = [s for s in fix if s.form == "limit" and not s.soft]
     r = engine.infer(world, Draft(), catalog=limit_only)
-    assert h.name not in r.blue and not any(h.name in a["blue"] for a in r.alternatives)
+    assert h.name not in r.six and not any(h.name in a["six"] for a in r.alternatives)
 
 
 @pytest.mark.parametrize("base", [OFF, DEFAULT], ids=["base-off", "base-on"])
@@ -157,10 +157,10 @@ def test_the_fill_is_the_optimal_whenever_the_optimal_holds_every_lock(synthetic
     assert not catalog.has_scoring_terms(ASSUMPTIONS_ONLY)
     for map_name in ("Harbor Gate", "Ember Ruins"):
         best = engine.infer(world, Draft(map_name), catalog=ASSUMPTIONS_ONLY, base=base)
-        for hero in best.blue:
+        for hero in best.six:
             fill = engine.infer(world, Draft(map_name, blue=(hero,)), catalog=ASSUMPTIONS_ONLY,
                                 base=base)
-            assert fill.blue == best.blue, (map_name, hero, fill.blue)
+            assert fill.six == best.six, (map_name, hero, fill.six)
 
 
 def test_a_seat_solved_across_the_pool_is_timed_from_when_its_search_began(

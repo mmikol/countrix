@@ -212,7 +212,7 @@ def test_the_scripts_read_payload_keys_the_server_writes(synthetic_world, monkey
     read("plan momentum shapes current red_current fill expected blue map side", solved)
     read(
         "picks contributions alternatives considered seconds playstyle cited scoring unscored"
-        " blue", solved["current"])
+        " six", solved["current"])
     read("hero role why evidence portrait", Pick.__annotations__)
     read(
         "id kind applies ok weighted form when bonus penalty norm spread need metric raw"

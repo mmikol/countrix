@@ -138,7 +138,7 @@ def probe() -> Probe | None:
     or a playbook whose limits seat no composition."""
     started = time.time()
     data = get_json(PROBE, timeout=2 * MINUTE)
-    picks = (data or {}).get("blue", {}).get("blue") or []
+    picks = (data or {}).get("blue", {}).get("six") or []
     if len(picks) != 6:                            # a six, or the service failed
         return None
     return Probe(seconds=round(time.time() - started, 1), picks=picks)

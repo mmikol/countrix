@@ -175,8 +175,8 @@ function renderInf() {
      optimal, which blue's own picks never constrain; before any pick, the
      optimal alone. The picks' scores are the badges above the pickers */
   renderResult(d.expected, el('inf-red'), 'red - most likely starting comp' + (d.map ? ' on ' + d.map : ''));
-  var held = d.current && d.current.blue ? d.current.blue.length : 0;
-  var revealed = d.red_current && d.red_current.blue ? d.red_current.blue.length : 0;
+  var held = d.current && d.current.six ? d.current.six.length : 0;
+  var revealed = d.red_current && d.red_current.six ? d.red_current.six.length : 0;
   var ours = d.fill ? resultHTML(d.fill, 'blue - your picks, the rest filled')
            : held >= TEAM ? resultHTML(d.current, 'blue - your six') : '';
   el('inf-blue').innerHTML = ours + resultHTML(d.blue, 'blue - optimal vs red\'s ' + (revealed ? 'picks' : 'likely six') + (d.side ? ', on ' + d.side : ''));
@@ -216,7 +216,7 @@ function resultHTML(d, title) {
   out += d.contributions && d.contributions.length ? bars(d.contributions) : '';
   if (d.alternatives && d.alternatives.length) {
     out += "<div class='alts'><b>alternatives</b><ol>" +
-      d.alternatives.map(function (a) { return '<li>' + esc(a.blue.join(', ')) + '</li>'; }).join('') + '</ol></div>';
+      d.alternatives.map(function (a) { return '<li>' + esc(a.six.join(', ')) + '</li>'; }).join('') + '</ol></div>';
   }
   return out + '</div>';
 }

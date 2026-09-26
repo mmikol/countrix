@@ -14,7 +14,7 @@ from typing import Literal, NotRequired, TypedDict
 from facts.draft import TEAM_SIZE
 from facts.factset import Fact, FactSet
 from facts.model import ROLES
-from facts.team import text
+from facts.team import SPECIALIST_DELTA, text
 from inference import base as base_module
 from inference import catalog as catalog_module
 from inference.base import BaseWeights
@@ -45,7 +45,7 @@ class Pick(TypedDict):
 class Alternative(TypedDict):
     """A runner-up six: its heroes, its score, and its share of the result's
     best - None until the result is scaled, and where it reads unscored."""
-    blue: list[str]
+    six: list[str]
     score: float
     normalized: int | None
 
@@ -127,8 +127,8 @@ class Result:
     the six onto it and scale_to() sets what 100 means."""
     kind: ResultKind
     map_name: str | None
-    red: list[str]
-    blue: list[str]
+    against: list[str]                 # the other seat's revealed picks
+    six: list[str]                     # the seat's six, or its picks as they stand
     locked: list[str]
     catalog: list[Strategy]
     base: BaseWeights                  # the default engine's weights it was scored under
@@ -279,7 +279,7 @@ class Result:
         unscored = self.unscored()
         scoring = unscored is None
         return {"kind": self.kind, "seat": self.seat, "map": self.map_name,
-                "red": self.red, "blue": self.blue, "locked": self.locked,
+                "against": self.against, "six": self.six, "locked": self.locked,
                 "bans": self.bans, "side": self.side, "partial": self.partial,
                 "score": round(self.score, 3), "scoring": scoring, "unscored": unscored,
                 "weights": {s.id: s.weight for s in self.catalog if s.kind == "heuristic"},
@@ -302,7 +302,7 @@ class Result:
         unscored = self.unscored()
         lines = [self._headline(), "  %s%s - score %.2f %s%s, %d candidates considered in %.1fs"
                  " under %d constraints, %d heuristics and %d assumptions"
-                 % (", ".join(self.blue), " (%s)" % self.playstyle if self.playstyle else "",
+                 % (", ".join(self.six), " (%s)" % self.playstyle if self.playstyle else "",
                     self.score, self._share_label(unscored),
                     " (rank %d among the feasible field)" % self.rank
                     if self.rank else "", self.considered, self.seconds,
@@ -311,14 +311,14 @@ class Result:
             lines.append("  UNSCORED: " + unscored.split(" - ", 1)[-1])
         if self.partial:
             lines.append("  PARTIAL: %d of %d picked - sums read low until the team is full"
-                         % (len(self.blue), TEAM_SIZE))
+                         % (len(self.six), TEAM_SIZE))
         if self.violations:
             lines.append("  VIOLATES: " + ", ".join(self.violations))
         lines += ["  %-8s %-14s %s" % (p["role"], p["hero"] + ("*" if p["locked"] else ""),
                                        p["why"])
                   for p in self.picks]
         lines.append(self._breakdown())
-        lines += ["  alt %d: %s (%.2f)" % (i, ", ".join(alt["blue"]), alt["score"])
+        lines += ["  alt %d: %s (%.2f)" % (i, ", ".join(alt["six"]), alt["score"])
                   for i, alt in enumerate(self.alternatives, start=1)]
         if self.considerations:
             lines.append("  ground rules to reconcile against: " + ", ".join(
@@ -334,7 +334,7 @@ class Result:
             "red" if self.seat == "red" else "blue",
             " on %s" % self.side if self.side else "",
             " on %s" % self.map_name if self.map_name else "",
-            ", ".join(self.red) or "an unknown enemy",
+            ", ".join(self.against) or "an unknown enemy",
             " (locked: %s)" % ", ".join(self.locked) if self.locked else "",
             " (banned: %s)" % ", ".join(self.bans) if self.bans else "")
 
@@ -390,7 +390,7 @@ class Board:
         """The board as text: the plan, each seat, and the verdict."""
         parts = ["game plan:\n" + self.plan]
         parts += [r.rendered() for r in (self.blue, self.red, self.current, self.red_current)
-                  if r.blue or r.kind != "current"]
+                  if r.six or r.kind != "current"]
         if self.fill:
             parts.append(self.fill.rendered())
         if self.countered:
@@ -415,7 +415,7 @@ def _reasons(fs: FactSet, hero_name: str, locked: bool) -> tuple[str, list[str]]
     """The facts that justify one pick, from the board's own FactSet - the
     facts about OUR copy of the hero: a mirror pick has facts on both sides
     (red's Tracer answers our Ana; ours partners our D.Va), and only the
-    facts the FactSet filed under the seat's own side (its "blue") count. A
+    facts the FactSet filed under the seat's own six (its "blue") count. A
     win rate names the queue it was captured in."""
     why: list[str] = []
     evidence: list[str] = []
@@ -439,7 +439,7 @@ def _reasons(fs: FactSet, hero_name: str, locked: bool) -> tuple[str, list[str]]
         evidence.extend(f.id for f in partners[:3])
     cite("hero.map_win", lambda f: "wins %.1f%% here%s" % (f.value, rated))
     for f in own("hero.map_delta"):
-        if f.value >= 2.5:
+        if f.value >= SPECIALIST_DELTA:
             why.append("map specialist (%+.1f)" % f.value)
             evidence.append(f.id)
     cite("hero.map_style_fit", lambda f: "fits the %s style" % f.value)

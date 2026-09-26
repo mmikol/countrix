@@ -102,9 +102,9 @@ def test_the_search_reaches_the_enumerated_maximum(synthetic_world, catalog_copy
         best = feasible[0]
         assert best.score > feasible[-1].score, draft          # the playbook tells sixes apart
         got = engine.infer(world, draft, catalog=fix, pool_size=2, top=1, base=base)
-        if sorted(got.blue) != sorted(best.names) or abs(got.score - best.score) > 1e-9:
+        if sorted(got.six) != sorted(best.names) or abs(got.score - best.score) > 1e-9:
             missed.append("%s: %.6f %s, enumerated %.6f %s"
-                          % (draft, got.score, sorted(got.blue), best.score, sorted(best.names)))
+                          % (draft, got.score, sorted(got.six), best.score, sorted(best.names)))
         seated = {h.id for pool in solver.pools().values() for h in pool}
         seated |= {h.id for h in solver.locked}
         reached_back += [h.name for h in best.heroes if h.id not in seated]
@@ -140,7 +140,7 @@ def test_a_hard_limit_no_pooled_six_meets_is_met_past_the_pool(synthetic_world, 
     best = min((c for c in scored if not c.violations), key=solver._rank_key)
     got = engine.infer(world, Draft("Harbor Gate", side="attack"), catalog=playbook,
                        pool_size=2, top=1, base=base)
-    assert sorted(got.blue) == sorted(best.names) and got.violations == []
+    assert sorted(got.six) == sorted(best.names) and got.violations == []
     assert abs(got.score - best.score) < 1e-9
 
 
@@ -151,7 +151,7 @@ def test_shape_limits_bound_the_search_and_a_stricter_one_narrows_it(synthetic_w
     # two tanks is allowed under the two-tank limit; a third is not, and is the queue's
     r = engine.infer(world, Draft("Harbor Gate", ("Needle",), ("Anvil", "Kite")), pool_size=4,
                      catalog=fix)
-    assert {"Anvil", "Kite"} <= set(r.blue)
+    assert {"Anvil", "Kite"} <= set(r.six)
     with pytest.raises(Refusal, match="the queue allows at most 2 tanks"):
         engine.infer(world, Draft("Harbor Gate", (), ("Anvil", "Kite", "Mortar")),
                      pool_size=4, catalog=fix)
@@ -163,7 +163,7 @@ def test_shape_limits_bound_the_search_and_a_stricter_one_narrows_it(synthetic_w
     cat = catalog.load(str(tmp_path))
     r = engine.infer(world, Draft("Harbor Gate", ("Needle",), ("Balm",)), pool_size=4,
                      catalog=cat)
-    roles = sorted(world.hero(n).role for n in r.blue)
+    roles = sorted(world.hero(n).role for n in r.six)
     assert roles == ["damage", "damage", "support", "support", "tank", "tank"]
 
 
@@ -457,7 +457,7 @@ def test_a_rule_scales_by_the_metric_it_names(synthetic_world, tmp_path):
         best = engine.infer(world, Draft(map_name, ("Anvil", "Gale"),
                                          side=board_side(m, "attack")),
                             top=1, catalog=playbook, base=OFF)
-        cand = solver.prepare(scoring.Candidate([world.hero(n) for n in best.blue]))
+        cand = solver.prepare(scoring.Candidate([world.hero(n) for n in best.six]))
         solver.score(cand, detail=True)
         return next(c for c in cand.contributions if c["id"] == strategy_id)
 
@@ -500,7 +500,7 @@ def test_style_ties_break_by_name_so_hash_order_cannot_reach_the_answer(syntheti
     fix = catalog.load(FIXTURE_PLAYBOOK)
     once = engine.infer(world, Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm",)), catalog=fix)
     twice = engine.infer(world, Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm",)), catalog=fix)
-    assert once.blue == twice.blue and abs(once.score - twice.score) < 1e-12
+    assert once.six == twice.six and abs(once.score - twice.score) < 1e-12
 
 
 def test_a_board_confidence_reads_the_boards_own_ban_count(synthetic_world, tmp_path):

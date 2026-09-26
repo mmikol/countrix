@@ -73,7 +73,7 @@ def test_facts_and_infer_through_the_tools(ctx):
     with pytest.raises(Refusal, match="unknown heroes"):
         ctx.call("reach", hero="Nosuchhero")
     text, data = ctx.call("infer", map="King's Row", red=["Zarya"], blue=["Ana"])
-    assert len(data["blue"]) == 6 and "Ana" in data["blue"]
+    assert len(data["six"]) == 6 and "Ana" in data["six"]
     assert "optimal comp" in text
 
 
@@ -82,7 +82,7 @@ def test_a_compact_infer_names_the_silent_heuristics_and_fits_a_reply(ctx):
     board = {"map": "King's Row", "red": ["Zarya"], "blue": ["Ana"]}
     _, full = ctx.call("infer", **board)
     text, data = ctx.call("infer", compact=True, **board)
-    assert data["blue"] == full["blue"] and data["score"] == full["score"]
+    assert data["blue"] == full["six"] and data["score"] == full["score"]
     silent = sorted(c["id"] for c in full["contributions"] if c.get("spread") is False)
     assert data["silent"] == silent
     assert data["idle"] == sum(1 for c in full["contributions"] if not c["applies"])

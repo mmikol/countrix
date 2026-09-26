@@ -95,7 +95,7 @@ def test_a_scoring_strategy_that_waits_on_its_board_reads_unscored_with_the_reas
     empty = engine.board(world, Draft(), catalog=scratch, brief=off).to_dict()
     assert empty["blue"]["normalized"] == 100 and empty["blue"]["unscored"] is None
     assert "waits for enemy.light_flyers >= 1" in empty["momentum"]["verdict"]
-    assert empty["blue"]["red"] == []
+    assert empty["blue"]["against"] == []
     flying = engine.board(world, Draft("Harbor Gate", ("Mortar", "Gale"), ("Anvil", "Needle")),
                           catalog=scratch, brief=off).to_dict()
     assert flying["blue"]["scoring"] is True and flying["blue"]["normalized"] == 100
@@ -145,7 +145,7 @@ def test_the_rendered_breakdown_marks_a_need():
     terms are needs; the flag rides to_dict() on each contribution."""
     from inference.result import Result
     r = Result(
-        kind="evaluate", map_name=None, red=[], blue=[], locked=[], catalog=[], base=OFF,
+        kind="evaluate", map_name=None, against=[], six=[], locked=[], catalog=[], base=OFF,
         contributions=[
             {
                 "id": "a-reward", "kind": "heuristic", "form": "heuristic",

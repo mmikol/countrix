@@ -101,7 +101,7 @@ def test_a_rate_that_is_not_a_finite_number_is_no_edge_and_the_board_still_solve
     anvil.map_rates = {**w.hero("Anvil").map_rates, harbor.id: MapRate(float("nan"), 12.0)}
     result = engine.infer(broken, Draft("Harbor Gate", side="attack"), catalog=ASSUMPTIONS_ONLY,
                           top=1)
-    assert len(result.blue) == 6 and result.score == result.score
+    assert len(result.six) == 6 and result.score == result.score
 
 
 def test_the_synergy_and_counter_terms_read_the_wikis_pairs_and_edges(synthetic_world):
@@ -178,7 +178,7 @@ def test_each_seat_reads_the_other_sides_likely_six_or_its_picks(synthetic_world
     red's reads that pick. Each counter term cites the fact that says which."""
     empty = engine.board(synthetic_world, Draft("Harbor Gate", side="attack"),
                          catalog=ASSUMPTIONS_ONLY)
-    likely = empty.expected.blue
+    likely = empty.expected.six
     # the plan says the six counters it, and names the engine's terms it is built on
     assert "No red pick yet: the six counters their likely six (" in empty.plan
     assert "the highest win-rate six" not in empty.plan
@@ -280,7 +280,7 @@ def test_a_playbook_of_assumptions_scores_by_the_engine_and_its_best_six_is_the_
         if sum(1 for h in six if h.role == "tank") <= 2]
     ranked = sorted((objective.score(objective.prepare(c), detail=False) for c in sixes),
                     key=lambda c: (-c.score, -c.tiebreak, sorted(c.names)))
-    assert sorted(b.blue.blue) == sorted(ranked[0].names)
+    assert sorted(b.blue.six) == sorted(ranked[0].names)
     assert b.blue.score == pytest.approx(ranked[0].score) and ranked[0].score > ranked[1].score
     assert b.blue.alternatives[0]["score"] == pytest.approx(ranked[1].score, abs=1e-3)
 

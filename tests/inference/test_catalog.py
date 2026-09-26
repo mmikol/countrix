@@ -295,7 +295,7 @@ def test_a_draft_scores_nothing_whatever_its_kind(tmp_path):
     playbook = catalog.load(str(tmp_path))
     assert sorted(h.form for h in playbook) == ["assumption", "draft"]
     assert not any(h.scores for h in playbook) and not catalog.has_scoring_terms(playbook)
-    result = Result(kind="current", map_name=None, red=[], blue=[], locked=[],
+    result = Result(kind="current", map_name=None, against=[], six=[], locked=[],
                     catalog=playbook, base=OFF)
     assert result.waiting() == UNSCORED
 

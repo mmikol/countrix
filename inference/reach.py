@@ -114,9 +114,9 @@ def search(world: World, name: str) -> Reach:
                 try:
                     top = engine.infer(world, Draft(map_name=m.name, red=tuple(red), side=side),
                                        top=1)
-                    if hero.name in top.blue:
+                    if hero.name in top.six:
                         return {"hero": hero.name, "seated": True, "map": m.name, "side": side,
-                                "red": red, "banned": [], "six": top.blue, "gap": 0.0}
+                                "red": red, "banned": [], "six": top.six, "gap": 0.0}
                     held = engine.infer(world, Draft(map_name=m.name, red=tuple(red),
                                                      blue=(hero.name,), side=side), top=1)
                 except Infeasible:
@@ -147,9 +147,9 @@ def _banning(world: World, hero: Hero, map_name: str, red: list[str], side: str)
         try:
             top = engine.infer(world, Draft(map_name=map_name, red=tuple(red),
                                             bans=tuple(banned), side=side), top=1)
-            if banned and hero.name in top.blue:
+            if banned and hero.name in top.six:
                 return {"hero": hero.name, "seated": True, "map": map_name, "side": side,
-                        "red": red, "banned": banned, "six": top.blue, "gap": 0.0}
+                        "red": red, "banned": banned, "six": top.six, "gap": 0.0}
             if len(banned) == MAX_BANS:
                 break
             held = engine.infer(world, Draft(map_name=map_name, red=tuple(red),
@@ -157,8 +157,8 @@ def _banning(world: World, hero: Hero, map_name: str, red: list[str], side: str)
                                 top=1)
         except Infeasible:
             return None
-        rivals = [h for h in top.blue if _role(world, h) == hero.role
-                  and h not in held.blue and h not in red]
+        rivals = [h for h in top.six if _role(world, h) == hero.role
+                  and h not in held.six and h not in red]
         if not rivals:
             break
         banned = [*banned, rivals[0]]
@@ -173,4 +173,4 @@ def seated(world: World, board: Reach) -> bool:
                                         bans=tuple(board["banned"]), side=board["side"]), top=1)
     except Infeasible:
         return False
-    return board["hero"] in top.blue
+    return board["hero"] in top.six

@@ -228,6 +228,6 @@ def test_the_json_endpoints_answer_over_http(served, monkeypatch, dsn):
     code, _, body = get(served + "/api/facts?map=Ilios&blue=Ana")
     assert code == 200 and json.loads(body)["count"] > 0
     code, _, body = get(served + "/api/board?map=Ilios&blue=Ana&bans=Widowmaker")
-    assert code == 200 and json.loads(body)["blue"]["blue"] and json.loads(body)["plan"]
+    assert code == 200 and json.loads(body)["blue"]["six"] and json.loads(body)["plan"]
     code, _, body = get(served + "/api/board?blue=Nobody")
     assert code == 400 and "error" in json.loads(body)

@@ -82,10 +82,10 @@ def test_an_error_reply_reports_the_layers_own_message(monkeypatch):
 def test_readiness_solves_one_board_through_the_service(monkeypatch):
     """A six back from the probe means ready, anything else means not."""
     calls = []
-    six = {"blue": {"blue": ["D.Va", "Winston", "Cassidy", "Genji", "Ana", "Brigitte"]}}
+    six = {"blue": {"six": ["D.Va", "Winston", "Cassidy", "Genji", "Ana", "Brigitte"]}}
     monkeypatch.setattr(orchestrator, "get_json", lambda url, timeout=10: calls.append(url) or six)
     probe = orchestrator.probe()
-    assert probe["picks"] == six["blue"]["blue"] and probe["seconds"] >= 0
+    assert probe["picks"] == six["blue"]["six"] and probe["seconds"] >= 0
     assert calls == [orchestrator.PROBE]
     monkeypatch.setattr(orchestrator, "get_json", lambda url, timeout=10: {"error": "died"})
     assert orchestrator.probe() is None

@@ -96,9 +96,9 @@ def enumerated(world, rules, draft, base, pool_size=2):
 def metric_of(world, result, key):
     """A result's six's value of one team metric, as the objective reads it."""
     m = world.map(result.map_name) if result.map_name else None
-    objective = scoring.Objective(world, m, red=[world.hero(n) for n in result.red],
+    objective = scoring.Objective(world, m, red=[world.hero(n) for n in result.against],
                                   catalog=[], base=OFF)
-    cand = objective.prepare(scoring.Candidate([world.hero(n) for n in result.blue]))
+    cand = objective.prepare(scoring.Candidate([world.hero(n) for n in result.six]))
     return cand.ns["team"][key]
 
 
@@ -113,8 +113,8 @@ def test_a_rule_at_weight_zero_is_the_objective_without_it(synthetic_world, tmp_
     for draft in BOARDS:
         a = engine.infer(synthetic_world, draft, catalog=without, top=5)
         b = engine.infer(synthetic_world, draft, catalog=zero, top=5)
-        assert (a.blue, a.score) == (b.blue, b.score), draft
-        assert [x["blue"] for x in a.alternatives] == [x["blue"] for x in b.alternatives]
+        assert (a.six, a.score) == (b.six, b.score), draft
+        assert [x["six"] for x in a.alternatives] == [x["six"] for x in b.alternatives]
 
 
 @pytest.mark.parametrize("direction", ["maximize", "minimize"])
@@ -153,8 +153,8 @@ def test_a_hard_limits_optimum_meets_it_and_is_the_best_six_that_does(
     for draft in (BOARDS[0], BOARDS[1], BOARDS[3]):
         feasible, _ = enumerated(synthetic_world, rules, draft, base)
         got = engine.infer(synthetic_world, draft, catalog=rules, pool_size=2, top=1, base=base)
-        assert got.violations == [] and shape([synthetic_world.hero(n) for n in got.blue])[2] >= 3
-        assert sorted(got.blue) == sorted(feasible[0].names), draft
+        assert got.violations == [] and shape([synthetic_world.hero(n) for n in got.six])[2] >= 3
+        assert sorted(got.six) == sorted(feasible[0].names), draft
         assert got.score == pytest.approx(feasible[0].score, abs=1e-9)
 
 
@@ -167,7 +167,7 @@ def test_a_soft_limit_that_charges_nothing_prunes_nothing(synthetic_world, tmp_p
     for draft in BOARDS:
         a = engine.infer(synthetic_world, draft, catalog=without, top=1)
         b = engine.infer(synthetic_world, draft, catalog=free, top=1)
-        assert (a.blue, a.score) == (b.blue, b.score), draft
+        assert (a.six, a.score) == (b.six, b.score), draft
 
 
 # --- needs and guards ----------------------------------------------------------------
@@ -202,7 +202,7 @@ def test_a_need_never_pays_and_a_failed_guard_neither_costs_nor_pays(
     for draft in BOARDS:
         a = engine.infer(w, draft, catalog=without, top=1)
         b = engine.infer(w, draft, catalog=only_off, top=1)
-        assert (a.blue, a.score) == (b.blue, b.score), draft
+        assert (a.six, a.score) == (b.six, b.score), draft
 
 
 # --- the breakdown and the order --------------------------------------------------------
@@ -247,7 +247,7 @@ def test_a_six_scores_the_same_in_any_seat_order_and_a_draft_in_any_order(
                         tuple(reversed(draft.bans)), side=draft.side)
         a = engine.infer(w, draft, catalog=rules, top=1)
         b = engine.infer(w, flipped, catalog=rules, top=1)
-        assert (sorted(a.blue), a.score) == (sorted(b.blue), b.score), draft
+        assert (sorted(a.six), a.score) == (sorted(b.six), b.score), draft
 
 
 # --- symmetry: the board is infer, seat by seat -------------------------------------------
@@ -270,15 +270,15 @@ def test_each_seat_of_a_board_is_infer_on_that_seats_draft(synthetic_world, tmp_
     b = engine.board(w, draft, catalog=rules, brief=engine.Brief(countered=False))
     blue = engine.infer(w, dataclasses.replace(draft, blue=()), catalog=rules,
                         top=engine.BOARD_TOP)
-    assert (b.blue.blue, b.blue.red) == (blue.blue, blue.red)
+    assert (b.blue.six, b.blue.against) == (blue.six, blue.against)
     assert b.blue.score == pytest.approx(blue.score, abs=1e-9)
-    assert [a["blue"] for a in b.blue.alternatives] == [a["blue"] for a in blue.alternatives]
+    assert [a["six"] for a in b.blue.alternatives] == [a["six"] for a in blue.alternatives]
     mirror = Draft(draft.map_name, draft.blue, (), draft.bans, side=opposite(draft.side))
     red = engine.infer(w, mirror, catalog=rules, top=engine.BOARD_TOP)
-    assert b.red.blue == red.blue and b.red.score == pytest.approx(red.score, abs=1e-9)
+    assert b.red.six == red.six and b.red.score == pytest.approx(red.score, abs=1e-9)
     if 0 < len(draft.blue) < 6:
         fill = engine.infer(w, draft, catalog=rules, top=engine.BOARD_TOP)
-        assert b.fill.blue == fill.blue and b.fill.score == pytest.approx(fill.score, abs=1e-9)
+        assert b.fill.six == fill.six and b.fill.score == pytest.approx(fill.score, abs=1e-9)
     if len(draft.blue) == 6:
         evaluated = engine.evaluate(w, draft, catalog=rules)
         assert b.current.score == pytest.approx(evaluated.score, abs=1e-9)
@@ -287,7 +287,7 @@ def test_each_seat_of_a_board_is_infer_on_that_seats_draft(synthetic_world, tmp_
     fresh = solver_module.Solver(w, m, red=red_h, locked=[], banned=banned,
                                  side=board_side(m, draft.side), catalog=rules, base=DEFAULT)
     fresh.freeze_bounds()
-    six = fresh.score(fresh.prepare(scoring.Candidate([w.hero(n) for n in b.blue.blue])))
+    six = fresh.score(fresh.prepare(scoring.Candidate([w.hero(n) for n in b.blue.six])))
     assert six.score == pytest.approx(b.blue.score, abs=1e-9)
     assert sum(c["weighted"] for c in b.blue.contributions) == pytest.approx(b.blue.score,
                                                                              abs=1e-9)
@@ -314,8 +314,8 @@ def test_scaling_every_weight_by_ten_moves_no_six_the_search_visits(synthetic_wo
         a = engine.infer(synthetic_world, draft, catalog=rules, pool_size=2, top=5)
         b = engine.infer(synthetic_world, draft, catalog=tenfold, pool_size=2, top=5,
                          base=heavy)
-        assert a.blue == b.blue and b.score == pytest.approx(10 * a.score), draft
-        assert [x["blue"] for x in a.alternatives] == [x["blue"] for x in b.alternatives]
+        assert a.six == b.six and b.score == pytest.approx(10 * a.score), draft
+        assert [x["six"] for x in a.alternatives] == [x["six"] for x in b.alternatives]
 
 
 # --- the search against a full enumeration ---------------------------------------------------
@@ -339,7 +339,7 @@ def test_under_open_queue_and_the_healing_floor_the_search_reaches_the_enumerate
         assert best.score > feasible[-1].score, draft
         wide += max(shape(best.heroes)) >= 3
         got = engine.infer(synthetic_world, draft, catalog=rules, pool_size=2, top=1, base=base)
-        if sorted(got.blue) != sorted(best.names) or abs(got.score - best.score) > 1e-9:
-            missed.append("%s: %s, enumerated %s" % (draft, sorted(got.blue), sorted(best.names)))
+        if sorted(got.six) != sorted(best.names) or abs(got.score - best.score) > 1e-9:
+            missed.append("%s: %s, enumerated %s" % (draft, sorted(got.six), sorted(best.names)))
     assert not missed, "the search misses the enumerated maximum:\n  " + "\n  ".join(missed)
     assert wide                       # some board's best holds three of a role

@@ -128,7 +128,7 @@ def _board_facts(world: World, result: Result, side: str) -> FactSet:
     """The facts of the board a result stands on: its map, both sides as it
     names them, its bans, and the side."""
     return board_facts.generate(world, Draft(
-        map_name=result.map_name, red=tuple(result.red), blue=tuple(result.blue),
+        map_name=result.map_name, red=tuple(result.against), blue=tuple(result.six),
         bans=tuple(result.bans), side=side))
 
 
@@ -152,18 +152,18 @@ def _seated(world: World, draft: Draft, seat: Seat) -> _Seated:
 
 def _seat_result(
         board: _Seated, *, kind: ResultKind, seat: Seat, catalog: list[Strategy],
-        base: BaseWeights, blue: list[str], locked: list[str],
+        base: BaseWeights, six: list[str], locked: list[str],
         partial: bool = False) -> Result:
     """A seat's Result on a resolved board, before a six is recorded on it."""
     return Result(kind=kind, map_name=board.m.name if board.m else None,
-                  red=[h.name for h in board.red], blue=blue, locked=locked, catalog=catalog,
+                  against=[h.name for h in board.red], six=six, locked=locked, catalog=catalog,
                   base=base, bans=[h.name for h in board.bans], side=board.side, seat=seat,
                   partial=partial)
 
 
 def _alternatives(ranked: Iterable[Candidate]) -> list[Alternative]:
     """The runners-up as a Result lists them: each six in role order, its score."""
-    return [Alternative(blue=_order(c.heroes), score=round(c.score, 3), normalized=None)
+    return [Alternative(six=_order(c.heroes), score=round(c.score, 3), normalized=None)
             for c in ranked]
 
 
@@ -212,7 +212,7 @@ def _optimal(
     times the search this call makes."""
     started = time.time() if began is None else began
     board = _seated(world, draft, seat)
-    result = _seat_result(board, kind=kind, seat=seat, catalog=catalog, base=base, blue=[],
+    result = _seat_result(board, kind=kind, seat=seat, catalog=catalog, base=base, six=[],
                           locked=[h.name for h in board.blue])
     if solved is None:
         solved = Solver(world, board.m, red=board.red, locked=board.blue, banned=board.bans,
@@ -223,7 +223,7 @@ def _optimal(
                          " locked %s picks - relax a constraint in inference/strategies/"
                          % seat)
     best = solved.ranked[0]
-    result.blue = _order(best.heroes)
+    result.six = _order(best.heroes)
     fs = _board_facts(world, result, board.side)
     result.record_candidate(best, fs, solved.solver.considered)
     result.alternatives = _alternatives(solved.ranked[1:top + 1])
@@ -244,7 +244,7 @@ def _evaluated(
         raise Refusal("evaluate needs exactly %d %s picks (got %d)"
                          % (TEAM_SIZE, seat, len(board.blue)))
     result = _seat_result(board, kind=kind, seat=seat, catalog=catalog, base=base,
-                          blue=[h.name for h in board.blue], locked=[])
+                          six=[h.name for h in board.blue], locked=[])
     evaluated = evaluate_comp(world, board.m, board.blue, red=board.red, banned=board.bans,
                               side=board.side, catalog=catalog, base=base, pool_size=pool_size,
                               swept=swept)
@@ -279,7 +279,7 @@ def _current(
     started = time.time()
     board = _seated(world, draft, seat)
     picks = [h.name for h in board.blue]
-    result = _seat_result(board, kind=kind, seat=seat, catalog=catalog, base=base, blue=picks,
+    result = _seat_result(board, kind=kind, seat=seat, catalog=catalog, base=base, six=picks,
                           locked=picks, partial=True)
     if board.blue:
         cand = solver.prepare(Candidate(board.blue))
@@ -404,7 +404,7 @@ def _board_once(
     red_split.merge()
     blue = solve.optimal(blue_seat, blue_split, seat="blue")
     red = solve.optimal(red_seat, red_split, seat="red")
-    countered_seat = dataclasses.replace(draft, red=tuple(red.result.blue))
+    countered_seat = dataclasses.replace(draft, red=tuple(red.result.six))
     against_split, answer_split = solve.sweep_countered(countered_seat)
     for split in (fill_split, red_fill_split, against_split, answer_split):
         split.merge()
@@ -423,7 +423,7 @@ def _board_once(
                  blue=blue.result, red=red.result, current=cur, red_current=red_cur,
                  fill=fill, countered=countered, momentum=momentum(seats),
                  plan=plan(world, board.m, draft.side, list(draft.bans), board.red, shown,
-                           likely=expected.blue),
+                           likely=expected.six),
                  shapes=[list(s) for s in legal_shapes(catalog)], expected=expected)
 
 
@@ -552,8 +552,8 @@ def _expected(
     for the board; until red reveals a pick blue's counter term reads it.
     A Result like every other seat: its picks carry the reason each rests on."""
     likely = compute.expected_picks(world, m, banned=bans_h)
-    return Result(kind="expected", map_name=m.name if m else None, red=[],
-                  blue=[p["hero"] for p in likely], locked=[], catalog=catalog, base=base,
+    return Result(kind="expected", map_name=m.name if m else None, against=[],
+                  six=[p["hero"] for p in likely], locked=[], catalog=catalog, base=base,
                   bans=list(draft.bans), side=draft.side, seat="red",
                   picks=[Pick(hero=p["hero"], role=p["role"], rate=p["rate"],
                               locked=p["locked"], why=p["why"], evidence=[])

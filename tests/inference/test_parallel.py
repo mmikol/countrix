@@ -37,8 +37,8 @@ def test_the_pooled_and_the_in_process_board_run_one_orchestration(
     red = {"locked": (), "enemy": ours, "pool": 6}
     fill = {"locked": ours, "enemy": enemy, "pool": 6}
     red_fill = {"locked": enemy, "enemy": ours, "pool": 6}
-    against = {"locked": (), "enemy": tuple(alone.red.blue), "pool": 4}
-    answer = {"locked": ours, "enemy": tuple(alone.red.blue), "pool": 4}
+    against = {"locked": (), "enemy": tuple(alone.red.six), "pool": 4}
+    answer = {"locked": ours, "enemy": tuple(alone.red.six), "pool": 4}
     assert trace == [
         Call("rank_roster", **blue), Call("rank_roster", **red),
         Call("sweep", **blue), Call("sweep", **red),

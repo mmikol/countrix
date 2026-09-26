@@ -23,7 +23,7 @@ FIX = catalog.load(FIXTURE_PLAYBOOK)
 def comp(blue, score, best, partial=False, seat="blue"):
     """A seat's current comp of `blue` under the reference playbook, scoring
     `score` on a scale whose 100 is `best`."""
-    return Result(kind="current", map_name=None, red=[], blue=blue, locked=blue,
+    return Result(kind="current", map_name=None, against=[], six=blue, locked=blue,
                   catalog=FIX, base=OFF, score=score, best=best, partial=partial, seat=seat)
 
 
@@ -87,7 +87,7 @@ def test_both_seats_are_read_through_their_fills_while_half_drafted(
     assert b.momentum["verdict"].startswith("even - blue %d, red %d (partial picks)"
                                             % (b.momentum["blue"], b.momentum["red"]))
     assert b.momentum["odds"] == {"blue": 50, "red": 50}
-    assert b.countered.kind == "countered" and len(b.countered.blue) == 6
+    assert b.countered.kind == "countered" and len(b.countered.six) == 6
     assert "Anvil" in b.countered.locked and not b.countered.partial
     assert b.momentum["countered"] == b.countered.to_dict()["normalized"]
 
@@ -212,7 +212,7 @@ def test_the_plan_says_nothing_the_board_contradicts(synthetic_world):
     red_lean = theirs["style_lean"] or theirs["style_top"]
     assert red_lean == "brawl"
     # a real Result, not a stand-in: _plan reads .facts, which Result defines
-    six = Result(kind="infer", map_name=m.name, red=["Anvil", "Mortar"], blue=[],
+    six = Result(kind="infer", map_name=m.name, against=["Anvil", "Mortar"], six=[],
                  locked=[], catalog=rules, base=OFF, playstyle="brawl", contributions=terms)
     said = plan.plan(world, m, "", [], red_h, six)                     # a mirror
     assert "(Anvil, Mortar) lean brawl too: %s." % plan.SAME_LEAN["brawl"] in said
@@ -300,6 +300,6 @@ def test_the_plan_describes_the_six_the_comps_tab_shows(synthetic_world, scratch
     assert "The six keeps your pick (Balm) and fills the rest." in one.plan
     assert "the six leans %s" % one.fill.playstyle in one.plan
     assert one.plan.endswith("your 1 pick, red's 1 revealed pick.")
-    full = board((), tuple(one.fill.blue))
+    full = board((), tuple(one.fill.six))
     assert "The six is the one you picked." in full.plan and "your 6 picks" in full.plan
     assert "the six counters" not in full.plan and "their likely six is " in full.plan
