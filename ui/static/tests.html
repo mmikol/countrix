@@ -95,10 +95,21 @@ two-swap, a broken constraint shows up as a board that used to be exact and is n
 <tr><td>no released hero is missing a core kit number</td><td>a tank that deals no damage still scores, just wrongly</td></tr>
 <tr><td>an unguarded heuristic never opposes a guarded one on its metric</td><td>weight is otherwise spent on both sides of one question</td></tr>
 <tr><td>the parallel and single-process paths agree bit for bit</td><td>a worker split must not decide an answer</td></tr>
+<tr><td>a rule at weight 0 is the objective without it</td><td>a weight is the only way a rule moves a six</td></tr>
+<tr><td>the optimum's metric moves toward a rule's end as its weight grows, never back</td><td>a heavier weight that bought a worse six on its own metric would mean the argmax is not one</td></tr>
+<tr><td>every six's breakdown sums to its score</td><td>the bars the board shows are the number the solver maximises</td></tr>
+<tr><td>each seat of a board is infer on that seat's draft</td><td>the board and the tools must read an unrevealed side the same way</td></tr>
+<tr><td>scaling every weight by ten moves no six the search visits</td><td>a cut in score points would make which sixes are searched depend on the scale</td></tr>
+<tr><td>a need never pays, and a guard that fails neither costs nor pays</td><td>entering a guarded state must not be rewarded for being entered</td></tr>
 </tbody></table></div>
-<p>A hard limit is enforced with nothing rewarding it; an extreme heuristic drives the pick to
-its metric's true optimum over the whole legal space; the two compose. Each was checked against
-a playbook holding that one rule, where the right answer can be worked out without the solver.</p>
+<p>A hard limit is enforced with nothing rewarding it: under one the search returns the best six
+that meets it, against a full enumeration, and a limit no pooled six meets is met past the pool.
+A soft limit with no penalty prunes nothing. A heavy heuristic drives the pick toward its
+metric's end as far as the board's scale reaches: past the highest six the scale saw, every six
+reads the same, which the backlog holds. Each is a test on the twelve-hero roster, where the right answer can be
+enumerated (tests/inference/test_mechanics.py), and the search's twin of the gate runs there
+under open queue with the healing floor on, where a shape needs more of a role than the pool
+holds.</p>
 
 <h2 id='open'>What is not proven</h2>
 <ul>

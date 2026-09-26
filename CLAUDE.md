@@ -238,6 +238,10 @@ db <- facts <- inference <- door <- ui.
   the default engine on and off, each role's pool cut to two, the search
   against a full enumeration, with no database, so CI runs it. A board it
   misses is a solver defect: fix the search, never swap the board out.
+  `tests/inference/test_mechanics.py` holds its open-queue twin under the
+  healing floor and the objective's properties as a mechanism - weight
+  response, limits, needs, the breakdown, order, each seat of a board
+  against infer, and a tenfold scale - on the same terms.
 - `tests/fixtures/reach.json` records a board per released hero that
   seats it, beside the objective it was recorded under - the playbook's
   digest (`catalog.playbook_digest`) and the default engine's stamp
