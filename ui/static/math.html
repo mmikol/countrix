@@ -162,7 +162,8 @@ both sides alike: a sum over fewer picks reads low, so the seat with more picks 
 one seat unscored the bars show the shares alone. This is not a fitted probability.</p>
 <p id='argmax'><b>The argmax.</b> Each role's pool is the six heroes of highest standing: a
 hero's mean score across the reference sixes it appears in, plus %(PARTNER_POINTS)g for each
-locked partner. Every legal shape is filled around the locked picks and scored. A local search
+locked partner. Every legal shape is filled around the locked picks and scored; a shape that
+needs more of a role than the pool holds takes that role's next heroes. A local search
 then swaps same-role heroes while the score rises, starting from the best %(SEEDS)d sixes and
 from the best six of every shape within %(SHAPE_REACH)g points of the top, and finally brings
 the wiki's synergy pairs into the leading sixes two slots at a time. Ties break by mean map win

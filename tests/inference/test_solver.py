@@ -53,8 +53,9 @@ def test_the_search_reaches_the_enumerated_maximum(synthetic_world, catalog_copy
     together - every legal six is enumerated and scored, and infer returns
     the best of them, tie-break included. Each role's pool holds two of its
     four heroes, so the reach-back steps have to find the rest. The playbook
-    is the reference plus a role queue: a shape the pools cannot seat is
-    never searched, and pools of two cannot seat three of a role. It holds
+    is the reference plus a role queue, which keeps the field to one shape;
+    tests/inference/test_mechanics.py holds the open queue, where a shape
+    needs more of a role than the pool holds. It holds
     with the default engine under the playbook and without it; the pair is
     two heroes the pools cut, and what ranks the pools differs between the
     two, so each names its own. A board this misses is a solver defect: fix

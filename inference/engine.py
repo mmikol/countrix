@@ -65,9 +65,13 @@ FIELD_BUDGET = 500_000
 def field_size(pool: int) -> int:
     """The legal sixes a search over `pool` candidates per role enumerates
     with nothing locked and no shape limit but the queue's tanks: the sum
-    over the queue's shapes of the product of C(pool, need) per role."""
+    over the queue's shapes of the product of C(max(pool, need), need) per
+    role - a shape that needs more of a role than the pool holds takes that
+    many (Solver.legal_sixes)."""
+    def seats(need: int) -> int:
+        return comb(max(pool, need), need)
     return sum(
-        comb(pool, t) * comb(pool, d) * comb(pool, TEAM_SIZE - t - d)
+        seats(t) * seats(d) * seats(TEAM_SIZE - t - d)
         for t in range(MAX_TANKS + 1) for d in range(TEAM_SIZE - t + 1))
 
 

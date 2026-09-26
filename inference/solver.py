@@ -5,7 +5,9 @@ A Solver is the board's Objective (inference.scoring) on the board's scale
     legal_sixes     every shape the queue and the hard limits allow, filled around
                     the locked picks from a per-role pool of released heroes (an
                     announced hero waits) ranked by standing, PARTNER_POINTS for
-                    each locked partner (six per role by default)
+                    each locked partner (six per role by default); a shape that
+                    needs more of a role than the pool holds takes that role's
+                    next-ranked heroes, so every legal shape is seated
     sweep           a slice of the enumeration prepared, scored and slimmed. The
                     slices partition the field, so the search splits across
                     processes.
@@ -124,14 +126,20 @@ class Solver(Objective):
         return scale.board_prior(self, h, partners)
 
     def pools(self) -> dict[str, list[Hero]]:
+        """Each role's pool: its top pool_size by _pool_key."""
+        return {role: heroes[:self.pool_size] for role, heroes in self._ranked().items()}
+
+    def _ranked(self) -> dict[str, list[Hero]]:
+        """Each role's released heroes, less the locked picks and the bans,
+        in _pool_key's order."""
         locked_ids = {h.id for h in self.locked} | self.banned
-        pools: dict[str, list[Hero]] = {}
+        ranked: dict[str, list[Hero]] = {}
         for role in ROLES:
             heroes = [h for h in self.world.heroes.values()      # announced heroes wait
                       if h.role == role and h.released and h.id not in locked_ids]
             heroes.sort(key=self._pool_key)
-            pools[role] = heroes[:self.pool_size]
-        return pools
+            ranked[role] = heroes
+        return ranked
 
     def _pool_key(self, h: Hero) -> tuple[float, float, str]:
         """Standing first, PARTNER_POINTS for each locked partner; then the old
@@ -145,15 +153,19 @@ class Solver(Objective):
     def legal_sixes(self) -> Iterator[list[Hero]]:
         """Every legal six around the locked picks, as a list of heroes. A six's
         roles fix its shape and the pools hold neither the locked picks nor the
-        bans, so no two of these are the same set. Lazy: a slice of the search
-        builds candidates for its own positions and walks past the rest."""
-        pools = self.pools()
+        bans, so no two of these are the same set. A shape that needs more of a
+        role than the pool holds takes that many of the role's ranking, so a
+        small pool still seats every shape: a climb keeps its start's shape, so
+        a shape never swept is a shape never searched. Lazy: a slice of the
+        search builds candidates for its own positions and walks past the rest."""
+        ranked = self._ranked()
         locked_by_role = self._locked_by_role
         for t, d, s in self.shapes():
             need = {"tank": t - len(locked_by_role["tank"]),
                     "damage": d - len(locked_by_role["damage"]),
                     "support": s - len(locked_by_role["support"])}
-            choices = [list(itertools.combinations(pools[r], need[r])) for r in ROLES]
+            choices = [list(itertools.combinations(ranked[r][:max(self.pool_size, need[r])],
+                                                   need[r])) for r in ROLES]
             for combo in itertools.product(*choices):
                 yield self.locked + [h for part in combo for h in part]
 
