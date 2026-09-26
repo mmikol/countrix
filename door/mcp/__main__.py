@@ -66,8 +66,8 @@ def _serve_http(server: Server, ctx: tools.Context, argv: list[str]) -> int:
     host, _, port = args.http.rpartition(":")
     if not port.isdigit():
         parser.error("--http takes [HOST:]PORT, got %r" % args.http)
-    http.serve(server, host or "127.0.0.1", int(port), _status(ctx),
-               allowed_hosts=args.allow_host)
+    http.serve(
+        server, host or "127.0.0.1", int(port), _status(ctx), allowed_hosts=args.allow_host)
     return 0
 
 
