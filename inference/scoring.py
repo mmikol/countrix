@@ -23,6 +23,7 @@ from inference.expr import Expr, Scope, Value, scope
 from inference.strategy import Strategy, settled_by_board
 
 CONFIDENCE_KEY = "\x00confidence"   # a rule's scale bounds, beside its own
+UNGUARDED_KEY = "\x00unguarded"     # a need's metric over every six, its guard ignored
 NEED_BUDGET = 2.0                 # the most one guarded state can cost
 
 
@@ -62,7 +63,7 @@ class Norm(NamedTuple):
 _EMPTY: MetricBag = {}
 
 
-def _split_key(key: str | None) -> MetricKey:
+def split_key(key: str | None) -> MetricKey:
     """A dotted metric key -> (namespace, key)."""
     section, _, name = (key or "").partition(".")
     return MetricKey(section=section, key=name)
@@ -84,6 +85,18 @@ def _amount(value: Value) -> float:
     if isinstance(value, (int, float)):               # a bool is an int
         return float(value)
     raise TypeError("a bonus or penalty reads a number, got %r" % (value,))
+
+
+def _guard_key(h: Strategy) -> object:
+    """What makes two guards one: the same text and the same params. A param
+    the dialect read as a list cannot key a dict, so its strategy stands
+    alone."""
+    key = (h.when.source if h.when is not None else None, tuple(sorted(h.params.items())))
+    try:
+        hash(key)
+    except TypeError:
+        return h.id
+    return key
 
 
 def _slot_gate(held: list[bool | None], slot: int, h: Strategy, sc: Scope) -> bool:
@@ -264,22 +277,24 @@ class Objective:
         self._hard_limits = [limit for limit in self._limits if not limit[0].soft]
         self._scored = [(r, gates[r.id], slots.get(r.id, 0))
                         for r in self.scored_constraints]
-        self._heuristics = [(g, gates[g.id], slots.get(g.id, 0), *_split_key(g.metric))
+        self._heuristics = [(g, gates[g.id], slots.get(g.id, 0), *split_key(g.metric))
                             for g in self.heuristics]
         # the same, for whatever metric a rule scales itself by; None where none
-        self.confidence_metrics = [_split_key(g.confidence) if g.confidence else None
+        self.confidence_metrics = [split_key(g.confidence) if g.confidence else None
                                    for g in self.heuristics]
         # a heuristic guarded on the six's own state is a need: see score().
         # Needs that share a guard share NEED_BUDGET: the state costs at most
-        # that much however many rules the playbook writes about it
-        guards = {g.id: g.when.source for g in self.heuristics
+        # that much however many rules the playbook writes about it. A guard
+        # is one state where its text and its params are the same - the slot
+        # _gates shares; the same state written two ways is two guards
+        guards = {g.id: _guard_key(g) for g in self.heuristics
                   if g.need and g.when is not None}
-        written: dict[str, float] = {}
+        written: dict[object, float] = {}
         for g in self.heuristics:
             if g.id in guards:
                 written[guards[g.id]] = written.get(guards[g.id], 0.0) + g.weight
-        self._needs = {hid: min(1.0, NEED_BUDGET / written[source])
-                       if written[source] else 1.0 for hid, source in guards.items()}
+        self._needs = {hid: min(1.0, NEED_BUDGET / written[guard])
+                       if written[guard] else 1.0 for hid, guard in guards.items()}
         self._freeze_norms()
 
     def _gates(self) -> tuple[dict[str, bool | None], dict[str, int], int]:
@@ -301,13 +316,7 @@ class Objective:
                 gates[h.id] = bool(h.when.evaluate(sc))
             else:
                 gates[h.id] = None
-                key: object
-                try:
-                    key = (h.when.source, tuple(sorted(h.params.items())))
-                    hash(key)
-                except TypeError:          # a param the dialect read as a list
-                    key = h.id
-                slots[h.id] = groups.setdefault(key, len(groups))
+                slots[h.id] = groups.setdefault(_guard_key(h), len(groups))
         return gates, slots, len(groups)
 
     # --- namespace and preparation -------------------------------------------
@@ -394,10 +403,16 @@ class Objective:
 
     def _freeze_norms(self) -> None:
         """One Norm per heuristic for the scoring loop. A spread of None -
-        the sample never moved - normalises everything to 0.5."""
+        the sample never moved - normalises everything to 0.5. A need whose
+        guarded sixes never spread - none of the reference meets its guard,
+        or all that do share one value - reads its metric over every
+        reference six instead: a state the reference never met is not free
+        to every six the search walks into."""
         self._norms = []
         for g in self.heuristics:
             lo, hi = self.bounds.get(g.id, Interval(low=0.0, high=0.0))
+            if hi <= lo and g.id in self._needs:
+                lo, hi = self.bounds.get(g.id + UNGUARDED_KEY, Interval(low=lo, high=hi))
             self._norms.append(Norm(
                 strategy=g, low=lo, span=hi - lo if hi > lo else None,
                 weight=g.weight * self._needs.get(g.id, 1.0),

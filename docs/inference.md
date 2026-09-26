@@ -133,7 +133,10 @@ A constraint or a heuristic takes an optional `when` guard and applies
 only where it holds. A heuristic guarded on the six's own state
 (`team.*` or `matchup.*`) is a need: it adds `weight x (norm - 1)`, so
 met it costs nothing and unmet it costs its weight, and the needs on one
-guard cost `NEED_BUDGET` (2) together at most. The scale is a seeded
+guard cost `NEED_BUDGET` (2) together at most. One guard is one text with
+one set of params: `team.supports <= 1` and `team.supports < 2` are two
+guards, and each gets its budget. A need whose guarded reference sixes
+never spread reads its metric over every reference six instead. The scale is a seeded
 sample of 1200 legal sixes plus the field of each role's top six by the
 board's prior (`inference/scale.py`), and `confidence` names a second
 metric that scales the weight by how strongly the premise holds: a

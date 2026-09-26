@@ -208,6 +208,36 @@ def test_a_rule_guarded_on_the_six_itself_is_a_need_and_a_state_has_a_budget(
         for c in pair["contributions"] if c["id"].startswith("solo-"))
 
 
+def test_one_guard_is_one_budget_and_an_unmet_state_still_costs(synthetic_world, tmp_path):
+    """Needs share NEED_BUDGET by guard: the same text and the same params,
+    the key the gates share a slot by - one text with two params is two
+    states, and gets two budgets. A need whose guarded sixes never spread
+    in the reference reads its metric over every reference six, so a six
+    the search walks into that state is charged, not waved through at 1."""
+    from inference import scale, scoring
+    w = synthetic_world
+    rule = ("---\nname: %s\nkind: heuristic\ndirection: maximize\nmetric: team.cc_count\n"
+            "weight: 4\nwhen: team.supports <= params.CAP\nparams:\n  CAP: %d\n---\nx\n")
+    for name, cap in (("n1", 1), ("n2", 1), ("n3", 3)):
+        (tmp_path / ("%s.md" % name)).write_text(rule % (name, cap), "utf-8")
+    playbook = catalog.load(str(tmp_path))
+    objective = scoring.Objective(w, w.map("Harbor Gate"), red=[], catalog=playbook, base=OFF)
+    assert objective._needs == {"n1": 0.25, "n2": 0.25, "n3": 0.5}
+    # the unguarded bounds ride beside the guarded ones and merge as they do
+    prepared = scale._prepared(objective)
+    bounds = scale._bounds_over(objective, prepared)
+    assert bounds["n1" + scoring.UNGUARDED_KEY] == scoring.Interval(
+        *(lambda v: (min(v), max(v)))([c.ns["team"]["cc_count"] for c in prepared]))
+    # a need the reference never met in its guarded state
+    objective.adopt_bounds({"n3" + scoring.UNGUARDED_KEY: scoring.Interval(0.0, 4.0)})
+    six = [w.hero(n) for n in ("Anvil", "Kite", "Rook", "Needle", "Flint", "Balm")]
+    cand = objective.score(objective.prepare(scoring.Candidate(six)))
+    [term] = [c for c in cand.contributions if c["id"] == "n3"]
+    cc = cand.ns["team"]["cc_count"]
+    assert cc < 4 and term["norm"] == pytest.approx(cc / 4)
+    assert term["weighted"] < 0 and term["weighted"] == pytest.approx(4 * 0.5 * (cc / 4 - 1))
+
+
 def test_partners_that_only_pay_together_are_brought_in_together(synthetic_world, tmp_path):
     """One slot at a time, a pair worth nothing apart is never met: each partner
     alone only costs. The playbook here pays one synergy pair, the two

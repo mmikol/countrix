@@ -27,12 +27,14 @@ from facts.model import ROLES, Hero
 from facts.team import number
 from inference.scoring import (
     CONFIDENCE_KEY,
+    UNGUARDED_KEY,
     Bounds,
     Candidate,
     Interval,
     MetricKey,
     Objective,
     SixKey,
+    split_key,
 )
 from inference.shapes import legal_shapes
 
@@ -134,13 +136,21 @@ def _confidence_bounds(objective: Objective, spec: MetricKey, index: int,
 
 
 def _bounds_over(objective: Objective, prepared: Sequence[Candidate]) -> Bounds:
-    """{heuristic id: Interval(low, high)} over prepared sixes, and under id +
-    CONFIDENCE_KEY the bounds of the confidence metric a heuristic names. A
-    heuristic no six here values is left out, its confidence entry with it:
-    the objective reads a missing id as (0, 0), and a slice that never saw a
-    value must not merge a (0, 0) into the other slices' bounds."""
+    """{heuristic id: Interval(low, high)} over prepared sixes, under id +
+    CONFIDENCE_KEY the bounds of the confidence metric a heuristic names, and
+    under id + UNGUARDED_KEY a need's metric over every six here, its guard
+    ignored, which the objective reads where the guarded sixes never spread.
+    A heuristic no six here values is left out, its confidence entry with
+    it: the objective reads a missing id as (0, 0), and a slice that never
+    saw a value must not merge a (0, 0) into the other slices' bounds."""
     out: Bounds = {}
     for i, g in enumerate(objective.heuristics):
+        if g.need:
+            metric = split_key(g.metric)
+            whole = [float(number(value)) for c in prepared if c.ns is not None
+                     and (value := c.ns.get(metric.section, {}).get(metric.key)) is not None]
+            if whole:
+                out[g.id + UNGUARDED_KEY] = _spanning(whole)
         values = [value for c in prepared if (value := c.raw[i]) is not None]
         if not values:
             continue
