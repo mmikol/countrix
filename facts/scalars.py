@@ -354,21 +354,29 @@ def _energy(piece: KitPiece) -> Energy | None:
     return Energy(max(cost), max(regen), max(delay, default=0.0))
 
 
+def _beam_heal(piece: KitPiece) -> float | None:
+    """A beam's sustained hp/s: at the duty its energy allows where it spends
+    energy, else its heal row; None where it has no heal row."""
+    rate, hot, hot_s = _beam_rows(piece)
+    if not rate:
+        return None
+    energy = _energy(piece)
+    if energy is None:
+        return rate
+    targets = SPRAY_TARGETS if piece.name in SPRAYS else 1.0
+    return targets * energy_duty(energy.cost, energy.regen, energy.delay, rate, hot, hot_s,
+                                 EMPTY_WAIT.get(piece.name, 0.0))
+
+
 def _weapon_heal(piece: KitPiece) -> float:
     """A weapon's sustained hp/s onto teammates: a resource beam at the duty
     its energy allows, a beam at its heal row, any other at its published
     rate with the reload in; a splash that lands on an aimed teammate adds
     the others it reaches."""
-    energy = _energy(piece)
     if "beam" in piece.keywords:
-        rate, hot, hot_s = _beam_rows(piece)
-        if energy and rate:
-            targets = SPRAY_TARGETS if piece.name in SPRAYS else 1.0
-            return targets * energy_duty(
-                energy.cost, energy.regen, energy.delay, rate, hot, hot_s,
-                EMPTY_WAIT.get(piece.name, 0.0))
-        if rate:
-            return rate
+        beam = _beam_heal(piece)
+        if beam is not None:
+            return beam
     rate = piece.rate("hps", "heal") or 0.0
     direct = [f.value for f in piece.flat("heal") if "direct" in (f.condition or "")]
     splash = [f.value for f in piece.flat("heal") if "splash" in (f.condition or "")]

@@ -231,12 +231,9 @@ def _reach(piece: KitPiece) -> Reach:
     kind = _kind(piece)
     if kind == "melee":
         return Reach(piece.reach or MELEE_REACH, True)
-    if "shotgun" in piece.weapon_kind and not piece.stats.get("range"):
-        starts = [s.value for s in piece.stats.get("damage_falloff_range", ())
-                  if s.value is not None and s.value >= MIN_FALLOFF_START
-                  and "min" in (s.condition or "") and "simultaneous" not in (s.condition or "")]
-        if starts:
-            return Reach(min(starts), True)
+    start = _falloff_start(piece)
+    if start is not None:
+        return Reach(start, True)
     if piece.reach:
         return Reach(min(MAX_REACH, piece.reach), True)
     if kind == "beam":
@@ -245,6 +242,19 @@ def _reach(piece: KitPiece) -> Reach:
         return Reach(MAX_REACH, False)
     speed = piece.max_stat("pspeed") or DEFAULT_PSPEED
     return Reach(min(MAX_REACH, speed * PROJECTILE_WINDOW), False)
+
+
+def _falloff_start(piece: KitPiece) -> float | None:
+    """Where a shotgun with no published range starts to fall off: the
+    nearest start of its minimum-damage rows, MIN_FALLOFF_START or more, a
+    simultaneous row aside; None for any other weapon."""
+    if "shotgun" not in piece.weapon_kind or piece.stats.get("range"):
+        return None
+    starts = [
+        s.value for s in piece.stats.get("damage_falloff_range", ())
+        if s.value is not None and s.value >= MIN_FALLOFF_START
+        and "min" in (s.condition or "") and "simultaneous" not in (s.condition or "")]
+    return min(starts, default=None)
 
 
 def _fights(guns: Sequence[KitPiece]) -> list[tuple[KitPiece, float]]:
@@ -411,12 +421,7 @@ def _eater(h: Hero) -> tuple[float, str, str | None]:
     for a in h.abilities:
         if "negate projectile" not in a.keywords or a.kind not in (KIND_ABILITY, KIND_ULTIMATE):
             continue
-        if a.kind == KIND_ULTIMATE:
-            strength, said = ULT, "ultimate"
-        else:
-            lasts, wait = a.max_stat("duration") or 0.0, a.max_stat("cooldown") or 0.0
-            up = lasts / (lasts + wait) if lasts + wait else 0.0
-            strength, said = _clamp(up / EATER_UPTIME), "up %.0f%%" % (100 * up)
+        strength, said = _eater_strength(a)
         words = set(a.name.lower().split())
         family = next((code for word, code in FLAG_FAMILIES.items() if word in words), None)
         if family is None and not PROJECTILES_RE.search(a.description or ""):
@@ -427,100 +432,189 @@ def _eater(h: Hero) -> tuple[float, str, str | None]:
     return best
 
 
+def _eater_strength(a: KitPiece) -> tuple[float, str]:
+    """An eater's strength and how the board says it: an ultimate ULT, an
+    ability its uptime over EATER_UPTIME."""
+    if a.kind == KIND_ULTIMATE:
+        return ULT, "ultimate"
+    lasts, wait = a.max_stat("duration") or 0.0, a.max_stat("cooldown") or 0.0
+    up = lasts / (lasts + wait) if lasts + wait else 0.0
+    return _clamp(up / EATER_UPTIME), "up %.0f%%" % (100 * up)
+
+
+class _MainGun(NamedTuple):
+    """What the mechanisms read of a hero's main weapon: its kind, its
+    biggest hit, the hit armor takes, the share of that hit armor removes,
+    and how much of it a Defense Matrix or a Deflect takes."""
+    kind: str
+    hit: float
+    instance: float
+    armor_loss: float
+    eaten: float
+    deflected: float
+
+
+_NO_GUN = _MainGun(kind="none", hit=0.0, instance=0.0, armor_loss=0.0, eaten=0.0, deflected=0.0)
+
+
+def _main_gun(main: KitPiece | None) -> _MainGun:
+    """The main weapon's reads; _NO_GUN for a hero without one."""
+    if main is None:
+        return _NO_GUN
+    kind = _kind(main)
+    hit = max(main.hits() or [0.0]) or _per_hit(main) or 0.0
+    instance = _per_hit(main) or hit or 1.0
+    taken = _clamp(hit / EAT_FULL_HIT, EAT_SMALL_SHARE)
+    return _MainGun(kind=kind, hit=hit, instance=instance,
+                    armor_loss=_armor_loss(main, kind, instance),
+                    eaten=_flag(main, "ignores_matrix") * taken,
+                    deflected=_flag(main, "ignores_deflect") * taken)
+
+
+def _mobility(h: Hero) -> tuple[float, tuple[str, ...]]:
+    """The hero's mobility, its movement tools weighed strong or weak over
+    MOBILITY_FULL, and the tools."""
+    moves = [
+        a for a in h.abilities
+        if a.kind in (KIND_ABILITY, KIND_PASSIVE) and not a.for_allies and _movement(a)]
+    mobility = _clamp(sum(STRONG_MOVE if a.keywords & MOVE_STRONG else WEAK_MOVE for a in moves)
+                      / MOBILITY_FULL)
+    return mobility, tuple(a.name for a in moves)
+
+
+def _saves(h: Hero) -> tuple[float, tuple[str, ...], tuple[str, ...]]:
+    """The hero's saves - a cleanse at CLEANSE_SAVE, invulnerability at
+    INVULN_SAVE, each by its cooldown - the pieces, and its escapes: the
+    abilities that save the hero itself."""
+    saves = [
+        a for a in h.abilities
+        if a.kind in (KIND_ABILITY, KIND_ULTIMATE) and a.keywords & (SAVE | CLEANSE)]
+    save = _clamp(sum((CLEANSE_SAVE if a.keywords & CLEANSE else INVULN_SAVE)
+                      * _cd_weight(a, SAVE_CD_FULL) for a in saves))
+    escape = tuple(sorted(a.name for a in h.abilities
+                          if a.kind == KIND_ABILITY and a.keywords & SAVE and not a.for_allies))
+    return save, tuple(a.name for a in saves), escape
+
+
+def _sustain(h: Hero, support_hps: float) -> tuple[float, float]:
+    """How long the hero keeps itself up, its own healing over its pool, and
+    its healing onto teammates as a share of support_hps."""
+    own = h.self_heal + SELF_HPS_SECONDS * h.self_hps + LIFESTEAL_SECONDS * h.lifesteal * h.dps
+    self_sustain = _clamp(own / h.pool) if h.pool else 0.0
+    heal_out = _clamp(h.hps / support_hps) if support_hps else 0.0
+    return self_sustain, heal_out
+
+
+def _backline(h: Hero, reach: float) -> float:
+    """1 for a backline subrole or a hero that fights from BACKLINE_REACH, 0.5
+    from MIDLINE_REACH, else 0."""
+    if h.subrole in BACKLINE or reach >= BACKLINE_REACH:
+        return 1.0
+    return 0.5 if reach >= MIDLINE_REACH else 0.0
+
+
 def features(h: Hero, support_hps: float) -> Features:
     """The facts every mechanism reads of one hero. support_hps is the
     roster's best support's sustained healing, which heal_out is a share of."""
     steady = [w for w in h.weapons if w.damages and w.name not in FORM_GATED]
     main = _main(steady)
+    gun = _main_gun(main)
     fights = _fights(steady)
     burst, burst_piece = _burst(h)
     reach, range_weapon = max(((m, w.name) for w, m in fights), default=(0.0, ""))
     aa, aa_weapon, aa_kind, aa_reach = _anti_air(h, fights, burst)
     flight, flight_piece = _flight(h)
-    moves = [a for a in h.abilities
-                if a.kind in (KIND_ABILITY, KIND_PASSIVE) and not a.for_allies and _movement(a)]
-    mobility = _clamp(sum(STRONG_MOVE if a.keywords & MOVE_STRONG else WEAK_MOVE for a in moves)
-                      / MOBILITY_FULL)
+    mobility, mobility_pieces = _mobility(h)
     cc_int, cc_deny, int_pieces, deny_pieces = _control(h)
-    ult_channels = [a.name for a in h.abilities
-                    if a.kind == KIND_ULTIMATE and "channel" in a.keywords]
-    channels = [a.name for a in h.abilities if a.kind == KIND_ABILITY and "channel" in a.keywords
-                and not a.for_allies and not _movement(a)]
-    saves = [a for a in h.abilities if a.kind in (KIND_ABILITY, KIND_ULTIMATE)
-                and a.keywords & (SAVE | CLEANSE)]
-    save = _clamp(sum((CLEANSE_SAVE if a.keywords & CLEANSE else INVULN_SAVE)
-                      * _cd_weight(a, SAVE_CD_FULL) for a in saves))
-    antiheal, antiheal_piece = 0.0, ""
-    for a in h.abilities:
-        for s in a.stats.get("healing_mod", ()):
-            if s.value is not None and s.value < 0 and (s.condition or "") != "allies":
-                strength = -s.value / 100.0 * (ULT if a.kind == KIND_ULTIMATE else 1.0)
-                if strength > antiheal:
-                    antiheal, antiheal_piece = strength, "%s (%+g%% healing received)" % (
-                        a.name, s.value)
-    own = h.self_heal + SELF_HPS_SECONDS * h.self_hps + LIFESTEAL_SECONDS * h.lifesteal * h.dps
-    self_sustain = _clamp(own / h.pool) if h.pool else 0.0
-    heal_out = _clamp(h.hps / support_hps) if support_hps else 0.0
-    barriers = [(a.max_stat("barrier_health") or 0.0, a.name) for a in h.abilities
-                if a.kind == KIND_ABILITY and "barrier" in a.keywords
-                and not a.keywords & {"bubble", "attached"}]
-    barrier, barrier_piece = max(barriers, default=(0.0, ""))
+    ult_channels, channels = _channels(h)
+    save, save_pieces, escape = _saves(h)
+    antiheal, antiheal_piece = _antiheal(h)
+    self_sustain, heal_out = _sustain(h, support_hps)
+    barrier, barrier_piece = _barrier(h)
     pierce, pierce_piece = _pierce(steady, h.abilities)
     eater, eater_piece, eater_family = _eater(h)
-    hit = (max(main.hits() or [0.0]) or _per_hit(main) or 0.0) if main else 0.0
-    instance = (_per_hit(main) or hit or 1.0) if main else 0.0
-    main_kind = _kind(main) if main else "none"
     armor = h.armor + h.form_armor
     return Features(
         id=h.id, name=h.name, role=h.role, subrole=h.subrole, pool=h.pool, armor=armor,
         armor_share=armor / (h.pool + h.form_armor) if h.pool else 0.0, dps=h.dps,
         burst=burst, burst_piece=burst_piece, melee_only=h.melee_only, main=main,
-        main_kind=main_kind, main_hit=hit, instance=instance,
-        armor_loss=_armor_loss(main, main_kind, instance) if main else 0.0,
+        main_kind=gun.kind, main_hit=gun.hit, instance=gun.instance,
+        armor_loss=gun.armor_loss,
         range=reach, range_weapon=range_weapon, aa=aa, aa_weapon=aa_weapon, aa_kind=aa_kind,
         aa_reach=aa_reach, flight=flight, flight_piece=flight_piece, mobility=mobility,
         mobile=_clamp((mobility - MOBILE_FROM) / (1.0 - MOBILE_FROM)),
-        mobility_pieces=tuple(a.name for a in moves),
+        mobility_pieces=mobility_pieces,
         diver=1.0 if h.subrole in DIVERS else 0.0,
-        escape=tuple(sorted(a.name for a in h.abilities if a.kind == KIND_ABILITY
-                            and a.keywords & SAVE and not a.for_allies)),
+        escape=escape,
         cc_int=cc_int, cc_deny=cc_deny, cc_int_pieces=int_pieces, cc_deny_pieces=deny_pieces,
         channel=CHANNEL_ULT * bool(ult_channels) + CHANNEL_ABILITY * bool(channels),
         channel_pieces=tuple(ult_channels + channels), save=save,
-        save_pieces=tuple(a.name for a in saves),
+        save_pieces=save_pieces,
         antiheal=_clamp(antiheal), antiheal_piece=antiheal_piece, self_sustain=self_sustain,
         heal_out=heal_out, heal_rel=max(self_sustain, heal_out), barrier=barrier,
         barrier_piece=barrier_piece,
         barrier_share=barrier / (barrier + h.pool) if barrier else 0.0, pierce=pierce,
         pierce_piece=pierce_piece, eater=eater, eater_piece=eater_piece,
-        eater_family=eater_family,
-        eaten=_flag(main, "ignores_matrix") * _clamp(hit / EAT_FULL_HIT, EAT_SMALL_SHARE)
-        if main else 0.0,
-        deflected=_flag(main, "ignores_deflect") * _clamp(hit / EAT_FULL_HIT, EAT_SMALL_SHARE)
-        if main else 0.0,
-        projectile_main=main_kind == "projectile",
+        eater_family=eater_family, eaten=gun.eaten, deflected=gun.deflected,
+        projectile_main=gun.kind == "projectile",
         percent_ult=next((u.name for u in h.ults if any(
             s.unit_num == "percent" for s in u.stats.get("damage", ()))), ""),
         tankness=_clamp((h.pool - TANK_POOL_LOW) / TANK_POOL_SPAN) if h.role == "tank" else 0.0,
-        backline=1.0 if h.subrole in BACKLINE or reach >= BACKLINE_REACH else (
-            0.5 if reach >= MIDLINE_REACH else 0.0),
+        backline=_backline(h, reach),
         oneshot_risk=_clamp((burst - ONESHOT_FROM) / ONESHOT_SPAN))
+
+
+def _channels(h: Hero) -> tuple[list[str], list[str]]:
+    """The hero's channelled ultimates, and its channelled abilities that
+    are neither for allies nor a movement tool."""
+    ults = [a.name for a in h.abilities if a.kind == KIND_ULTIMATE and "channel" in a.keywords]
+    abilities = [a.name for a in h.abilities if a.kind == KIND_ABILITY and "channel" in a.keywords
+                 and not a.for_allies and not _movement(a)]
+    return ults, abilities
+
+
+def _antiheal(h: Hero) -> tuple[float, str]:
+    """The hero's strongest cut to the healing an enemy receives, an
+    ultimate's at ULT, and the piece: a negative healing_mod row not on
+    allies."""
+    best, where = 0.0, ""
+    for a in h.abilities:
+        for s in a.stats.get("healing_mod", ()):
+            if s.value is not None and s.value < 0 and (s.condition or "") != "allies":
+                strength = -s.value / 100.0 * (ULT if a.kind == KIND_ULTIMATE else 1.0)
+                if strength > best:
+                    best, where = strength, "%s (%+g%% healing received)" % (a.name, s.value)
+    return best, where
+
+
+def _barrier(h: Hero) -> tuple[float, str]:
+    """The hero's largest placed barrier's health and its name: a bubble or an
+    attached barrier is not placed."""
+    barriers = [(a.max_stat("barrier_health") or 0.0, a.name) for a in h.abilities
+                if a.kind == KIND_ABILITY and "barrier" in a.keywords
+                and not a.keywords & {"bubble", "attached"}]
+    return max(barriers, default=(0.0, ""))
 
 
 def _pierce(steady: Sequence[KitPiece], abilities: Sequence[KitPiece]) -> tuple[float, str]:
     """How the hero passes a barrier: its weapon whole, else a damaging
     ability at half, else an ultimate at ULT."""
     for w in steady:
-        if (w.max_stat("ignores_barrier") or 0) >= 1 or "barrier piercing" in w.keywords:
+        if _passes_barriers(w):
             return 1.0, "%s (weapon passes barriers)" % w.name
     best, where = 0.0, ""
     for a in abilities:
-        if a.kind in (KIND_ABILITY, KIND_ULTIMATE) and a.damages and not a.for_allies and (
-                "barrier piercing" in a.keywords or (a.max_stat("ignores_barrier") or 0) >= 1):
+        if (a.kind in (KIND_ABILITY, KIND_ULTIMATE) and a.damages and not a.for_allies
+                and _passes_barriers(a)):
             strength = ULT if a.kind == KIND_ULTIMATE else PARTIAL
             if strength > best:
                 best, where = strength, "%s (passes barriers)" % a.name
     return best, where
+
+
+def _passes_barriers(piece: KitPiece) -> bool:
+    """A piece the kit marks as passing barriers, by its flag or its keyword."""
+    return (piece.max_stat("ignores_barrier") or 0) >= 1 or "barrier piercing" in piece.keywords
 
 
 def _armor_loss(main: KitPiece, kind: str, instance: float) -> float:
