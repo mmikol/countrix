@@ -166,9 +166,7 @@ def has_scoring_terms(catalog: Iterable[Strategy]) -> bool:
     constraint or a soft limit. A playbook of hard limits and prose alone
     ties every legal six at zero - the board then says "unscored" rather
     than 100 / 100."""
-    return any(
-        h.kind == "heuristic" or h.form == "scored" or (h.form == "limit" and h.soft)
-        for h in catalog)
+    return any(h.scores for h in catalog)
 
 
 class KindCounts(TypedDict):

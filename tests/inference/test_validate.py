@@ -171,7 +171,7 @@ def test_the_families_file_every_scoring_strategy_once():
         "scored": ("anti-heal-answer", "squish-limit", "under-healed"),
         "other": ("anti-air", "effective-hp", "healing-floor", "range-war")}
     filed = [i for ids in kin.values() for i in ids]
-    assert sorted(filed) == sorted(s.id for s in playbook if rescore.scores(s))
+    assert sorted(filed) == sorted(s.id for s in playbook if s.scores)
     assert "open-queue-tanks" not in filed                        # a hard limit scores nothing
     assert rescore.families(ASSUMPTIONS_ONLY) == []
 

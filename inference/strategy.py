@@ -401,6 +401,13 @@ class Strategy:
         return self.form in ("heuristic", "limit", "scored")
 
     @property
+    def scores(self) -> bool:
+        """Whether the strategy moves a six's score: a heuristic, a scored
+        constraint or a soft limit. A hard limit prunes and adds nothing, and
+        a draft or an assumption the solver never reads."""
+        return self.form in ("heuristic", "scored") or (self.form == "limit" and self.soft)
+
+    @property
     def pending(self) -> bool:
         """A draft: the /strategy skill has not inferred its frontmatter yet."""
         return self.form == "draft"

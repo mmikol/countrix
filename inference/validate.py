@@ -268,7 +268,7 @@ def _playbook(subject: Subject, kin: Sequence[rescore.Family]) -> report.Playboo
                 for f in kin]
     return report.Playbook(
         name=subject.name, digest=subject.digest,
-        scoring=any(rescore.scores(s) for s in subject.catalog), families=families)
+        scoring=any(s.scores for s in subject.catalog), families=families)
 
 
 def _counts(

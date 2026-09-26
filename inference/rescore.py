@@ -78,13 +78,6 @@ def _names(strategy: Strategy) -> set[str]:
     return names
 
 
-def scores(strategy: Strategy) -> bool:
-    """Whether a strategy moves a six's score: a heuristic, a scored
-    constraint or a soft limit. A hard limit prunes and adds nothing."""
-    return strategy.form in ("heuristic", "scored") or (
-        strategy.form == "limit" and strategy.soft)
-
-
 # the families in the order a strategy is filed: the first whose test it meets
 FAMILY_TESTS: tuple[tuple[str, str, Callable[[Strategy], bool]], ...] = (
     ("side", "the side bonuses: rules that read map.side",
@@ -105,7 +98,7 @@ def families(catalog: Sequence[Strategy]) -> list[Family]:
     test it meets; a family the playbook holds nothing of is left out."""
     filed: dict[str, list[str]] = {}
     for strategy in catalog:
-        if not scores(strategy):
+        if not strategy.scores:
             continue
         name = next(name for name, _meaning, test in FAMILY_TESTS if test(strategy))
         filed.setdefault(name, []).append(strategy.id)

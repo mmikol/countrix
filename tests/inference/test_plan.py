@@ -185,18 +185,18 @@ def test_the_plan_says_nothing_the_board_contradicts(synthetic_world):
     rules = [
         Ns(
             id="two-supports-hold", name="Two supports hold a six", kind="constraint",
-            form="scored", category="shape", when=None, pending=False),
+            form="scored", category="shape", when=None, pending=False, scores=True),
         Ns(
             id="dive-the-pocket", name="Dive the pocket", kind="constraint", form="scored",
-            category="matchup", when=Expr("enemy.dmg_amp >= 2"), pending=False),
+            category="matchup", when=Expr("enemy.dmg_amp >= 2"), pending=False, scores=True),
         Ns(
             id="brawl-maps", name="Brawl maps reward durability", kind="heuristic",
             form="heuristic", category="map", when=Expr("map.style_top == 'brawl'"),
-            pending=False),
+            pending=False, scores=True),
         Ns(
             id="poke-needs-reach", name="Poke needs reach", kind="heuristic",
             form="heuristic", category="shape", when=Expr("team.style_lean == 'poke'"),
-            pending=False),
+            pending=False, scores=True),
         Ns(
             id="unmet", name="An unmet need", kind="heuristic", form="heuristic",
             category="general", when=None, pending=False)]

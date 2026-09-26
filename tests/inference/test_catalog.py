@@ -252,6 +252,23 @@ def test_a_constraint_is_a_limit_or_scored_and_an_assumption_is_prose(tmp_path):
             load_one(bad)
 
 
+def test_a_draft_scores_nothing_whatever_its_kind(tmp_path):
+    """A heuristic draft - a name, a kind and prose - is not a scoring term:
+    with the engine off, a playbook of it and an assumption reads UNSCORED,
+    not "no scoring strategy applies yet". One predicate, Strategy.scores,
+    answers it for the catalog, the result and the validation."""
+    from inference.base import OFF
+    from inference.result import UNSCORED, Result
+    (tmp_path / "d.md").write_text("---\nname: d\nkind: heuristic\n---\nx\n", "utf-8")
+    (tmp_path / "a.md").write_text("---\nname: a\nkind: assumption\n---\nx\n", "utf-8")
+    playbook = catalog.load(str(tmp_path))
+    assert sorted(h.form for h in playbook) == ["assumption", "draft"]
+    assert not any(h.scores for h in playbook) and not catalog.has_scoring_terms(playbook)
+    result = Result(kind="current", map_name=None, red=[], blue=[], locked=[],
+                    catalog=playbook, base=OFF)
+    assert result.waiting() == UNSCORED
+
+
 def test_a_guard_is_settled_by_the_board_when_it_reads_only_red_the_map_the_world_and_params():
     assert settled_by_board(["enemy.size", "map.known", "world.heal_bench", "params.X"])
     assert not settled_by_board(["enemy.size", "team.supports"])
