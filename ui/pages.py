@@ -18,7 +18,7 @@ from typing import NamedTuple
 from door.mcp.matches import NOTE_LIMIT, RESULTS
 from facts import compute, counters, scalars
 from facts.draft import MAX_BANS, TEAM_SIZE
-from inference import base, scale, scoring, solver
+from inference import base, engine, scale, scoring, solver
 
 GITHUB_MARK = (
     "<svg viewBox='0 0 16 16' width='15' height='15' aria-hidden='true'><path fill='currentColor' d='M8 0C3.58 0 0 3.58 0 8"  # noqa: E501
@@ -204,7 +204,8 @@ def view_math() -> str:
         "NEED_BUDGET": scoring.NEED_BUDGET,
         "PARTNER_POINTS": solver.PARTNER_POINTS,
         "SEEDS": solver.SEEDS,
-        "SHAPE_REACH": solver.SHAPE_REACH,
+        "POOL_DEFAULT": engine.POOL_DEFAULT,
+        "FIELD": format(engine.field_size(engine.POOL_DEFAULT), ","),
         "RESTARTS": solver.RESTARTS,
         "FORMATION_RADIUS": scalars.FORMATION_RADIUS,
         "TEAMMATES": scalars.TEAMMATES,

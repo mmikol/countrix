@@ -160,23 +160,25 @@ a six that breaks a hard limit: the search discards it, so it has no rank and no
 rest. A seat still drafting is read through its fill, the best six its picks can reach, on
 both sides alike: a sum over fewer picks reads low, so the seat with more picks would lead. With
 one seat unscored the bars show the shares alone. This is not a fitted probability.</p>
-<p id='argmax'><b>The argmax.</b> Each role's pool is the six heroes of highest standing: a
-hero's mean score across the reference sixes it appears in, plus %(PARTNER_POINTS)g for each
-locked partner. Every legal shape is filled around the locked picks and scored; a shape that
-needs more of a role than the pool holds takes that role's next heroes. A local search
-then swaps same-role heroes while the score rises, starting from the best %(SEEDS)d sixes and
-from the best six of every shape within %(SHAPE_REACH)g points of the top, and finally brings
-the wiki's synergy pairs into the leading sixes two slots at a time. Ties break by mean map win
-rate, then by name.</p>
-<p id='searched'><b>What is searched, and what is not.</b> There are
-<b>18,040,386</b> legal sixes. The search scores about <b>14,500</b> of them, near enough
-0.08%%, so the answer is not a proof that nothing better exists. Two things cut the space.
-The <b>pool</b> keeps each role's six highest-standing heroes, a truncation that can drop a
-hero who is weak alone and decisive beside one partner. The <b>local search</b> reaches back
-out of the pool: it swaps against the whole released roster, restarts %(RESTARTS)d times inside
-the leading shape, and changes two seats at once, which is how a pair that only pays together
-is found. The suite checks the reaching back on every run: on small boards of a twelve-hero
-test roster under a two-two-two role queue, each role's pool cut to half, the search returns
+<p id='argmax'><b>The argmax.</b> Each role's pool is the %(POOL_DEFAULT)d heroes of highest
+standing: a hero's mean score across the reference sixes it appears in, plus %(PARTNER_POINTS)g
+for each locked partner. Every legal shape is filled around the locked picks and scored; a
+shape that needs more of a role than the pool holds takes that role's next heroes. A local
+search then swaps same-role heroes while the score rises, starting from the best %(SEEDS)d
+sixes and from the best six of every shape, and brings each of the wiki's synergy pairs into
+the leading sixes two slots at a time. Ties break by mean map win rate, then by name. The
+alternatives beside the answer are the best other sixes the search scored, not a proven next
+five.</p>
+<p id='searched'><b>What is searched, and what is not.</b> The current roster makes about
+twenty million legal sixes. The search sweeps <b>%(FIELD)s</b> of them, every legal shape over
+each role's pool of %(POOL_DEFAULT)d, and its climbs bring what it scores to some tens of
+thousands, under 0.2%%, so the answer is not a proof that nothing better exists. Two things
+cut the space. The <b>pool</b> keeps each role's highest-standing heroes, a truncation that
+can drop a hero who is weak alone and decisive beside one partner. The <b>local search</b>
+reaches back out of the pool: it swaps against the whole released roster, restarts
+%(RESTARTS)d times inside the leading shape, and changes two seats at once, which is how a
+pair that only pays together is found. The suite checks the reaching back on every run: on
+small boards of a twelve-hero test roster, each role's pool cut to half, the search returns
 the maximum a full enumeration finds, with the default engine on and off, and on at least one
 of them the winning six holds a hero the pool cut. The tests page has the larger proofs.</p>
 <p id='against-red'><b>What it is optimal against.</b> A comp is optimal <i>against the red

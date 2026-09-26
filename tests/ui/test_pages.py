@@ -305,7 +305,7 @@ def test_an_apostrophe_cannot_close_a_single_quoted_attribute():
     (scoring, "NEED_BUDGET", "one state costs %s at most"),
     (solver, "PARTNER_POINTS", "plus %s for each locked partner"),
     (solver, "SEEDS", "from the best %s sixes"),
-    (solver, "SHAPE_REACH", "within %s points of the top"),
+    (engine, "POOL_DEFAULT", "each role's pool of %s, and its climbs"),
     (solver, "RESTARTS", "restarts %s times"),
 ])
 def test_the_math_page_quotes_each_constant_from_the_code(monkeypatch, module, name, phrase):

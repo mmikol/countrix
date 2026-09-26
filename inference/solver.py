@@ -14,11 +14,12 @@ A Solver is the board's Objective (inference.scoring) on the board's scale
     rank            sorted by score, then tie-break, then names - a total order, so
                     the answer does not depend on how the sweep was split
     refine          local search from the best six sixes and the best of every
-                    shape within SHAPE_REACH of the best: swap any slot for any
-                    same-role hero on the roster, keep improvements; bring each
-                    of the wiki's synergy pairs into the best sixes two slots at
-                    once; then climb from random sixes of the leader's shape and
-                    change two seats at once
+                    swept shape: swap any slot for any same-role hero on the
+                    roster, keep improvements; bring each of the wiki's synergy
+                    pairs into the best sixes two slots at once; then climb from
+                    random sixes of the leader's shape and change two seats at
+                    once. Which sixes it visits reads no score threshold, so
+                    scaling the objective moves none of them
 """
 
 import heapq
@@ -38,8 +39,6 @@ from inference.strategy import Strategy
 PARTNER_POINTS = 0.5              # a locked partner's worth when ranking a pool
 SEEDS = 6                         # the local search's starts, whatever `top` asks for
 RESTARTS = 24                     # in-shape random starts: the SEEDS are near-duplicates
-SHAPE_REACH = 4.0                 # a shape starts too when its best six is this close
-PAIR_TRIES = 800                  # the most new sixes one refine scores bringing pairs in
 
 
 class Infeasible(Refusal):
@@ -216,10 +215,12 @@ class Solver(Objective):
     def refine(self, ranked: list[Candidate]) -> list[Candidate]:
         """Local search: swap any open slot for any same-role hero. A swap keeps
         the shape, so the starts are the best SEEDS of the field and the best
-        six of every shape in it: an off-shape six can win only if its own
-        shape was searched. Then the best SEEDS sixes try each of the wiki's synergy pairs
-        brought in two slots at once, and the swaps run on from any that gained:
-        partners that pay only together are never met one swap at a time.
+        six of every shape in it, however far below the best: an off-shape six
+        can win only if its own shape was searched, and a cut in score points
+        would move with the objective's scale. Then the best SEEDS sixes try
+        every one of the wiki's synergy pairs brought in two slots at once, and
+        the swaps run on from any that gained: partners that pay only together
+        are never met one swap at a time.
 
         An empty field refines to an empty field: rank() returns before calling
         it, and evaluate_comp refuses a board with no feasible six the way
@@ -229,10 +230,7 @@ class Solver(Objective):
         known = {c.key: c for c in ranked}
         starts = list(ranked[:SEEDS])
         shapes: set[tuple[str, ...]] = set()
-        floor = ranked[0].score - SHAPE_REACH
         for cand in ranked:                   # sorted: the first of a shape is its best
-            if cand.score < floor:
-                break                         # a swap or two will not make this up
             shape = tuple(sorted(h.role for h in cand.heroes))
             if shape not in shapes:
                 shapes.add(shape)
@@ -245,8 +243,7 @@ class Solver(Objective):
         pairs = self._pairs()
         if pairs:
             for seed in heapq.nsmallest(SEEDS, known.values(), key=self._rank_key):
-                spent = self.considered + PAIR_TRIES      # each seed gets its own budget
-                paired = self._bring_pair(seed, pairs, known, spent)
+                paired = self._bring_pair(seed, pairs, known)
                 if paired is not seed:
                     self._climb(paired, roster, known)
         # the SEEDS are the top of one pool-restricted sweep and sit within a swap
@@ -357,10 +354,11 @@ class Solver(Objective):
         return out
 
     def _bring_pair(self, seed: Candidate, pairs: Sequence[tuple[Hero, Hero]],
-                    known: dict[SixKey, Candidate], spent: int) -> Candidate:
+                    known: dict[SixKey, Candidate]) -> Candidate:
         """Each pair with neither partner in the six, seated in two open slots of
-        their own roles, until `considered` reaches `spent`. -> the best six met,
-        the seed itself where none beat it."""
+        their own roles. -> the best six met, the seed itself where none beat
+        it. Every pair is tried: a budget spent in id order skipped the same
+        late-id pairs on every board."""
         locked_ids = {h.id for h in self.locked}
         open_slots: dict[str, list[int]] = {}
         for index, hero in enumerate(seed.heroes):
@@ -370,8 +368,6 @@ class Solver(Objective):
         for a, b in pairs:
             if a.id in seed.key or b.id in seed.key:
                 continue                      # one swap reaches these
-            if self.considered >= spent:
-                break
             for i, j in _seatings(open_slots, a, b):
                 heroes = list(seed.heroes)
                 heroes[i], heroes[j] = a, b
