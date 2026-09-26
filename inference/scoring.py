@@ -87,26 +87,27 @@ def _amount(value: Value) -> float:
     raise TypeError("a bonus or penalty reads a number, got %r" % (value,))
 
 
-def _guard_key(h: Strategy) -> object:
+def _guard_key(strategy: Strategy) -> object:
     """What makes two guards one: the same text and the same params. A param
     the dialect read as a list cannot key a dict, so its strategy stands
     alone."""
-    key = (h.when.source if h.when is not None else None, tuple(sorted(h.params.items())))
+    when = strategy.when.source if strategy.when is not None else None
+    key = (when, tuple(sorted(strategy.params.items())))
     try:
         hash(key)
     except TypeError:
-        return h.id
+        return strategy.id
     return key
 
 
-def _slot_gate(held: list[bool | None], slot: int, h: Strategy, sc: Scope) -> bool:
+def _slot_gate(held: list[bool | None], slot: int, strategy: Strategy, sc: Scope) -> bool:
     """A gate the candidate decides, read once per slot: the answer a strategy
-    guarded the same way already left in `held`, else h's `when` evaluated on
-    this scope with h's params and kept there."""
+    guarded the same way already left in `held`, else this one's `when`
+    evaluated on this scope with its params and kept there."""
     gate = held[slot]
     if gate is None:
-        sc["params"] = h.params_section
-        when = h.when                  # set: a gate the candidate decides has one
+        sc["params"] = strategy.params_section
+        when = strategy.when           # set: a gate the candidate decides has one
         gate = held[slot] = when is None or bool(when.evaluate(sc))
     return gate
 
@@ -254,9 +255,9 @@ class Objective:
         self.catalog = catalog
         # the default engine on this board; None while it is off
         self.base = Base(world, m, red=self.red, banned=banned, weights=base) if base.on else None
-        self.limits = [h for h in catalog if h.form == "limit"]
-        self.heuristics = [h for h in catalog if h.form == "heuristic"]
-        self.scored_constraints = [h for h in catalog if h.form == "scored"]
+        self.limits = [s for s in catalog if s.form == "limit"]
+        self.heuristics = [s for s in catalog if s.form == "heuristic"]
+        self.scored_constraints = [s for s in catalog if s.form == "scored"]
         # the red side's metrics do not change across candidates
         self.red_t = team_metrics(world, self.red, m, ())
         self.static: Namespace = {
@@ -271,8 +272,8 @@ class Objective:
         # a limit with its require:, which every limit has
         gates, slots, self.gate_slots = self._gates()
         self._limits: list[tuple[Strategy, Expr, bool | None, int]] = [
-            (h, h.require, gates[h.id], slots.get(h.id, 0)) for h in self.limits
-            if h.require is not None]
+            (limit, limit.require, gates[limit.id], slots.get(limit.id, 0))
+            for limit in self.limits if limit.require is not None]
         # the limits prepare() prunes by: a soft one only charges, in score()
         self._hard_limits = [limit for limit in self._limits if not limit[0].soft]
         self._scored = [(r, gates[r.id], slots.get(r.id, 0))
@@ -293,8 +294,8 @@ class Objective:
         for g in self.heuristics:
             if g.id in guards:
                 written[guards[g.id]] = written.get(guards[g.id], 0.0) + g.weight
-        self._needs = {hid: min(1.0, NEED_BUDGET / written[guard])
-                       if written[guard] else 1.0 for hid, guard in guards.items()}
+        self._needs = {sid: min(1.0, NEED_BUDGET / written[guard])
+                       if written[guard] else 1.0 for sid, guard in guards.items()}
         self._freeze_norms()
 
     def _gates(self) -> tuple[dict[str, bool | None], dict[str, int], int]:
@@ -308,15 +309,15 @@ class Objective:
         gates: dict[str, bool | None] = {}
         slots: dict[str, int] = {}
         groups: dict[object, int] = {}
-        for h in self.catalog:
-            if h.when is None:
-                gates[h.id] = True
-            elif settled_by_board(h.when.names):
-                sc["params"] = h.params_section
-                gates[h.id] = bool(h.when.evaluate(sc))
+        for strategy in self.catalog:
+            if strategy.when is None:
+                gates[strategy.id] = True
+            elif settled_by_board(strategy.when.names):
+                sc["params"] = strategy.params_section
+                gates[strategy.id] = bool(strategy.when.evaluate(sc))
             else:
-                gates[h.id] = None
-                slots[h.id] = groups.setdefault(_guard_key(h), len(groups))
+                gates[strategy.id] = None
+                slots[strategy.id] = groups.setdefault(_guard_key(strategy), len(groups))
         return gates, slots, len(groups)
 
     # --- namespace and preparation -------------------------------------------
@@ -335,13 +336,13 @@ class Objective:
         sc = cand.scope = scope(ns)
         held: list[bool | None] = [None] * self.gate_slots
         violations = []
-        for h, require, gate, slot in self._hard_limits:
+        for limit, require, gate, slot in self._hard_limits:
             if gate is None:
-                gate = _slot_gate(held, slot, h, sc)
+                gate = _slot_gate(held, slot, limit, sc)
             if gate:
-                sc["params"] = h.params_section
+                sc["params"] = limit.params_section
                 if not require.evaluate(sc):
-                    violations.append(h.id)
+                    violations.append(limit.id)
         cand.violations = violations
         raw: list[float | None] = []
         keep = raw.append
@@ -367,9 +368,9 @@ class Objective:
         if sc is None:
             raise RuntimeError("shortfall() takes a prepared candidate")
         total = 0.0
-        for h, require, _gate, _slot in self._hard_limits:
-            if h.id in cand.violations:
-                sc["params"] = h.params_section
+        for limit, require, _gate, _slot in self._hard_limits:
+            if limit.id in cand.violations:
+                sc["params"] = limit.params_section
                 total += require.shortfall(sc)
         return total
 
@@ -470,18 +471,18 @@ class Objective:
         pruned what breaks it), a soft one charges its penalty where it fails
         - a charge, so a penalty expression below zero charges nothing and
         never pays a six for breaking the limit."""
-        for h, require, applies, slot in self._limits:
+        for limit, require, applies, slot in self._limits:
             if applies is None:
-                applies = _slot_gate(held, slot, h, sc)
+                applies = _slot_gate(held, slot, limit, sc)
             ok, penalty = True, 0.0
             if applies:
-                sc["params"] = h.params_section
+                sc["params"] = limit.params_section
                 ok = bool(require.evaluate(sc))
-                if h.soft and not ok and h.penalty is not None:     # a soft limit has one
-                    penalty = max(0.0, _amount(h.penalty.evaluate(sc)))
+                if limit.soft and not ok and limit.penalty is not None:   # a soft limit has one
+                    penalty = max(0.0, _amount(limit.penalty.evaluate(sc)))
             total -= penalty
             if out is not None:
-                out.append({"id": h.id, "kind": "constraint", "form": "limit",
+                out.append({"id": limit.id, "kind": "constraint", "form": "limit",
                             "applies": applies, "ok": ok, "weighted": -penalty,
                             "metric": require.source})
         return total

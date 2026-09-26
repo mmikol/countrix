@@ -66,22 +66,22 @@ KIND_ORDER = {k: i for i, k in enumerate(KINDS)}
 def _read(directory: str, name: str, ids: set[str]) -> Strategy:
     """One strategy file, validated; any failure is a CatalogError naming the
     file."""
-    hid = name[:-3]                       # the id IS the filename; nothing overrides it
+    sid = name[:-3]                       # the id IS the filename; nothing overrides it
     try:
-        if not ID_RE.fullmatch(hid):
+        if not ID_RE.fullmatch(sid):
             raise CatalogError("%s: the filename must be lowercase-kebab" % name)
         path = os.path.join(directory, name)
         with open(path, encoding="utf-8") as handle:
             raw = handle.read()
         parsed = parse_frontmatter(raw)
-        if "id" in parsed.meta and str(parsed.meta["id"]) != hid:
+        if "id" in parsed.meta and str(parsed.meta["id"]) != sid:
             raise CatalogError("%s: id: is the filename; drop it" % name)
-        if hid in ids:
-            raise CatalogError("%s: duplicate id %r" % (name, hid))
-        return Strategy(hid, parsed.meta, body=parsed.body, raw=raw, path=path)
+        if sid in ids:
+            raise CatalogError("%s: duplicate id %r" % (name, sid))
+        return Strategy(sid, parsed.meta, body=parsed.body, raw=raw, path=path)
     except (CatalogError, FrontmatterError) as error:
         text = str(error)
-        wrapped = CatalogError(text if text.startswith((name, hid)) else "%s: %s" % (name, text))
+        wrapped = CatalogError(text if text.startswith((name, sid)) else "%s: %s" % (name, text))
         wrapped.file = name
         raise wrapped from error
     except Exception as error:            # bytes that are not text, a directory, ...
@@ -124,25 +124,25 @@ def parse_weights(items: Mapping[str, object] | Iterable[object] | None) -> dict
     Refusal, which the board, the service and the board tool answer as the
     caller's error."""
     if isinstance(items, Mapping):
-        pairs = [(str(hid), value) for hid, value in items.items()]
+        pairs = [(str(sid), value) for sid, value in items.items()]
     else:
         pairs = [_weight_entry(item) for item in items or []]
     low, high = WEIGHT_RANGE
     out = {}
-    for hid, value in pairs:
+    for sid, value in pairs:
         weight = finite_number(value)
         if weight is None:
-            raise Refusal("weight %r for %r is not a number" % (value, hid))
-        out[hid.strip()] = min(high, max(low, weight))
+            raise Refusal("weight %r for %r is not a number" % (value, sid))
+        out[sid.strip()] = min(high, max(low, weight))
     return out
 
 
 def _weight_entry(item: object) -> tuple[str, object]:
     """One `id:value` string -> (id, value)."""
-    hid, colon, value = str(item).partition(":")
+    sid, colon, value = str(item).partition(":")
     if not colon:
         raise Refusal("a weight is id:value, got %r" % item)
-    return hid, value
+    return sid, value
 
 
 def weighted(catalog: list[Strategy], weights: Mapping[str, float] | None) -> list[Strategy]:

@@ -154,9 +154,9 @@ class Result:
     pending: list[str] = field(init=False)
 
     def __post_init__(self) -> None:
-        self.considerations = [Consideration(id=h.id, name=h.name)
-                               for h in self.catalog if h.kind == "assumption"]
-        self.pending = [h.id for h in self.catalog if h.pending]
+        self.considerations = [Consideration(id=s.id, name=s.name)
+                               for s in self.catalog if s.kind == "assumption"]
+        self.pending = [s.id for s in self.catalog if s.pending]
 
     def scale_to(self, best: float) -> None:
         """Set what 100 means here - the board's best score - and write each
@@ -211,16 +211,17 @@ class Result:
                  " so no comp is a share of it" % best)
         if self.base.on:                             # the engine's terms always apply
             return below
-        by_id = {h.id: h for h in self.catalog}
+        by_id = {s.id: s for s in self.catalog}
         waiting = []
         for c in self.contributions:
-            h = by_id.get(c["id"])
-            if h is None:
+            strategy = by_id.get(c["id"])
+            if strategy is None:
                 continue
-            if c["applies"] and h.form != "limit":   # terms apply: the best is just not above zero
+            if c["applies"] and strategy.form != "limit":   # it applies: the best is not above zero
                 return below
             if not c["applies"]:
-                waiting.append("%s waits for %s" % (h.name, h.when.source) if h.when else h.name)
+                waiting.append("%s waits for %s" % (strategy.name, strategy.when.source)
+                               if strategy.when else strategy.name)
         return ("unscored on this board - no scoring strategy applies yet"
                 + (": " + "; ".join(waiting) if waiting else ""))
 
@@ -244,7 +245,7 @@ class Result:
             self.picks.append(Pick(hero=h.name, role=h.role, subrole=h.subrole,
                                    portrait=h.portrait, locked=h.name in locked, why=why,
                                    evidence=evidence))
-        by_id = {h.id: h for h in self.catalog}
+        by_id = {s.id: s for s in self.catalog}
         for c in self.contributions:
             if c["kind"] == "base":
                 fact = self._base_fact(fs, c)
@@ -281,7 +282,7 @@ class Result:
                 "red": self.red, "blue": self.blue, "locked": self.locked,
                 "bans": self.bans, "side": self.side, "partial": self.partial,
                 "score": round(self.score, 3), "scoring": scoring, "unscored": unscored,
-                "weights": {h.id: h.weight for h in self.catalog if h.kind == "heuristic"},
+                "weights": {s.id: s.weight for s in self.catalog if s.kind == "heuristic"},
                 # a partial team has no share to report: the sum runs over the picks
                 # it has, so a perfectly played draft reads 16 after one pick and can
                 # fall when the right third pick lands. The fill result carries the
