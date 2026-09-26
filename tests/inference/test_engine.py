@@ -196,16 +196,20 @@ def test_an_empty_catalog_is_the_callers_and_loads_no_playbook(synthetic_world, 
 
 
 def test_blue_counters_the_likely_six_until_red_reveals_a_pick(synthetic_world):
-    """With no red pick the board solves blue against red's likely six, so the
+    """With no red pick the board's counter term reads red's likely six, so the
     opening suggestion is a counter to what the map and the meta say red
-    fields; the first reveal replaces that with red's actual picks."""
-    from inference import engine
+    fields; nothing else reads it, so every seat reads red as empty, as infer
+    does. The first reveal replaces that with red's actual picks."""
+    from inference import base, engine
     world = synthetic_world
     fix = catalog.load(FIXTURE_PLAYBOOK)
     m = world.map("Harbor Gate")
     likely = [p["hero"] for p in compute.expected_picks(world, m)]
     b = engine.board(world, Draft("Harbor Gate", (), ("Balm",)), catalog=fix)
-    assert b.blue.red == likely and b.current.red == likely and b.fill.red == likely
+    assert b.blue.red == [] and b.current.red == [] and b.fill.red == []
+    for seat in (b.blue, b.current, b.fill):
+        [c] = [c for c in seat.contributions if c["id"] == base.COUNTERS]
+        assert c["likely"] and c["against"] == likely
     assert b.expected.blue == likely and b.expected.kind == "expected"
     assert [p["hero"] for p in b.expected.picks] == likely
     assert "their likely starting comp" in b.rendered()

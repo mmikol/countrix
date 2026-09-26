@@ -178,9 +178,9 @@ test roster under a two-two-two role queue, each role's pool cut to half, the se
 the maximum a full enumeration finds, with the default engine on and off, and on at least one
 of them the winning six holds a hero the pool cut. The tests page has the larger proofs.</p>
 <p id='against-red'><b>What it is optimal against.</b> A comp is optimal <i>against the red
-you can see</i>, not against every red they might pick. Before red reveals anything the board
-answers their most likely starting comp, drawn from the map's pick rates; each pick they show
-re-solves against what is now known. It is a best reply to present information and changes as
+you can see</i>, not against every red they might pick. Before red reveals anything the
+default engine's counter term reads their most likely starting comp, drawn from the map's pick
+rates, and nothing else does; each pick they show re-solves against what is now known. It is a best reply to present information and changes as
 that information does. The hedge is the <i>if countered optimally</i> case the
 <code>board</code> tool reports: it scores your six against red's best reply to it, so a comp
 that wins only while red plays badly shows up there. The board page does not solve it.</p>
@@ -204,9 +204,9 @@ strategy is read, and it does not change when red reveals a pick.</p>
 
 pick(h, map)   the hero's pick rate on this map (overall with no map set)
 partners(h, S) heroes already on the six the synergy table pairs h with</pre>
-<p id='counter'><b>Blue's optimal counter</b>: solved against red's revealed picks, or their
-likely comp until they reveal one, on this map, side and bans; never against blue's own
-picks. Once blue picks, its seat shows blue's six above the optimal: from one to five picks,
+<p id='counter'><b>Blue's optimal counter</b>: solved against red's revealed picks, on this
+map, side and bans - the six infer returns for the same draft; until red reveals one the
+counter term reads their likely comp; never against blue's own picks. Once blue picks, its seat shows blue's six above the optimal: from one to five picks,
 the picks with the rest filled by a second solve that keeps them - the six the suggestion
 tiles offer; at six, the six itself. The game plan describes that six. Red's
 optimal is solved as the scale for red's score and not shown.</p>

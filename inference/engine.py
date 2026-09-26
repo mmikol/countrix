@@ -275,9 +275,10 @@ def board(
     they reveal:
 
         blue         blue's optimal six: the best counter to red's selection
-                     as revealed - or, before they reveal a pick, to their
-                     likely six - on this map, side and bans; blue's own
-                     picks never constrain it
+                     as revealed, on this map, side and bans - infer's six for
+                     the same draft; before red reveals a pick the counter
+                     term reads their likely six and nothing else does; blue's
+                     own picks never constrain it
         red          red's optimal six: their best counter to blue's
                      selection, on the other side - the scale red's current
                      comp is measured on
@@ -306,8 +307,8 @@ def board(
         expected     red's likely six from the data alone - a two-two-two from
                      the map's pick rates and the wiki's synergies, past the
                      bans - static for the board, no strategy read; what the
-                     comps tab shows for red and what blue counters until red
-                     reveals a pick
+                     comps tab shows for red and what blue's counter term reads
+                     until red reveals a pick
 
     The brief's weights override the files' for this board only - the
     playbook tab's sliders; the files stay as they are and every result says
@@ -356,12 +357,13 @@ def _board_once(
     draft = dataclasses.replace(draft, side=_side(m, draft.side))
     _check_teams(red_h, blue_h, "blue")
     expected = _expected(world, m, bans_h, draft, catalog, brief.base)
-    enemy = draft.red or tuple(expected.blue)
-    # each seat's draft, from that seat's perspective: its own picks are `blue`
-    blue_seat = dataclasses.replace(draft, red=enemy, blue=())
+    # each seat's draft, from that seat's perspective: its own picks are `blue`,
+    # the other side's revealed ones `red`. An unrevealed side is read as infer
+    # reads it: the counter term alone takes its likely six (base.opponent)
+    blue_seat = dataclasses.replace(draft, blue=())
     red_seat = Draft(map_name=draft.map_name, red=draft.blue, blue=(), bans=draft.bans,
                      side=opposite(draft.side))
-    ours = dataclasses.replace(draft, red=enemy)       # blue's current comp and fill
+    ours = draft                                       # blue's current comp and fill
     theirs = Draft(map_name=draft.map_name, red=draft.blue, blue=draft.red, bans=draft.bans,
                    side=opposite(draft.side))
     solve = _Pass(world, catalog, brief, workers, watch)
@@ -397,7 +399,8 @@ def _board_once(
     return Board(map_name=expected.map_name, side=draft.side, bans=list(draft.bans),
                  blue=blue.result, red=red.result, current=cur, red_current=red_cur,
                  fill=fill, countered=countered, momentum=momentum(seats),
-                 plan=plan(world, m, draft.side, list(draft.bans), red_h, shown),
+                 plan=plan(world, m, draft.side, list(draft.bans), red_h, shown,
+                           likely=expected.blue),
                  shapes=[list(s) for s in legal_shapes(catalog)], expected=expected)
 
 
@@ -523,7 +526,7 @@ def _expected(
         world: World, m: Map | None, bans_h: Sequence[Hero], draft: Draft,
         catalog: list[Strategy], base: BaseWeights) -> Result:
     """Red's likely six - the map and the meta alone, past the bans - static
-    for the board; until red reveals a pick it is what blue's seat counters.
+    for the board; until red reveals a pick blue's counter term reads it.
     A Result like every other seat: its picks carry the reason each rests on."""
     likely = compute.expected_picks(world, m, banned=bans_h)
     return Result(kind="expected", map_name=m.name if m else None, red=[],

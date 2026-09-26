@@ -89,18 +89,13 @@ def test_a_scoring_strategy_that_waits_on_its_board_reads_unscored_with_the_reas
     assert countered["scoring"] is (countered["unscored"] is None)
     assert grounded["momentum"]["verdict"].startswith("unscored on this board")
     assert "waits for enemy.light_flyers >= 1" in grounded["momentum"]["verdict"]
-    # no picks at all: blue's seat counters red's likely six, the optimal is the
-    # reference (100), and the verdict is the plain "no picks yet"
+    # no picks at all: the optimal is the reference (100), and blue's seat reads
+    # red as infer does, empty - the likely six is the counter term's alone, and
+    # the engine is off - so the one rule waits here too
     empty = engine.board(world, Draft(), catalog=scratch, brief=off).to_dict()
     assert empty["blue"]["normalized"] == 100 and empty["blue"]["unscored"] is None
-    # enemy.light_flyers counts fliers tanks aside: a flying tank does not raise the guard
-    if any(
-            world.hero(name).flyer and world.hero(name).role != "tank"
-            for name in empty["expected"]["blue"]):
-        assert empty["momentum"]["verdict"] == "no picks yet on either side"
-    else:                         # the likely six fields no such flier: the one rule waits here too
-        assert "waits for enemy.light_flyers >= 1" in empty["momentum"]["verdict"]
-    assert empty["blue"]["red"] == empty["expected"]["blue"]           # countering the likely six
+    assert "waits for enemy.light_flyers >= 1" in empty["momentum"]["verdict"]
+    assert empty["blue"]["red"] == []
     flying = engine.board(world, Draft("Harbor Gate", ("Mortar", "Gale"), ("Anvil", "Needle")),
                           catalog=scratch, brief=off).to_dict()
     assert flying["blue"]["scoring"] is True and flying["blue"]["normalized"] == 100

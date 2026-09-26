@@ -275,11 +275,12 @@ def _family(world: World, m: Map | None, style: str, role: str,
 
 def plan(
         world: World, m: Map | None, side: str, bans: Sequence[str],
-        red_h: Sequence[Hero], six: Result) -> str:
+        red_h: Sequence[Hero], six: Result, likely: Sequence[str] = ()) -> str:
     """The game plan in prose for `six`, the six the comps tab shows for blue
     - blue's optimal before any blue pick, the fill around one to five, the
     picks themselves at six: the ground, blue's picks it keeps, what to play
-    on it, what red's picks mean (their likely six until one is revealed),
+    on it, what red's picks mean (their likely six, `likely`, until one is
+    revealed),
     the family of heroes to stay in when you stray from the six, and what the
     six is built for - from the same facts and strategies the solver scored,
     so that picks can be tailored toward the optimal without matching it.
@@ -293,7 +294,7 @@ def plan(
         if sentence is not None:
             read.append(sentence)
     lines = [" ".join(read)]
-    for line in (_them(world, m, red_h, lean, six, scoring),
+    for line in (_them(world, m, red_h, lean, six, likely),
                  _family_line(world, m, lean, bans), _above_all(six, lean)):
         if line is not None:
             lines.append(line)
@@ -409,12 +410,12 @@ def _advice(lean: str, roles: Mapping[str, int] | None) -> str:
 
 def _them(
         world: World, m: Map | None, red_h: Sequence[Hero], lean: str, blue_r: Result,
-        scoring: bool) -> str | None:
+        likely: Sequence[str]) -> str | None:
     """What red's picks mean: their lean against the six's, and which picks
     of the six answer which of theirs - read off the hero.vs_answers facts
     the picks cite. With nothing revealed, their likely six (_unrevealed)."""
     if not red_h:
-        return _unrevealed(blue_r, scoring)
+        return _unrevealed(blue_r, likely)
     n = len(red_h)
     theirs = team_metrics(world, red_h, m, [])
     red_lean = text(theirs["style_lean"]) or text(theirs["style_top"])
@@ -431,15 +432,17 @@ def _them(
     return them + _answers([h.name for h in red_h], _answered(blue_r))
 
 
-def _unrevealed(six: Result, scoring: bool) -> str | None:
-    """Their likely six while red has revealed nothing: the six searched as
-    its counter says so; blue's own six, or one nothing scored, counters
-    nothing, and the plan only names it."""
-    if not six.red:
+def _unrevealed(six: Result, likely: Sequence[str]) -> str | None:
+    """Their likely six while red has revealed nothing: a six searched with
+    a counter term that read it says it counters it; blue's own six, or one
+    scored with that term off, counters nothing, and the plan only names it."""
+    if not likely:
         return None
-    if scoring and six.kind != "evaluate":
-        return "No red pick yet: the six counters their likely six (%s)." % ", ".join(six.red)
-    return "No red pick yet: their likely six is %s." % _and(six.red)
+    if six.kind != "evaluate" and any(
+            c["id"] == base.COUNTERS and c["applies"] and c.get("likely")
+            for c in six.contributions):
+        return "No red pick yet: the six counters their likely six (%s)." % ", ".join(likely)
+    return "No red pick yet: their likely six is %s." % _and(likely)
 
 
 def _answered(six: Result) -> dict[str, list[str]]:

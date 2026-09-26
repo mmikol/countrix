@@ -11,7 +11,7 @@ from facts import board_facts
 from facts.draft import Draft
 from facts.records import StyleScore
 from facts.team import team_metrics
-from inference import catalog
+from inference import base, catalog
 from inference.base import OFF
 from inference.expr import Expr
 from inference.result import Result
@@ -223,8 +223,14 @@ def test_the_plan_says_nothing_the_board_contradicts(synthetic_world):
     assert "lean brawl: %s." % plan.THEIR_LEAN["brawl"] in said
     assert "but against this red the six leans poke" in said
     assert "Above all: brawl maps reward durability; poke needs reach." in said
-    said = plan.plan(world, m, "", [], [], six)                        # red revealed nothing
+    said = plan.plan(world, m, "", [], [], six, likely=["Anvil", "Mortar"])   # none revealed
     assert "this red" not in said and "but the six leans poke" in said
+    # the engine is off, so no counter term read the likely six: the plan only names it
+    assert "No red pick yet: their likely six is Anvil and Mortar." in said
+    six.contributions = [*terms, {"id": base.COUNTERS, "kind": "base", "form": "base",
+                                  "applies": True, "weighted": 0.5, "metric": None,
+                                  "likely": True}]
+    said = plan.plan(world, m, "", [], [], six, likely=["Anvil", "Mortar"])
     assert "No red pick yet: the six counters their likely six (Anvil, Mortar)." in said
     tanks = plan._family(world, m, "brawl", "tank", ["Mortar"])
     tagged = [

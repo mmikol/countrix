@@ -148,10 +148,9 @@ def test_the_counters_read_the_likely_six_until_the_other_side_locks_a_pick(synt
     assert (locked.terms.answers, locked.terms.exposures) == (2, 2)
     [c] = [c for c in locked.contributions if c["id"] == base.COUNTERS]
     assert c["against"] == ["Gale"] and c["likely"] is False
-    # handed exactly the likely six as picks, as the board hands blue's seat, it is
-    # the likely six still
+    # picks that happen to equal the likely six are picks: the fact says red as it stands
     objective, _ = prepared(w, "Harbor Gate", likely, SIX[:1], banned=("Needle",))
-    assert objective.base.opponent.likely
+    assert not objective.base.opponent.likely
 
 
 def test_each_seat_reads_the_other_sides_likely_six_or_its_picks(synthetic_world):
