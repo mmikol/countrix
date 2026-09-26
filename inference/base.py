@@ -178,12 +178,13 @@ def rate_edge(h: Hero, m: Map | None) -> float:
     """One hero's trusted win-rate edge in points: its win rate on the map
     (overall where there is no map or no row for it) over COIN_FLIP, times
     p / (p + RATE_PICK_HALF) for its pick rate p on the same footing - the
-    map's where the map's row gives one. A hero with no rate has no edge."""
+    map's where the map's row gives one. A hero with no rate, or a rate that
+    is not a finite number, has no edge: a NaN would carry into every score."""
     row = h.map_rates.get(m.id) if m is not None else None
     win, pick = (row.win, row.pick) if row is not None else (h.win, h.pick)
     if pick is None:
         pick = h.pick
-    if win is None or not pick:
+    if win is None or not pick or not (math.isfinite(win) and math.isfinite(pick)):
         return 0.0
     return pick / (pick + RATE_PICK_HALF) * (win - COIN_FLIP)
 

@@ -85,6 +85,25 @@ def test_a_rarely_picked_heroes_edge_is_pulled_toward_a_coin_flip(synthetic_worl
     assert edge(half) == pytest.approx(-2.0)          # a weak hero's deficit is pulled in too
 
 
+def test_a_rate_that_is_not_a_finite_number_is_no_edge_and_the_board_still_solves(
+        synthetic_world):
+    """A NaN or an infinity in the pulled rates reads as a hero with no rate:
+    it made the six's score NaN, and the standing's integer tally then
+    failed the whole board."""
+    w = synthetic_world
+    harbor = w.map("Harbor Gate")
+    anvil = copy.copy(w.hero("Anvil"))
+    for win, pick in ((float("nan"), 12.0), (52.5, float("nan")), (float("inf"), 12.0)):
+        anvil.map_rates = {**w.hero("Anvil").map_rates, harbor.id: MapRate(win, pick)}
+        assert base.rate_edge(anvil, harbor) == 0.0, (win, pick)
+    broken = copy.copy(w)
+    broken.heroes = {**w.heroes, anvil.id: anvil}
+    anvil.map_rates = {**w.hero("Anvil").map_rates, harbor.id: MapRate(float("nan"), 12.0)}
+    result = engine.infer(broken, Draft("Harbor Gate", side="attack"), catalog=ASSUMPTIONS_ONLY,
+                          top=1)
+    assert len(result.blue) == 6 and result.score == result.score
+
+
 def test_the_synergy_and_counter_terms_read_the_wikis_pairs_and_edges(synthetic_world):
     """Synergy is team.synergy_score (Anvil+Balm 2, Needle+Tansy 2); against
     red's locked picks the counter term is the graph's weight each way, every
