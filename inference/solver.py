@@ -19,7 +19,8 @@ A Solver is the board's Objective (inference.scoring) on the board's scale
     refine          local search from the best six sixes and the best of every
                     swept shape: swap any slot for any same-role hero on the
                     roster, keep improvements; bring each of the wiki's synergy
-                    pairs into the best sixes two slots at once; then climb from
+                    pairs into the best sixes and each shape's climbed best two
+                    slots at once; then climb from
                     random sixes of the leader's shape and change two seats at
                     once. Which sixes it visits reads no score threshold, so
                     scaling the objective moves none of them
@@ -223,8 +224,9 @@ class Solver(Objective):
         the shape, so the starts are the best SEEDS of the field and the best
         six of every shape in it, however far below the best: an off-shape six
         can win only if its own shape was searched, and a cut in score points
-        would move with the objective's scale. Then the best SEEDS sixes try
-        every one of the wiki's synergy pairs brought in two slots at once, and
+        would move with the objective's scale. Then the best SEEDS sixes and
+        each shape's climbed best try every one of the wiki's synergy pairs
+        brought in two slots at once, and
         the swaps run on from any that gained: partners that pay only together
         are never met one swap at a time.
 
@@ -244,11 +246,17 @@ class Solver(Objective):
                     starts.append(cand)
         roster = [h for h in sorted(self.world.heroes.values(), key=lambda h: h.id)
                   if h.released and h.id not in self.banned]    # announced heroes wait here too
-        for seed in starts:
-            self._climb(seed, roster, known)
+        tops = {c.key: c for c in (self._climb(seed, roster, known) for seed in starts)}
         pairs = self._pairs()
         if pairs:
-            for seed in heapq.nsmallest(SEEDS, known.values(), key=self._rank_key):
+            # the best sixes, and each shape's climbed best: a shape the leader
+            # does not hold gets one climb, and a pair that pays only together
+            # is a saddle that climb cannot cross
+            seeds = {c.key: c for c in heapq.nsmallest(SEEDS, known.values(),
+                                                       key=self._rank_key)}
+            for key, top in tops.items():
+                seeds.setdefault(key, top)
+            for seed in sorted(seeds.values(), key=self._rank_key):
                 paired = self._bring_pair(seed, pairs, known)
                 if paired is not seed:
                     self._climb(paired, roster, known)
