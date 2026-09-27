@@ -1,10 +1,10 @@
 """board(): both seats on opposite sides, the weights it is given, the fight
 odds, the shapes and the queue's tank limit, an empty catalog kept as the
-caller's, the likely six, a full six on control, every seat of a board on the
-synthetic World, the page's boards superseding one another, and the healing
-floor on top of the default engine. Every board is the synthetic World's but
-the last, King's Row on the built database. test_board_gate holds the lobby's
-limits on every door."""
+caller's, a limit red's reveal already breaks, the likely six, a full six on
+control, every seat of a board on the synthetic World, the page's boards
+superseding one another, and the healing floor on top of the default engine.
+Every board is the synthetic World's but the last, King's Row on the built
+database. test_board_gate holds the lobby's limits on every door."""
 
 import pytest
 
@@ -179,6 +179,25 @@ def test_the_queue_caps_tanks_at_two_whatever_the_playbook_holds(synthetic_world
         engine.evaluate(world, Draft("Harbor Gate", (),
                                      ("Anvil", "Kite", "Mortar", "Balm", "Tansy", "Needle")),
                         catalog=ASSUMPTIONS_ONLY)
+
+
+def test_red_may_reveal_what_a_limit_forbids_and_blue_may_not_lock_it(synthetic_world, tmp_path):
+    """A limit binds the sixes the playbook builds, not the other side's
+    revealed picks: red past it still gets its optimal and its current comp,
+    read off its picks with no fill, while blue locking past it is refused."""
+    from inference import engine
+    (tmp_path / "three-supports.md").write_text(
+        "---\nname: At most three supports\nkind: constraint\n"
+        "require: team.supports <= 3\n---\n# At most three supports\n\n"
+        "A six fields at most three supports.\n", encoding="utf-8")
+    cat = catalog.load(str(tmp_path))
+    world, supports = synthetic_world, ("Balm", "Myrrh", "Sorrel", "Tansy")
+    d = engine.board(world, Draft("Harbor Gate", supports), catalog=cat).to_dict()
+    for seat in ("blue", "red"):
+        assert sum(world.hero(n).role == "support" for n in d[seat]["blue"]) <= 3, seat
+    assert sorted(d["red_current"]["blue"]) == sorted(supports)
+    with pytest.raises(Refusal, match="the limits around the locked blue picks"):
+        engine.board(world, Draft("Harbor Gate", (), supports), catalog=cat)
 
 
 def test_an_empty_catalog_is_the_callers_and_loads_no_playbook(synthetic_world, monkeypatch):

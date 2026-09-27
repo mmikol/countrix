@@ -202,7 +202,21 @@ def test_the_shipped_healing_floor_is_a_scored_constraint_at_weight_two():
     assert heal.when is None and heal.bonus is None and heal.require is None
     assert {k: heal.to_dict()[k] for k in HEAL_RATE} == HEAL_RATE
     assert catalog.has_scoring_terms(shipped)
-    assert [h.id for h in shipped if h.kind != "assumption"] == ["heal-rate"]
+    assert [h.id for h in shipped if h.form == "scored"] == ["heal-rate"]
+
+
+def test_the_shipped_support_limit_is_a_hard_limit_at_three():
+    """inference/strategies/at-most-three-supports.md, the owner's limit: a
+    require on the Support role's count with three as its dial, never soft,
+    and the shipped playbook's one limit."""
+    shipped = catalog.load(catalog.SHIPPED_DIR)
+    limit = next(s for s in shipped if s.id == "at-most-three-supports")
+    assert (limit.kind, limit.form, limit.category, limit.soft) == (
+        "constraint", "limit", "shape", False)
+    assert limit.require is not None
+    assert limit.require.source == "team.supports <= params.MAX_SUPPORTS"
+    assert limit.params == {"MAX_SUPPORTS": 3}
+    assert [s.id for s in shipped if s.form == "limit"] == ["at-most-three-supports"]
 
 
 def test_catalog_rejects_a_goal_on_an_unknown_metric(tmp_path):

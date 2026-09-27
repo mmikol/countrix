@@ -385,7 +385,12 @@ def _board_once(
     cur = solve.current(ours, blue, blue_split, seat="blue")
     red_cur = solve.current(theirs, red, red_split, seat="red")
     fill = solve.filled(ours, fill_split, seat="blue", best=blue.result.score)
-    red_fill = solve.filled(theirs, red_fill_split, seat="red", best=red.result.score)
+    try:
+        red_fill = solve.filled(theirs, red_fill_split, seat="red", best=red.result.score)
+    except Infeasible:
+        # red's revealed picks are the other side's facts, not ours to limit: past
+        # a limit they already break no fill exists, and red is read off its picks
+        red_fill = None
     countered = solve.countered(countered_seat, against_split, answer_split)
     seats = Seats(current=cur, red_current=red_cur, blue=blue.result, red=red.result,
                   fill=fill, red_fill=red_fill, countered=countered)
