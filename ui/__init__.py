@@ -11,8 +11,8 @@ code, and no layer imports it.
     static/     what the browser loads: the stylesheet, the scripts, the
                 display font and its licence, math.html and tests.html
     validation  the validation report: `python -m ui.validation` judges a
-                playbook against the recorded matches, prints the text and
-                writes a page of charts to db/raw, for the owner's own use
+                playbook against the recorded matches, prints the text and,
+                with --out, writes a page of charts, for the owner's own use
     charts      the report's charts as inline SVG: intervals against 0, the
                 hero effects, the calibration and the score difference
 """

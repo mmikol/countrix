@@ -33,8 +33,8 @@ from typing import NamedTuple
 import psycopg
 
 from db import psql
-from db.data import ArticlePullSummary, fetch
-from db.data.names import RENAMED, hero_key, index, name_key, unaccented
+from db.data import ArticlePullSummary, cache
+from db.data.normalizer import RENAMED, hero_key, index, name_key, unaccented
 from db.data.wiki import WIKI, WikiError, matchup_tables, strategy_sections
 
 # --- extract: markup -> Python ---------------------------------------------
@@ -479,7 +479,7 @@ def strategy_edges(
     return strategy_sections.combine(readings)
 
 
-def run(connection: psycopg.Connection, pull: fetch.PullContext) -> CountersSummary:
+def run(connection: psycopg.Connection, pull: cache.PullContext) -> CountersSummary:
     """Reload counters from every released hero's article - its Match-Up
     column and its Strategy section, each edge marked with its basis -> the
     edges stored, the cells read and what went unanswered."""

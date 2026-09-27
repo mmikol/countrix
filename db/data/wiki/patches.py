@@ -10,7 +10,7 @@ from typing import NamedTuple
 import psycopg
 
 from db import psql
-from db.data import PullSummary, fetch
+from db.data import PullSummary, cache
 from db.data.wiki import WIKI, cargo_query
 
 CARGO_TABLE = "Patches"
@@ -44,7 +44,7 @@ class PatchesSummary(PullSummary):
     latest: str | None
 
 
-def run(connection: psycopg.Connection, pull: fetch.PullContext) -> PatchesSummary:
+def run(connection: psycopg.Connection, pull: cache.PullContext) -> PatchesSummary:
     """Upsert every dated patch from the Patches cargo table -> the patches
     loaded, the undated ones skipped and the latest."""
     patches, skipped = dated_patches(cargo_query(pull, CARGO_TABLE, CARGO_FIELDS))

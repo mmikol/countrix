@@ -20,7 +20,7 @@ import psycopg
 from psycopg.sql import SQL
 
 from db import psql
-from db.data import PullSummary, fetch
+from db.data import PullSummary, cache
 from db.data.wiki import WIKI, WikiError, fetch_wikitext, markup
 
 # --- extract: markup -> Python ---------------------------------------------
@@ -85,7 +85,7 @@ class SeasonsSummary(PullSummary):
     upcoming: list[str]
 
 
-def run(connection: psycopg.Connection, pull: fetch.PullContext) -> SeasonsSummary:
+def run(connection: psycopg.Connection, pull: cache.PullContext) -> SeasonsSummary:
     """Reload the seasons that have started and restamp every rates snapshot
     with its season, in one transaction -> the seasons, the latest, the
     snapshots stamped and the seasons still to come."""

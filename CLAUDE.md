@@ -31,7 +31,7 @@ COUNTRIX_NO_DATABASE=1 .venv/bin/python -m pytest -q -rs -p no:cacheprovider --c
 .venv/bin/python -m door.mcp list                 # the MCP tools; `call <tool> '<json>'` runs one in-process
 .venv/bin/python -m door.mcp call db_docs         # regenerate every generated doc section (needs the database)
 .venv/bin/python -m ui.board --port 8018          # the board, engine in-process (8017 is the compose board)
-.venv/bin/python -m ui.validation                 # the playbook against the recorded matches: text, and a page in db/raw
+.venv/bin/python -m ui.validation                 # the playbook against the recorded matches: text; --out <path> writes a page
 .venv/bin/python orchestrator.py up|test|status|down   # the Docker stack; `up` rebuilds the image `test` runs in
 ```
 
@@ -44,9 +44,7 @@ Tests marked `invariant` need the database and skip without one, through
 the `db` fixture. The suite targets `db/psql/cluster` when that
 cluster is built and `DATABASE_URL` is unset; `DATABASE_URL` or
 `./docker-db <command>` points it at another Postgres. CI sets no
-variable: it has no cluster and no pgserver. The suite audits its tool
-calls to a temporary file (`audit_log` in `tests/conftest.py`) and leaves
-`db/raw/audit.jsonl`, the repo's own log, alone.
+variable: it has no cluster and no pgserver.
 
 The solver's pool (`inference/parallel.py`) spawns `max(6, min(cores, 12))`
 worker processes (12 here) in any process that calls `engine.board()`
@@ -78,9 +76,8 @@ db <- facts <- inference <- door <- ui.
   `playbook`, `matches` in `door/mcp/`) declares its tools with `@tool(...)`
   into the one `REGISTRY` (`door/mcp/registry.py`), which lists them in `FAMILIES`'
   order, and `door/mcp/tools.py` imports every family. A call arrives over
-  stdio, HTTP or in-process (`ctx.call`), is checked against the
-  tool's schema by the same `Tool` wrapper on every path, and is audited to
-  `db/raw/audit.jsonl` (argument sizes and type names, never values).
+  stdio, HTTP or in-process (`ctx.call`), and is checked against the
+  tool's schema by the same `Tool` wrapper on every path.
   The code that writes lives with what it writes - the pulls in `db/data`,
   the strategies table in `inference.catalog.mirror`, the playbook's files
   in `inference.tune`, the recorded matches in `db.matches` - and only the
@@ -165,7 +162,7 @@ db <- facts <- inference <- door <- ui.
   `docker-entrypoint.sh`). Migrations ship in the image, not a mount: once
   `orchestrator.py up` rebuilds it, any new migration file makes the `data`
   container `db_rebuild` on start, which drops the dated rates history and
-  keeps the recorded matches (`db/raw/kept-matches.json` across the drop).
+  the recorded matches with it.
 
 ## What the tests hold you to
 
@@ -216,11 +213,11 @@ db <- facts <- inference <- door <- ui.
   holds: a backticked id the record cites and `inference/strategies/`
   lacks is a dropped rule, and fails.
 - A new table carries `source_id` and `cao`, has rows (`matches` and
-  `match_picks` alone may be empty: they fill as the owner plays), is
-  exported to `db/raw` (`export_csv`) and is named in `facts/tables.py` (a test greps
-  its source); regenerate the schema sections of docs/db.md. Its migration
-  also wants a `schema.DOC_DOMAIN` entry keyed by filename, or docs/db.md
-  files it under foundation - no test catches that one.
+  `match_picks` alone may be empty: they fill as the owner plays) and is
+  named in `facts/tables.py` (a test greps its source); regenerate the
+  schema sections of docs/db.md. Its migration also wants a
+  `schema.DOC_DOMAIN` entry keyed by filename, or docs/db.md files it
+  under foundation - no test catches that one.
 - A new metric: an entry in `TEAM_METRICS` (`VERSUS_METRICS` for one that
   reads the other side), `MATCHUP_METRICS`, `MAP_METRICS` or
   `WORLD_METRICS` and the key its function computes (the namespace must
@@ -262,7 +259,7 @@ db <- facts <- inference <- door <- ui.
   statement in an applied migration, add the next number. The `--` prose
   is documentation the data dictionary reads, and is kept current.
   Locally, `db_migrate` keeps the data; `db_rebuild` drops it, the
-  recorded matches aside.
+  recorded matches included.
 - Over stdio, stdout is the JSON-RPC wire. Code reachable from a tool logs
   through `ctx.log` or stderr, never `print`. A refusal raises `db.Refusal`;
   anything else is the server's fault.
@@ -270,7 +267,7 @@ db <- facts <- inference <- door <- ui.
   that `db.psql.identifier()` returns, composed with `psycopg.sql.SQL`;
   values are always parameters.
 - Pulls read only Blizzard's site and the wiki, through the page caches and
-  the one request loop in `db/data/fetch.py`, each at the pace of its own
+  the one request loop in `db/data/cache.py`, each at the pace of its own
   `RequestPolicy`: 5 s a page for the rates (`RATES_POLICY` in
   `db/data/blizzard/meta.py`); for the wiki (`db/data/wiki/__init__.py`),
   2 s a Cargo page with six attempts to wait out a rate limit
@@ -280,7 +277,7 @@ db <- facts <- inference <- door <- ui.
   use only. Nothing public - a README image, a doc example, a published page -
   shows a rate figure or text derived from one.
 - A pull matches a hero or map name against the database through
-  `db.data.names` - `index` and `name_key`, or `hero_key` where a former
+  `db.data.normalizer` - `index` and `name_key`, or `hero_key` where a former
   name can appear - never by `.lower()`.
 - Never `docker compose down -v`: it deletes the database volume.
 
@@ -332,7 +329,7 @@ venv and restore its local config, which lives in the gitignored
 ```bash
 .venv/bin/pip install --upgrade "desloppify[full]"
 .venv/bin/desloppify update-skill claude        # refreshes .claude/skills/desloppify/SKILL.md
-for p in .venv .cache-blizzard .cache-wiki db/psql/cluster db/raw .claude/worktrees; do .venv/bin/desloppify exclude $p; done
+for p in .venv .cache-blizzard .cache-wiki db/psql/cluster .claude/worktrees; do .venv/bin/desloppify exclude $p; done
 ```
 
 The target score is set with `desloppify config set target_strict_score

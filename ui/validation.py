@@ -1,8 +1,10 @@
 """The validation report: the playbook against the recorded matches, as
-text on stdout and as a page of charts written to db/raw (gitignored).
+text on stdout and, where --out names a path, as a page of charts with its
+JSON beside it.
 
     .venv/bin/python -m ui.validation                       # the playbook in force
     .venv/bin/python -m ui.validation --playbook tests/fixtures/playbook --all
+    .venv/bin/python -m ui.validation --out ~/validation.html
 
 inference.validate does the work; this module loads the World, the
 recorded matches and the playbook, runs it and draws the result: the maps
@@ -21,7 +23,7 @@ from collections.abc import Callable, Sequence
 
 import psycopg
 
-from db import RAW_DIR, ROOT, Refusal, psql, to_stderr
+from db import ROOT, Refusal, psql, to_stderr
 from facts import tables
 from facts.matches import load_matches
 from inference import catalog, validate
@@ -30,7 +32,6 @@ from inference.report import SplitReport, Validation, rendered
 from ui import charts
 from ui.charts import esc
 
-DEFAULT_OUT = os.path.join(RAW_DIR, "validation.html")
 # a model's name where a chart row has room for a few words
 SHORT = {"M1": "map and side", "M2": "map win rates", "M3": "heroes", "M4": "heroes + playbook"}
 
@@ -305,8 +306,8 @@ def write(v: Validation, path: str) -> str:
 def command_line(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="python -m ui.validation",
-        description="Judge a playbook against the recorded matches; print the report and"
-                    " write it as a page of charts.")
+        description="Judge a playbook against the recorded matches; print the report and,"
+                    " with --out, write it as a page of charts.")
     parser.add_argument("--playbook", default=None,
                         help="a playbook folder inside the repo (default: the one in force)")
     parser.add_argument("--all", action="store_true",
@@ -315,14 +316,20 @@ def command_line(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--effect", type=float, default=validate.EFFECT,
                         help="the win chance an effect moves an even map to, which the guard"
                              " sizes the sample for (default %(default)s)")
-    parser.add_argument("--out", default=DEFAULT_OUT,
-                        help="the page to write, the JSON beside it (default db/raw/"
-                             "validation.html, gitignored)")
+    parser.add_argument("--out", default=None,
+                        help="the page to write, the JSON beside it, outside the repo"
+                             " (default: none, the text alone)")
     return parser.parse_args(argv)
 
 
 def run(args: argparse.Namespace, out: Callable[[str], None] = print) -> Validation:
-    """The validation the arguments ask for, printed and written."""
+    """The validation the arguments ask for, printed, and written where
+    --out names, which is refused inside the repo: the page carries
+    rate-derived figures, and a file there is one `git add` from public."""
+    page = os.path.abspath(args.out) if args.out else None
+    if page and os.path.commonpath([page, ROOT]) == ROOT:
+        raise Refusal("--out %s is inside the repo; the page carries rate-derived figures"
+                      % args.out)
     subject = validate.Subject.of(catalog.named_dir(args.playbook))
     validate.check_effect(args.effect)
     with psycopg.connect(psql.default_dsn()) as cx:
@@ -331,16 +338,15 @@ def run(args: argparse.Namespace, out: Callable[[str], None] = print) -> Validat
     report = validate.validate(world, recorded, subject, validate.Options(
         pin=not args.all, effect=args.effect, log=to_stderr))
     out(rendered(report))
-    path = os.path.abspath(write(report, args.out))
-    inside = os.path.commonpath([path, ROOT]) == ROOT
-    out("the report: %s" % (os.path.relpath(path, ROOT) if inside else path))
+    if page:
+        out("the report: %s" % write(report, page))
     return report
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the validation from the shell -> 0, or 2 on a refusal: a folder
-    outside the repo, a playbook that does not load, an effect that is not a
-    win chance."""
+    outside the repo, a page inside it, a playbook that does not load, an
+    effect that is not a win chance."""
     try:
         run(command_line(argv))
     except Refusal as refused:

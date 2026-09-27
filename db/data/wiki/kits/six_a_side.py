@@ -16,7 +16,7 @@ import re
 from collections.abc import Mapping
 from typing import NamedTuple
 
-from db.data.names import ability_key
+from db.data.normalizer import ability_key
 from db.data.wiki import markup
 
 POOL_FIELDS = ("health", "shield", "armor")

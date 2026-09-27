@@ -18,8 +18,8 @@ from collections.abc import Mapping, Sequence
 import psycopg
 
 from db import psql
-from db.data import ArticlePullSummary, fetch
-from db.data.names import hero_key, index, name_key
+from db.data import ArticlePullSummary, cache
+from db.data.normalizer import hero_key, index, name_key
 from db.data.wiki import WIKI, WikiError
 from db.data.wiki.matchup_tables import (
     PLACEHOLDERS,
@@ -148,7 +148,7 @@ class SynergiesSummary(ArticlePullSummary):
     unmatched: list[str]
 
 
-def run(connection: psycopg.Connection, pull: fetch.PullContext) -> SynergiesSummary:
+def run(connection: psycopg.Connection, pull: cache.PullContext) -> SynergiesSummary:
     """Reload synergies from the Team Synergy column of every released hero's
     article -> the pairs stored, the mutual ones and the heroes left unpaired."""
     cursor = connection.cursor()

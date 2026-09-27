@@ -176,7 +176,7 @@ def derive_strategies(ctx: Context, ids: list[str] | None = None) -> ToolReply:
 
 
 @tool(
-    "tuning_log", "The audit trail of every change to the strategies'"
+    "tuning_log", "The record of every change to the strategies'"
     " frontmatter, newest last.",
     {"lines": {"type": "integer", "description": "how many, 1 or more (default 20)"}})
 def tuning_log(ctx: Context, lines: int = 20) -> ToolReply:

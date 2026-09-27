@@ -35,7 +35,7 @@ Bring the roster and the kits up to date. Work through the
    article has no written cell, `no_edge` those in no counter yet,
    `contradicted` the pairs the two articles disagree on (no edge). An
    announced hero has none. `pull_rates` with `refresh: true` if the user
-   wants today's rates too. Then `db_docs`, `export_csv`.
+   wants today's rates too. Then `db_docs`.
 6. **Report**, in under ten lines: heroes added or flipped to released,
    announced heroes with their release days, kits, synergy pairs and
    counters stored, and what the facts now say about the hero (`facts` with

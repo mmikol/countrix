@@ -13,7 +13,7 @@ from typing import NamedTuple
 import psycopg
 
 from db import psql
-from db.data import ArticlePullSummary, fetch
+from db.data import ArticlePullSummary, cache
 from db.data.wiki import WIKI, WikiError, fetch_articles, fetch_wikitext, markup
 
 # --- extract: markup -> Python ---------------------------------------------
@@ -177,7 +177,7 @@ class MapsSummary(ArticlePullSummary):
     maps_with_stages: dict[str, int]
 
 
-def run(connection: psycopg.Connection, pull: fetch.PullContext) -> MapsSummary:
+def run(connection: psycopg.Connection, pull: cache.PullContext) -> MapsSummary:
     """Upsert the modes, the maps and their combinations from the Maps
     article, and each map's stages from its own article -> the modes, maps,
     combinations and stages stored, and the articles that would not fetch."""

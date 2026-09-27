@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from typing import NamedTuple
 
 from db import KIND_ULTIMATE, ROLES, Refusal
-from db.data.names import name_key
+from db.data.normalizer import name_key
 from facts.kit import KitPiece
 from facts.records import (
     DerivedEdge,

@@ -4,7 +4,8 @@
 #   data        the door: builds the database from the bind-mounted page
 #               caches when it is empty or stale, then serves every MCP tool
 #               at http://localhost:8020/mcp (.mcp.json, server
-#               "countrix-docker")
+#               "countrix-docker"). A rebuild drops the recorded matches
+#               with every other table
 #   ui          the board at http://localhost:8017, with the INFERENCE ENGINE
 #               in the board's process, reading the strategy files live
 #   refresher   the door's clock: seasons and rates daily at
@@ -19,8 +20,9 @@
 # to two fixed hosts. Every published port binds to 127.0.0.1. No keys, no
 # accounts.
 # COUNTRIX_MCP_TOKEN (in .env) requires a bearer token on the MCP server.
-# One image, built once by `data`, shared by every container; each container
-# mounts only what it reads, read-only unless it writes there.
+# One image, built once by `data`, shared by every container but db, which
+# runs postgres's own; each container mounts only what it reads, read-only
+# unless it writes there.
 
 name: countrix
 
@@ -91,10 +93,9 @@ services:
     environment:
       <<: *env
       COUNTRIX_MCP_TOKEN: ${COUNTRIX_MCP_TOKEN:-}
-    volumes:                         # every tool lands here: the pulls, the mirror, a tune,
-      - ./.cache-blizzard:/app/.cache-blizzard             # a draft, the docs, the audit log
+    volumes:                         # every tool lands here: the pulls, a tune, a draft, the docs
+      - ./.cache-blizzard:/app/.cache-blizzard
       - ./.cache-wiki:/app/.cache-wiki
-      - ./db/raw:/app/db/raw
       - ./inference/strategies:/app/inference/strategies
       - ./docs:/app/docs
     ports:
@@ -150,10 +151,9 @@ services:
   refresher:
     <<: *app
     command: ["refresh"]
-    volumes:                      # pulls into the caches, re-exports the mirror; reads the playbook
+    volumes:                      # pulls into the caches; reads the playbook
       - ./.cache-blizzard:/app/.cache-blizzard
       - ./.cache-wiki:/app/.cache-wiki
-      - ./db/raw:/app/db/raw
       - ./inference/strategies:/app/inference/strategies:ro
     environment:
       <<: *env

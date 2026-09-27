@@ -6,8 +6,8 @@ drives the pulls through its tools, and the facts and inference layers read
 the tables over db.psql.default_dsn().
 
     data/         the sources, one package each (blizzard, wiki), and what
-                  they share: the page cache (fetch) and name matching
-                  (names). Page to table.
+                  they share: the page cache (cache) and name matching
+                  (normalizer). Page to table.
     psql/         the database: where it is and the helpers every writer
                   needs (psql), the schema, the ledger, rebuild and the
                   generated docs (psql.schema), the migrations, and the
@@ -17,8 +17,7 @@ the tables over db.psql.default_dsn().
                   request that raised (a Refusal 400, anything else 500 with
                   its traceback on stderr) and the one JSON reader
     matches       the one writer of the owner's recorded matches, by id:
-                  the door's record_match, delete_match and db_rebuild call it
-    raw/          the CSV mirror the tools export (gitignored)
+                  the door's record_match and delete_match call it
 
 This file holds what the whole layer must agree on: where things live (ROOT
 and the paths under it), the shape of a `sources` row (Source), the roles
@@ -50,7 +49,6 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # artifact - `db_rebuild` reproduces it from the migrations plus the page
 # caches - so it is gitignored, not committed.
 DEFAULT_DB_DIR = os.path.join(ROOT, "db", "psql", "cluster")
-RAW_DIR = os.path.join(ROOT, "db", "raw")
 
 CACHE_DIRS = {
     "blizzard": os.path.join(ROOT, ".cache-blizzard"),

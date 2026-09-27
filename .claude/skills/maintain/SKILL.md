@@ -212,11 +212,9 @@ is a lesson the next run relearns.
   needs more than the data container's 1 GiB, and coverage cannot write
   `/app/.coverage`. Now: tests solve at the default pool, and the image
   run points `COVERAGE_FILE` at the tmpfs.
-- **Single pulls make the mirror lie.** Any `pull_*` against the Docker
-  database leaves `db/raw` behind until `export_csv` runs, and a rates
-  pull appends a dated snapshot every time. Now: tests run the
-  pulls inside a rolled-back transaction, and a pull run by hand is
-  followed by `export_csv` before the in-image parity test.
+- **Single pulls append.** A rates pull against the Docker database
+  appends a dated snapshot every time. Now: tests run the pulls inside a
+  rolled-back transaction.
 - **Hash order reached the answer.** Style ties broke by the iteration
   order of a set of names, so PYTHONHASHSEED changed the solver's six.
   Now: every tie in the scoring path breaks by name, and a test flips

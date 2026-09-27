@@ -7,9 +7,9 @@ Bring everything up and prove it is ready. Run, from the repo root:
 
     .venv/bin/python orchestrator.py up    # or without `up`, to also run the agents
 
-It builds the one image, starts one container per role (`db`, `data`,
-`ui`, `refresher`), waits for each container's health, and prints a
-verdict. A first build scrapes the sources once
+It builds the one image, starts the containers (`db`, `data`, `ui`,
+`refresher`), waits for the data layer and the board to answer, and
+prints a verdict. A first build scrapes the sources once
 (minutes); later starts take seconds. Then:
 
 1. Read the verdict. `READY` means: the data layer answers with no pending
@@ -35,8 +35,8 @@ verdict. A first build scrapes the sources once
    with `refresh: true` on the `countrix-docker` MCP server). The
    refresher container refreshes daily on its own and on start when the
    caches are a day old, so this is rarely needed.
-4. Never run `docker compose down -v`: that deletes the database volume
-   (the rebuild costs a scrape).
+4. Never run `docker compose down -v`: that deletes the database volume,
+   the recorded matches with it (the rebuild costs a scrape).
 
 `.venv/bin/python orchestrator.py status` answers "is it up?" without
 touching anything; `.venv/bin/python orchestrator.py test` runs the suite

@@ -17,7 +17,7 @@ Every change is kept on the hero as a KitChange for the facts to word.
 
 import re
 
-from db.data.names import ability_key
+from db.data.normalizer import ability_key
 from facts.draft import SIX_V_SIX
 from facts.kit import KitPiece, Stat
 from facts.model import Hero, World

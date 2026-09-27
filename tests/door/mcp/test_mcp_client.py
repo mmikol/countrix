@@ -15,13 +15,13 @@ from door.mcp import client
 from tests.db.test_web import _Answered, _door
 
 
-def test_call_tool_reads_the_answer_the_refusal_and_the_door_turning_it_away(tmp_path):
-    httpd, url = _door(tmp_path)
+def test_call_tool_reads_the_answer_the_refusal_and_the_door_turning_it_away():
+    httpd, url = _door()
     assert client.call_tool(url, "hello", {}) == client.CallReply(
         "hello\nsecond line", {"said": "hello"}, 200)
     assert client.call_tool(url, "refuse", {}) == client.CallReply("no strategy 'x'", None, 400)
     httpd.shutdown()
-    httpd, url = _door(tmp_path, token="s3cret")
+    httpd, url = _door(token="s3cret")
     # the token the door refused is the relay's own, not its caller's: 502
     assert client.call_tool(url, "hello", {}) == client.CallReply(
         "the MCP server answered 401: a bearer token is required", None, 502)

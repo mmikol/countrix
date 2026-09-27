@@ -8,7 +8,7 @@ import pytest
 
 from door import refresh
 from door.mcp.schema import ToolReply
-from tests.db.test_fetch import write_aged
+from tests.db.test_cache import write_aged
 
 
 def test_seconds_until_the_next_daily_run():
@@ -30,7 +30,7 @@ def test_cache_age_reads_the_newest_page(tmp_path):
 def test_refresh_once_survives_a_bad_day(monkeypatch):
     from door.mcp import tools
     logs = []
-    nowhere = tools.Context(dsn="postgresql://nowhere", client="test")
+    nowhere = tools.Context(dsn="postgresql://nowhere")
     monkeypatch.setattr(tools.Context, "call", lambda ctx, name, **kw: (_ for _ in ()).throw(
         RuntimeError("blizzard 504")))
     ok, text = refresh.refresh_once(nowhere, logs.append)
@@ -66,12 +66,9 @@ def test_a_schedule_refuses_a_time_that_is_not_hh_mm():
 
 def test_the_command_line_exits_with_the_refresh_verdict(monkeypatch, capsys):
     verdicts = iter([(False, "down"), (True, "")])
-    contexts = []
-    monkeypatch.setattr(refresh, "refresh_once",
-                        lambda ctx, **kw: contexts.append(ctx) or next(verdicts))
+    monkeypatch.setattr(refresh, "refresh_once", lambda ctx, **kw: next(verdicts))
     assert refresh.main(["--once"]) == 1
     assert refresh.main(["--once"]) == 0
-    assert [ctx.client for ctx in contexts] == ["refresher", "refresher"]   # its audit lines
     # --help prints the docstring's usage map as written, not reflowed
     with pytest.raises(SystemExit) as helped:
         refresh.main(["--help"])
@@ -117,13 +114,13 @@ def test_daily_refresh_touches_only_what_moves(monkeypatch):
     calls = []
     monkeypatch.setattr(tools.Context, "call", lambda ctx, name, **kw: calls.append(
         (name, kw.get("refresh"))) or ToolReply("%s: ok\n  rows  1" % name, {}))
-    ok, text = refresh.refresh_once(tools.Context(dsn="postgresql://nowhere", client="test"),
+    ok, text = refresh.refresh_once(tools.Context(dsn="postgresql://nowhere"),
                                     lambda m: None, full=False)
     # seasons first: the day's snapshots are stamped with the season live today
     assert ok and calls == [("pull_seasons", True), ("pull_rates", True),
-                            ("load_authored", None), ("export_csv", None)]
+                            ("load_authored", None)]
     # the log keeps each tool's headline line, not its counts
-    assert text == "pull_seasons: ok; pull_rates: ok; load_authored: ok; export_csv: ok"
+    assert text == "pull_seasons: ok; pull_rates: ok; load_authored: ok"
     # the hero articles (kits, synergies, counters) are the full refresh's: a
     # daily refetch would keep the wiki cache young and full_due() never true
     assert not set(refresh.DAILY) & {"pull_kits", "pull_synergies", "pull_counters"}
@@ -131,7 +128,7 @@ def test_daily_refresh_touches_only_what_moves(monkeypatch):
     # the calls above are stubbed, so a renamed tool would pass them: the names are checked here
     assert {name for name, _ in calls} <= set(tools.REGISTRY.names())
     calls.clear()
-    ok, text = refresh.refresh_once(tools.Context(dsn="postgresql://nowhere", client="test"),
+    ok, text = refresh.refresh_once(tools.Context(dsn="postgresql://nowhere"),
                                     lambda m: None, full=True)
     assert ok and calls == [("sync_all", True)] and text == "sync_all: ok"
     assert {name for name, _ in calls} <= set(tools.REGISTRY.names())

@@ -4,7 +4,7 @@ once already."""
 
 import pytest
 
-from db.data.names import hero_key, name_key, slug
+from db.data.normalizer import hero_key, name_key, slug
 from db.data.wiki import WikiError
 from db.data.wiki.kits.measurements import parse_measurements
 from db.data.wiki.maps import parse_phases, parse_stages, parse_stretches, stages_of

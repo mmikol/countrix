@@ -89,7 +89,7 @@ def test_the_handler_logs_what_failed_and_the_timed_routes_alone(served, capsys)
 
 # --- the reader ------------------------------------------------------------------------
 
-def _door(tmp_path, token=None):
+def _door(token=None):
     """A real MCP door over HTTP on a free port, serving two tools."""
     def hello(**kw):
         return "hello\nsecond line", {"said": "hello"}
@@ -97,8 +97,7 @@ def _door(tmp_path, token=None):
     def refuse(**kw):
         raise Refusal("no strategy 'x'")
     empty = tool_schema()
-    mcp = Server([Tool("hello", "d", empty, hello), Tool("refuse", "d", empty, refuse)],
-                 audit_path=str(tmp_path / "audit.jsonl"))
+    mcp = Server([Tool("hello", "d", empty, hello), Tool("refuse", "d", empty, refuse)])
     httpd = HttpServer(("127.0.0.1", 0), mcp, lambda: {"status": "ok"}, token=token)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     return httpd, "http://127.0.0.1:%d/mcp" % httpd.server_address[1]
@@ -118,8 +117,8 @@ class _Answered(io.BytesIO):
         return False
 
 
-def test_read_json_reads_the_status_and_body_of_any_answer(tmp_path, monkeypatch):
-    httpd, url = _door(tmp_path, token="s3cret")
+def test_read_json_reads_the_status_and_body_of_any_answer(monkeypatch):
+    httpd, url = _door(token="s3cret")
     health = url.replace("/mcp", "/health")                  # open without the token
     assert web.read_json(health, 10) == web.JsonAnswer(200, {"status": "ok"})
     ping = urllib.request.Request(

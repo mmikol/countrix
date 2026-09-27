@@ -78,7 +78,7 @@ frontmatter, and the solver reads nothing else.
 
 ## Engineering
 
-- **958 tests, 97% line coverage** with the database built, against a 75%
+- **952 tests, 97% line coverage** with the database built, against a 75%
   floor. CI runs ruff, mypy and the database-free suite, held to 78%, on every
   push to main and every pull request.
 - **The search is held to brute force.** A CI gate enumerates every legal six
@@ -88,8 +88,8 @@ frontmatter, and the solver reads nothing else.
   pooled and single-process answers are pinned to agree exactly.
 - **Typed throughout.** mypy checks every source module in CI; records that
   cross a module boundary are dataclasses, NamedTuples or TypedDicts.
-- **One door for writes.** 37 MCP tools over stdio, HTTP or in-process, each
-  schema-checked and audited; the query tool runs as a read-only database login.
+- **One door for writes.** 36 MCP tools over stdio, HTTP or in-process, each
+  schema-checked; the query tool runs as a read-only database login.
 - **Hardened containers.** Three services share one image and run unprivileged
   on a read-only root with every capability dropped; PostgreSQL keeps the five
   it needs to start. Every port binds to loopback, and every HTTP server refuses

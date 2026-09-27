@@ -7,14 +7,14 @@
     attr            a tag's attribute as text, which both read the pages with
     BlizzardError   a page that answered in a shape neither reader knows
 
-Ordinary web pages fetched with db.data.fetch.cached_get; the endpoints and
+Ordinary web pages fetched with db.data.cache.cached_get; the endpoints and
 the `sources` row its pages become are named here, once.
 """
 
 from bs4 import Tag
 
 from db import Source
-from db.data.fetch import FetchError
+from db.data.cache import FetchError
 
 BASE_URL = "https://overwatch.blizzard.com/en-us"
 HEROES_URL = BASE_URL + "/heroes/"

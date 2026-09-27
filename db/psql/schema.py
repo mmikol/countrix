@@ -3,6 +3,8 @@ and the generated documentation.
 
     read_migrations, apply   the files in order (Migration), and applying them
     applied, pending         the ledger against the files on disk
+    table_names, table_count
+                             the public schema's tables, read from the catalog
     state                    how ready the database is: empty, stale,
                              unfilled or current - the one definition every
                              reader of readiness asks
@@ -104,6 +106,13 @@ def pending(connection: psycopg.Connection) -> list[str]:
     return [m.name for m in read_migrations() if m.name not in have]
 
 
+def table_names(connection: psycopg.Connection) -> list[str]:
+    """Every table in the public schema, read from the catalog rather than
+    a hand-kept list, which drifts."""
+    return [row[0] for row in connection.execute(
+        "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename")]
+
+
 def table_count(connection: psycopg.Connection) -> int:
     """How many tables the public schema holds."""
     return psql.scalar(connection.execute(
@@ -133,7 +142,7 @@ def drop_all(connection: psycopg.Connection) -> list[str]:
     """Drop every table in the public schema, read from the catalog rather
     than the migration text so a table whose migration was deleted still
     goes. Returns the tables dropped."""
-    tables = psql.table_names(connection)
+    tables = table_names(connection)
     if tables:
         connection.execute(SQL("DROP TABLE IF EXISTS {} CASCADE").format(
             SQL(", ").join(Identifier(t) for t in tables)))
@@ -342,7 +351,7 @@ def generate_docs(connection: psycopg.Connection, path: str | None = None) -> st
     """Write the ER diagrams and the data dictionary into docs/db.md (or
     `path`) from the live schema and the migrations' prose -> a summary line."""
     origins = _migration_tables()
-    tables = psql.table_names(connection)
+    tables = table_names(connection)
     columns = {t: _columns(connection, t) for t in tables}
     fks = _foreign_keys(connection)
     domain = {t: DOC_DOMAIN.get(origins.get(t, NO_ORIGIN).migration, "foundation") for t in tables}

@@ -29,7 +29,7 @@ are no kit rows, so a hero's kit numbers are given whole.
 import datetime
 from typing import TypedDict
 
-from db.data.names import name_key
+from db.data.normalizer import name_key
 from facts import tables
 from facts.compute import STAGE_MENTIONS
 from facts.model import Hero, Map, World

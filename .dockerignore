@@ -4,7 +4,6 @@
 db/psql/cluster
 .cache-blizzard
 .cache-wiki
-db/raw
 __pycache__
 **/__pycache__
 .pytest_cache

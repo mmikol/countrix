@@ -8,11 +8,7 @@ db.web's guard refuses a request that does not name this server before any
 of it runs. The door then asks for the bearer token when one is set,
 refuses a body not labelled application/json with 415, caps a body at
 MAX_BODY and a batch at MAX_BATCH messages, and holds each client address
-to RATE_LIMIT tool calls a RATE_WINDOW. A tool call's audit line names
-http and the client's address and session. A request to /mcp the door
-turns away leaves a line too, under the address alone, the key the rate
-limit counts by; the guard's 403 and the 404s and 405 for what the door
-does not serve leave none.
+to RATE_LIMIT tool calls a RATE_WINDOW.
 """
 
 import hmac
@@ -26,7 +22,6 @@ from collections.abc import Callable, Iterable, Mapping
 from urllib.parse import urlsplit
 
 from db import web
-from door.mcp.audit import audit_refusal
 from door.mcp.server import PARSE_ERROR, Server, error_response
 
 MAX_BODY = 1 << 20            # one request is a tool call, not an upload
@@ -39,14 +34,14 @@ MAX_TRACKED_CLIENTS = 1000    # past this, clients unseen for a window are forgo
 
 class _RejectedError(Exception):
     """A request to /mcp the door turns away before any message in it is
-    handled: the status, the reason its audit line records, the JSON body -
-    {"error": reason} unless the reply needs its own - and any headers."""
+    handled: the status, the JSON body - {"error": reason} unless the reply
+    needs its own - and any headers."""
 
     def __init__(
             self, code: int, reason: str, payload: Mapping[str, object] | None = None,
             headers: Mapping[str, str] | None = None) -> None:
         super().__init__(code, reason)
-        self.code, self.reason = code, reason
+        self.code = code
         self.payload: Mapping[str, object] = {"error": reason} if payload is None else payload
         self.headers = dict(headers or {})
 
@@ -78,14 +73,6 @@ class HttpHandler(web.Handler):
             raise _RejectedError(401, "a bearer token is required",
                                  headers={"WWW-Authenticate": "Bearer"})
 
-    def _turn_away(self, rejected: _RejectedError) -> None:
-        """Answer a request the door rejected, the one place that does: its
-        audit line first - no tool, under the client address the rate limit
-        counts by, refused with the status and the reason - then the reply."""
-        audit_refusal("http", "http:%s" % self.client_address[0],
-                      "%d %s" % (rejected.code, rejected.reason), self.server.mcp.audit_path)
-        self._json(rejected.payload, rejected.code, rejected.headers)
-
     def do_DELETE(self) -> None:
         """Ends a session. This server keeps no session state to end, and the
         request passes the guard and the token check anyway, so every method
@@ -95,7 +82,7 @@ class HttpHandler(web.Handler):
         try:
             self._check_token()
         except _RejectedError as rejected:
-            return self._turn_away(rejected)
+            return self._json(rejected.payload, rejected.code, rejected.headers)
         self._json(None)
 
     def do_POST(self) -> None:
@@ -112,7 +99,7 @@ class HttpHandler(web.Handler):
             messages = message if isinstance(message, list) else [message]
             self._admit(messages)
         except _RejectedError as rejected:
-            return self._turn_away(rejected)
+            return self._json(rejected.payload, rejected.code, rejected.headers)
         self._dispatch(messages, batched=isinstance(message, list))
 
     def _read_message(self) -> object:
@@ -152,13 +139,10 @@ class HttpHandler(web.Handler):
                                  headers={"Retry-After": str(RATE_WINDOW)})
 
     def _dispatch(self, messages: list[object], *, batched: bool) -> None:
-        """Handle each message as this client, then reply: 202 when nothing
-        needs an answer, else the answers - a list for a batch - with a new
-        Mcp-Session-Id after an initialize."""
-        session = (self.headers.get("Mcp-Session-Id") or "-")[:8]
-        client = "http:%s/%s" % (self.client_address[0], session)
-        responses = [r for r in (self.server.mcp.handle(m, client) for m in messages)
-                     if r is not None]
+        """Handle each message, then reply: 202 when nothing needs an answer,
+        else the answers - a list for a batch - with a new Mcp-Session-Id
+        after an initialize."""
+        responses = [r for r in (self.server.mcp.handle(m) for m in messages) if r is not None]
         headers: dict[str, str] = {}
         if any(isinstance(m, dict) and m.get("method") == "initialize" for m in messages):
             headers["Mcp-Session-Id"] = uuid.uuid4().hex
@@ -169,14 +153,13 @@ class HttpHandler(web.Handler):
 
 class HttpServer(web.LocalServer):
     """The MCP server over HTTP: the door's token, the rate limit per client
-    address, and the status /health reports. Its audit lines name http."""
+    address, and the status /health reports."""
 
     def __init__(
             self, address: tuple[str, int], mcp: Server,
             status: Callable[[], Mapping[str, object]], allowed_hosts: Iterable[str] = (),
             token: str | None = None, rate_limit: int = RATE_LIMIT) -> None:
         super().__init__(address, HttpHandler, allowed_hosts)
-        mcp.transport = "http"
         self.mcp = mcp
         self.status = status
         self.token = token if token is not None else os.environ.get("COUNTRIX_MCP_TOKEN") or None

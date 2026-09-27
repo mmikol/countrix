@@ -5,7 +5,7 @@ network: the pages are inline HTML."""
 import pytest
 from bs4 import BeautifulSoup
 
-from db.data import fetch
+from db.data import cache
 from db.data.blizzard import BlizzardError
 from db.data.blizzard import heroes as blizzard_heroes
 from db.data.blizzard.heroes import (
@@ -205,11 +205,11 @@ def test_a_hero_page_that_will_not_fetch_is_recorded_and_the_rest_are_stored(mon
     stored, and the missing hero's rows are left as they were."""
     def pages(pull, url, key, **kwargs):
         if key == "ana":
-            raise fetch.FetchError("%s failed after 3 attempts: gone" % url)
+            raise cache.FetchError("%s failed after 3 attempts: gone" % url)
         return HERO if key == "tracer" else ROSTER
     monkeypatch.setattr(blizzard_heroes, "cached_get", pages)
     connection = RecordingConnection()
-    summary = blizzard_heroes.run(connection, fetch.PullContext(None, log=lambda line: None))
+    summary = blizzard_heroes.run(connection, cache.PullContext(None, log=lambda line: None))
     assert [line.split(":")[0] for line in summary["missing"]] == ["Ana"]
     assert summary["heroes"] == 2 and summary["abilities"] == 2 and summary["perks"] == 4
     [cursor] = connection.cursors
@@ -233,5 +233,5 @@ def test_a_changed_hero_page_fails_the_pull_and_is_not_counted_missing(monkeypat
     monkeypatch.setattr(blizzard_heroes, "cached_get", pages)
     connection = RecordingConnection()
     with pytest.raises(BlizzardError, match="tracer: expected 1 carousel, found 0"):
-        blizzard_heroes.run(connection, fetch.PullContext(None, log=lambda line: None))
+        blizzard_heroes.run(connection, cache.PullContext(None, log=lambda line: None))
     assert connection.cursors == [] and connection.commits == 0

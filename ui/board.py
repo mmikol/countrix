@@ -159,9 +159,8 @@ def api_board(query: Query) -> web.Reply:
 
 
 def tool_context() -> tools.Context:
-    """Where an in-process tool call lands: the database default_dsn() names,
-    the call audited as the board's."""
-    return tools.Context(client="board")
+    """Where an in-process tool call lands: the database default_dsn() names."""
+    return tools.Context()
 
 
 def door_call(name: str, arguments: Mapping[str, object], key: str) -> web.Reply:

@@ -64,11 +64,6 @@ past that, and asks for `Authorization: Bearer <token>` when
 `COUNTRIX_MCP_TOKEN` is set in `.env`; `.mcp.json` sends it, and `ui`
 holds it too. `/health` stays open for the healthchecks.
 
-**Every call leaves a line.** Each tool call, and each request to `/mcp`
-the door turns away, is one line in `db/raw/audit.jsonl`: the caller, the
-tool, each argument's size or type name (never its value), the outcome.
-`door/mcp/audit.py` holds the rest.
-
 **A failure keeps its traceback.** A request that raises is 400 with the
 refusal's reason or 500 with the error's type and message
 (`db.web.failure`), and the traceback goes to stderr; the door's JSON-RPC
@@ -145,7 +140,7 @@ the browser loads hero portraits and role icons from Blizzard's CDNs.
   is not copied).
 - On a Linux host whose checkout is not owned by uid 1000, set
   `COUNTRIX_UID` and `COUNTRIX_GID` in `.env` to the owner's ids, or the
-  containers cannot write the bind mounts (the audit log, the mirror, a
-  tune) and say so in their logs.
+  containers cannot write the bind mounts (the caches, a tune) and say so
+  in their logs.
 
 To report a vulnerability, see [SECURITY.md](../SECURITY.md).

@@ -14,7 +14,7 @@ import shutil
 import pytest
 
 from db import Refusal
-from db.data.names import name_key
+from db.data.normalizer import name_key
 from facts.draft import Draft, board_side
 from facts.records import Synergy
 from facts.team import team_metrics

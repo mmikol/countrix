@@ -15,14 +15,13 @@
                         checked and returned as a psycopg.sql.Identifier
     lookup_ids          {value: id} over one column, each value as stored;
                         a name a source writes is matched through
-                        db.data.names.index
+                        db.data.normalizer.index
     scalar              the one value a statement returns: a count, an
                         upsert's RETURNING
     now, current_patch, current_season
                         what a capture is stamped with
     SEASON_ON_DATE      the season live on a date: the one rule
                         current_season and pull_seasons' restamp share
-    export              the CSV mirror under db/raw, and its mark (ExportMark)
 
     schema              the migrations applied and recorded in the ledger,
                         pending, rebuild, the generated docs, and state():
@@ -37,12 +36,12 @@ import os
 import re
 import threading
 from datetime import UTC, datetime
-from typing import Any, TypedDict
+from typing import Any
 
 import psycopg
 from psycopg.sql import SQL, Identifier
 
-from db import DEFAULT_DB_DIR, RAW_DIR, Source
+from db import DEFAULT_DB_DIR, Source
 
 try:
     import pgserver
@@ -133,7 +132,7 @@ def lookup_ids(
     """{value: id} over key_column, each value as stored. A code needs no
     fold: ability_kinds is seeded with db.ABILITY_KINDS, in lower case. A
     hero or map name a source writes is matched through
-    db.data.names.index, which rekeys this by name_key."""
+    db.data.normalizer.index, which rekeys this by name_key."""
     return {
         row[0]: row[1]
         for row in cursor.execute(
@@ -193,75 +192,3 @@ def current_season(cursor: psycopg.Cursor) -> int | None:
     """The season live today (SEASON_ON_DATE). NULL until pull_seasons."""
     row = cursor.execute(SEASON_ON_DATE.format(SQL("CURRENT_DATE"))).fetchone()
     return row[0] if row else None
-
-
-# --- the CSV mirror ------------------------------------------------------
-
-def table_names(connection: psycopg.Connection) -> list[str]:
-    """Every table in the database, read from the catalog rather than a
-    hand-kept list, which drifts."""
-    return [
-        row[0]
-        for row in connection.execute(
-            "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
-            " ORDER BY tablename"
-        ).fetchall()
-    ]
-
-
-EXPORT_MARK = "EXPORT.json"
-
-
-class ExportMark(TypedDict):
-    """EXPORT.json: which database the mirror came from, when, and how many tables."""
-    system_identifier: str
-    exported_at: str
-    table_count: int
-
-
-def database_identity(connection: psycopg.Connection) -> str:
-    """The cluster's own identifier (assigned at initdb): the same for every
-    connection string that reaches the same database, different for every
-    other database. What the mirror is stamped with."""
-    return str(scalar(connection.execute(
-        "SELECT system_identifier FROM pg_control_system()")))
-
-
-def export(connection: psycopg.Connection, raw_dir: str = RAW_DIR) -> dict[str, int]:
-    """Write one CSV per table, and EXPORT.json saying which database they
-    came from and when. Any other CSV in `raw_dir` is removed, so the mirror
-    holds the schema's tables and nothing else. Returns {table: row count},
-    in table order."""
-    if not os.path.isdir(raw_dir):
-        os.makedirs(raw_dir)
-    counts: dict[str, int] = {}
-    for table in table_names(connection):
-        path = os.path.join(raw_dir, table + ".csv")
-        name = identifier(table)
-        with open(path, "w", encoding="utf-8", newline="") as handle, connection.cursor().copy(
-                SQL("COPY (SELECT * FROM {}) TO STDOUT WITH (FORMAT csv, HEADER true)")
-                .format(name)) as copy:
-            for chunk in copy:
-                handle.write(bytes(chunk).decode("utf-8"))
-        # Counted from the database, not by counting newlines: descriptions
-        # embed newlines, which inflates the latter.
-        counts[table] = scalar(connection.execute(SQL("SELECT count(*) FROM {}").format(name)))
-    current = {table + ".csv" for table in counts}
-    for stale in sorted(set(os.listdir(raw_dir)) - current):
-        if stale.endswith(".csv"):
-            os.remove(os.path.join(raw_dir, stale))
-    with open(os.path.join(raw_dir, EXPORT_MARK), "w", encoding="utf-8") as handle:
-        json.dump(ExportMark(system_identifier=database_identity(connection),
-                             exported_at=now().isoformat(),
-                             table_count=len(counts)), handle)
-    return counts
-
-
-def export_mark(raw_dir: str = RAW_DIR) -> ExportMark | None:
-    """The mirror's EXPORT.json, or None before the first export."""
-    path = os.path.join(raw_dir, EXPORT_MARK)
-    if not os.path.exists(path):
-        return None
-    with open(path, encoding="utf-8") as handle:
-        return json.load(handle)
-

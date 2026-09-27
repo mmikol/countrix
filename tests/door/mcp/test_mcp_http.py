@@ -1,8 +1,8 @@
 """The door over Streamable HTTP, the data-layer container's: the real
 server spawned on a free port, and an in-process HttpServer for the guards -
 the origin check, the bearer token, the JSON label, the body and batch caps,
-the rate limit per client address, /health's 500 for a status that raises,
-and the audit line each call and each refusal leaves."""
+the rate limit per client address, and /health's 500 for a status that
+raises."""
 
 import http.client
 import json
@@ -123,10 +123,9 @@ def test_http_transport_guards_get_origin_and_health(http_server):
     assert delete("/nope") == 404
 
 
-def _http_server(tmp_path, token=None, rate_limit=120, status=lambda: {"status": "ok"}):
-
-    ctx = tools.Context(dsn="postgresql://nowhere", client="test")
-    mcp = Server(tools.REGISTRY.bind(ctx), None, audit_path=str(tmp_path / "audit.jsonl"))
+def _http_server(token=None, rate_limit=120, status=lambda: {"status": "ok"}):
+    ctx = tools.Context(dsn="postgresql://nowhere")
+    mcp = Server(tools.REGISTRY.bind(ctx), None)
     httpd = HttpServer(("127.0.0.1", 0), mcp, status, token=token,
                        rate_limit=rate_limit)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
@@ -144,18 +143,8 @@ def _knock(url, body, headers=None):
         return error.code, json.loads(error.read() or b"null")
 
 
-def _audited(tmp_path):
-    """The audit lines an in-process HttpServer left, oldest first."""
-    return [json.loads(line) for line in (tmp_path / "audit.jsonl").read_text().splitlines()]
-
-
-def _refusal(line):
-    """A door's refusal as the audit line records it: (client, tool, refused)."""
-    return line["client"], line["tool"], line["refused"]
-
-
-def test_the_door_requires_its_token_when_one_is_set(tmp_path):
-    httpd, url = _http_server(tmp_path, token="s3cret")
+def test_the_door_requires_its_token_when_one_is_set():
+    httpd, url = _http_server(token="s3cret")
     call = {"jsonrpc": "2.0", "id": 1, "method": "tools/call",
             "params": {"name": "list_sources", "arguments": {}}}
     assert _knock(url, call)[0] == 401
@@ -163,14 +152,10 @@ def test_the_door_requires_its_token_when_one_is_set(tmp_path):
     code, reply = _knock(url, call, {"Authorization": "Bearer s3cret"})
     assert code == 200 and reply["result"]["isError"] is False
     httpd.shutdown()
-    lines = _audited(tmp_path)
-    assert [_refusal(line) for line in lines[:2]] == [
-        ("http:127.0.0.1", None, "401 a bearer token is required")] * 2
-    assert [(line["tool"], line["ok"]) for line in lines[2:]] == [("list_sources", True)]
 
 
-def test_the_door_refuses_huge_bodies_and_rate_limits_a_client_and_audits_every_call(tmp_path):
-    httpd, url = _http_server(tmp_path, rate_limit=3)
+def test_the_door_refuses_huge_bodies_and_rate_limits_a_client():
+    httpd, url = _http_server(rate_limit=3)
     call = {"jsonrpc": "2.0", "id": 1, "method": "tools/call",
             "params": {"name": "list_sources", "arguments": {}}}
     assert _knock(url, b"x" * ((1 << 20) + 1))[0] == 413
@@ -178,28 +163,15 @@ def test_the_door_refuses_huge_bodies_and_rate_limits_a_client_and_audits_every_
     assert codes == [200, 200, 200, 429]
     assert _knock(url, call, {"Mcp-Session-Id": "two"})[0] == 429     # the budget is the host's
     batch = [dict(call, id=i) for i in range(21)]
-    assert _knock(url, batch)[0] == 413
+    assert _knock(url, batch) == (413, {"error": "at most 20 messages per batch"})
     httpd.shutdown()
-    lines = _audited(tmp_path)
-    assert len(lines) == 7                  # a line for each request, the refused ones too
-    called = lines[1:4]
-    assert all(line["tool"] == "list_sources" and line["ok"] for line in called)
-    assert {line["client"] for line in called} == {"http:127.0.0.1/one"}
-    assert called[0]["transport"] == "http" and set(called[0]) >= {"t", "args", "ms"}
-    # each refusal is a line under the address the door limits, whatever session it claims
-    assert [_refusal(line) for line in lines[:1] + lines[4:]] == [
-        ("http:127.0.0.1", None, "413 request too large"),
-        ("http:127.0.0.1", None, "429 too many calls; try again in a minute"),
-        ("http:127.0.0.1", None, "429 too many calls; try again in a minute"),
-        ("http:127.0.0.1", None, "413 at most 20 messages per batch")]
-    assert all(line["transport"] == "http" and line["ok"] is False for line in lines[4:])
 
 
-def test_a_missing_content_length_is_refused_as_required(tmp_path):
+def test_a_missing_content_length_is_refused_as_required():
     """A POST with no Content-Length, or one that is not a number, is told so
     - not answered as bad JSON after reading an empty body. urllib always sets
     the header, so the requests are built by hand."""
-    httpd, url = _http_server(tmp_path)
+    httpd, url = _http_server()
     address = urlparse(url)
     for length in (None, "abc"):
         connection = http.client.HTTPConnection(address.hostname, address.port, timeout=10)
@@ -213,27 +185,23 @@ def test_a_missing_content_length_is_refused_as_required(tmp_path):
         assert "Content-Length" in json.loads(response.read())["error"]
         connection.close()
     httpd.shutdown()
-    assert [_refusal(line) for line in _audited(tmp_path)] == [
-        ("http:127.0.0.1", None, "400 a positive Content-Length is required")] * 2
 
 
-def test_a_post_that_does_not_claim_json_is_refused_and_audited(tmp_path):
+def test_a_post_that_does_not_claim_json_is_refused():
     """The board's rule on its writes holds at the door: a body not labelled
-    application/json is 415 before it is read, and the refusal leaves a line."""
-    httpd, url = _http_server(tmp_path)
+    application/json is 415 before it is read."""
+    httpd, url = _http_server()
     assert _knock(url, {"jsonrpc": "2.0", "id": 1, "method": "ping"},
                   {"Content-Type": "text/plain"}) == (415, {"error": "a JSON body is required"})
     httpd.shutdown()
-    assert [_refusal(line) for line in _audited(tmp_path)] == [
-        ("http:127.0.0.1", None, "415 a JSON body is required")]
 
 
-def test_health_answers_a_status_that_raises_with_a_500_that_names_it(tmp_path):
+def test_health_answers_a_status_that_raises_with_a_500_that_names_it():
     """/health is a request boundary like every other route: a bug in the
     status read is a 500 with its type and message, not a dropped connection."""
     def broken():
         raise RuntimeError("a bug in read_status")
-    httpd, url = _http_server(tmp_path, status=broken)
+    httpd, url = _http_server(status=broken)
     with pytest.raises(urllib.error.HTTPError) as failed:
         urllib.request.urlopen(url + "/health", timeout=10)
     assert failed.value.code == 500

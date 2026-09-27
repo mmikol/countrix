@@ -24,14 +24,13 @@ class Offline(tools.Context):
 
 
 @pytest.fixture()
-def ctx(synthetic_world, monkeypatch, tmp_path):
+def ctx(synthetic_world, monkeypatch):
     digest = catalog.playbook_digest(FIXTURE_PLAYBOOK)
     recorded = [r.match for r in matches.rows(synthetic_world, 6, matches.noise, seed="door",
                                              digest=digest, per_session=3)]
     monkeypatch.setattr(tables, "load", lambda cx: synthetic_world)
     monkeypatch.setattr(solver, "load_matches", lambda cx: recorded)
-    monkeypatch.setenv("COUNTRIX_AUDIT", str(tmp_path / "audit.jsonl"))
-    return Offline(dsn="postgresql://nowhere", client="test")
+    return Offline(dsn="postgresql://nowhere")
 
 
 def test_validate_playbook_judges_the_recorded_matches_through_the_door(ctx):

@@ -23,10 +23,10 @@ import psycopg
 from bs4 import BeautifulSoup, Tag
 
 from db import INPUT_DEVICE, PLATFORM, REGION, psql
-from db.data import PullSummary, fetch
+from db.data import PullSummary, cache
 from db.data.blizzard import BLIZZARD, RATES_URL, BlizzardError, attr
-from db.data.fetch import cache_key, cached_get
-from db.data.names import index, name_key
+from db.data.cache import cache_key, cached_get
+from db.data.normalizer import index, name_key
 from db.psql import current_patch, current_season
 
 # --- extract: markup -> Python ---------------------------------------------
@@ -77,7 +77,7 @@ def parse_filter_options(html: str, select_id: str) -> list[tuple[str, str]]:
 
 # ~40 sequential pages is more load than the source will take at speed.
 # Slower here is faster overall: being cut off costs the whole stage.
-RATES_POLICY = fetch.RequestPolicy(attempts=6, backoff=5.0, timeout=90, delay=5.0)
+RATES_POLICY = cache.RequestPolicy(attempts=6, backoff=5.0, timeout=90, delay=5.0)
 
 QUEUE_NAME = "competitive_role_queue"
 QUEUE_LABEL = "Competitive - Role Queue"
@@ -86,7 +86,7 @@ ALL_TIER = "All"
 REGION_PARAM = "Americas"         # the site's spelling of REGION, and its name in regions
 
 
-def competitive_rq(pull: fetch.PullContext) -> str:
+def competitive_rq(pull: cache.PullContext) -> str:
     """The rq code the page currently assigns to Competitive - Role Queue."""
     page = cached_get(
         pull, RATES_URL,
@@ -104,7 +104,7 @@ def competitive_rq(pull: fetch.PullContext) -> str:
     return codes[0]
 
 
-def fetch_slice(pull: fetch.PullContext, params: dict[str, str], rq: str) -> str:
+def fetch_slice(pull: cache.PullContext, params: dict[str, str], rq: str) -> str:
     """One rates page for a given filter combination."""
     query = dict(params, rq=rq, input=INPUT_PARAM, region=REGION_PARAM)
     return cached_get(
@@ -227,7 +227,7 @@ def _store(
                         sorted(unmatched))
 
 
-def run(connection: psycopg.Connection, pull: fetch.PullContext) -> RatesSummary:
+def run(connection: psycopg.Connection, pull: cache.PullContext) -> RatesSummary:
     """Fetch the rates page by tier and by map, then store it as one new
     dated snapshot in one transaction -> the rows written, the snapshots
     held, the misses. A page read from the stale cache stamps no snapshot:

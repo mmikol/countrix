@@ -15,8 +15,8 @@ from types import MappingProxyType
 from typing import NamedTuple
 
 from db import ROLES
-from db.data.fetch import PullContext
-from db.data.names import ability_key
+from db.data.cache import PullContext
+from db.data.normalizer import ability_key
 from db.data.wiki import Articles, fetch_articles, markup
 from db.data.wiki.kits.kit_rows import HeroKit
 from db.data.wiki.kits.six_a_side import SixKit, parse_six_a_side, with_stats

@@ -322,7 +322,7 @@ def status() -> int:
 AGENT_TOOL_NAMES = ("db_status", "strategies", "tuning_log", "metrics", "facts", "infer",
                     "query", "sync_all", "pull_rates", "pull_counters", "pull_synergies",
                     "pull_seasons", "load_authored", "infer_strategy", "tune", "db_docs",
-                    "export_csv", "reach")
+                    "reach")
 # A refresh pull fetches dozens of pages at a polite pace: minutes, not the
 # seconds a tool call is given by default. MCP_TOOL_TIMEOUT is read in
 # milliseconds.

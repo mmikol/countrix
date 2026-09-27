@@ -15,7 +15,7 @@ import psycopg
 from psycopg.sql import SQL
 
 from db import psql
-from db.data import ArticlePullSummary, fetch
+from db.data import ArticlePullSummary, cache
 from db.data.wiki import WIKI, fetch_articles, markup
 from db.data.wiki.maps import parse_stretches
 
@@ -325,7 +325,7 @@ def _counted(counts: Mapping[str, int]) -> str:
     return "  ".join("%s %d" % (f, n) for f, n in counts.items() if n)
 
 
-def run(connection: psycopg.Connection, pull: fetch.PullContext) -> TerrainSummary:
+def run(connection: psycopg.Connection, pull: cache.PullContext) -> TerrainSummary:
     """Reload map_terrain and stage_terrain from every map's article -> the
     maps and stages counted, the rows and words, and the maps without text."""
     cursor = connection.cursor()

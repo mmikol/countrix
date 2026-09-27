@@ -41,7 +41,8 @@ reason in `inference/strategies/tuning-log.md`. Nothing is edited by hand.
 - A weight of 0 silences a heuristic without deleting it; deleting a file
   is a human decision, not a tune.
 - `tuning_log` (tool) or the `strategy://tuning-log` resource is the
-  audit trail - show it when the user asks how the weights got here.
+  record of every change - show it when the user asks how the weights got
+  here.
 - At most two tanks is the queue's own rule: the solver keeps every six
   to it whatever the playbook holds (`MAX_TANKS` in `facts/draft.py`),
   and the `open-queue-ranked` assumption states it. No strategy file

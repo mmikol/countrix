@@ -1,20 +1,18 @@
 """The recorded matches through the door: check_match on the synthetic World
-with no database, then record_match, list_matches, delete_match and
-db_rebuild's keep and restore against a scratch database holding the same
-roster (tests/scratch.py), never the built one. The synthetic roster has
-four tanks (Anvil, Kite, Mortar, Quarry), twelve released heroes and Wisp,
-announced; Harbor Gate is Hybrid, Ember Ruins Control, Salt Flats Push."""
+with no database, then record_match, list_matches and delete_match against
+a scratch database holding the same roster (tests/scratch.py), never the
+built one. The synthetic roster has four tanks (Anvil, Kite, Mortar,
+Quarry), twelve released heroes and Wisp, announced; Harbor Gate is
+Hybrid, Ember Ruins Control, Salt Flats Push."""
 
 import datetime
-import json
-import os
 
 import psycopg
 import pytest
 
 from db import Refusal
-from door.mcp import lifecycle, tools
 from door.mcp import matches as door_matches
+from door.mcp import tools
 from door.mcp.schema import ToolReply
 from facts.draft import Draft
 from facts.matches import load_matches
@@ -122,7 +120,7 @@ def test_the_record_tools_take_what_the_board_and_the_skill_send():
 
 
 def test_a_call_the_schema_refuses_reaches_no_database():
-    nowhere = tools.Context(dsn="postgresql://nobody@127.0.0.1:9/nowhere", client="test")
+    nowhere = tools.Context(dsn="postgresql://nobody@127.0.0.1:9/nowhere")
     board = {"map": "Harbor Gate", "blue": BLUE, "red": RED}
     with pytest.raises(Refusal, match="must be one of 'win', 'loss', 'draw'"):
         nowhere.call("record_match", result="won", **board)
@@ -141,7 +139,7 @@ def ctx(scratch_dsn):
     """A context on the scratch database, its matches cleared."""
     with psycopg.connect(scratch_dsn) as cx:
         cx.execute("delete from matches")
-    return tools.Context(dsn=scratch_dsn, client="test")
+    return tools.Context(dsn=scratch_dsn)
 
 
 def _record(ctx, **overrides):
@@ -227,90 +225,5 @@ def test_delete_match_takes_a_match_and_its_picks(ctx, scratch_dsn):
 def test_a_database_the_migrations_have_not_reached_refuses_a_record(dsn):
     with scratch.database(dsn) as bare:
         with pytest.raises(Refusal, match=r"no matches table yet \(migration 024\): run db_m"):
-            _record(tools.Context(dsn=bare, client="test"))
-        assert tools.Context(dsn=bare, client="test").call("list_matches").data["total"] == 0
-
-
-# --- db_rebuild keeps them -------------------------------------------------------------
-
-class Seeded(tools.Context):
-    """A context whose sync_all stores the synthetic roster instead of
-    pulling - every hero but those `leave_out` names - or fails as `broken`
-    says, as a pull that raised would."""
-
-    leave_out = ()
-    broken = False
-
-    def call(self, name, /, **arguments):
-        if name == "sync_all":
-            if self.broken:
-                raise RuntimeError("a pull failed")
-            scratch.seed(self.dsn, leave_out=self.leave_out)
-            return ToolReply("sync_all: seeded", {})
-        return super().call(name, **arguments)
-
-
-@pytest.fixture()
-def rebuilt(dsn, tmp_path, monkeypatch):
-    """A database of its own - a rebuild drops every table - with KEPT_MATCHES
-    in a temporary folder."""
-    monkeypatch.setattr(lifecycle, "KEPT_MATCHES", str(tmp_path / "kept-matches.json"))
-    with scratch.database(dsn) as target:
-        scratch.seed(target)
-        yield target
-
-
-@pytest.mark.invariant
-def test_a_rebuild_keeps_every_recorded_match_under_its_id(rebuilt):
-    ctx = Seeded(dsn=rebuilt, client="test")
-    _record(ctx, played_on="2026-09-20")
-    _record(ctx, played_on="2026-09-21", map="Ember Ruins", side="", note="lost the forge")
-    ctx.call("delete_match", match_id=_record(ctx).data["match_id"])   # ids 1 and 2 remain
-    with psycopg.connect(rebuilt) as cx:
-        before = load_matches(cx)
-    text, data = ctx.call("db_rebuild")
-    assert text == "db_rebuild: dropped %d tables, rebuilt, 2 recorded match(es) restored" % (
-        data["dropped"])
-    assert data["matches"] == {"restored": 2, "unrestored": []}
-    with psycopg.connect(rebuilt) as cx:
-        assert load_matches(cx) == before
-        assert {c for (c,) in cx.execute(
-            "select distinct s.code from matches join sources s using (source_id)")} == {"user"}
-    assert not os.path.exists(lifecycle.KEPT_MATCHES)
-    # the next match recorded takes an id past the restored ones
-    assert _record(ctx).data["match_id"] > max(m.match_id for m in before)
-
-
-@pytest.mark.invariant
-def test_a_rebuild_that_fails_leaves_the_matches_for_the_next(rebuilt):
-    ctx = Seeded(dsn=rebuilt, client="test")
-    _record(ctx, note="the one to keep")
-    with psycopg.connect(rebuilt) as cx:
-        before = load_matches(cx)
-    ctx.broken = True
-    with pytest.raises(RuntimeError, match="a pull failed"):
-        ctx.call("db_rebuild")
-    with open(lifecycle.KEPT_MATCHES, encoding="utf-8") as handle:
-        assert [row["note"] for row in json.load(handle)] == ["the one to keep"]
-    ctx.broken = False
-    _text, data = ctx.call("db_rebuild")      # the tables are empty now: the file has them
-    assert data["matches"] == {"restored": 1, "unrestored": []}
-    with psycopg.connect(rebuilt) as cx:
-        assert load_matches(cx) == before
-
-
-@pytest.mark.invariant
-def test_a_match_whose_hero_left_the_roster_stays_in_the_kept_file(rebuilt):
-    ctx = Seeded(dsn=rebuilt, client="test")
-    gone = _record(ctx).data["match_id"]
-    kept = _record(ctx, blue=["Anvil", "Quarry", "Needle", "Gale", "Balm", "Sorrel"],
-                   red=["Mortar", "Kite", "Needle", "Flint", "Myrrh", "Tansy"],
-                   bans=[]).data["match_id"]
-    ctx.leave_out = ("Rook",)
-    text, data = ctx.call("db_rebuild")
-    assert data["matches"] == {"restored": 1, "unrestored": [gone]}
-    assert "1 recorded match(es) kept in" in text
-    with psycopg.connect(rebuilt) as cx:
-        assert [m.match_id for m in load_matches(cx)] == [kept]
-    with open(lifecycle.KEPT_MATCHES, encoding="utf-8") as handle:
-        assert [row["match_id"] for row in json.load(handle)] == [gone]
+            _record(tools.Context(dsn=bare))
+        assert tools.Context(dsn=bare).call("list_matches").data["total"] == 0

@@ -20,7 +20,7 @@ import psycopg
 from psycopg.rows import TupleRow
 
 from db import KIND_WEAPON
-from db.data.names import name_key
+from db.data.normalizer import name_key
 from facts import counters
 from facts import kit_format as kit_format_module
 from facts.draft import EXPECTED_SHAPE, KIT_FORMAT

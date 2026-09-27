@@ -7,7 +7,6 @@ import pytest
 from psycopg.conninfo import make_conninfo
 from psycopg.sql import SQL, Identifier
 
-from db import psql
 from db.data.wiki.kits.measurements import CANONICAL_UNITS
 from db.psql import schema
 
@@ -252,7 +251,7 @@ def test_no_hero_has_two_abilities_that_fold_together(rows):
     # every rerun then routes stats to whichever row it finds first.
     from collections import Counter
 
-    from db.data.names import ability_key
+    from db.data.normalizer import ability_key
     folds = Counter((h, ability_key(a)) for h, a in rows(
         "select hero_id, name from abilities"))
     dupes = {k: v for k, v in folds.items() if v > 1}
@@ -319,7 +318,7 @@ def test_the_migration_chain_builds_an_empty_database(db, dsn):
             schema.apply(cx, schema.read_migrations())
             assert schema.pending(cx) == []
             assert schema.state(cx) == "unfilled"
-            assert psql.table_names(cx) == psql.table_names(db)
+            assert schema.table_names(cx) == schema.table_names(db)
     finally:
         with psycopg.connect(dsn, autocommit=True) as admin:
             admin.execute(SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(

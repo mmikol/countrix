@@ -11,16 +11,15 @@ keeps it current.
   that applies when that map is on the board, so a rule can matter on
   King's Row and whisper on Ilios. Stored in the database, not the files:
   a `map_tunings` table (map, strategy, weight, params, reason, stamped)
-  the `tune` tool writes when the call names a map, mirrored in the
-  strategies export; the catalog applies the map's set over the file's
-  defaults when the solver is built for that map (`catalog.weighted`
-  already layers a session's slider values the same way, so the map's set
-  is one more layer under the sliders); the playbook tab shows the map's
-  values when a map is chosen and the file's when none is, and the board
-  result names which set it was scored under. Cost: two days - a
-  migration, the tool's `map` argument, the layering, the tab, the facts
-  line that names the set - and a test that the same six scores
-  differently under two maps' sets.
+  the `tune` tool writes when the call names a map; the catalog applies
+  the map's set over the file's defaults when the solver is built for
+  that map (`catalog.weighted` already layers a session's slider values
+  the same way, so the map's set is one more layer under the sliders);
+  the playbook tab shows the map's values when a map is chosen and the
+  file's when none is, and the board result names which set it was
+  scored under. Cost: two days - a migration, the tool's `map` argument,
+  the layering, the tab, the facts line that names the set - and a test
+  that the same six scores differently under two maps' sets.
 - **What the healing figures leave out.** `Hero.hps` now sums every
   piece over the teammates it reaches and holds a beam to its resource
   (docs/inference.md, Sustained healing). Three limits stand: the bench
@@ -112,9 +111,9 @@ keeps it current.
   both run on a bare `orchestrator.py` when the caches are a day old, so
   Blizzard is asked at twice its pace and two DELETE-then-INSERT reloads
   can interleave. A `pg_try_advisory_lock` taken by `refresh_once` and
-  the door's pulls, `sync_all`, `db_rebuild`, `db_migrate`,
-  `load_authored` and `export_csv`, with the callers told to wait on it,
-  serialises every writer whichever process it runs in. Cost: half a day.
+  the door's pulls, `sync_all`, `db_rebuild`, `db_migrate` and
+  `load_authored`, with the callers told to wait on it, serialises every
+  writer whichever process it runs in. Cost: half a day.
 - **Patches daily.** `door/refresh.py`'s DAILY set pulls seasons and
   rates but not patches, so a day's snapshot is stamped with a patch list
   up to a week old and the board's patch-since-capture warning comes up to
@@ -182,6 +181,11 @@ few match-ups the wiki rates (the counters table is a list).
 
 ## Done
 
+- **Nothing is written to `db/raw`.** The CSV mirror and `export_csv`,
+  the door's audit log and the file that carried the recorded matches
+  across a rebuild are deleted. `db_rebuild` drops the matches with every
+  other table; the owner records none for now. The validation page is
+  written only where `--out` names, and a path inside the repo is refused.
 - **The stack is four containers.** The sentry is gone: its quarantine
   hid the failure the catalog makes loud, its patterns matched ordinary
   prose and missed real injections, and nothing read its flags; every
@@ -197,7 +201,7 @@ few match-ups the wiki rates (the counters table is a list).
   time and a sessions split with bootstrap intervals over sessions, ablate
   each strategy family, judge a playbook only from its digest's first map,
   and withhold the verdict below (5.6 / b)^2 decided maps. Pure Python;
-  the page is personal use, in `db/raw`.
+  the page is personal use, written only where `--out` names.
 - **The owner's matches are the second user input** - `match-level`
   branch. Migration 024 adds `matches` and `match_picks`, one row a map
   with both sixes, the bans, blue's side and blue's result, under the
@@ -205,8 +209,7 @@ few match-ups the wiki rates (the counters table is a list).
   checks a board and as only a played map can be, and stamps the
   playbook's digest; `list_matches` and `delete_match` read and fix the
   record; the board's record tab and the `/record` skill call it;
-  `facts/matches.py` reads it back as `Match` records; `db_rebuild` keeps
-  it across the drop.
+  `facts/matches.py` reads it back as `Match` records.
 - **The strategies are the one user input** - `data-only-inputs` branch.
   `seasons` and `synergies` are pulled from the wiki (`pull_seasons`,
   `pull_synergies`); `map_playstyle` and `comp_archetypes` are dropped

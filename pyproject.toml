@@ -4,7 +4,7 @@
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-extend-exclude = ["db/psql/cluster", "db/raw", ".cache-*"]
+extend-exclude = ["db/psql/cluster", ".cache-*"]
 
 [tool.ruff.lint]
 # pycodestyle, pyflakes, isort, bugbear, blind excepts, comprehensions,

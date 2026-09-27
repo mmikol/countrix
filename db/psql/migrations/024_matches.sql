@@ -3,7 +3,7 @@
 -- entered through the door's record_match - the board's record tab, the
 -- /record skill - never logged by the game. One row is one map. Nothing
 -- here is pulled: every row carries the `user` source, as the strategies
--- do, and db_rebuild keeps the rows across the drop.
+-- do. db_rebuild drops the rows with every other table.
 --
 -- 009 recorded the match that followed a recommendation and 014 dropped it;
 -- these tables record what was played, whatever the board said.

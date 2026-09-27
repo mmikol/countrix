@@ -7,7 +7,7 @@ name_key, and counts what it read. No database, no network."""
 
 import datetime
 
-from db.data import fetch
+from db.data import cache
 from db.data.wiki import Articles, heroes
 from db.data.wiki.kits import hero_articles
 from db.data.wiki.kits.hero_articles import HeroProfile, Supplement
@@ -31,7 +31,7 @@ def _subrole(params):
 
 
 def _pull(lines):
-    return fetch.PullContext(None, log=lines.append)
+    return cache.PullContext(None, log=lines.append)
 
 
 def test_an_announced_hero_is_stored_from_its_article_and_the_rest_are_reported():

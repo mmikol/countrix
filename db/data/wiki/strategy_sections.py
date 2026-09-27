@@ -70,7 +70,7 @@ import re
 from collections.abc import Mapping, Sequence
 from typing import NamedTuple
 
-from db.data.names import name_key
+from db.data.normalizer import name_key
 from db.data.wiki import markup
 from db.data.wiki.matchup_tables import SENTENCE_END_RE
 

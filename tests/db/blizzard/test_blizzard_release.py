@@ -7,7 +7,7 @@ import pytest
 from db import KIND_ABILITY, KIND_ULTIMATE, psql
 from db.data.blizzard import heroes as blizzard_heroes
 from db.data.blizzard.heroes import AbilityText, HeroCard, PerkText, Subrole
-from db.data.names import name_key, slug
+from db.data.normalizer import name_key, slug
 from db.data.wiki.kits import kit_store
 from db.data.wiki.kits.kit_rows import AbilityEntry, HeroKit, PerkEntry
 

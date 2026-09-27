@@ -27,7 +27,7 @@ the one the board shows) when it answers, else `countrix`.
    If the patch reworked a hero,
    `pull_synergies` with `refresh: true` (the hero articles refetched),
    then `pull_counters` with no refresh (the same articles' Match-Up
-   cells). Then `db_docs` and `export_csv`.
+   cells). Then `db_docs`.
 4. **Report**, in under ten lines: the patch now on record, the capture
    date now, each pull's summary line (rows, heroes, anything unknown),
    and whether the board's facts still warn. Never edit a file by hand.

@@ -30,12 +30,11 @@ db/
     blizzard/        overwatch.blizzard.com
     wiki/            overwatch.fandom.com
       kits/          the heroes pull's kit pipeline
-    fetch.py         the page cache, its freshness policy and the request loop
-    names.py         matching hero, map and ability names across sources
+    cache.py         the page cache, its freshness policy and the request loop
+    normalizer.py    matching hero, map and ability names across sources
   psql/              the database: where it is, the schema, the ledger
     migrations/      the schema as a sequence
     cluster/         the embedded Postgres a local build creates (gitignored)
-  raw/               one CSV per table, the mirror (exported, gitignored)
 ```
 
 ### What the layer shares
@@ -44,10 +43,10 @@ db/
 | --- | --- |
 | `__init__.py` | what the whole layer agrees on: the paths, the `sources` row (`Source`), `ROLES` in `role_id` order, the seeded ability kinds and perk tiers, the rates scope (console, controller, Americas), `Refusal`, the one error a caller can fix, `Log`, and `embed`, which rewrites a generated doc section |
 | `data/__init__.py` | `PullSummary`, what every pull's `run()` returns, and `ArticlePullSummary`, which adds the pages that would not fetch |
-| `data/fetch.py` | the page cache, its freshness and the one request loop: `cached_get`, `cached`, `request` under a `RequestPolicy`, and `PullContext`, what a pull's `run()` takes beside its connection |
-| `data/names.py` | one hero, map or ability across sources: `name_key`, `hero_key` through `RENAMED`, `slug`, `ability_key` and `index` |
+| `data/cache.py` | the page cache, its freshness and the one request loop: `cached_get`, `cached`, `request` under a `RequestPolicy`, and `PullContext`, what a pull's `run()` takes beside its connection |
+| `data/normalizer.py` | one hero, map or ability across sources: `name_key`, `hero_key` through `RENAMED`, `slug`, `ability_key` and `index` |
 | `web.py` | what the three HTTP servers share: the Host and Origin guard, the reply to a request that raised, and `read_json`, the one HTTP reader; its docstring holds the relay's status map |
-| `matches.py` | the one writer of `matches` and `match_picks`: `store` takes a match by id - the map's, each hero's - and `delete` removes one with its picks. The door's `record_match` and `delete_match` call it, and `db_rebuild`, which keeps the matches across its drop; `facts/matches.py` reads them back |
+| `matches.py` | the one writer of `matches` and `match_picks`: `store` takes a match by id - the map's, each hero's - and `delete` removes one with its picks. The door's `record_match` and `delete_match` call it; `facts/matches.py` reads them back |
 
 ### `data/` - one package per source
 
@@ -78,19 +77,12 @@ and each module's docstring says what it reads.
 | `migrations/` | The schema as a sequence, one file per step: `001` sources and the foundation, `002` heroes, `003` maps, `004` meta, `005` playbook, `006` inference, `007` the three layers, `008` the ledger, `009` and `014` the tables that recorded matches, added and dropped again, `010` constraints and heuristics (the `strategies` table), `011` and `012` the `matrix_reader` login the `query` tool connects as, with the dynamic-SQL functions withdrawn from `PUBLIC`, `013` the assumption kind, `015` announced heroes, `016` the playbook each `strategies` row was mirrored from, `017` that column's comment, `018` `map_playstyle` and `comp_archetypes` dropped, `seasons` and `synergies` pulled from the wiki, `019` `map_strategy` and the third source's rates, snapshots and `sources` row dropped, `counters` pulled from the wiki, `020` `map_terrain`, the terrain features each map's wiki article names, `021` `stage_terrain`, with every Hybrid map's two phases and an Escort map's named stretches stored as stages, `022` the `strategies.playbook` comment under the Countrix name, `023` the columns nothing read dropped - `raw_value` on the three stat tables, `patches.platform` and `url`, `subroles.icon_url`, `stat_keys.label` and `unit`, `roles.name`, `024` `matches` and `match_picks`, the owner's recorded games, one row a map with both sixes and the bans, under the `user` source, `025` the 6v6 kit beside the 5v5 one: `heroes.health_6v6`, `shield_6v6` and `armor_6v6`, and `kit_6v6`, each 6v6 line of a hero's article, `026` `counters.basis` and `evidence`: each counter edge marked with the part of the article it was read in, the Match-Up column or the Strategy section, a Strategy edge with its sentence. A statement in an applied migration is never edited; a change is a new file, and a populated database catches up with `db_migrate`. The `--` prose above each `CREATE TABLE` is the data dictionary's text, and is kept current. |
 | `cluster/` | the embedded Postgres `db_init` or `db_rebuild` creates through pgserver (gitignored); a reader starts it on first touch and never creates it. The compose stack runs its own Postgres, the `db` service, which the host reaches through `./docker-db` |
 
-### `raw/` - the mirror
-
-One CSV per table, exported by `export_csv` after every sync, plus
-`EXPORT.json` naming the database that exported it. Gitignored. The
-parity tests read it, and skip themselves when the mirror came from the
-other database.
-
 ## The order of a build
 
 `sync_all` runs the pulls in dependency order - `blizzard.heroes`,
 `wiki.heroes`, `wiki.maps`, `wiki.terrain`, `wiki.patches`, `wiki.seasons`,
 `blizzard.meta`, `wiki.playstyles`, `wiki.synergies`, `wiki.matchups` -
-then `load_authored`, then `export_csv`. Entity tables refresh in place;
+then `load_authored`. Entity tables refresh in place;
 each rates pull appends a dated snapshot, the series the trend facts
 difference. The page caches (`.cache-blizzard/`, `.cache-wiki/` at the
 repo root) make every build after the first cost almost no requests.
@@ -104,29 +96,25 @@ stateDiagram-v2
     stale --> current: db_migrate<br/>keeps the data
     empty --> current: db_rebuild
     unfilled --> current: db_rebuild
-    stale --> current: db_rebuild<br/>drops the rates history,<br/>keeps the recorded matches
+    stale --> current: db_rebuild<br/>drops the rates history<br/>and the recorded matches
     current --> current: the refresher - pull_seasons + pull_rates daily,<br/>sync_all weekly, entities upsert in place,<br/>rates APPEND a dated snapshot
 ```
 
 `db_rebuild` drops every table, reapplies the migrations and runs
 `sync_all`, whatever the state - unless the playbook does not load, which
-refuses it before anything is dropped. The owner's recorded matches are the one
-thing no source gives back, so it keeps them: they go to
-`db/raw/kept-matches.json` before the drop and come back by name once
-`sync_all` has refilled the roster, each under its own id. A rebuild that
-fails leaves the file for the next one, and a match whose map or hero the
-roster no longer names stays in it. Docker's `data` container asks
-`python -m db.psql.schema` for the state (`schema.state`), runs
-`db_rebuild` on anything but current, then serves the door; a refused
-rebuild ends the container, which restarts until the playbook loads.
-`db_status` and the door's `/health` report the same state, which the ui
-and refresher containers wait on.
+refuses it before anything is dropped. The owner's recorded matches go
+with the rest, the one thing no source gives back. Docker's `data`
+container asks `python -m db.psql.schema` for the state (`schema.state`),
+runs `db_rebuild` on anything but current, then serves the door; a
+refused rebuild ends the container, which restarts until the playbook
+loads. `db_status` and the door's `/health` report the same state, which
+the ui and refresher containers wait on.
 
 ## Keeping it fresh
 
 The `refresher` container runs the door's clock, `door/refresh.py`: once
 a day `pull_seasons` and `pull_rates` (a new dated snapshot), then the
-strategies mirror and `raw/`, or `sync_all` with refresh on in their place
+strategies mirror, or `sync_all` with refresh on in their place
 once the wiki cache is older than `COUNTRIX_REFRESH_FULL_DAYS`. A page
 that fails to refetch keeps its cached copy and is listed under `stale`;
 a rates pull that read one stamps no snapshot and replies

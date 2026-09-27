@@ -27,7 +27,7 @@ from tests.inference import FIXTURE_PLAYBOOK
 
 @pytest.fixture(scope="module")
 def ctx(db, dsn):
-    return tools.Context(dsn=dsn, client="test")
+    return tools.Context(dsn=dsn)
 
 
 @pytest.mark.invariant
@@ -114,7 +114,7 @@ def test_query_runs_as_the_reader_role(ctx):
 # None of these touches the database, so they run without one (as CI does).
 
 def test_query_refuses_file_and_server_reaching_sql_before_connecting():
-    nowhere = tools.Context(dsn="postgresql://nowhere", client="test")
+    nowhere = tools.Context(dsn="postgresql://nowhere")
     for sql in ("select pg_read_file('/etc/passwd')", "select * from pg_ls_dir('.')",
                 "COPY heroes TO PROGRAM 'id'", "select pg_sleep(10)"):
         with pytest.raises(Refusal, match=r"refuses|read-only"):
@@ -140,24 +140,23 @@ def test_only_db_init_and_db_rebuild_create_the_cluster(tmp_path, monkeypatch):
     for name, asked in (("db_init", "boot asked"), ("db_rebuild", "boot asked"),
                         ("db_status", "resolver asked"), ("db_migrate", "resolver asked")):
         with pytest.raises(psql.NoDatabaseError, match=asked):
-            tools.Context(client="test").call(name)
+            tools.Context().call(name)
     with pytest.raises(psycopg.OperationalError):
-        tools.Context(dsn="postgresql://nobody@127.0.0.1:9/nowhere", client="test").call("db_init")
+        tools.Context(dsn="postgresql://nobody@127.0.0.1:9/nowhere").call("db_init")
 
 
 def test_a_rebuild_refuses_a_playbook_that_does_not_load_before_it_drops_anything(
         tmp_path, monkeypatch):
     """sync_all mirrors the playbook after every pull, long after the drop, so
-    a rebuild checks it first: a broken playbook costs no table and strands
-    no recorded match in the kept file."""
+    a rebuild checks it first: a broken playbook costs no table."""
     monkeypatch.setenv("COUNTRIX_STRATEGIES", str(tmp_path))      # no strategies at all
     monkeypatch.setattr(psql, "boot", lambda: pytest.fail("the database was reached"))
     with pytest.raises(Refusal, match="nothing was dropped: the playbook does not load"):
-        tools.Context(client="test").call("db_rebuild")
+        tools.Context().call("db_rebuild")
 
 
 def test_metrics_tool_serves_the_vocabulary():
-    text, data = tools.Context(dsn="postgresql://nowhere", client="test").call("metrics")
+    text, data = tools.Context(dsn="postgresql://nowhere").call("metrics")
     assert "team.coverage_share" in data["metrics"] and "team.coverage_share" in data["numeric"]
     assert "map.side" in data["text"] and "map.side" not in data["numeric"]
     assert set(data["text"]) <= set(data["metrics"])
@@ -165,7 +164,7 @@ def test_metrics_tool_serves_the_vocabulary():
 
 
 def test_derive_strategies_is_idle_with_nothing_pending():
-    text, data = tools.Context(dsn="postgresql://nowhere", client="test").call("derive_strategies")
+    text, data = tools.Context(dsn="postgresql://nowhere").call("derive_strategies")
     assert data["skipped"] == "nothing pending" and "nothing pending" in text
     assert data["deferred"] == 0
 
@@ -184,7 +183,7 @@ def test_every_playbook_write_mirrors_the_catalog_once(tmp_path, monkeypatch):
     class Offline(tools.Context):
         def connect(self):
             return contextlib.nullcontext("cx")
-    ctx = Offline(dsn="postgresql://nowhere", client="test")
+    ctx = Offline(dsn="postgresql://nowhere")
     heuristic = next(h for h in catalog.load() if h.kind == "heuristic")
     files = len(catalog.strategy_files(str(tmp_path)))
     ctx.call("tune", id=heuristic.id, field="weight", value=3, reason="a test")
@@ -215,7 +214,7 @@ def test_add_strategy_stores_a_soft_limit_with_a_numeric_penalty(tmp_path, monke
     class Offline(tools.Context):
         def connect(self):
             return contextlib.nullcontext("cx")
-    _, added = Offline(dsn="postgresql://nowhere", client="test").call(
+    _, added = Offline(dsn="postgresql://nowhere").call(
         "add_strategy", id="tank-cap", name="Tank cap", kind="constraint",
         body="At most two tanks.", reason="a test", require="team.tanks <= 2", soft=True,
         penalty=2, category="shape", by="a headless agent")
@@ -228,7 +227,7 @@ def test_the_tuning_log_tool_refuses_fewer_than_one_line(tmp_path, monkeypatch):
     for name in catalog.strategy_files(FIXTURE_PLAYBOOK):
         shutil.copy(os.path.join(FIXTURE_PLAYBOOK, name), tmp_path / name)
     monkeypatch.setenv("COUNTRIX_STRATEGIES", str(tmp_path))
-    ctx = tools.Context(dsn="postgresql://nowhere", client="test")
+    ctx = tools.Context(dsn="postgresql://nowhere")
     for lines in (0, -3):
         with pytest.raises(Refusal, match="lines is 1 or more"):
             ctx.call("tuning_log", lines=lines)
@@ -253,7 +252,7 @@ def test_a_board_tool_hands_its_function_one_draft(tmp_path, monkeypatch):
             return contextlib.nullcontext("cx")
     monkeypatch.setattr(tables, "load", lambda cx: None)
     monkeypatch.setattr(board_facts, "generate", lambda world, draft: seen.append(draft) or Stub())
-    Offline(dsn="postgresql://nowhere", client="test").call(
+    Offline(dsn="postgresql://nowhere").call(
         "facts", map="Ilios", red=["Ana"], bans=["Mei"])
     assert seen == [Draft("Ilios", ("Ana",), (), ("Mei",), "")]
     for name in ("facts", "infer", "evaluate", "board"):

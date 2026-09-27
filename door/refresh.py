@@ -10,16 +10,15 @@ date on a schedule.
 
 A refresh comes in two sizes. The DAILY one refetches what moves day to
 day - the wiki's seasons (a snapshot is stamped with the season live that
-day) and the rates - then re-mirrors the strategies and re-exports db/raw.
-The FULL one is `sync_all` with refresh on: every page of every source,
-including the hero pages and the wiki articles (kits, synergies, counters)
-that only change with a patch; it runs when
-the wiki cache is older than COUNTRIX_REFRESH_FULL_DAYS (7). Either
-way a page that fails keeps its cached copy, so a flaky source degrades
-to yesterday's numbers rather than an empty table, and the pull's reply
-lists it under stale: its first line, which the log keeps, ends with the
-count, and sync_all's with the pulls that read one. The `refresher`
-container runs this loop.
+day) and the rates - then re-mirrors the strategies. The FULL one is
+`sync_all` with refresh on: every page of every source, including the hero
+pages and the wiki articles (kits, synergies, counters) that only change
+with a patch; it runs when the wiki cache is older than
+COUNTRIX_REFRESH_FULL_DAYS (7). Either way a page that fails keeps its
+cached copy, so a flaky source degrades to yesterday's numbers rather than
+an empty table, and the pull's reply lists it under stale: its first line,
+which the log keeps, ends with the count, and sync_all's with the pulls
+that read one. The `refresher` container runs this loop.
 """
 
 import argparse
@@ -119,9 +118,9 @@ class Refreshed(NamedTuple):
 def refresh_once(
         ctx: tools.Context, log: tools.Log = print, full: bool | None = None,
         full_days: float = DEFAULT_FULL_DAYS) -> Refreshed:
-    """One refresh -> (ok, text): daily (seasons, rates, strategies, export)
-    or full (every source) - decided by full_due() unless `full` is given -
-    its text each tool's headline, joined by "; ". Never raises; a failure
+    """One refresh -> (ok, text): daily (seasons, rates, strategies) or full
+    (every source) - decided by full_due() unless `full` is given - its
+    text each tool's headline, joined by "; ". Never raises; a failure
     returns (False, the error)."""
     started = time.time()
     try:
@@ -135,7 +134,7 @@ def refresh_once(
             calls: list[tuple[str, dict[str, object]]] = [("sync_all", {"refresh": True})]
         else:
             calls = [(name, {"refresh": True}) for name in DAILY]
-            calls += [("load_authored", {}), ("export_csv", {})]
+            calls.append(("load_authored", {}))
         text = "; ".join(ctx.call(name, **arguments).text.partition("\n")[0]
                          for name, arguments in calls)
     except Exception as error:  # noqa: BLE001  # a failed refresh leaves yesterday's data in place
@@ -183,7 +182,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     # the full-refresh age has no flag: nothing passes one, and compose sets it
     full_days = float(os.environ.get("COUNTRIX_REFRESH_FULL_DAYS", DEFAULT_FULL_DAYS))
-    ctx = tools.Context(log=print, client="refresher")  # DATABASE_URL, or the embedded cluster
+    ctx = tools.Context(log=print)      # DATABASE_URL, or the embedded cluster
     if args.once:
         ok, _ = refresh_once(ctx, full=args.full or None, full_days=full_days)
         return 0 if ok else 1

@@ -19,13 +19,13 @@ from bs4 import BeautifulSoup, Tag
 from psycopg.sql import SQL
 
 from db import PERK_TIERS, ROLES, psql
-from db.data import ArticlePullSummary, fetch
+from db.data import ArticlePullSummary, cache
 from db.data.blizzard import BLIZZARD, HEROES_URL, BlizzardError, attr
-from db.data.fetch import cache_key, cached_get
+from db.data.cache import cache_key, cached_get
 
 # One host serves every page. A keep-alive socket it drops fails one request,
 # and a retry on a fresh connection saves the pull.
-PAGE_POLICY = fetch.RequestPolicy(attempts=3)
+PAGE_POLICY = cache.RequestPolicy(attempts=3)
 
 # --- extract: markup -> Python ---------------------------------------------
 
@@ -332,7 +332,7 @@ class HeroesSummary(ArticlePullSummary):
     portraits: int
 
 
-def run(connection: psycopg.Connection, pull: fetch.PullContext) -> HeroesSummary:
+def run(connection: psycopg.Connection, pull: cache.PullContext) -> HeroesSummary:
     """Store the roster and every hero page's ability and perk text, in one
     transaction -> the heroes, subroles, abilities, perks and portraits, and
     the hero pages that would not fetch (missing): those heroes are stored
@@ -354,7 +354,7 @@ def run(connection: psycopg.Connection, pull: fetch.PullContext) -> HeroesSummar
         try:
             page = cached_get(pull, "%s%s/" % (HEROES_URL, slug), cache_key(slug),
                               policy=PAGE_POLICY)
-        except fetch.FetchError as error:
+        except cache.FetchError as error:
             # the hero is still stored from the roster; its text stays as it was
             missing.append("%s: %s" % (hero.name, error))
             pull.log("  [%2d/%d] %-18s %s" % (index, len(heroes), hero.name, error))

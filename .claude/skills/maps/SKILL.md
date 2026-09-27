@@ -29,7 +29,7 @@ Bring the map pool up to date. Work through the
    rotation, or `pull_rates` has not run since it joined) is styled by its
    terrain alone; a map with neither rates nor terrain text has no style.
    If the hero tags look stale, `pull_playstyles` with `refresh: true`.
-5. Then `db_docs` and `export_csv`.
+5. Then `db_docs`.
 6. **Report**, in under ten lines: maps added or changed, stages, each new
    map's rewarded style and whether it has rates yet, and the capture date
    now. Never edit a file by hand.

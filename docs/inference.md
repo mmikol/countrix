@@ -373,9 +373,9 @@ heroes alone do not? `rescore.py` picks the maps and runs them through the
 engine, `predict.py` holds the models, the splits and their scores,
 `fit.py` the statistics under them, and `report.py` the answer as JSON and
 as text. It runs as the `validate_playbook` tool, or as
-`.venv/bin/python -m ui.validation`, which prints the same text and
-writes a page of charts and its JSON to `db/raw/validation.html`. Nothing
-it runs writes to the database or the playbook.
+`.venv/bin/python -m ui.validation`, which prints the same text and, with
+`--out`, writes a page of charts and its JSON there. Nothing it runs
+writes to the database or the playbook.
 
 **The rescore.** Each map goes through `evaluate` from both seats: blue's
 six against red's on blue's side, red's against blue's on the other
@@ -473,8 +473,9 @@ the sample for.
   after.
 
 The page and the JSON carry figures derived from Blizzard's rates (M2,
-each map's win difference). They are the owner's alone: `db/raw` is
-gitignored, and nothing public shows them.
+each map's win difference). They are the owner's alone: they are written
+only where `--out` names, never inside the repo, and nothing public shows
+them.
 
 ## The catalog
 
@@ -483,7 +484,6 @@ gitignored, and nothing public shows them.
 
 #### Constraints
 
-##### Heal at the other side's rate (`heal-rate`, sustain, scored)
 ##### Never more than three supports (`at-most-three-supports`, shape, limit)
 
 `require team.supports <= params.MAX_SUPPORTS` (hard)
@@ -491,6 +491,7 @@ params: MAX_SUPPORTS=3
 
 A six fields at most three supports, on every board. Open Queue sets no cap on supports, so this rule sets one: a six with a fourth support is never chosen. Measured as the six's support count.
 
+##### Heal at the other side's rate (`heal-rate`, sustain, scored)
 
 weight 2; penalty `matchup.heal_shortfall`
 

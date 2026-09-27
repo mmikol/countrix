@@ -18,7 +18,7 @@ from typing import NamedTuple
 
 import psycopg
 
-from db.data.fetch import PullContext
+from db.data.cache import PullContext
 from db.data.wiki import Articles, fetch_articles, markup
 
 SECTION_RE = re.compile(r"^==(?!=)[^=\n]*synergy[^=\n]*==[ \t]*$", re.M | re.I)

@@ -8,7 +8,7 @@ import os
 import pytest
 
 from db import CACHE_DIRS
-from db.data.fetch import PullContext
+from db.data.cache import PullContext
 from db.data.wiki import maps, terrain
 
 needs_cache = pytest.mark.skipif(

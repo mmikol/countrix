@@ -5,9 +5,8 @@ http.py a POST each.
 A Server speaks the parts a tool host needs: `initialize`, `ping`,
 `tools/list`, `tools/call`, `resources/list`, `resources/read`,
 `resources/templates/list` and an empty `prompts/list`. A tools/call is
-checked against the tool's schema (schema.Tool) and audited (audit.py).
-Logs go to stderr unless the server is told otherwise - over stdio, stdout
-is the wire.
+checked against the tool's schema (schema.Tool). Logs go to stderr unless
+the server is told otherwise - over stdio, stdout is the wire.
 """
 
 import traceback
@@ -15,7 +14,6 @@ from collections.abc import Callable, Iterable, Mapping
 from typing import NotRequired, Protocol, TypedDict
 
 from db import Log, Refusal, to_stderr
-from door.mcp.audit import Transport, audited
 from door.mcp.schema import Tool
 
 PROTOCOL_VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")
@@ -118,26 +116,23 @@ type Method = Callable[[Message], Mapping[str, object]]
 
 class Server:
     """The protocol over any transport: its tools by name, the resources it
-    serves, where it logs (stderr unless told), the transport its audit lines
-    name - stdio until an HttpServer serves it - and the audit log's path."""
+    serves, and where it logs (stderr unless told)."""
 
     def __init__(
             self, tools: Iterable[Tool], resources: Resources | None = None, *,
-            log: Log | None = None, audit_path: str | None = None) -> None:
+            log: Log | None = None) -> None:
         self.tools = {t.name: t for t in tools}
         self.resources = resources
         self.log: Log = log or to_stderr
-        self.transport: Transport = "stdio"
-        self.audit_path = audit_path
 
-    def handle(self, message: object, client: str) -> Response | None:
-        """One decoded message from `client` (as the audit line names the
-        caller) -> a response, or None for a notification. A message that is
-        not an object or names no string method is INVALID_REQUEST, and a
-        request the wire cannot serve - its params not an object, a field
-        missing or of the wrong type - INVALID_PARAMS; anything else that
-        escapes a method is the server's fault, INTERNAL with its type and
-        message, and its traceback goes to the log, never to the caller."""
+    def handle(self, message: object) -> Response | None:
+        """One decoded message -> a response, or None for a notification. A
+        message that is not an object or names no string method is
+        INVALID_REQUEST, and a request the wire cannot serve - its params not
+        an object, a field missing or of the wrong type - INVALID_PARAMS;
+        anything else that escapes a method is the server's fault, INTERNAL
+        with its type and message, and its traceback goes to the log, never
+        to the caller."""
         if not isinstance(message, dict):
             return error_response(None, INVALID_REQUEST, "expected an object")
         msg_id: object = message.get("id")
@@ -150,7 +145,7 @@ class Server:
         try:
             if method.startswith("notifications/"):
                 return None                # a notification gets no response
-            handler = self._methods(client).get(method)
+            handler = self._methods().get(method)
             if handler is None:
                 return error_response(msg_id, METHOD_NOT_FOUND, "unknown method %r" % method)
             if not isinstance(params, dict):
@@ -162,13 +157,13 @@ class Server:
             self.log(traceback.format_exc())
             return error_response(msg_id, INTERNAL, "%s: %s" % (type(error).__name__, error))
 
-    def _methods(self, client: str) -> dict[str, Method]:
-        """The methods this server answers, a tools/call audited as `client`'s."""
+    def _methods(self) -> dict[str, Method]:
+        """The methods this server answers."""
         return {
             "initialize": self._initialize,
             "ping": lambda p: {},
             "tools/list": self._tools_list,
-            "tools/call": lambda p: self._tools_call(p, client),
+            "tools/call": self._tools_call,
             "resources/list": self._resources_list,
             "resources/read": self._resources_read,
             "resources/templates/list": lambda p: {"resourceTemplates": []},
@@ -200,7 +195,7 @@ class Server:
     def _tools_list(self, params: Message) -> Message:
         return {"tools": [t.describe() for t in self.tools.values()]}
 
-    def _tools_call(self, params: Message, client: str) -> ToolResult:
+    def _tools_call(self, params: Message) -> ToolResult:
         if "name" not in params:
             raise InvalidParamsError("missing parameter 'name'")
         name = params["name"]
@@ -211,8 +206,7 @@ class Server:
         if not isinstance(arguments, dict):
             raise InvalidParamsError("arguments must be an object")
         try:
-            text, structured = audited(tool.name, arguments, lambda: tool(arguments),
-                                       self.transport, client, self.audit_path)
+            text, structured = tool(arguments)
         except Refusal as refused:
             return ToolResult(content=[TextContent(type="text", text=str(refused))],
                               isError=True)

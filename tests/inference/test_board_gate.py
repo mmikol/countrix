@@ -4,8 +4,8 @@ the engine's three entry points is refused with the same message on each.
 The page's board is not listed: in-process it opens a connection and hands
 the query to serve.handle_board, which is a door here, and on the service
 it is that handler again. The synthetic World stands in for the database
-and the reference playbook for the live one, every tool call is audited to
-a scratch file, and every board solves in this process."""
+and the reference playbook for the live one, and every board solves in
+this process."""
 
 import contextlib
 
@@ -45,16 +45,15 @@ class Offline(tools.Context):
 
 
 @pytest.fixture()
-def doors(synthetic_world, monkeypatch, tmp_path):
+def doors(synthetic_world, monkeypatch):
     """Each door by name, as a call that takes a board: red, blue and bans as
     tuples, one dict for Draft(**board), ctx.call(name, **board) and the HTTP
     doors' parsed query."""
     monkeypatch.setattr(tables, "load", lambda cx: synthetic_world)
     # board() asks the pool for its workers before _board_once refuses
     monkeypatch.setenv("COUNTRIX_PARALLEL", "0")
-    monkeypatch.setenv("COUNTRIX_AUDIT", str(tmp_path / "audit.jsonl"))
     monkeypatch.setenv("COUNTRIX_STRATEGIES", FIXTURE_PLAYBOOK)
-    ctx = Offline(dsn="postgresql://nowhere", client="test")
+    ctx = Offline(dsn="postgresql://nowhere")
 
     def query(board):
         return {key: list(value) for key, value in board.items()}

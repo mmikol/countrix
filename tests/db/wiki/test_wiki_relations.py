@@ -9,8 +9,8 @@ from datetime import date
 import pytest
 
 from db import CACHE_DIRS
-from db.data.fetch import PullContext
-from db.data.names import name_key
+from db.data.cache import PullContext
+from db.data.normalizer import name_key
 from db.data.wiki import WikiError, seasons, synergies
 
 needs_cache = pytest.mark.skipif(

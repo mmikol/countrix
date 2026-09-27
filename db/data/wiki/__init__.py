@@ -38,7 +38,7 @@ The readers the loaders share, no run():
 
 The article HTML sits behind a bot challenge; the only open path is the
 MediaWiki endpoint below, which returns JSON (Cargo) and raw wikitext and
-rate-limits. This module is that client, run on db.data.fetch's request
+rate-limits. This module is that client, run on db.data.cache's request
 loop and page cache at the pace of its two policies (CARGO_POLICY,
 ARTICLE_POLICY), and the `sources` row its pages become.
 fetch_articles is how a pull reads one article per entity: an article that
@@ -52,7 +52,7 @@ from typing import NamedTuple
 import requests
 
 from db import Source
-from db.data.fetch import (
+from db.data.cache import (
     FetchError,
     PullContext,
     RateLimitError,

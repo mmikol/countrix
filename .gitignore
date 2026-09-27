@@ -15,8 +15,7 @@ __pycache__/
 .cache-wiki/
 /db/psql/cluster/
 
-# the CSV mirror (scraped text and rates) and any stray export
-db/raw/
+# any table copied out as CSV: it holds the rates
 *.csv
 
 # scratch: a throwaway script at the root is never part of the project, and

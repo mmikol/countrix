@@ -18,8 +18,7 @@ from door.mcp.server import Server
 def _status(ctx: tools.Context) -> Callable[[], dict[str, object]]:
     """The data container's /health: the database's state and counts, or
     degraded with the reason when the database is out of reach. It reads
-    the database directly, not through the door - a read writes nothing -
-    so a healthcheck leaves no audit line."""
+    the database directly, not through the door: a read writes nothing."""
     def status() -> dict[str, object]:
         try:
             found = lifecycle.read_status(ctx)
@@ -70,7 +69,7 @@ def _http_command_line(argv: list[str]) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
-    ctx = tools.Context(client="shell")
+    ctx = tools.Context()
     server = Server(tools.REGISTRY.bind(ctx), tools.StrategyResources())
     if not argv:
         stdio.serve(server)

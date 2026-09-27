@@ -10,7 +10,7 @@ import re
 import requests
 
 import db
-from db.data import fetch
+from db.data import cache
 from db.data.wiki.kits.hero_articles import (
     Announcement,
     parse_announcement,
@@ -115,7 +115,7 @@ def test_an_unfetchable_hero_page_is_reported_rather_than_read_as_empty(tmp_path
     (tmp_path / "Mizuki.wikitext").write_text(KIT_ARTICLE, encoding="utf-8")
     by_hero = {"Mizuki": kit("Healing Kasa"), "Freja": kit("Quick Dash")}
     added = supplement_kits(
-        fetch.PullContext(str(tmp_path), session=Down(), log=lambda line: None), by_hero)
+        cache.PullContext(str(tmp_path), session=Down(), log=lambda line: None), by_hero)
     [line] = added.articles.missing
     assert line.startswith("Freja: ") and "the wiki is unreachable" in line
     assert added.articles.found == {"Mizuki": KIT_ARTICLE}      # the pull reads no article again

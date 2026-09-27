@@ -19,7 +19,7 @@ import psycopg
 from psycopg.sql import SQL
 
 from db import KIND_WEAPON, PERK_TIERS, psql
-from db.data.names import ability_key, name_key
+from db.data.normalizer import ability_key, name_key
 from db.data.wiki.kits import modifiers
 from db.data.wiki.kits.hero_articles import HeroProfile
 from db.data.wiki.kits.kit_rows import AbilityEntry, HeroKit, PerkEntry, WeaponEntry

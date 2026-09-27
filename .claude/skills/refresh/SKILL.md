@@ -53,9 +53,9 @@ is left half-done: a step that fails is reported, not hidden.
    no board seats is reported, not fixed here. Do not add strategies
    here - that is the user's `/strategy`.
 5. **Regenerate and mirror.** `db_docs` (the catalog in
-   docs/inference.md, the ERD and data dictionary), then `export_csv`.
-   `load_authored` if anything in step 3 or 4 changed, so the
-   `strategies` table matches the files.
+   docs/inference.md, the ERD and data dictionary), then `load_authored`
+   if anything in step 3 or 4 changed, so the `strategies` table matches
+   the files.
 6. **Report**, in under fifteen lines: the capture date now, what was
    refetched, drafts completed (ids and forms), weights moved (id, old,
    new, reason), anything skipped and why, and that the board is ready at

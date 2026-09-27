@@ -17,7 +17,7 @@ from typing import TypedDict
 
 import psycopg
 
-from db.data import PullSummary, fetch
+from db.data import PullSummary, cache
 from db.data.blizzard import BLIZZARD
 from db.data.blizzard import heroes as blizzard_heroes
 from db.data.blizzard import meta as blizzard_meta
@@ -35,7 +35,7 @@ from door.mcp.schema import ToolReply
 from inference import catalog, derive
 
 # A pull's own function: the source module's run(connection, pull).
-type PullFn = Callable[[psycopg.Connection, fetch.PullContext], PullSummary]
+type PullFn = Callable[[psycopg.Connection, cache.PullContext], PullSummary]
 
 
 def _summary(name: str, stored: str, summary: PullSummary) -> ToolReply:
@@ -88,9 +88,9 @@ def _pull(ctx: Context, source: str, fn: PullFn, refresh: bool) -> PullSummary:
     # refresh: every page cached before the refresh began is fetched again -
     # before sync_all's start under it (ctx.cutoff), else before this pull's
     # - and a page written since is read. The cached copy survives a failed
-    # fetch and is listed (see fetch.cached)
+    # fetch and is listed (see cache.cached)
     cutoff = (time.time() if ctx.cutoff is None else ctx.cutoff) if refresh else None
-    pull = fetch.PullContext(ctx.cache(source), log=ctx.log, cutoff=cutoff)
+    pull = cache.PullContext(ctx.cache(source), log=ctx.log, cutoff=cutoff)
     with ctx.connect() as cx:
         summary = fn(cx, pull)
     summary["stale"] = pull.stale
@@ -128,7 +128,7 @@ def pull_tool(
     "pull_heroes", "Blizzard's roster: heroes, roles, subroles, portraits,"
     " ability and perk text. Run first - everything links to heroes.",
     source="blizzard", stored="roster stored")
-def pull_heroes(connection: psycopg.Connection, pull: fetch.PullContext) -> PullSummary:
+def pull_heroes(connection: psycopg.Connection, pull: cache.PullContext) -> PullSummary:
     return blizzard_heroes.run(connection, pull)
 
 
@@ -139,7 +139,7 @@ def pull_heroes(connection: psycopg.Connection, pull: fetch.PullContext) -> Pull
     " article's 6v6 pools and 6v6_details lines, a malformed value rejected."
     " Run after pull_heroes.",
     source="wiki", stored="kit numbers stored")
-def pull_kits(connection: psycopg.Connection, pull: fetch.PullContext) -> PullSummary:
+def pull_kits(connection: psycopg.Connection, pull: cache.PullContext) -> PullSummary:
     return wiki_heroes.run(connection, pull)
 
 
@@ -149,7 +149,7 @@ def pull_kits(connection: psycopg.Connection, pull: fetch.PullContext) -> PullSu
     " map's five points, a Hybrid map's two phases, an Escort map's stretches"
     " where its article names them. Push maps have none.",
     source="wiki", stored="map pool stored")
-def pull_maps(connection: psycopg.Connection, pull: fetch.PullContext) -> PullSummary:
+def pull_maps(connection: psycopg.Connection, pull: cache.PullContext) -> PullSummary:
     return wiki_maps.run(connection, pull)
 
 
@@ -160,14 +160,14 @@ def pull_maps(connection: psycopg.Connection, pull: fetch.PullContext) -> PullSu
     " same per stage, where the article has text about the stage. Reloads"
     " map_terrain and stage_terrain whole. Run after pull_maps: a stage must"
     " exist before its terrain.", source="wiki", stored="terrain stored")
-def pull_terrain(connection: psycopg.Connection, pull: fetch.PullContext) -> PullSummary:
+def pull_terrain(connection: psycopg.Connection, pull: cache.PullContext) -> PullSummary:
     return wiki_terrain.run(connection, pull)
 
 
 @pull_tool(
     "pull_patches", "The wiki's patch list, so every rates snapshot can say"
     " which game version it measured.", source="wiki", stored="patches stored")
-def pull_patches(connection: psycopg.Connection, pull: fetch.PullContext) -> PullSummary:
+def pull_patches(connection: psycopg.Connection, pull: cache.PullContext) -> PullSummary:
     return wiki_patches.run(connection, pull)
 
 
@@ -175,7 +175,7 @@ def pull_patches(connection: psycopg.Connection, pull: fetch.PullContext) -> Pul
     "pull_seasons", "The wiki's Season pages: every season that has started,"
     " with its start date. Restamps every rates snapshot with its season. Run"
     " before pull_rates.", source="wiki", stored="seasons stored")
-def pull_seasons(connection: psycopg.Connection, pull: fetch.PullContext) -> PullSummary:
+def pull_seasons(connection: psycopg.Connection, pull: cache.PullContext) -> PullSummary:
     return wiki_seasons.run(connection, pull)
 
 
@@ -184,14 +184,14 @@ def pull_seasons(connection: psycopg.Connection, pull: fetch.PullContext) -> Pul
     " by rank tier and by map (Competitive Role Queue - the page offers no"
     " Open Queue - console, Americas). Slow when uncached: ~40 pages, 5s apart.",
     source="blizzard", stored="snapshot stored")
-def pull_rates(connection: psycopg.Connection, pull: fetch.PullContext) -> PullSummary:
+def pull_rates(connection: psycopg.Connection, pull: cache.PullContext) -> PullSummary:
     return blizzard_meta.run(connection, pull)
 
 
 @pull_tool(
     "pull_playstyles", "The wiki's team-composition page: which playstyle"
     " (dive, brawl, poke) each hero belongs to.", source="wiki", stored="styles stored")
-def pull_playstyles(connection: psycopg.Connection, pull: fetch.PullContext) -> PullSummary:
+def pull_playstyles(connection: psycopg.Connection, pull: cache.PullContext) -> PullSummary:
     return wiki_playstyles.run(connection, pull)
 
 
@@ -202,7 +202,7 @@ def pull_playstyles(connection: psycopg.Connection, pull: fetch.PullContext) -> 
     " as the note. Placeholders, cells rated below GOOD and MIRROR are"
     " dropped. Run after pull_heroes.",
     source="wiki", stored="pairs stored")
-def pull_synergies(connection: psycopg.Connection, pull: fetch.PullContext) -> PullSummary:
+def pull_synergies(connection: psycopg.Connection, pull: cache.PullContext) -> PullSummary:
     return wiki_synergies.run(connection, pull)
 
 
@@ -213,7 +213,7 @@ def pull_synergies(connection: psycopg.Connection, pull: fetch.PullContext) -> P
     " sentence that names a counter and says which way it runs stored as an"
     " edge of its own basis with the sentence as its evidence. Reloads the"
     " table whole. Run after pull_heroes.", source="wiki", stored="counters stored")
-def pull_counters(connection: psycopg.Connection, pull: fetch.PullContext) -> PullSummary:
+def pull_counters(connection: psycopg.Connection, pull: cache.PullContext) -> PullSummary:
     return wiki_matchups.run(connection, pull)
 
 
@@ -242,8 +242,8 @@ def load_authored(ctx: Context) -> ToolReply:
 
 @tool(
     "sync_all", "Every pull_* tool in dependency order, then the strategies"
-    " mirror, then the CSV mirror. On a populated database this is an"
-    " update: entities refresh in place, rates append a snapshot.", REFRESH)
+    " mirror. On a populated database this is an update: entities refresh in"
+    " place, rates append a snapshot.", REFRESH)
 def sync_all(ctx: Context, refresh: bool = False) -> ToolReply:
     results: dict[str, Mapping[str, object]] = {}
     pulls = ctx.tools.pulls()
@@ -256,9 +256,8 @@ def sync_all(ctx: Context, refresh: bool = False) -> ToolReply:
         results[spec.name] = run.call(spec.name, refresh=refresh).data
     ctx.log("=== load_authored ===")
     results["load_authored"] = ctx.call("load_authored").data
-    results["export_csv"] = ctx.call("export_csv").data
     stale = [spec.name for spec in pulls if results[spec.name].get("stale")]
-    text = "sync_all: %d pulls + strategies mirror + export done" % len(pulls)
+    text = "sync_all: %d pulls + strategies mirror done" % len(pulls)
     if stale:
         text += "; stale: %s" % ", ".join(stale)
     return ToolReply(text, results)

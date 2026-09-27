@@ -5,15 +5,14 @@ call lands in.
                      schema.ToolSchema), function and family, and for a pull
                      the source whose cache it reads
     Registry         tools family by family, each name once: bind() hands a
-                     server its Tools, run() is the audited in-process call,
+                     server its Tools, run() is the in-process call,
                      write_docs() the tool reference in docs/mcp.md
     FAMILIES         the family modules, in the order the registry lists them
     REGISTRY, tool   the one registry, and the decorator a family declares
                      each of its tools with
     Context          where a call lands: the database, the page caches, the
-                     log, the caller the audit line names (board, refresher,
-                     shell, nested:<tool>), a refresh's cutoff, and the
-                     registry one tool calls another through (call)
+                     log, a refresh's cutoff, and the registry one tool calls
+                     another through (call)
     REFRESH          the refresh argument of every pull and of the rebuild
 
 A family module - pulls, lifecycle, facts, solver, playbook, matches -
@@ -37,7 +36,6 @@ from typing import ClassVar, Self
 import psycopg
 
 from db import CACHE_DIRS, ROOT, Log, embed, psql, to_stderr
-from door.mcp.audit import audited
 from door.mcp.schema import (
     Properties,
     Property,
@@ -149,15 +147,13 @@ class Registry:
 
     def run(self, ctx: "Context", name: str, /, **arguments: object) -> ToolReply:
         """Call a tool by name, in-process - the refresher's, the shell's, the
-        board's and one tool's call of another - audited under the caller
-        ctx.client names. The call is validated against the tool's schema,
-        like a call through either door: a call the schema refuses is a
-        Refusal, and a name no tool has is a NoSuchToolError, which reaches no
-        tool and leaves no audit line. The name is positional only, so a tool
+        board's and one tool's call of another. The call is validated against
+        the tool's schema, like a call through either door: a call the schema
+        refuses is a Refusal, and a name no tool has is a NoSuchToolError,
+        which reaches no tool. The name is positional only, so a tool
         argument called `name` (add_strategy has one) reaches the tool
         instead of colliding here."""
-        tool = _bind(ctx, self.get(name))
-        return audited(name, arguments, lambda: tool(arguments), "in-process", ctx.client)
+        return _bind(ctx, self.get(name))(arguments)
 
     def write_docs(self, path: str | None = None) -> str:
         """The tool reference - every tool, its description and its arguments -
@@ -179,11 +175,9 @@ class Registry:
 
 def _bind(ctx: "Context", spec: ToolSpec) -> Tool:
     """One tool bound to a context: the wrapper that checks every call
-    against the tool's schema, over the function with a copy of ctx named
-    after the tool filled in - so a call the tool makes to another is
-    audited as nested:<tool>, whichever door the outer call came through."""
-    return Tool(spec.name, spec.description, spec.schema,
-                functools.partial(spec.fn, ctx.nested(spec.name)))
+    against the tool's schema, over the function with ctx filled in, so a
+    call the tool makes to another lands in the same context."""
+    return Tool(spec.name, spec.description, spec.schema, functools.partial(spec.fn, ctx))
 
 
 def _escaped(text: str) -> str:
@@ -208,40 +202,23 @@ tool = REGISTRY.tool
 
 
 class Context:
-    """Where a tool call lands: the database, the page caches, the log, the
-    caller its in-process calls are audited as, and the registry of every
-    tool, which one tool reaches another through. It is whole once tools.py
-    has imported every family.
+    """Where a tool call lands: the database, the page caches, the log, and
+    the registry of every tool, which one tool reaches another through. It
+    is whole once tools.py has imported every family.
 
     cutoff is the moment a refresh began, which the pulls called through
     the context share (refreshing); None, and a pull that refreshes takes
-    the moment it starts.
-
-    The client is required, so no in-process call is anonymous: 'board',
-    'refresher' or 'shell' where one is built, and 'nested:<tool>' on the
-    copy a tool is handed (nested), whichever door the tool's own call came
-    through."""
+    the moment it starts."""
 
     tools: ClassVar[Registry] = REGISTRY
 
     def __init__(
             self, dsn: str | None = None, caches: Mapping[str, str] | None = None,
-            log: Log | None = None, *, client: str) -> None:
+            log: Log | None = None) -> None:
         self._dsn = dsn
         self.caches: dict[str, str] = dict(CACHE_DIRS, **(caches or {}))
         self.log: Log = log or to_stderr
-        self.client = client
         self.cutoff: float | None = None
-
-    def nested(self, tool: str) -> Self:
-        """A copy for `tool` to call others through, audited as nested:<tool>.
-        A copy keeps its class - a test's connect() with it - and shares the
-        caches, the log and the cutoff; one made before this context resolved
-        its dsn resolves the same one on first use (psql.default_dsn is
-        idempotent)."""
-        copied = copy.copy(self)
-        copied.client = "nested:%s" % tool
-        return copied
 
     def refreshing(self) -> Self:
         """A copy whose pulls refresh as one, against a cutoff of now: a page
@@ -273,6 +250,5 @@ class Context:
 
     def call(self, name: str, /, **arguments: object) -> ToolReply:
         """A tool by name, in-process - the refresher's, the shell's, the
-        board's and one tool's call of another - audited as this context's
-        client (Registry.run)."""
+        board's and one tool's call of another (Registry.run)."""
         return self.tools.run(self, name, **arguments)

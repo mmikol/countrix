@@ -14,12 +14,12 @@ import pytest
 import requests
 
 from db import INPUT_DEVICE, PLATFORM, REGION, psql
-from db.data import fetch
+from db.data import cache
 from db.data.blizzard import meta
-from db.data.fetch import cache_key
+from db.data.cache import cache_key
 from db.data.wiki import WikiError, maps, patches, playstyles, seasons, terrain
 from tests.db.recording import RecordingConnection
-from tests.db.test_fetch import write_aged
+from tests.db.test_cache import write_aged
 from tests.db.test_transforms import HYBRID_PAGE
 from tests.db.wiki.test_wiki_playstyles_and_patches import COMPOSITION
 
@@ -48,7 +48,7 @@ class Offline:
 
 
 def _pull(tmp_path, lines, **kwargs):
-    return fetch.PullContext(str(tmp_path), session=Offline(), log=lines.append, **kwargs)
+    return cache.PullContext(str(tmp_path), session=Offline(), log=lines.append, **kwargs)
 
 
 def _cache(tmp_path, pages, hours=0):
@@ -151,7 +151,7 @@ def test_a_rates_pull_that_read_a_stale_page_stamps_no_snapshot(tmp_path, monkey
     """A refresh whose every refetch fails reads yesterday's pages from the
     cache; stamping them as a capture of today would be a lie, so nothing is
     written, the source's row included."""
-    monkeypatch.setattr(meta, "RATES_POLICY", fetch.RequestPolicy(attempts=1, backoff=0, delay=0))
+    monkeypatch.setattr(meta, "RATES_POLICY", cache.RequestPolicy(attempts=1, backoff=0, delay=0))
     _cache(tmp_path, RATES_PAGES, hours=48)
     connection, lines = RecordingConnection(RATES_READS), []
     pull = _pull(tmp_path, lines, max_age=0)

@@ -47,7 +47,7 @@ def test_seasons_and_synergies_are_pulls_in_dependency_order():
 def test_every_pull_reads_blizzard_or_the_wiki():
     assert {spec.source for spec in tools.REGISTRY.pulls()} == {"blizzard", "wiki"}
     assert set(db.CACHE_DIRS) == {"blizzard", "wiki"}
-    nowhere = tools.Context(dsn="postgresql://nowhere", client="test")
+    nowhere = tools.Context(dsn="postgresql://nowhere")
     assert set(nowhere.caches) == {"blizzard", "wiki"}
     _text, data = nowhere.call("list_sources")
     assert [s["code"] for s in data["sources"]] == ["blizzard", "wiki"]
@@ -75,8 +75,7 @@ def test_pull_counters_runs_the_wikis_matchups(monkeypatch, tmp_path):
     monkeypatch.setattr(matchups, "run", run)
     # a cache folder of its own: the tool creates the one it is handed, and an
     # empty .cache-wiki at the root lets the next run's cache tests fetch
-    ctx = Offline(dsn="postgresql://nowhere", caches={"wiki": str(tmp_path / "wiki")},
-                  client="test")
+    ctx = Offline(dsn="postgresql://nowhere", caches={"wiki": str(tmp_path / "wiki")})
     text, data = ctx.call("pull_counters")
     assert seen == {"connection": "cx", "cache_dir": ctx.caches["wiki"]}
     assert text.splitlines()[0] == "pull_counters: counters stored"
@@ -92,7 +91,7 @@ def test_a_pull_hands_run_its_sources_cache_and_the_context_log(monkeypatch, tmp
         return {"snapshots": 1, "tables": ["meta_snapshots"]}
     monkeypatch.setattr(meta, "run", run)
     ctx = Offline(dsn="postgresql://nowhere", caches={"blizzard": str(tmp_path / "blizzard")},
-                  log=lambda line: None, client="test")
+                  log=lambda line: None)
     began = time.time()
     text, _ = ctx.call("pull_rates", refresh=True)
     assert text.splitlines()[0] == "pull_rates: snapshot stored"
@@ -108,10 +107,10 @@ def test_a_pull_hands_run_its_sources_cache_and_the_context_log(monkeypatch, tmp
 
 class Synced(Offline):
     """A context whose sync reaches the pulls and stops short of the
-    database: the strategies mirror and the export answer empty."""
+    database: the strategies mirror answers empty."""
 
     def call(self, name, /, **arguments):
-        if name in ("load_authored", "export_csv"):
+        if name == "load_authored":
             return ToolReply("%s: skipped" % name, {})
         return super().call(name, **arguments)
 
@@ -136,8 +135,7 @@ def test_a_full_refresh_holds_every_pull_to_the_moment_it_began(monkeypatch, tmp
                    pulls.wiki_matchups):
         monkeypatch.setattr(module, "run", run)
     caches = {"blizzard": str(tmp_path / "blizzard"), "wiki": str(tmp_path / "wiki")}
-    ctx = Synced(dsn="postgresql://nowhere", caches=caches, log=lambda line: None,
-                 client="test")
+    ctx = Synced(dsn="postgresql://nowhere", caches=caches, log=lambda line: None)
     began = time.time()
     ctx.call("sync_all", refresh=True)
     assert len(seen) == len(tools.REGISTRY.pulls())
@@ -160,7 +158,7 @@ def test_a_stale_page_is_named_in_the_pull_reply(monkeypatch, tmp_path):
         return {"snapshots": 1, "tables": ["meta_snapshots"]}
     monkeypatch.setattr(meta, "run", run)
     ctx = Offline(dsn="postgresql://nowhere", caches={"blizzard": str(tmp_path / "blizzard")},
-                  log=lambda line: None, client="test")
+                  log=lambda line: None)
     text, data = ctx.call("pull_rates", refresh=True)
     assert text.splitlines()[0] == "pull_rates: snapshot stored; stale: 1"
     assert data["stale"] == ["rates_x.html: gone"]
@@ -177,7 +175,7 @@ def test_a_pull_that_stores_no_table_says_nothing_stored(monkeypatch, tmp_path):
         return {"snapshot_id": None, "tables": []}
     monkeypatch.setattr(meta, "run", run)
     ctx = Offline(dsn="postgresql://nowhere", caches={"blizzard": str(tmp_path / "blizzard")},
-                  log=lambda line: None, client="test")
+                  log=lambda line: None)
     text, data = ctx.call("pull_rates", refresh=True)
     assert text.splitlines()[0] == "pull_rates: nothing stored; stale: 1"
     assert data["tables"] == [] and data["snapshot_id"] is None
@@ -248,11 +246,6 @@ def test_every_path_the_layer_declares_exists():
     for path in (schema.MIGRATIONS_DIR, catalog.strategies_dir(),
                  os.path.join(db.ROOT, "docs")):
         assert os.path.isdir(path), path
-    # the CSV mirror is created on first export and never committed: scraped
-    # text and rates stay out of the public repository
-    assert db.RAW_DIR.endswith(os.path.join("db", "raw"))
-    with open(os.path.join(db.ROOT, ".gitignore"), encoding="utf-8") as handle:
-        assert "db/raw/" in handle.read().split()
 
 
 # --- the built database ----------------------------------------------------

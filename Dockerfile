@@ -4,8 +4,8 @@
 # the role.
 FROM python:3.12-slim
 
-# Nothing here runs as root. Files the containers write (caches, db/raw, the
-# playbook) stay owned by the bind mounts' owner: uid 1000 by default,
+# Nothing here runs as root. Files the containers write (caches, the playbook,
+# the docs) stay owned by the bind mounts' owner: uid 1000 by default,
 # COUNTRIX_UID/GID on a Linux host whose checkout belongs to someone else
 # (compose.yaml).
 RUN useradd --create-home --uid 1000 app
@@ -21,7 +21,7 @@ COPY requirements.txt .
 RUN grep -vE '^(pgserver|ruff|mypy)' requirements.txt | pip install --no-cache-dir -r /dev/stdin
 
 COPY . .
-RUN mkdir -p db/raw .cache-blizzard .cache-wiki \
+RUN mkdir -p .cache-blizzard .cache-wiki \
     && chown -R app:app /app
 USER app
 

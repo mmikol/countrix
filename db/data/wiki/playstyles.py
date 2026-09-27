@@ -12,8 +12,8 @@ from typing import NamedTuple
 import psycopg
 
 from db import psql
-from db.data import PullSummary, fetch
-from db.data.names import index, name_key
+from db.data import PullSummary, cache
+from db.data.normalizer import index, name_key
 from db.data.wiki import WIKI, WikiError, fetch_wikitext, markup
 
 # --- extract: markup -> Python ---------------------------------------------
@@ -54,7 +54,7 @@ class PlaystylesSummary(PullSummary):
     unmatched: list[str]
 
 
-def run(connection: psycopg.Connection, pull: fetch.PullContext) -> PlaystylesSummary:
+def run(connection: psycopg.Connection, pull: cache.PullContext) -> PlaystylesSummary:
     """Reload the playstyles and the heroes listed under each -> the styles,
     the hero links stored and the names that matched no hero."""
     playstyles = parse_playstyles(fetch_wikitext(pull, COMPOSITION_PAGE))

@@ -14,8 +14,8 @@ from collections.abc import Mapping
 import psycopg
 
 from db import psql
-from db.data import ArticlePullSummary, fetch
-from db.data.names import index, name_key, slug
+from db.data import ArticlePullSummary, cache
+from db.data.normalizer import index, name_key, slug
 from db.data.wiki import WIKI, cargo_query
 from db.data.wiki.kits import kit_store
 from db.data.wiki.kits.hero_articles import parse_announcement, supplement_kits
@@ -37,7 +37,7 @@ CARGO_FIELDS = (
 
 
 def _announce_heroes(
-        cursor: psycopg.Cursor, pull: fetch.PullContext, found: Mapping[str, str],
+        cursor: psycopg.Cursor, pull: cache.PullContext, found: Mapping[str, str],
         hero_ids: dict[str, int], source_id: int) -> list[str]:
     """Heroes the Cargo table names that the roster lacks, from their
     articles (`found`, {name: wikitext}): those whose article is marked
@@ -85,7 +85,7 @@ class KitsSummary(KitCounts, ArticlePullSummary):
     rejected_6v6: list[str]
 
 
-def run(connection: psycopg.Connection, pull: fetch.PullContext) -> KitsSummary:
+def run(connection: psycopg.Connection, pull: cache.PullContext) -> KitsSummary:
     """Store the Cargo table's kits, with what each hero article adds, in one
     transaction -> every row counted, the heroes announced and skipped, and
     the articles that would not fetch. Each article is asked for once: the

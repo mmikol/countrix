@@ -2,14 +2,17 @@
 page draws a chart per question and a table under each, says it is for
 personal use and labels what reads the rates, escapes what the owner
 typed, and the command line prints the text, writes the page and the JSON
-beside it, and answers a refusal with exit status 2."""
+beside it only where --out names, outside the repo, and answers a refusal
+with exit status 2."""
 
 import contextlib
 import json
+import os
 import re
 
 import pytest
 
+from db import ROOT
 from inference import catalog, rescore, validate
 from tests import matches
 from tests.inference import FIXTURE_PLAYBOOK
@@ -91,9 +94,19 @@ def test_the_command_line_prints_the_text_and_writes_the_page_and_its_json(
     assert re.search(r"<title>Playbook validation</title>", out.read_text(encoding="utf-8"))
     assert json.loads((tmp_path / "report.json").read_text(encoding="utf-8"))["counts"] == \
         judged["counts"]
+    # without --out the text is all it gives: no page, nowhere
+    monkeypatch.setattr(validation, "write", lambda *args: pytest.fail("wrote a page"))
+    printed.clear()
+    validation.run(validation.command_line(["--playbook", "tests/fixtures/playbook"]),
+                   out=printed.append)
+    assert len(printed) == 1 and printed[0].startswith("validation of tests/fixtures/playbook")
 
 
 def test_the_command_line_answers_a_refusal_with_status_2(capsys):
-    assert validation.main(["--playbook", "..", "--out", "/dev/null"]) == 2
+    assert validation.main(["--playbook", ".."]) == 2
     assert "inside the repo" in capsys.readouterr().err
-    assert validation.main(["--playbook", "docs", "--out", "/dev/null"]) == 2
+    assert validation.main(["--playbook", "docs"]) == 2
+    # the page carries rate-derived figures: never a file the repo could commit
+    assert validation.main(["--out", os.path.join(ROOT, "validation.html")]) == 2
+    assert "inside the repo; the page carries" in capsys.readouterr().err
+    assert not os.path.exists(os.path.join(ROOT, "validation.html"))

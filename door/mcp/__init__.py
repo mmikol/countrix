@@ -17,7 +17,6 @@ Postgres or the playbook runs under one of them.
                  caps and the rate limit a client is held to
     schema       a tool as the protocol serves it: its arguments as JSON
                  Schema, its reply, and the Tool that checks every call
-    audit        the audit line every call leaves, through any door
     client       the one client that calls the door over HTTP: call_tool, a
                  tools/call read into a CallReply, for the board and
                  orchestrator.py
@@ -27,8 +26,8 @@ Postgres or the playbook runs under one of them.
     tools        every family imported, so the registry is whole, and the
                  Context the servers, the refresher and the board use
     pulls        pull, clean, store: the pull_* tools, load_authored, sync_all
-    lifecycle    the database's life: status, init, migrate, rebuild, the CSV
-                 mirror, the generated docs, read-only query
+    lifecycle    the database's life: status, init, migrate, rebuild, the
+                 generated docs, read-only query
     boards       the five properties a board tool takes, and board_tool,
                  which hands its function the one Draft they name
     facts        the facts layer: roster and a board's facts
@@ -41,7 +40,7 @@ Postgres or the playbook runs under one of them.
     __main__     the command line above
 
 The protocol, its transports and its client are dependency-free (server,
-stdio, http, schema, audit, client), so the door has nothing to audit but
-its own few hundred lines; the surface is the standard one - initialize,
-tools/list, tools/call, resources - so any MCP client can drive it.
+stdio, http, schema, client): the door is its own few hundred lines, and
+the surface is the standard one - initialize, tools/list, tools/call,
+resources - so any MCP client can drive it.
 """

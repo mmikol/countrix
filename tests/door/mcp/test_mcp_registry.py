@@ -1,12 +1,11 @@
 """The one registry the door lists its tools from, with no database: the
 families in FAMILIES' order whichever imports first, each family's tools in
 the order its module declares them, a registry's refusal of a name twice or
-a tool outside its families, and the name a tool's call of another is
-audited under."""
+a tool outside its families, and the context a tool's call of another lands
+in."""
 
 import functools
 import inspect
-import json
 import subprocess
 import sys
 
@@ -63,16 +62,14 @@ def test_a_registry_refuses_a_tool_name_twice_and_a_tool_outside_its_families():
     assert local.names() == ["twice"]
 
 
-def test_a_tool_calling_another_is_audited_as_nested_under_its_name(tmp_path, monkeypatch):
-    """The outer call is audited as its caller's, and the call the tool makes
-    inside it as nested:<tool>, on a copy of the context that keeps its class."""
-    path = tmp_path / "audit.jsonl"
-    monkeypatch.setenv("COUNTRIX_AUDIT", str(path))
+def test_a_tool_calling_another_calls_it_through_its_callers_context():
+    """A tool is handed the context it was called through, its class kept - a
+    test's connect() with it - and the call it makes of another lands there."""
     local = Registry([__name__])
 
     @local.tool("outer", "calls inner")
     def outer(ctx):
-        assert isinstance(ctx, Local) and ctx.client == "nested:outer"
+        assert ctx is caller
         return ctx.call("inner")
 
     @local.tool("inner", "answers")
@@ -82,12 +79,8 @@ def test_a_tool_calling_another_is_audited_as_nested_under_its_name(tmp_path, mo
     class Local(tools.Context):
         tools = local
 
-    ctx = Local(dsn="postgresql://nowhere", client="shell")
-    assert ctx.call("outer") == ("inner", {})
-    assert ctx.client == "shell"                          # the caller's own context is untouched
-    lines = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
-    assert [(e["tool"], e["client"]) for e in lines] == [
-        ("inner", "nested:outer"), ("outer", "shell")]
+    caller = Local(dsn="postgresql://nowhere")
+    assert caller.call("outer") == ("inner", {})
 
 
 def test_a_registry_lists_a_family_in_its_place_whenever_it_registers():
