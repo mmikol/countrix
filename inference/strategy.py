@@ -134,9 +134,8 @@ FIELD_RULE = "field must be one of %s or params.NAME" % ", ".join(TUNABLE)
 
 
 class CatalogError(ValueError):
-    """A playbook the catalog refuses: the message names the rule a file
-    breaks, and `file` the file, once the catalog knows it."""
-    file: str | None = None         # the strategy file at fault, when one is
+    """A playbook the catalog refuses: the message names the file at fault,
+    once the catalog knows it, and the rule it breaks."""
 
 
 # --- the rule each field keeps ---------------------------------------------------

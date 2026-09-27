@@ -145,6 +145,17 @@ def test_only_db_init_and_db_rebuild_create_the_cluster(tmp_path, monkeypatch):
         tools.Context(dsn="postgresql://nobody@127.0.0.1:9/nowhere", client="test").call("db_init")
 
 
+def test_a_rebuild_refuses_a_playbook_that_does_not_load_before_it_drops_anything(
+        tmp_path, monkeypatch):
+    """sync_all mirrors the playbook after every pull, long after the drop, so
+    a rebuild checks it first: a broken playbook costs no table and strands
+    no recorded match in the kept file."""
+    monkeypatch.setenv("COUNTRIX_STRATEGIES", str(tmp_path))      # no strategies at all
+    monkeypatch.setattr(psql, "boot", lambda: pytest.fail("the database was reached"))
+    with pytest.raises(Refusal, match="nothing was dropped: the playbook does not load"):
+        tools.Context(client="test").call("db_rebuild")
+
+
 def test_metrics_tool_serves_the_vocabulary():
     text, data = tools.Context(dsn="postgresql://nowhere", client="test").call("metrics")
     assert "team.coverage_share" in data["metrics"] and "team.coverage_share" in data["numeric"]

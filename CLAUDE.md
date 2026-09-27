@@ -46,7 +46,7 @@ cluster is built and `DATABASE_URL` is unset; `DATABASE_URL` or
 `./docker-db <command>` points it at another Postgres. CI sets no
 variable: it has no cluster and no pgserver. The suite audits its tool
 calls to a temporary file (`audit_log` in `tests/conftest.py`) and leaves
-`db/raw/audit.jsonl`, which the sentry reads, alone.
+`db/raw/audit.jsonl`, the repo's own log, alone.
 
 The solver's pool (`inference/parallel.py`) spawns `max(6, min(cores, 12))`
 worker processes (12 here) in any process that calls `engine.board()`
@@ -80,13 +80,11 @@ db <- facts <- inference <- door <- ui.
   order, and `door/mcp/tools.py` imports every family. A call arrives over
   stdio, HTTP or in-process (`ctx.call`), is checked against the
   tool's schema by the same `Tool` wrapper on every path, and is audited to
-  `db/raw/audit.jsonl` (argument sizes and type names, never values) -
-  except the sentry, which renames a bad strategy
-  file to `.md.quarantined` outside the door. The code that writes lives
-  with what it writes - the pulls in `db/data`, the strategies table in
-  `inference.catalog.mirror`, the playbook's files in `inference.tune`, the
-  recorded matches in `db.matches` - and
-  only the tools call it. Reads bypass the door: the board, `facts/` and
+  `db/raw/audit.jsonl` (argument sizes and type names, never values).
+  The code that writes lives with what it writes - the pulls in `db/data`,
+  the strategies table in `inference.catalog.mirror`, the playbook's files
+  in `inference.tune`, the recorded matches in `db.matches` - and only the
+  tools call it. Reads bypass the door: the board, `facts/` and
   `inference/` read through `db.psql.default_dsn()` - `DATABASE_URL`, else
   the embedded pgserver cluster at `db/psql/cluster`, started on first
   touch; only db_init and db_rebuild create it (`psql.boot`), and a read
@@ -153,14 +151,16 @@ db <- facts <- inference <- door <- ui.
   and the pooled and sequential answers must agree bit for bit: string-seeded
   RNGs, integer tallies, ties broken by `map_win_mean` and then sorted names.
 - **The board** (`ui/board.py`, its pages in `ui/pages.py`) serves
-  `/api/facts` in-process and answers `/api/board` and `/api/strategies`
-  with `inference/serve.py`'s handlers, in-process or on the service
-  `COUNTRIX_INFERENCE_URL` names. It is read-only unless
+  `/api/facts` in-process and answers `/api/board`, `/api/strategies` and
+  `/health` with `inference/serve.py`'s handlers, in-process - the compose
+  stack's `ui` container runs the engine and its pool - or on the service
+  `COUNTRIX_INFERENCE_URL` names. `serve.Admission` holds the boards in
+  flight to one `engine.FIELD_BUDGET` of sixes. It is read-only unless
   `COUNTRIX_READ_ONLY=0`; its two writes, a weight's `tune` and a match's
   `record_match`, go through the door.
   All three HTTP servers stand on `db/web.py`: a request whose Host or Origin
   is not a local name or one given with `--allow-host` is refused with 403.
-- **Docker** runs one image as five roles plus postgres (`compose.yaml`,
+- **Docker** runs one image as three roles plus postgres (`compose.yaml`,
   `docker-entrypoint.sh`). Migrations ship in the image, not a mount: once
   `orchestrator.py up` rebuilds it, any new migration file makes the `data`
   container `db_rebuild` on start, which drops the dated rates history and
@@ -281,8 +281,6 @@ db <- facts <- inference <- door <- ui.
 - A pull matches a hero or map name against the database through
   `db.data.names` - `index` and `name_key`, or `hero_key` where a former
   name can appear - never by `.lower()`.
-- `.venv/bin/python -m door.sentry --once` is not read-only: it renames a
-  suspect strategy file to `.md.quarantined`.
 - Never `docker compose down -v`: it deletes the database volume.
 
 ## Style

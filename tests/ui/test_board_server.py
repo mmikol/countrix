@@ -178,6 +178,10 @@ def test_the_page_the_statics_the_math_and_the_strategies_need_no_database(
     assert code == 200 and b"The Counter Utility Matrix" in body
     code, _, body = get(served + "/api/strategies")
     assert code == 200 and json.loads(body)["strategies"]
+    code, _, body = get(served + "/health")      # the engine's, for the container's healthcheck
+    health = json.loads(body)
+    assert code == 200 and health["status"] == "degraded" and health["strategies"]
+    assert "heroes" not in health and health["error"]
     with monkeypatch.context() as broken:                 # a playbook that does not load
         broken.setenv("COUNTRIX_STRATEGIES", str(tmp_path))
         code, _, body = get(served + "/api/strategies")

@@ -79,7 +79,7 @@ def test_an_error_reply_reports_the_layers_own_message(monkeypatch):
     assert "board: TypeError: boom" in lines
 
 
-def test_readiness_solves_one_board_through_the_service(monkeypatch):
+def test_readiness_solves_one_board_on_the_board(monkeypatch):
     """A six back from the probe means ready, anything else means not."""
     calls = []
     six = {"blue": {"blue": ["D.Va", "Winston", "Cassidy", "Genji", "Ana", "Brigitte"]}}

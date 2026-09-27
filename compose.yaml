@@ -1,26 +1,21 @@
-# .venv/bin/python orchestrator.py  ->  one container per role, and a guard:
+# .venv/bin/python orchestrator.py  ->  one container per role:
 #
 #   db          PostgreSQL
 #   data        the door: builds the database from the bind-mounted page
 #               caches when it is empty or stale, then serves every MCP tool
 #               at http://localhost:8020/mcp (.mcp.json, server
 #               "countrix-docker")
-#   inference   INFERENCE ENGINE: http://localhost:8019, reading the strategy
-#               files live
-#   ui          the board at http://localhost:8017
+#   ui          the board at http://localhost:8017, with the INFERENCE ENGINE
+#               in the board's process, reading the strategy files live
 #   refresher   the door's clock: seasons and rates daily at
 #               COUNTRIX_REFRESH_AT (05:00 container time; set TZ), every
 #               source weekly, and on start when the caches are 20 hours old
-#   sentry      the guard: quarantines a strategy file that will not load or
-#               reads like an instruction, flags instruction-like text in the
-#               database, watches the MCP audit log; its report is what
-#               `orchestrator.py status` prints
 #
 # Every container but db runs as an unprivileged user on a read-only root
 # filesystem, with every capability dropped, no new privileges and process
 # and memory limits. db takes no new privileges and keeps only the five
 # capabilities its image needs to start as root and drop to postgres (below).
-# All six share one network. Only data and refresher open a connection out,
+# All four share one network. Only data and refresher open a connection out,
 # to two fixed hosts. Every published port binds to 127.0.0.1. No keys, no
 # accounts.
 # COUNTRIX_MCP_TOKEN (in .env) requires a bearer token on the MCP server.
@@ -117,49 +112,40 @@ services:
       retries: 30
       start_period: 900s   # the first build scrapes the sources
 
-  inference:
+  ui:
     <<: *app
-    deploy:                          # the solver's worker pool: ~70 MB a worker, twelve at most
-      resources:
+    deploy:                          # the solver's worker pool: ~70 MB a worker, twelve at
+      resources:                     # most, beside the boards in flight (inference/serve.py)
         limits:
           memory: 2g
           pids: 256
-    command: ["inference"]
-    volumes: &reader_mounts       # the playbook, read-only; everything else comes from the database
-      - ./inference/strategies:/app/inference/strategies:ro
-    ports:
-      - "127.0.0.1:8019:8019"
-    depends_on:
-      data:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "python", "-c",
-             "import json,urllib.request;d=json.load(urllib.request.urlopen('http://localhost:8019/health'));assert d['status']=='ok'"]
-      interval: 10s
-      timeout: 5s
-      retries: 18
-      start_period: 30s
-
-  ui:
-    <<: *app
     command: ["ui"]
-    volumes: *reader_mounts
+    volumes:                      # the playbook, read-only; everything else comes from the database
+      - ./inference/strategies:/app/inference/strategies:ro
     ports:
       - "127.0.0.1:8017:8017"
     environment:
       <<: *env
-      COUNTRIX_INFERENCE_URL: http://inference:8019
       COUNTRIX_UI_HOST: 0.0.0.0
       # the board writes nothing unless COUNTRIX_READ_ONLY=0; the two below
       # are the channel its writes would use (a tune, a record_match, through the door)
       COUNTRIX_READ_ONLY: ${COUNTRIX_READ_ONLY:-}
       COUNTRIX_MCP_URL: http://data:8020/mcp
       COUNTRIX_MCP_TOKEN: ${COUNTRIX_MCP_TOKEN:-}
+      # the solver's workers; empty is one per core, six to twelve (inference/parallel.py)
+      COUNTRIX_WORKERS: ${COUNTRIX_WORKERS:-}
     depends_on:
       data:
         condition: service_healthy
-      inference:
-        condition: service_healthy
+    healthcheck:
+      # the engine's health: the playbook loads and the database answers.
+      # Nothing waits on it; `docker compose ps` and orchestrator.py read it
+      test: ["CMD", "python", "-c",
+             "import json,urllib.request;d=json.load(urllib.request.urlopen('http://localhost:8017/health'));assert d['status']=='ok'"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
 
   refresher:
     <<: *app
@@ -177,19 +163,6 @@ services:
       TZ: ${TZ:-UTC}
     depends_on:
       data:
-        condition: service_healthy
-
-  sentry:
-    <<: *app
-    command: ["sentry"]
-    volumes:                      # quarantines in the playbook; the report in raw, beside the audit log
-      - ./db/raw:/app/db/raw
-      - ./inference/strategies:/app/inference/strategies
-    environment:
-      <<: *env
-      COUNTRIX_SENTRY_EVERY: ${COUNTRIX_SENTRY_EVERY:-30}
-    depends_on:
-      db:
         condition: service_healthy
 
 volumes:

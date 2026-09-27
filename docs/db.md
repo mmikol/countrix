@@ -109,15 +109,17 @@ stateDiagram-v2
 ```
 
 `db_rebuild` drops every table, reapplies the migrations and runs
-`sync_all`, whatever the state. The owner's recorded matches are the one
+`sync_all`, whatever the state - unless the playbook does not load, which
+refuses it before anything is dropped. The owner's recorded matches are the one
 thing no source gives back, so it keeps them: they go to
 `db/raw/kept-matches.json` before the drop and come back by name once
 `sync_all` has refilled the roster, each under its own id. A rebuild that
 fails leaves the file for the next one, and a match whose map or hero the
 roster no longer names stays in it. Docker's `data` container asks
 `python -m db.psql.schema` for the state (`schema.state`), runs
-`db_rebuild` on anything but current, then serves the door. `db_status`
-and the door's `/health` report the same state, which the inference, ui
+`db_rebuild` on anything but current, then serves the door; a refused
+rebuild ends the container, which restarts until the playbook loads.
+`db_status` and the door's `/health` report the same state, which the ui
 and refresher containers wait on.
 
 ## Keeping it fresh

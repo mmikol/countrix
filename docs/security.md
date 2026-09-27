@@ -44,14 +44,14 @@ and `POST /api/match` answer 403, or 415 first for a body not labelled
 is recorded elsewhere. At `0` the POSTs become calls to the door's `tune`
 and `record_match` tools, which ignore the setting. The board's code
 writes no playbook file and no row, and its container mounts the playbook
-read-only. A match's note is free text a session reads back, so the
-sentry scans it with the rest of the database's text.
+read-only. A match's note is free text a session reads back, and the
+skills treat it as data.
 
 **Every server answers only to its own names.** The door, the inference
 service and the board stand on `db/web.py`, which checks each request's
 `Host` and `Origin` before any route runs, on every method. Each must be a
 local name (`db.web.LOCAL_HOSTS`) or one the server was started with: its
-compose service name (`data`, `inference`) or a published board's public
+compose service name (`data`) or a published board's public
 name. Anything else is 403, a missing `Host` and `Origin: null` included.
 A page rebound by DNS sends its own host name, so the Host check stops it.
 
@@ -106,23 +106,19 @@ new privileges and process and memory limits. `db` keeps the five
 capabilities its image needs to start as root and drop to `postgres`,
 takes no new privileges, and has a writable root and no limits.
 
-**Two containers reach out.** All six share one network: Docker publishes
-a port only for a container on a routable network, and the sentry needs
-the database. What keeps `inference`, `ui`, `db` and `sentry` off the
-internet is that their code opens no connection out. `data` and
+**The board holds its memory.** The ui container runs the solver's pool
+beside the page. A board waits for room while the boards in flight hold
+one `FIELD_BUDGET`'s worth of sixes, and answers 429 after a minute
+(`serve.Admission` in `inference/serve.py`), so a burst of boards queues
+instead of running the container out of memory and the page with it.
+
+**Two containers reach out.** All four share one network: Docker
+publishes a port only for a container on a routable network. What keeps
+`ui` and `db` off the internet is that their code opens no connection
+out. `data` and
 `refresher` fetch from two fixed hosts, Blizzard's site and the wiki. The
 page the board serves takes its code, styles and font from `ui/static`;
 the browser loads hero portraits and role icons from Blizzard's CDNs.
-
-**The sentry watches.** `door/sentry.py` runs a pass every thirty seconds.
-A playbook file that does not load through the catalog, or whose prose
-reads like an instruction, is renamed to `.md.quarantined`, which the
-catalog ignores. Such text in the database is flagged for a person to
-judge. The audit log's last minute is read for refusals, crashes, any
-client address past the door's rate limit and any line that is not an
-audit entry. `.venv/bin/python orchestrator.py status` prints the report,
-`db/raw/sentry.json`; `.venv/bin/python -m door.sentry --once` runs one
-pass and exits non-zero when something is wrong.
 
 ## What remains yours
 
@@ -131,15 +127,15 @@ pass and exits non-zero when something is wrong.
   into an interactive session. Read what a skill reports.
 - The sources are two public websites fetched over HTTPS by two
   containers. A compromised page can put text into the database; the
-  sentry flags it, the skills treat it as data, and a rebuild from the
-  page cache reproduces it until the cache is refreshed.
+  skills treat it as data, and a rebuild from the page cache reproduces
+  it until the cache is refreshed.
 - The board and the inference service have no authentication of their
   own. The database's password is `overwatch`, public in `compose.yaml`,
   unless `POSTGRES_PASSWORD` is set in `.env`, and `matrix_reader`'s is
   its own name (migration 012). The door carries the tools that write,
   refresh and rebuild, and its token is optional and unset by default.
-  Never publish the door (8020), the inference service (8019) or the
-  database (5433).
+  Never publish the door (8020), the database (5433) or an inference
+  service run on its own (8019).
 - A board published anyway goes out alone: its line in
   `docker-entrypoint.sh` gains `--allow-host <public name>`, or every
   request answers 403, and `COUNTRIX_READ_ONLY` stays at `1`.
@@ -149,6 +145,6 @@ pass and exits non-zero when something is wrong.
 - On a Linux host whose checkout is not owned by uid 1000, set
   `COUNTRIX_UID` and `COUNTRIX_GID` in `.env` to the owner's ids, or the
   containers cannot write the bind mounts (the audit log, the mirror, a
-  quarantine, a tune) and say so in their logs.
+  tune) and say so in their logs.
 
 To report a vulnerability, see [SECURITY.md](../SECURITY.md).

@@ -10,12 +10,13 @@ board or its pages.
 
 ```bash
 .venv/bin/python -m ui.board              # http://localhost:8017, the local cluster
-COUNTRIX_INFERENCE_URL=http://localhost:8019 .venv/bin/python -m ui.board   # comps from the service
+COUNTRIX_INFERENCE_URL=http://localhost:8019 .venv/bin/python -m ui.board   # comps from a service
 ```
 
 An `http.server` handler over psycopg, no web framework, no build step. In
-the compose stack the `ui` container computes the facts itself and asks
-the `inference` container for comps (`COUNTRIX_INFERENCE_URL`).
+the compose stack the `ui` container computes the facts and the comps
+itself, the solver's worker pool warmed at launch; `COUNTRIX_INFERENCE_URL`
+hands the comps to an inference service run on its own.
 
 ## `board.py` and `pages.py` - the page and its endpoints
 
@@ -33,8 +34,9 @@ map ([security.md](security.md)).
 | `/static/<file>` | `board.css`, `board.js`, `comps.js`, `playbook.js`, `record.js` and `bebas-neue.woff2`, nothing else |
 | `/api/roster` | the roster `facts/roster.py` builds, which the door's `roster` tool lists too: every hero (role, subrole, health pool, portrait, status, release day) and every map (mode, top style, sided or not), with the role icons and the patches newer than the rates |
 | `/api/facts?map=&side=&red=&blue=&bans=` | the FactSet for the board as JSON: the facts, their count and the playbook's record |
-| `/api/board?map=&side=&red=&blue=&bans=[&weights=&client=&pool=]` | the board solved at any stage under the playbook tab's weights: the `board` tool's answer ([mcp.md](mcp.md#the-tools)) without the countered case, which the page never reads. `serve.handle_board` in-process, or the service's `/board` when `COUNTRIX_INFERENCE_URL` is set, the query forwarded as received before any connection opens |
+| `/api/board?map=&side=&red=&blue=&bans=[&weights=&client=&pool=]` | the board solved at any stage under the playbook tab's weights: the `board` tool's answer ([mcp.md](mcp.md#the-tools)) without the countered case, which the page never reads. `serve.handle_board` in-process, or the service's `/board` when `COUNTRIX_INFERENCE_URL` is set, the query forwarded as received before any connection opens. A board waits while the boards in flight hold one `FIELD_BUDGET`'s worth of sixes, and answers 429 after a minute (`serve.Admission`) |
 | `/api/strategies` | the catalog: every constraint, heuristic and assumption with its kind, form, frontmatter and body - `serve.handle_strategies` in-process, or the service's `/strategies` |
+| `/health` | the engine's health, `serve.handle_health` in-process or the service's `/health`: ok or degraded, the strategies, the drafts pending and the heroes, and the error naming what is out of reach. The ui container's healthcheck and `orchestrator.py` read it |
 | `/math` | `static/math.html` in the page shell, the constants it quotes (the default engine's three weights and `RATE_PICK_HALF`, `SYNERGY_PULL`, `REFERENCE_SIZE`, `NEED_BUDGET` and the search's four) filled in by `pages.py`: the equation, the scoring function with the default engine under the playbook, the board and how the layers fit |
 | `/tests` | `static/tests.html` in the page shell: the designed proof, the adversarial hunt, the random sample, the regression gate, the suite, and what none of it proves |
 | `POST /api/weight` `{id, weight}` | the board's first write, a `tune` call through the door: over HTTP to `COUNTRIX_MCP_URL` with the bearer token when that is set (the compose stack), in-process otherwise. Off by default; `COUNTRIX_READ_ONLY=0` turns it and the *store* button on |

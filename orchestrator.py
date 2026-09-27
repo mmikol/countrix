@@ -16,34 +16,34 @@
 The agents run on the host, on the subscription (the claude CLI, signed in
 once); without the CLI the run still brings the stack up and says so. It
 imports the standard library, db's ROOT, db.web's JSON reader and MCP
-client, the sentry's report (door.sentry) and inference.derive, the headless
-claude recipe; run it with .venv/bin/python, since inference.derive loads
-psycopg. Exit code 0 means everything answered.
+client, inference.derive, the headless claude recipe, and the catalog, to
+check the playbook before the stack starts; run it with .venv/bin/python,
+since inference.derive loads psycopg. Exit code 0 means
+everything answered.
 """
 
-import json
 import os
 import subprocess  # nosec B404  # docker compose and the claude CLI, argv lists, never a shell
 import sys
 import time
 from collections.abc import Callable, Mapping
 from datetime import timedelta
-from typing import Any, NamedTuple, TypedDict, cast
+from typing import Any, NamedTuple, TypedDict
 
 from db import ROOT, web
-from door import sentry
-from inference import derive
+from inference import catalog, derive
+from inference.strategy import CatalogError
 
 # the compose stack's ports on this host (compose.yaml)
 DATA = "http://localhost:8020"
-INFERENCE = "http://localhost:8019"
 BOARD = "http://localhost:8017"
-URLS = {"data": DATA + "/health", "inference": INFERENCE + "/health", "ui": BOARD + "/api/roster"}
+# the inference layer's health is the board's: the ui container runs the engine
+URLS = {"data": DATA + "/health", "inference": BOARD + "/health", "ui": BOARD + "/api/roster"}
 MCP_URL = DATA + "/mcp"
-# one board solved through the service before the stack is called ready: only
-# the container (its memory limit in compose.yaml, a read-only root) shows
+# one board solved on the board before the stack is called ready: only the
+# container (its memory limit in compose.yaml, a read-only root) shows
 # whether this playbook fits its memory and time
-PROBE = INFERENCE + "/board?map=King%27s%20Row&red=Zarya&red=Pharah&side=attack"
+PROBE = BOARD + "/api/board?map=King%27s%20Row&red=Zarya&red=Pharah&side=attack"
 
 MINUTE = 60                         # seconds
 HOUR = 60 * MINUTE
@@ -63,14 +63,6 @@ def sh(*args: str, timeout: float, env: Mapping[str, str] | None = None) -> None
                          % (" ".join(args), timeout // MINUTE)) from error
     if result.returncode:
         raise SystemExit("error: %s exited %d" % (" ".join(args), result.returncode))
-
-
-def _json_object(raw: bytes) -> dict[str, Any]:
-    """The JSON object a body holds; ValueError for anything else."""
-    reply = json.loads(raw.decode("utf-8"))
-    if not isinstance(reply, dict):
-        raise ValueError("not a JSON object")
-    return reply
 
 
 def get_json(url: str, timeout: float = 10) -> dict[str, Any] | None:
@@ -102,8 +94,8 @@ def wait_for(url: str, seconds: float, what: str) -> dict[str, Any]:
 
 
 class Probe(TypedDict):
-    """One board solved through the inference service: how long it took, and
-    blue's six."""
+    """One board solved on the board's engine: how long it took, and blue's
+    six."""
     seconds: float
     picks: list[str]
 
@@ -116,8 +108,8 @@ class Verdict(NamedTuple):
 
 class Health(TypedDict):
     """What each served layer answered, None where nothing did, and the probe:
-    None when the service could not solve a board or was never asked. The
-    replies stay JSON off the wire; verdict reads them with .get."""
+    None when the board could not solve one or was never asked. The replies
+    stay JSON off the wire; verdict reads them with .get."""
     data: dict[str, Any] | None
     inference: dict[str, Any] | None
     ui: dict[str, Any] | None
@@ -126,20 +118,20 @@ class Health(TypedDict):
 
 def health() -> Health:
     """The three served layers' replies, and a board probed when the
-    inference service answers."""
+    inference layer answers."""
     replies = {layer: get_json(url) for layer, url in URLS.items()}
     return Health(data=replies["data"], inference=replies["inference"], ui=replies["ui"],
                   board=probe() if replies["inference"] else None)
 
 
 def probe() -> Probe | None:
-    """One board solved through the inference service -> {"seconds", "picks"},
-    or None when the service did not answer with a six: unreachable, erroring,
-    or a playbook whose limits seat no composition."""
+    """One board solved on the board -> {"seconds", "picks"}, or None when it
+    did not answer with a six: unreachable, erroring, or a playbook whose
+    limits seat no composition."""
     started = time.time()
     data = get_json(PROBE, timeout=2 * MINUTE)
     picks = (data or {}).get("blue", {}).get("blue") or []
-    if len(picks) != 6:                            # a six, or the service failed
+    if len(picks) != 6:                            # a six, or the solve failed
         return None
     return Probe(seconds=round(time.time() - started, 1), picks=picks)
 
@@ -177,7 +169,8 @@ def data_verdict(data: dict[str, Any] | None) -> Verdict:
 
 
 def inference_verdict(inf: dict[str, Any] | None, board: Probe | None) -> Verdict:
-    """The inference service answers, sees the playbook, and solves a board."""
+    """The inference layer answers on the board, sees the playbook, and solves
+    a board."""
     if not inf:
         return Verdict(False, ["inference: not answering"])
     if inf.get("status") != "ok":
@@ -190,9 +183,9 @@ def inference_verdict(inf: dict[str, Any] | None, board: Probe | None) -> Verdic
         inf["strategies"], inf.get("heroes", 0),
         " - %d draft(s) awaiting /strategy" % pending if pending else "")
     if board is None:
-        return Verdict(False, [summary, "inference: a board did not solve - the service"
+        return Verdict(False, [summary, "inference: a board did not solve - the engine"
                                         " fails under this playbook (`docker compose logs"
-                                        " inference`)"])
+                                        " ui`)"])
     return Verdict(True, [summary + ", a board in %.1fs" % board["seconds"]])
 
 
@@ -208,7 +201,7 @@ def ui_verdict(ui: dict[str, Any] | None) -> Verdict:
 
 def verdict(h: Health) -> Verdict:
     """The stack's verdict from the health map: ok when every layer is, and the
-    data layer's lines, then the inference service's, then the board's."""
+    data layer's lines, then the inference layer's, then the board's."""
     layers = (
         data_verdict(h["data"]),
         inference_verdict(h["inference"], h["board"]),
@@ -268,54 +261,58 @@ def derive_pending(h: Health) -> bool:
     return True
 
 
+def stale_mount(inf: dict[str, Any] | None) -> bool:
+    """The playbook's folder reads as empty or missing inside the board's
+    container - a bind mount gone stale - rather than a file in it that does
+    not load, whose error the verdict prints as it is."""
+    if not inf or inf.get("strategies"):
+        return False
+    error = str(inf.get("error", ""))
+    return "no strategies in " in error or "no strategies directory at " in error
+
+
+def playbook_problem() -> str | None:
+    """Why the playbook the stack reads does not load, checked on the host
+    under .env's COUNTRIX_STRATEGIES; None when it loads. The data container
+    refuses a rebuild over such a playbook and restarts until it loads."""
+    folder = os.environ.get("COUNTRIX_STRATEGIES") or dotenv().get("COUNTRIX_STRATEGIES") or ""
+    folder = folder.strip()
+    try:
+        catalog.load(os.path.abspath(os.path.join(ROOT, folder)) if folder else None)
+    except CatalogError as error:
+        return str(error)
+    return None
+
+
 def up() -> int:
-    """Build the image, start the containers, wait for each container,
-    complete pending drafts on the host -> the verdict's exit code."""
+    """Check the playbook, build the image, start the containers, wait for
+    each container, complete pending drafts on the host -> the verdict's
+    exit code."""
+    problem = playbook_problem()
+    if problem:
+        return report(False, ["playbook: %s - the stack would not start on it: the user"
+                              " fixes or removes that file" % problem])
     print("building the image and starting the containers...")
     sh("docker", "compose", "build", "data", timeout=30 * MINUTE)
     sh("docker", "compose", "up", "-d", "--remove-orphans", timeout=10 * MINUTE)
     print("waiting for the containers (a first build scrapes the sources: minutes)...")
     wait_for(URLS["data"], 30 * MINUTE, "the data layer")
-    wait_for(URLS["inference"], 10 * MINUTE, "the inference engine")
-    wait_for(URLS["ui"], 5 * MINUTE, "the board")
+    wait_for(URLS["ui"], 10 * MINUTE, "the board")
     h = health()
     if derive_pending(h):
         h = health()
     ok, lines = verdict(h)
-    if not ok and h["inference"] and not h["inference"].get("strategies"):
+    if not ok and stale_mount(h["inference"]):
         print("stale bind mounts detected; recreating the containers...")
         sh("docker", "compose", "up", "-d", "--force-recreate", timeout=10 * MINUTE)
-        wait_for(URLS["inference"], 5 * MINUTE, "the inference engine")
-        wait_for(URLS["ui"], 2 * MINUTE, "the board")
+        wait_for(URLS["ui"], 5 * MINUTE, "the board")
         ok, lines = verdict(health())
     return report(ok, lines)
 
 
-def sentry_line() -> str | None:
-    """What the sentry last saw, from the report it leaves at
-    sentry.REPORT_PATH (a door.sentry.Report); None without one, or when it
-    is not a JSON object or lacks a field the line reads."""
-    try:
-        with open(sentry.REPORT_PATH, "rb") as handle:
-            seen = cast(sentry.Report, _json_object(handle.read()))
-        parts = ["sentry: %s at %s" % ("ok" if seen["ok"] else "FLAGS", seen["checked_at"])]
-        if seen["quarantined"]:
-            parts.append("quarantined %s" % ", ".join(seen["quarantined"]))
-        if seen["flags"]:
-            parts.append("%d flag(s): %s" % (len(seen["flags"]), "; ".join(seen["flags"][:3])))
-        parts.append("%d tool call(s) in the last minute" % seen["calls_last_minute"])
-    except (OSError, ValueError, KeyError):
-        return None
-    return " - ".join(parts)
-
-
 def status() -> int:
-    """The verdict and the sentry's last pass, touching nothing."""
-    ok, lines = verdict(health())
-    seen = sentry_line()
-    if seen:
-        lines.append(seen)
-    return report(ok, lines)
+    """The verdict, touching nothing."""
+    return report(*verdict(health()))
 
 
 # The agents' run may call exactly these tools - the ones the /refresh skill
@@ -398,8 +395,7 @@ def report(ok: bool, lines: list[str]) -> int:
     for line in lines:
         print("  " + line)
     print(
-        "%s - board %s, inference %s, MCP over HTTP %s"
-        % ("READY" if ok else "NOT READY", BOARD, INFERENCE, MCP_URL))
+        "%s - board %s, MCP over HTTP %s" % ("READY" if ok else "NOT READY", BOARD, MCP_URL))
     return 0 if ok else 1
 
 

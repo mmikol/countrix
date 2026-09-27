@@ -52,8 +52,7 @@ def stubbed(monkeypatch):
     monkeypatch.setattr(orchestrator, "health", lambda: healthy)
     monkeypatch.setattr(orchestrator, "mcp",
                         lambda name, args=None, **k: calls.append(("mcp", name)) or "ok")
-    monkeypatch.setattr(orchestrator, "sentry_line",
-                        lambda: "sentry: ok at now - 0 tool call(s) in the last minute")
+    monkeypatch.setattr(orchestrator, "playbook_problem", lambda: None)
     return calls, healthy
 
 
@@ -67,11 +66,38 @@ def test_up_builds_starts_waits_and_reports(stubbed, capsys):
 
 def test_up_recreates_the_containers_when_a_bind_mount_went_stale(stubbed, capsys):
     calls, healthy = stubbed
-    healthy["inference"]["strategies"] = 0
-    healthy["inference"]["status"] = "degraded"
+    healthy["inference"] = {"status": "degraded", "heroes": 54,
+                            "error": "no strategies in /app/inference/strategies"}
     assert orchestrator.up() == 1
     assert ("sh", "docker", "compose", "up", "-d", "--force-recreate") in calls
     assert "NOT READY" in capsys.readouterr().out
+
+
+def test_up_reports_a_file_that_does_not_load_and_recreates_nothing(stubbed, capsys):
+    """A strategy file the catalog refuses is not a stale mount: the verdict
+    names it, and recreating the containers would change nothing."""
+    calls, healthy = stubbed
+    healthy["inference"] = {"status": "degraded", "heroes": 54,
+                            "error": "bad.md: kind: must be one of assumption, constraint"}
+    assert orchestrator.up() == 1
+    assert not any("--force-recreate" in c for c in calls)
+    assert "inference: bad.md: kind" in capsys.readouterr().out
+
+
+def test_up_stops_before_the_containers_on_a_playbook_that_does_not_load(
+        stubbed, monkeypatch, tmp_path, capsys):
+    """The data container refuses a rebuild over such a playbook and restarts
+    until it loads, so up() says so first instead of waiting on it."""
+    calls, _ = stubbed
+    monkeypatch.undo()
+    monkeypatch.setenv("COUNTRIX_STRATEGIES", str(tmp_path))       # a folder with no strategies
+    monkeypatch.setattr(orchestrator, "sh", lambda *a, timeout, env=None: calls.append(a))
+    assert orchestrator.playbook_problem().startswith("no strategies in")
+    assert orchestrator.up() == 1 and calls == []
+    assert "playbook: no strategies in" in capsys.readouterr().out
+    monkeypatch.delenv("COUNTRIX_STRATEGIES")
+    monkeypatch.setattr(orchestrator, "dotenv", dict)
+    assert orchestrator.playbook_problem() is None              # the shipped playbook loads
 
 
 def test_status_reports_pending_drafts_without_deriving(stubbed, capsys):
@@ -80,7 +106,7 @@ def test_status_reports_pending_drafts_without_deriving(stubbed, capsys):
     assert orchestrator.status() == 0
     assert not any(c[0] in ("sh", "mcp") for c in calls)
     out = capsys.readouterr().out
-    assert "2 draft(s) awaiting /strategy" in out and "sentry: ok" in out
+    assert "2 draft(s) awaiting /strategy" in out
 
 
 def test_up_reads_the_health_again_after_deriving_drafts(stubbed, monkeypatch):

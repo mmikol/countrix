@@ -53,5 +53,6 @@
     fit           the statistics validate reads, in pure Python: a ridge
                   logistic fit, log loss and Brier, the bootstrap over
                   sessions, the maps an effect needs
-    serve         the engine over HTTP, for the compose stack's board
+    serve         the engine's handlers, which the board runs in-process, and
+                  the engine over HTTP on its own
 """

@@ -52,7 +52,7 @@ change only what a check or the user points at, and leave a report.
 
 3. **Nothing stale.** Grep the tree for names that no longer exist: old
    module paths, renamed tools, renamed folders, old counts ("42 tables",
-   "four containers"), old env-var prefixes. Migration comments feed the
+   "six containers"), old env-var prefixes. Migration comments feed the
    data dictionary, so a renamed tool is renamed there too.
 
        git grep -n -i "<old name>" -- ':!docs/*.md'
@@ -77,8 +77,7 @@ change only what a check or the user points at, and leave a report.
    home and a docstring that says what it does; a module over a few hundred
    lines or a function over a screen is a smell to name, not necessarily to
    fix. Every write to the playbook or the database goes through a tool
-   that validates and logs it, the sentry's quarantine rename aside - no
-   new side doors. Two inputs are the user's: the strategy files and the
+   that validates and logs it - no new side doors. Two inputs are the user's: the strategy files and the
    matches the owner records through `record_match`. Every table but
    `strategies`, `matches` and `match_picks` is filled by a pull or derived
    at load, and none carries the `user` source. The pulls read Blizzard's
@@ -87,8 +86,7 @@ change only what a check or the user points at, and leave a report.
 6. **Security posture.** `docs/security.md` lists the measures; check
    that what it describes is still what the code does (the allowlist in
    `orchestrator.py`, the guards in `db/web.py` and `door/mcp/http.py`,
-   the `query` tool, the sentry's patterns, the compose hardening).
-   `.venv/bin/python -m door.sentry --once` must exit 0 on a clean tree.
+   the `query` tool, the compose hardening).
 
 7. **The backlog is current.** `pm/backlog.md` is the list of what is
    worth doing next, ordered by payoff over blast radius. A run moves an
@@ -187,10 +185,11 @@ is a lesson the next run relearns.
   solved fine on the host and returned 502 from the stack: the solver
   kept a namespace, 244 raw values and a 300-line breakdown for each of
   13,000 candidates, 1.8 GB at peak, over the inference container's
-  1 GiB. Now: the solver scores candidates slim and hydrates only the
-  winners (150 MB), `orchestrator.py up` solves one board through the
-  service before it says READY, and a change that scales with the
-  playbook's size is tried in the stack, not only on the host.
+  1 GiB (since merged into the ui container). Now: the solver scores
+  candidates slim and hydrates only the winners (150 MB),
+  `orchestrator.py up` solves one board on the stack's board before it
+  says READY, and a change that scales with the playbook's size is tried
+  in the stack, not only on the host.
 - **A metric under two names is scored twice.** The mechanical
   consistency pass compared rules on the same key and missed that
   every `matchup.*_diff` normalises exactly like its blue half (red is

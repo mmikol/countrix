@@ -1,5 +1,5 @@
 # countrix: one image for every role - the door (the MCP server and its tools),
-# the inference service, the board, the refresher, the sentry - and the tests.
+# the board with the inference engine, the refresher - and the tests.
 # compose.yaml runs one container per role from it; docker-entrypoint.sh picks
 # the role.
 FROM python:3.12-slim
@@ -26,6 +26,6 @@ RUN mkdir -p db/raw .cache-blizzard .cache-wiki \
 USER app
 
 ENV PYTHONUNBUFFERED=1
-EXPOSE 8017 8019 8020
+EXPOSE 8017 8020
 
 ENTRYPOINT ["./docker-entrypoint.sh"]

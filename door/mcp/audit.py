@@ -1,7 +1,7 @@
 """The audit log: one JSON line per tool call, through either transport and
 in-process - when, over which transport, from whom, which tool, the shape of
-its arguments, whether it succeeded, and how long it took. The sentry reads
-it. COUNTRIX_AUDIT moves it, read on every call.
+its arguments, whether it succeeded, and how long it took. COUNTRIX_AUDIT
+moves it, read on every call.
 
 Every line names its caller: stdio:<pid> (the process that launched the
 stdio server), http:<address>/<session>, and in-process the board, the
@@ -99,7 +99,7 @@ def audited[T](
     """Run one tool call from `client` and leave exactly one audit line for
     it. Every path to a tool - stdio, HTTP and the in-process calls of the
     board, the refresher, the shell and one tool of another - comes through
-    here, so the sentry's window covers all three. A Refusal - the tool
+    here, so the log covers all three. A Refusal - the tool
     refusing its input, the wrapper refusing the call - is audited as
     refused; anything else as crashed. Each carries its message, the crash
     with the error's type, as the door's reply does."""

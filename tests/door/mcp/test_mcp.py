@@ -283,6 +283,6 @@ def test_an_audit_line_records_sizes_and_type_names_never_values(tmp_path):
 
 def test_the_suite_audits_to_a_temporary_file_never_the_repos_log():
     """conftest's audit_log points every call the suite makes away from
-    db/raw/audit.jsonl, the log the sentry reads."""
+    db/raw/audit.jsonl, the repo's own log."""
     assert not os.path.abspath(default_audit_path()).startswith(
         os.path.abspath(RAW_DIR) + os.sep)

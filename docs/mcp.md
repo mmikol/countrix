@@ -55,7 +55,7 @@ the tool runs. What goes wrong is answered by its cause:
 | params that are not an object; a tool name or uri that is not a string or names nothing served | `INVALID_PARAMS` (-32602) |
 | a message that is not an object, or a method that is not a string | `INVALID_REQUEST` (-32600) |
 | a message with no method | dropped, no reply |
-| anything else, a playbook that does not load included | `INTERNAL` (-32603) with the error's type and message; the traceback goes to stderr, and the audit line says crashed, which the sentry counts |
+| anything else, a playbook that does not load included | `INTERNAL` (-32603) with the error's type and message; the traceback goes to stderr, and the audit line says crashed |
 
 ## From a shell
 
@@ -119,7 +119,7 @@ the leak the pin guards against.
 | `db_status` | Which database the tools are pointed at, its state (empty, stale, unfilled or current - what the containers wait on), its table and row counts, and the rates snapshots it holds. | none |
 | `db_init` | Apply the migrations to an EMPTY database (schema only; sync_all fills it). Refuses a database that already has tables. Creates the embedded cluster first when DATABASE_URL is unset and none is built. | none |
 | `db_migrate` | Apply the migrations the ledger has not recorded, in place: a populated database catching up with the files without a rebuild. Nothing pending is not an error. | none |
-| `db_rebuild` | Drop everything, reapply the migrations and run sync_all. The owner's recorded matches are kept across the drop and written back by name. Creates the embedded cluster first when DATABASE_URL is unset and none is built. | `refresh` (boolean): fetch again every page cached before the call began instead of reading the cache, so each page is fetched once, across sync_all's pulls too; a page that fails to fetch keeps its cached copy and is listed under stale |
+| `db_rebuild` | Drop everything, reapply the migrations and run sync_all. The owner's recorded matches are kept across the drop and written back by name. A playbook that does not load refuses it before anything is dropped. Creates the embedded cluster first when DATABASE_URL is unset and none is built. | `refresh` (boolean): fetch again every page cached before the call began instead of reading the cache, so each page is fetched once, across sync_all's pulls too; a page that fails to fetch keeps its cached copy and is listed under stale |
 | `export_csv` | Refresh db/raw/*.csv: one CSV per table. | none |
 | `db_docs` | Regenerate the generated sections of the docs: the ERD and data dictionary in docs/db.md from the live schema, the catalog and vocabulary in docs/inference.md from the strategies files, the tool reference in docs/mcp.md. | none |
 | `query` | Run read-only SQL against the database (one SELECT, WITH, EXPLAIN, SHOW, TABLE or VALUES statement, first 200 rows). Every table is documented in the data dictionary in docs/db.md. | `sql` *required* (string): the statement |

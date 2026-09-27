@@ -96,6 +96,83 @@ def test_a_refused_board_supersedes_nothing():
     assert ticket() is False
 
 
+def test_a_board_waits_for_room_and_holds_none_once_it_leaves():
+    """Admission counts the sixes each board in flight may enumerate: a board
+    alone is admitted whatever its field, a second waits until the first
+    leaves room, and nothing stays held after a board ends - raising
+    included."""
+    import threading
+    admission = serve.Admission(budget=100, wait=5)
+    order, inside, leave = [], threading.Event(), threading.Event()
+
+    def second():
+        with admission.admitted(60, lambda: False):
+            order.append("second in")
+            inside.set()
+            leave.wait(5)
+    with admission.admitted(500, lambda: False):        # alone: in, at most the budget
+        assert admission.held() == 100
+        waiter = threading.Thread(target=second)
+        waiter.start()
+        assert not inside.wait(0.2)                     # no room while the first holds it all
+        order.append("first out")
+    assert inside.wait(5) and order == ["first out", "second in"]
+    assert admission.held() == 60
+    with pytest.raises(ValueError), admission.admitted(40, lambda: False):  # room beside it
+        raise ValueError("the solve failed")
+    assert admission.held() == 60
+    leave.set()
+    waiter.join(5)
+    assert admission.held() == 0
+
+
+def test_a_waiting_board_stops_when_superseded_or_turned_away():
+    """A board still waiting for room is answered without solving: 400 once a
+    newer board from its client supersedes it, 429 once the wait runs out -
+    and handle_board says so before the World is read."""
+    from inference import supersede
+    admission = serve.Admission(budget=10, wait=0.05)
+    with admission.admitted(10, lambda: False):
+        with pytest.raises(supersede.Superseded), admission.admitted(5, lambda: True):
+            pass
+        with pytest.raises(serve.BusyError), admission.admitted(5, lambda: False):
+            pass
+    assert admission.held() == 0
+
+
+def test_a_board_superseded_while_it_waits_is_not_admitted_when_room_comes():
+    """The release that makes room wakes every waiter; one whose lane a newer
+    board took meanwhile stops there instead of solving a stale board."""
+    import threading
+
+    from inference import supersede
+    admission, lanes, caught = serve.Admission(budget=10, wait=5), supersede.Latest(), []
+    stale = lanes.take("tab1")
+
+    def waiter():
+        try:
+            with admission.admitted(8, stale):
+                caught.append("admitted")
+        except supersede.Superseded:
+            caught.append("superseded")
+    with admission.admitted(8, lambda: False):
+        thread = threading.Thread(target=waiter)
+        thread.start()
+        thread.join(0.1)
+        lanes.take("tab1")                       # the page moved on while it waited
+    thread.join(5)
+    assert caught == ["superseded"] and admission.held() == 0
+
+
+def test_a_board_with_no_room_answers_429(monkeypatch):
+    """No database is reached: the board is turned away before the World loads."""
+    admission = serve.Admission(budget=10, wait=0)
+    monkeypatch.setattr(serve, "ADMISSION", admission)
+    with admission.admitted(10, lambda: False):
+        data, code = serve.handle_board(None, {"map": ["Ilios"], "client": ["tab9"]})
+    assert code == 429 and "busy" in data["error"]
+
+
 @pytest.mark.invariant
 def test_health_reports_the_catalog_and_the_database(monkeypatch, dsn):
     monkeypatch.setattr(serve.psql, "default_dsn", lambda: dsn)
@@ -191,7 +268,7 @@ def test_the_inference_service_listens_where_the_environment_says(monkeypatch):
     monkeypatch.delenv("COUNTRIX_INFERENCE_PORT")
     args = serve.command_line([])
     assert (args.host, args.port) == ("127.0.0.1", 8019)
-    # the names it answers to beyond the local ones: `inference` in the compose stack
+    # the names it answers to beyond the local ones, as its caller names it
     assert args.allow_host == []
     assert serve.command_line(["--allow-host", "x", "--allow-host", "y"]).allow_host == ["x", "y"]
 
@@ -304,9 +381,9 @@ def _get(url, headers=None):
 
 
 def test_the_service_answers_only_to_the_names_it_is_called_by(served, monkeypatch):
-    """The board calls the service as http://inference:8019, so the compose
-    stack starts it with --allow-host inference; any other name is refused
-    before a route runs."""
+    """A board that names the service as http://inference:8019 needs it
+    started with --allow-host inference; any other name is refused before a
+    route runs."""
     monkeypatch.setattr(serve.psql, "default_dsn", lambda: "postgresql://nobody@127.0.0.1:9/nowhere")
     assert _get(served + "/health", {"Host": "evil.example"}) == (
         403, {"error": "host or origin not allowed"})

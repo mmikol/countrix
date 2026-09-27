@@ -107,10 +107,19 @@ keeps it current.
   database-bound tests share one cluster and mostly read; the
   cache-driven pulls roll back. Cost: an hour; risk: a test that assumed
   it ran alone.
-- **Reconsider the pool cap.** The tools allow a pool of 12; a pool of 8
-  with no locks needs more than 1 GiB and would be killed inside the
-  container. Either lower the cap to what the container can hold or size
-  the container for it. Cost: an hour.
+- **One writer at a time.** Nothing serialises the writers across
+  processes: the refresher's start-up refresh and the agents' `sync_all`
+  both run on a bare `orchestrator.py` when the caches are a day old, so
+  Blizzard is asked at twice its pace and two DELETE-then-INSERT reloads
+  can interleave. A `pg_try_advisory_lock` taken by `refresh_once` and
+  the door's pulls, `sync_all`, `db_rebuild`, `db_migrate`,
+  `load_authored` and `export_csv`, with the callers told to wait on it,
+  serialises every writer whichever process it runs in. Cost: half a day.
+- **Patches daily.** `door/refresh.py`'s DAILY set pulls seasons and
+  rates but not patches, so a day's snapshot is stamped with a patch list
+  up to a week old and the board's patch-since-capture warning comes up to
+  a week late. `pull_patches` first in DAILY is one Cargo query. Cost: an
+  hour with its test.
 
 ## Fact engine: more dependent variables
 
@@ -173,6 +182,15 @@ few match-ups the wiki rates (the counters table is a list).
 
 ## Done
 
+- **The stack is four containers.** The sentry is gone: its quarantine
+  hid the failure the catalog makes loud, its patterns matched ordinary
+  prose and missed real injections, and nothing read its flags; every
+  write now runs under a door tool without exception. The inference
+  container is merged into `ui`, which runs the engine and its pool in
+  process at 2 GiB and admits boards by the sixes their searches may
+  enumerate (`serve.Admission`, a 429 past a minute). `db_rebuild`
+  refuses a playbook that does not load before it drops anything, which
+  the sentry had been hiding by winning the race.
 - **The playbook is judged against the recorded matches** - `match-level`
   branch. `validate_playbook` and `python -m ui.validation` rescore each
   map with evaluate from both seats, score five models out of sample on a

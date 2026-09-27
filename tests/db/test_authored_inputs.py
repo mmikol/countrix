@@ -183,13 +183,6 @@ def test_a_pull_that_stores_no_table_says_nothing_stored(monkeypatch, tmp_path):
     assert data["tables"] == [] and data["snapshot_id"] is None
 
 
-def test_the_sentry_scans_the_wiki_tables_the_playbook_and_the_match_notes():
-    from door import sentry
-    scanned = dict(sentry.TEXT_COLUMNS)
-    assert {"synergies", "seasons", "strategies"} <= set(scanned)
-    assert scanned["matches"] == ("note",)          # a note is read back to a session
-
-
 def test_the_data_dictionary_says_where_seasons_and_synergies_come_from():
     # 018's COMMENT ON TABLE replaces the prose 004 wrote above CREATE TABLE
     # seasons; 005's prose above CREATE TABLE synergies is kept current itself

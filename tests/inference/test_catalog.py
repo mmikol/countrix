@@ -110,7 +110,7 @@ def test_a_file_named_for_another_id_cannot_hijack_it(catalog_copy):
         encoding="utf-8")
     with pytest.raises(CatalogError) as caught:
         catalog.load(catalog_copy)
-    assert caught.value.file == "aaa.md" and "id: is the filename" in str(caught.value)
+    assert str(caught.value).startswith("aaa.md: ") and "id: is the filename" in str(caught.value)
 
 
 def test_another_playbook_is_chosen_by_the_environment(monkeypatch, tmp_path):

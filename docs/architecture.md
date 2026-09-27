@@ -45,7 +45,7 @@ Code on your subscription, and the board never calls a model.
 | `db/` | **DATA LAYER** - `data/` and `psql/` pull every source, clean it and store it, with the schema, its migrations and the embedded cluster; `web.py` is what the three HTTP servers share, from the Host-and-Origin guard to the one MCP client; `matches.py` is the one writer of the recorded matches. The bottom of the import graph: it imports nothing above it, and the layers over it read Postgres directly, over `db.psql.default_dsn()` | [db.md](db.md) |
 | `facts/` | **FACTS LAYER** - everything the database knows about a board: the World (the database in memory), the metrics registry, the FactSet. It imports only `db`; the solver, the deriver, the door and the board read the same numbers through it | [`facts/__init__.py`](../facts/__init__.py) |
 | `inference/` | **INFERENCE LAYER** - the playbook of constraints, heuristics and assumptions in markdown, the solver, the tuning loop, the deriver | [inference.md](inference.md) |
-| `door/` | **THE DOOR** over all three layers - `mcp/`, the MCP server and its tools, under which every write runs, the sentry's quarantine rename aside; `refresh.py`, the clock that runs the tools daily and weekly; `sentry.py`, the guard over the playbook, the database's free text and the door's audit log | [mcp.md](mcp.md) |
+| `door/` | **THE DOOR** over all three layers - `mcp/`, the MCP server and its tools, under which every write runs; `refresh.py`, the clock that runs the tools daily and weekly | [mcp.md](mcp.md) |
 | `ui/` | **THE BOARD** - the page (map, sides, bans, red and blue rosters) over the facts layer's facts and the inference layer's answer: `board.py`, `pages.py` and `static/`, and `validation.py` with `charts.py`, the playbook against the recorded matches as text and a page of charts in `db/raw` - the only presentation code | [ui.md](ui.md) |
 | `tests/` | one folder per layer beside the root files' tests, with `synthetic.py`, a World of twelve released heroes, one announced hero and three maps built by hand, so a test works out its expected values with no database, `matches.py`, recorded matches on that World with an effect planted on the heroes or the playbook score, `scratch.py`, a scratch database on the test server holding that World's roster, where the recorded-match tests write instead of the built database, and `tests/fixtures/playbook/`, the reference playbook of every kind and form of strategy that the solver tests run on in place of `inference/strategies/` | |
 | `.claude/skills/` | the skills a Claude Code session runs here, one `SKILL.md` each | [The skills](#the-skills) |
@@ -103,16 +103,15 @@ flowchart LR
     CHAT["Claude Code session<br/>/comp and /record skills"] <-->|"MCP tools:<br/>pull_*, facts, infer, board,<br/>record_match"| DATA
 ```
 
-The door gates every write to Postgres or the playbook, the sentry's
-quarantine rename aside, and the layers read Postgres directly
-([mcp.md](mcp.md)).
+The door gates every write to Postgres or the playbook, and the layers
+read Postgres directly ([mcp.md](mcp.md)).
 
 ## The files
 
 | file | purpose |
 | --- | --- |
 | `orchestrator.py` | the end-to-end run. `.venv/bin/python orchestrator.py` brings the stack up (the data container pulls and ingests when the database is empty or stale), runs the agents headless on the `/refresh` skill, and leaves the app running. Verbs: `run` (default) · `up` · `agents` · `status` · `refresh` · `test` · `down` |
-| `compose.yaml` | one container per role from one image: `db` (PostgreSQL 16), `data` (the door: builds the database, then serves every MCP tool over HTTP), `inference` (the engine as a service), `ui` (the board), `refresher` (the door's clock), `sentry` (the guard). The five app containers run unprivileged on a read-only root with every capability dropped and memory and process limits; `db` keeps the five capabilities the postgres image needs to start as root, with no read-only root and no limits. Every port is published on 127.0.0.1 only. Bind mounts keep the caches, `db/raw`, `inference/strategies` and `docs` on the host, so tuning, authoring and regenerating need no rebuild |
+| `compose.yaml` | one container per role from one image: `db` (PostgreSQL 16), `data` (the door: builds the database, then serves every MCP tool over HTTP), `ui` (the board, with the inference engine in the board's process and the solver's worker pool beside it), `refresher` (the door's clock). The three app containers run unprivileged on a read-only root with every capability dropped and memory and process limits; `db` keeps the five capabilities the postgres image needs to start as root, with no read-only root and no limits. Every port is published on 127.0.0.1 only. Bind mounts keep the caches, `db/raw`, `inference/strategies` and `docs` on the host, so tuning, authoring and regenerating need no rebuild |
 | `Dockerfile` | the one image, run as an unprivileged user (uid 1000, or `COUNTRIX_UID`/`GID` from `.env` on a Linux host whose checkout is owned by someone else); `docker-entrypoint.sh` takes the role as its argument and, for `data`, builds the database when it is empty, unfilled or behind the migrations |
 | `docker-db` | run any host command against the compose database: `./docker-db .venv/bin/python -m door.mcp call infer '{"map": "Ilios"}'`; `orchestrator.py up` derives the stack's pending drafts through it |
 | `.mcp.json` | registers the two MCP servers a Claude Code session sees: `countrix` (stdio, the local cluster) and `countrix-docker` (HTTP, the stack's database) - [mcp.md](mcp.md) |
@@ -133,44 +132,43 @@ flowchart LR
         BROWSER["browser"]
         SHELL["./docker-db<br/>DATABASE_URL -> :5433"]
     end
-    subgraph DOCKER["docker compose (one image, five containers, plus postgres)"]
+    subgraph DOCKER["docker compose (one image, three containers, plus postgres)"]
         DATA["data - the door<br/>builds when empty or stale,<br/>then MCP over HTTP :8020/mcp"]
-        INF["inference - INFERENCE ENGINE<br/>:8019 infer · evaluate ·<br/>board · strategies"]
-        UI["ui - the board<br/>:8017<br/>facts in-process,<br/>comps via COUNTRIX_INFERENCE_URL"]
+        UI["ui - the board and the<br/>INFERENCE ENGINE :8017<br/>facts and comps in-process,<br/>the solver's worker pool"]
         DBC["db - postgres:16<br/>volume pgdata"]
         REF["refresher - the door's clock<br/>seasons + rates daily,<br/>every source weekly,<br/>and on start when stale"]
-        SEN["sentry - the guard<br/>the playbook, the database's text,<br/>the door's audit log"]
     end
     SESSION -->|".mcp.json: countrix-docker"| DATA
     BROWSER --> UI
-    UI -->|"HTTP"| INF
     UI -->|"COUNTRIX_MCP_URL:<br/>its writes, a tune<br/>and a recorded match"| DATA
     UI --> DBC
-    INF --> DBC
     DATA --> DBC
     SHELL --> DBC
     REF --> DBC
-    SEN --> DBC
 ```
 
 The containers share one network; only `data` and `refresher` ever open a
 connection out. `docker-entrypoint.sh` takes the role as its argument
-(`data`, `inference`, `ui`, `refresh`, `sentry`). Readiness has one
+(`data`, `ui`, `refresh`). Readiness has one
 definition, `db.psql.schema.state`: empty, stale (a migration the ledger
 lacks), unfilled (no heroes) or current. The entrypoint asks it through
-`python -m db.psql.schema`; `inference`, `ui` and `refresh` wait for
-current, up to the data healthcheck's 900 s, then exit. The data
-container's `/health` carries the state: compose's healthcheck holds
-`data` unhealthy until it is current, and `depends_on` starts `inference`,
-`ui` and `refresher` only then. `orchestrator.py` waits only for a first
-reply and reports the state in its verdict. [security.md](security.md) has
+`python -m db.psql.schema`; `ui` and `refresh` wait for current, up to the
+data healthcheck's 900 s, then exit. The data container's `/health`
+carries the state: compose's healthcheck holds `data` unhealthy until it
+is current, and `depends_on` starts `ui` and `refresher` only then. The
+board's `/health` is the engine's - the playbook and the database - and
+its healthcheck gates nothing. The board admits boards by the sixes their
+searches may enumerate, one `FIELD_BUDGET`'s worth at once
+(`serve.Admission`), so the pool and the fields in flight fit the ui
+container's 2 GiB. `orchestrator.py` waits only for a first reply and
+reports the state in its verdict. [security.md](security.md) has
 the rest of the measures.
 
 Settings, from the environment or `.env` (the refresh times are in [db.md](db.md)).
 Each is read where it is used, so a change takes effect on the next call -
 except where a server listens (the UI and inference host and port), the MCP
-server's token, `COUNTRIX_WORKERS` (read when the pool starts), the refresh
-clock and the sentry interval, which are read once at start:
+server's token, `COUNTRIX_WORKERS` (read when the pool starts) and the
+refresh clock, which are read once at start:
 
 | setting | default | meaning |
 | --- | --- | --- |
@@ -179,11 +177,10 @@ clock and the sentry interval, which are read once at start:
 | `COUNTRIX_PARALLEL` | `1` | `0`: every board in one process |
 | `COUNTRIX_UI_HOST`, `COUNTRIX_UI_PORT` | `127.0.0.1`, `8017` | where the board listens |
 | `COUNTRIX_READ_ONLY` | `1` | the board writes nothing: a slider's weight is the session's own, and the record tab says how to record; `0` brings back *store* and the record tab's result buttons |
-| `COUNTRIX_INFERENCE_HOST`, `COUNTRIX_INFERENCE_PORT` | `127.0.0.1`, `8019` | where the inference service listens |
-| `COUNTRIX_INFERENCE_URL` | unset | the inference service the board delegates to; its handlers run in the board's process when unset. http or https: any other scheme stops the board at launch |
+| `COUNTRIX_INFERENCE_HOST`, `COUNTRIX_INFERENCE_PORT` | `127.0.0.1`, `8019` | where the inference service listens, run on its own (`python -m inference.serve`); the stack runs none |
+| `COUNTRIX_INFERENCE_URL` | unset | the inference service the board delegates to; its handlers run in the board's process when unset, as in the stack. http or https: any other scheme stops the board at launch |
 | `COUNTRIX_MCP_TOKEN` | unset | bearer token the MCP server requires over HTTP |
 | `COUNTRIX_AUDIT` | `db/raw/audit.jsonl` | the MCP server's audit log |
-| `COUNTRIX_SENTRY_EVERY` | `30` | seconds between sentry sweeps |
 | `COUNTRIX_CLAUDE` | `claude` on `PATH`, else `~/.local/bin/claude` | the CLI the agents and `derive` run |
 | `COUNTRIX_MCP_URL` | unset | the MCP server the board's writes go to, a `tune` and a `record_match`; in-process through the same registry when unset. http or https, like the inference URL |
 | `COUNTRIX_REPO_URL` | `https://github.com/mmikol/countrix` | the repository the board's header links to |
@@ -198,7 +195,7 @@ holds the whole playbook; [mcp.md](mcp.md) has the servers and every tool.
 
 | skill | does | when |
 | --- | --- | --- |
-| `/up` | brings the stack up and current, and proves it: health, a board solved through the service, the URLs, the rates' capture date | before a game |
+| `/up` | brings the stack up and current, and proves it: health, a board solved on the board, the URLs, the rates' capture date | before a game |
 | `/comp` | "comp for King's Row, they have Zarya and Pharah, I'm on Ana": calls `infer` and `facts`, argues against the solver's optimum under the assumptions, answers with `[F#]` citations | during |
 | `/tune` | changes a weight, a dial or an expression through `tune` | between games |
 | `/strategy` | asks for a name, a kind and prose, infers the frontmatter and stores the strategy through `add_strategy` | when you learn something |

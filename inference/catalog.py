@@ -81,13 +81,10 @@ def _read(directory: str, name: str, ids: set[str]) -> Strategy:
         return Strategy(hid, parsed.meta, body=parsed.body, raw=raw, path=path)
     except (CatalogError, FrontmatterError) as error:
         text = str(error)
-        wrapped = CatalogError(text if text.startswith((name, hid)) else "%s: %s" % (name, text))
-        wrapped.file = name
-        raise wrapped from error
+        raise CatalogError(
+            text if text.startswith((name, hid)) else "%s: %s" % (name, text)) from error
     except Exception as error:            # bytes that are not text, a directory, ...
-        wrapped = CatalogError("%s: %s: %s" % (name, type(error).__name__, error))
-        wrapped.file = name
-        raise wrapped from error
+        raise CatalogError("%s: %s: %s" % (name, type(error).__name__, error)) from error
 
 
 def strategy_files(directory: str) -> list[str]:

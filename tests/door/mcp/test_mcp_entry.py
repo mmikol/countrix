@@ -83,9 +83,9 @@ def test_an_in_process_call_is_validated_against_the_tools_schema(tmp_path, monk
 
 
 def test_an_in_process_tool_call_leaves_one_audit_line(tmp_path, monkeypatch):
-    """The sentry's window is the audit log, so the refresher's and the shell's
-    path has to appear in it like a call through either door, under the
-    caller's name."""
+    """The audit log is the record of every call, so the refresher's and the
+    shell's path has to appear in it like a call through either door, under
+    the caller's name."""
     path = tmp_path / "audit.jsonl"
     monkeypatch.setenv("COUNTRIX_AUDIT", str(path))
     ctx = tools.Context(dsn="postgresql://nobody@127.0.0.1:9/x", client="shell")

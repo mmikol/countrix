@@ -5,12 +5,10 @@
 #               behind the migrations (the first build scrapes the sources;
 #               the mounted caches make later builds cheap), then serve every
 #               MCP tool on 8020
-#   inference   INFERENCE ENGINE: wait for the database, serve on 8019
-#   ui          the board: wait for the database, serve it on 8017
+#   ui          the board and the INFERENCE ENGINE: wait for the database,
+#               serve it on 8017
 #   refresh     the door's clock: wait for the database, then refresh it
 #               daily (door/refresh.py)
-#   sentry      the guard: the playbook, the database's text and the door, every
-#               COUNTRIX_SENTRY_EVERY seconds (door/sentry.py)
 #
 # Anything else is run as a command in the image:
 #   docker compose run data python -m door.mcp call sync_all
@@ -18,7 +16,7 @@
 set -e
 role="${1:-ui}"
 case "$role" in
-    data|inference|ui|refresh|sentry) ;;
+    data|ui|refresh) ;;
     *) exec "$@" ;;
 esac
 
@@ -28,23 +26,30 @@ db_state() {
     python -m db.psql.schema
 }
 
+# a refused rebuild - a playbook that does not load - ends the container, and
+# the restart tries again once the file loads
+rebuild() {
+    python -m door.mcp call db_rebuild || {
+        echo "data: the rebuild failed (above); the container retries on restart" >&2
+        exit 1
+    }
+}
+
 case "$role" in
-    sentry)
-        exec python -m door.sentry ;;
     data)
         state=$(db_state)
         case "$state" in
             empty|unfilled)
                 echo "data: $state database - running the first build (scrapes the sources once)"
-                python -m door.mcp call db_rebuild ;;
+                rebuild ;;
             stale)
                 echo "data: schema behind the migrations - rebuilding from the caches"
-                python -m door.mcp call db_rebuild ;;
+                rebuild ;;
             *)
                 echo "data: database current" ;;
         esac
         exec python -m door.mcp --http 0.0.0.0:8020 data ;;
-    inference|ui|refresh)
+    ui|refresh)
         # as long as the data healthcheck's start_period: 90 waits of 10 s. The
         # probe runs as its own command, so set -e ends the container when it fails
         waits=0
@@ -60,9 +65,7 @@ case "$role" in
             sleep 10
         done
         case "$role" in
-            # the board calls the service as http://inference:8019 (compose.yaml)
-            inference) exec python -m inference.serve --host 0.0.0.0 --port 8019 --allow-host inference ;;
-            refresh)   exec python -m door.refresh ;;
-            *)         exec python -m ui.board --host 0.0.0.0 --port 8017 ;;
+            refresh) exec python -m door.refresh ;;
+            *)       exec python -m ui.board --host 0.0.0.0 --port 8017 ;;
         esac ;;
 esac

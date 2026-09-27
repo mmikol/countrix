@@ -15,7 +15,7 @@ and skips itself when it is absent. COUNTRIX_LOCAL_SERVER or DATABASE_URL
 override the target; COUNTRIX_NO_DATABASE=1 runs the suite with no database,
 as CI does. A run that starts with no cluster ends with none. The suite
 audits its tool calls to a temporary file and leaves db/raw/audit.jsonl,
-which the sentry reads, alone.
+the repo's own log, alone.
 """
 
 import os
@@ -44,7 +44,7 @@ def _dsn():
 def audit_log(tmp_path_factory):
     """The suite's audit log, a temporary file: COUNTRIX_AUDIT is read on
     every call and the servers the suite spawns inherit it, so no tool call
-    here reaches db/raw/audit.jsonl, the log the sentry reads. A test that
+    here reaches db/raw/audit.jsonl, the repo's own log. A test that
     reads its own lines points the variable at a file of its own."""
     with pytest.MonkeyPatch.context() as patch:
         path = tmp_path_factory.mktemp("audit") / "audit.jsonl"

@@ -6,7 +6,9 @@ db_rebuild drops every table, and the owner's recorded matches are the one
 thing in them no source can give back. It keeps them: written to
 KEPT_MATCHES before the drop, written back by name once sync_all has
 refilled the roster, each under its own id, and the file removed when every
-one is back. A rebuild that fails leaves the file for the next one.
+one is back. A rebuild that fails leaves the file for the next one, and a
+playbook that does not load refuses the rebuild before anything is dropped:
+sync_all mirrors it only after every pull, when the tables are long gone.
 
 query is the one tool that runs a caller's SQL. It is guarded twice: the
 statement is checked before any connection opens (one read-only statement,
@@ -36,6 +38,7 @@ from facts import tables
 from facts.matches import Match, load_matches
 from facts.model import World
 from inference import catalog
+from inference.strategy import CatalogError
 
 
 class Snapshot(TypedDict):
@@ -154,9 +157,14 @@ def db_migrate(ctx: Context) -> ToolReply:
 @tool(
     "db_rebuild", "Drop everything, reapply the migrations and run"
     " sync_all. The owner's recorded matches are kept across the drop and"
-    " written back by name. Creates the embedded cluster first when DATABASE_URL"
+    " written back by name. A playbook that does not load refuses it before"
+    " anything is dropped. Creates the embedded cluster first when DATABASE_URL"
     " is unset and none is built.", REFRESH)
 def db_rebuild(ctx: Context, refresh: bool = False) -> ToolReply:
+    try:
+        catalog.load()
+    except CatalogError as error:
+        raise Refusal("nothing was dropped: the playbook does not load: %s" % error) from None
     with ctx.connect(boot=True) as cx:
         kept = _keep_matches(cx)
         dropped = schema.rebuild(cx)

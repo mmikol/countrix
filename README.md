@@ -39,9 +39,9 @@ hide the rate figures: Blizzard licenses those for personal use only.*
   sixes, the bans, the side and the result - from the board's record tab or a
   Claude Code session, checked against the roster and the queue's limits. The
   playbook and these matches are the only data a person writes.
-- **Serves it three ways.** A web board, an HTTP inference service and an MCP
-  (Model Context Protocol) server, the tool interface a Claude Code session
-  uses to draft comps and tune the playbook. The solver is arithmetic; the board
+- **Serves it two ways.** A web board and an MCP (Model Context Protocol)
+  server, the tool interface a Claude Code session uses to draft comps and
+  tune the playbook. The solver is arithmetic; the board
   never calls a model.
 
 ![Each pick with its reasons and the facts behind them](docs/img/reasons.jpg)
@@ -70,15 +70,15 @@ flowchart LR
 ```
 
 Three layers over one database, each a package, and a test fails any import that
-reaches up a layer. Every write goes through one door, the MCP server, the
-sentry's quarantine rename aside. Every metric is defined once, so the number
-on the board and the number the solver maximises come from the same function.
+reaches up a layer. Every write goes through one door, the MCP server. Every
+metric is defined once, so the number on the board and the number the solver
+maximises come from the same function.
 The playbook is markdown: each strategy is a file with a few lines of
 frontmatter, and the solver reads nothing else.
 
 ## Engineering
 
-- **940 tests, 97% line coverage** with the database built, against a 75%
+- **958 tests, 97% line coverage** with the database built, against a 75%
   floor. CI runs ruff, mypy and the database-free suite, held to 78%, on every
   push to main and every pull request.
 - **The search is held to brute force.** A CI gate enumerates every legal six
@@ -88,13 +88,12 @@ frontmatter, and the solver reads nothing else.
   pooled and single-process answers are pinned to agree exactly.
 - **Typed throughout.** mypy checks every source module in CI; records that
   cross a module boundary are dataclasses, NamedTuples or TypedDicts.
-- **One door for writes.** 36 MCP tools over stdio, HTTP or in-process, each
+- **One door for writes.** 37 MCP tools over stdio, HTTP or in-process, each
   schema-checked and audited; the query tool runs as a read-only database login.
-- **Hardened containers.** Five services share one image and run unprivileged
+- **Hardened containers.** Three services share one image and run unprivileged
   on a read-only root with every capability dropped; PostgreSQL keeps the five
   it needs to start. Every port binds to loopback, and every HTTP server refuses
-  a foreign Host or Origin. A sentry quarantines a strategy file whose prose
-  reads like an injected instruction and flags the same in the scraped text.
+  a foreign Host or Origin.
 - **Tested documentation.** Relative links resolve, every setting is documented,
   and the generated schema, tool and catalog references match a fresh render.
 
@@ -128,7 +127,6 @@ rates, synergies and counters.
 | | |
 | --- | --- |
 | the board | http://localhost:8017 |
-| the inference service | http://localhost:8019 |
 | the MCP server | http://localhost:8020/mcp |
 | PostgreSQL | localhost:5433 (`./docker-db <command>` points a host command at it) |
 

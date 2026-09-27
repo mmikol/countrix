@@ -24,9 +24,6 @@ db/raw/
 /_*.py
 /_*.json
 
-# what the sentry set aside; never committed
-*.md.quarantined
-
 # the bearer token, the uid/gid override
 .env
 

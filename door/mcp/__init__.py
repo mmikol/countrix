@@ -2,8 +2,7 @@
 layer's pulls - every source fetched, cleaned and stored in Postgres - and
 the tools the facts and inference layers expose through it: the facts, the
 solver and the playbook, and the owner's recorded matches. Every write to
-Postgres or the playbook runs under one of them, the sentry's quarantine
-rename aside.
+Postgres or the playbook runs under one of them.
 
     .venv/bin/python -m door.mcp                  serve over stdio (what .mcp.json launches)
     python -m door.mcp --http H:PORT              serve over HTTP (the data container)

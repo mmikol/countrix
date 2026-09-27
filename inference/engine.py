@@ -57,8 +57,9 @@ class SearchBounds(NamedTuple):
 # 225 MB. A board at pool 10 (411,825 sixes) holds up to three fields at once,
 # about 550 MB: blue's and red's ranked together in two workers and, with a full
 # six on a seat, that seat's revived again in this process to rank the six. The
-# budget is sized against the 2 GiB each solving container has - inference, and
-# data for the door's solver tools
+# budget is sized against the 2 GiB each solving container has - ui, whose boards
+# serve.Admission holds to one budget at once, and data for the door's solver
+# tools
 FIELD_BUDGET = 500_000
 
 

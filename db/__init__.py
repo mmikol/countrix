@@ -61,7 +61,7 @@ CACHE_DIRS = {
 # A page's age and the refresher's clock are read in hours.
 SECONDS_PER_HOUR = 3600.0
 
-# Where a progress line goes - a pull's, a tool's, the sentry's: to_stderr
+# Where a progress line goes - a pull's, a tool's, the clock's: to_stderr
 # below, print, a list's append.
 type Log = Callable[[str], None]
 

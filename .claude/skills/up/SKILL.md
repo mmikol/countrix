@@ -1,6 +1,6 @@
 ---
 name: up
-description: Bring the whole countrix stack up and current - database, the door (MCP), inference engine, board, refresher - and report the URLs and the data's vintage. Use when the user says to start, run, launch or check the app, or wants everything "good to go" before a game.
+description: Bring the whole countrix stack up and current - database, the door (MCP), the board with its inference engine, refresher - and report the URLs and the data's vintage. Use when the user says to start, run, launch or check the app, or wants everything "good to go" before a game.
 ---
 
 Bring everything up and prove it is ready. Run, from the repo root:
@@ -8,23 +8,28 @@ Bring everything up and prove it is ready. Run, from the repo root:
     .venv/bin/python orchestrator.py up    # or without `up`, to also run the agents
 
 It builds the one image, starts one container per role (`db`, `data`,
-`inference`, `ui`, `refresher`, `sentry`), waits for each container's
-health, and prints a verdict. A first build scrapes the sources once
+`ui`, `refresher`), waits for each container's health, and prints a
+verdict. A first build scrapes the sources once
 (minutes); later starts take seconds. Then:
 
 1. Read the verdict. `READY` means: the data layer answers with no pending
-   migrations and a populated database, the inference engine sees the
-   strategies and solves one board, the board serves the roster. Report
-   the URLs it prints (board http://localhost:8017, inference
-   http://localhost:8019, MCP over HTTP http://localhost:8020/mcp) and the
-   line "rates captured YYYY-MM-DD".
+   migrations and a populated database, the board's inference engine sees
+   the strategies and solves one board, the board serves the roster.
+   Report the URLs it prints (board http://localhost:8017, MCP over HTTP
+   http://localhost:8020/mcp) and the line "rates captured YYYY-MM-DD".
 2. `NOT READY` names the problem. The usual fixes, in order: a stale bind
    mount after moving directories -> `docker compose up -d --force-recreate`
    (the script already tries this once); a schema behind the migrations ->
    the `data` container rebuilds on its own, wait and run
    `.venv/bin/python orchestrator.py status` again; the database never
-   became reachable -> `docker compose logs db`; a board did not solve ->
-   `docker compose logs inference`.
+   became reachable -> `docker compose logs db`; a strategy file does not
+   load -> the run stops before the containers start, or the verdict's
+   inference line names it: tell the user the file and the catalog's
+   reason and leave the file alone - a field is set through `/tune`, a
+   draft finished through `/strategy`, and only the user removes a file
+   (the data container refuses a rebuild over it and restarts until it
+   loads, as `docker compose logs data` shows); a board did not solve ->
+   `docker compose logs ui`.
 3. If the rates capture date is not today and the user is about to play,
    offer `.venv/bin/python orchestrator.py refresh` (or the `sync_all` tool
    with `refresh: true` on the `countrix-docker` MCP server). The

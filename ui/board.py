@@ -13,7 +13,8 @@ comp, blue's picks filled and its optimal counter to red's, each seat's
 picks scored as a share of its own optimal, the fight odds and the game
 plan; the playbook panel is the strategies catalog as it sits on disk; the
 record panel is the board as a played map, ready to record. JSON endpoints
-under /api/ serve the first three.
+under /api/ serve the first three; /health is the engine's - the playbook
+and the database - for the container's healthcheck and orchestrator.py.
 
 The board writes twice, each a door tool call, and only when
 COUNTRIX_READ_ONLY=0: a weight stored from the playbook panel is a `tune`,
@@ -74,8 +75,8 @@ def _http_url(setting: str) -> str:
     return value
 
 
-# The inference service's handlers (inference/serve.py) run in-process unless
-# a service is named: in the compose stack the `inference` container serves them.
+# The inference service's handlers (inference/serve.py) run in-process - as in
+# the compose stack - unless COUNTRIX_INFERENCE_URL names a service.
 def inference_url() -> str:
     return _http_url("COUNTRIX_INFERENCE_URL")
 
@@ -215,6 +216,12 @@ def api_strategies() -> web.Reply:
     return remote("/strategies") if inference_url() else serve.handle_strategies()
 
 
+def api_health() -> web.Reply:
+    """The engine's health: the service's when one is named, else
+    serve.handle_health in this process."""
+    return remote("/health") if inference_url() else serve.handle_health()
+
+
 # --- server -----------------------------------------------------------------
 
 class Write(NamedTuple):
@@ -305,6 +312,8 @@ class Handler(web.Handler):
                 return self._html(pages.view_tests())
             if path == "/api/strategies":
                 return self._json(*api_strategies())
+            if path == "/health":
+                return self._json(*api_health())
             if path == "/api/board":              # connects only when it solves here
                 return self._json(*api_board(query))
             if path not in ("/api/roster", "/api/facts"):
