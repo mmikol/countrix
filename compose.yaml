@@ -22,7 +22,7 @@
 # One image, built once by `data`, shared by every container; each container
 # mounts only what it reads, read-only unless it writes there.
 
-name: counter-utility-matrix
+name: countrix
 
 x-app: &app
   image: countrix
