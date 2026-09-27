@@ -282,10 +282,10 @@ class Strategy:
     """One strategy file, parsed and checked: its fields, its expressions
     compiled, and the form they make it."""
 
-    def __init__(self, hid: str, meta: Frontmatter, body: str, raw: str, path: str) -> None:
-        self.id, self.body, self.raw, self.path = hid, body, raw, path
+    def __init__(self, strategy_id: str, meta: Frontmatter, body: str, raw: str, path: str) -> None:
+        self.id, self.body, self.raw, self.path = strategy_id, body, raw, path
         try:
-            self.name = _text(meta, "name") or hid.replace("-", " ")
+            self.name = _text(meta, "name") or strategy_id.replace("-", " ")
             self.kind: Kind = _choice("kind", meta.get("kind"), KINDS)
             self.category = _text(meta, "category") or "general"
             self.metric = _text(meta, "metric")
@@ -308,7 +308,7 @@ class Strategy:
             params = _given(meta, "params")
             self.params = {} if params is None else _params(params)
         except (CatalogError, ExprError) as error:
-            raise CatalogError("%s: %s" % (hid, error)) from error
+            raise CatalogError("%s: %s" % (strategy_id, error)) from error
         self.params_section = Section(dict(self.params))
         self._check()
 

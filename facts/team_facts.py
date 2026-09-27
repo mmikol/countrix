@@ -30,7 +30,7 @@ from facts.team import (
 UNDER_HEALED = 0.7
 
 
-def _count(n: float, word: str = "pick") -> str:
+def counted(n: float, word: str = "pick") -> str:
     """A count reads as a sentence: one pick, two picks, never one pick(s)."""
     return "%d %s%s" % (n, word, "" if n == 1 else "s")
 
@@ -110,9 +110,8 @@ def _shape_facts(
         w: _TeamWriter, figures: dict[str, float], heroes: Sequence[Hero], m: Map | None) -> None:
     label, metrics = w.label, w.metrics
     picked = ", ".join(h.name for h in heroes)
-    w.fact("size", "%s: %d pick%s locked (%s), %d slot%s open" % (
-        label, figures["size"], "" if figures["size"] == 1 else "s", picked,
-        figures["open_slots"], "" if figures["open_slots"] == 1 else "s"))
+    w.fact("size", "%s: %s locked (%s), %s open" % (
+        label, counted(figures["size"]), picked, counted(figures["open_slots"], "slot")))
     w.fact("tanks", "%s shape: %d tank / %d dps / %d support%s" % (
         label, figures["tanks"], figures["damage"], figures["supports"],
         " - " + "; ".join(names(metrics["shape_flags"])) if metrics["shape_flags"] else ""),
@@ -132,7 +131,7 @@ def _shape_facts(
             % (label, m.style_top, m.name, 100 * figures["style_fit"]))
     if metrics["shape_excess"]:
         w.fact("shape_excess", "%s over two per role: %s"
-            % (label, _count(figures["shape_excess"])))
+            % (label, counted(figures["shape_excess"])))
 
 
 def _durability_facts(w: _TeamWriter, figures: dict[str, float]) -> None:
@@ -173,7 +172,7 @@ def _damage_facts(w: _TeamWriter, figures: dict[str, float], heroes: Sequence[He
     w.listed("burst_ranged", "hp")
     if metrics["one_shots"]:
         w.fact("one_shots", "%s one-shots: %s whose biggest hit, a melee swing aside,"
-            " kills a %d pool" % (label, _count(figures["one_shots"]), SQUISHY_POOL))
+            " kills a %d pool" % (label, counted(figures["one_shots"]), SQUISHY_POOL))
     w.fact("dmg_ults", "%s damage ultimates: %d of %d carry damage, %g summed"
         % (label, figures["dmg_ults"], figures["size"], figures["ult_damage_total"]),
         also=("team.ult_damage_total",))
@@ -197,7 +196,7 @@ def _damage_facts(w: _TeamWriter, figures: dict[str, float], heroes: Sequence[He
             also=("team.range_max", "team.range_min"))
     if metrics["dmg_amp"]:
         w.fact("dmg_amp", "%s damage amplification: %s boost someone's damage"
-            % (label, _count(figures["dmg_amp"])))
+            % (label, counted(figures["dmg_amp"])))
 
 
 def _sustain_facts(w: _TeamWriter, figures: dict[str, float], world: World) -> None:
@@ -221,10 +220,10 @@ def _sustain_facts(w: _TeamWriter, figures: dict[str, float], world: World) -> N
     w.fact("lifelines", "%s lifelines: %d of %d picks carry any healing"
         % (label, figures["lifelines"], figures["size"]), also=("team.heal_peak_total",))
     if metrics["heal_amp"]:
-        w.fact("heal_amp", "%s healing amplification: %s" % (label, _count(figures["heal_amp"])))
+        w.fact("heal_amp", "%s healing amplification: %s" % (label, counted(figures["heal_amp"])))
     if metrics["antiheal"]:
         w.fact("antiheal", "%s anti-heal: %s can shut healing off"
-            % (label, _count(figures["antiheal"])))
+            % (label, counted(figures["antiheal"])))
     if metrics["cleanse"] or metrics["invuln"]:
         w.fact("invuln", "%s defensive answers: %d invulnerability, %d cleanse"
             % (label, figures["invuln"], figures["cleanse"]),
@@ -243,23 +242,23 @@ def _tool_facts(w: _TeamWriter, figures: dict[str, float], heroes: Sequence[Hero
                 "cooldown-bound; pick your fights"), "s", also=("team.cooldown_count",))
     cc_tools = ["%s: %s" % (h.name, ", ".join(h.cc_tools)) for h in heroes if h.cc_tools]
     w.fact("cc_count", "%s crowd control: %s%s" % (
-        label, _count(figures["cc_count"]), "; " + "; ".join(cc_tools) if cc_tools else ""))
+        label, counted(figures["cc_count"]), "; " + "; ".join(cc_tools) if cc_tools else ""))
     mobility_tools = ["%s: %s" % (h.name, ", ".join(h.mobility_tools))
         for h in heroes if h.mobility_tools]
     w.fact("mobility_count", "%s engage/escape tools: %s%s" % (
-        label, _count(figures["mobility_count"]),
+        label, counted(figures["mobility_count"]),
         "; " + "; ".join(mobility_tools) if mobility_tools else ""))
     if metrics["flyers"]:
-        w.fact("flyers", "%s vertical threats: %s fly" % (label, _count(figures["flyers"])))
+        w.fact("flyers", "%s vertical threats: %s fly" % (label, counted(figures["flyers"])))
     if metrics["barrier_hp"]:
         w.fact("barrier_hp", "%s barriers: %g hp across %s"
-            % (label, figures["barrier_hp"], _count(figures["barrier_count"])), "hp",
+            % (label, figures["barrier_hp"], counted(figures["barrier_count"])), "hp",
             also=("team.barrier_count",))
     if metrics["barrier_piercers"]:
         w.fact("barrier_piercers", "%s barrier-piercers: %s ignore barriers"
-            % (label, _count(figures["barrier_piercers"])))
+            % (label, counted(figures["barrier_piercers"])))
     if metrics["deployables"]:
-        w.fact("deployables", "%s deployables: %s" % (label, _count(figures["deployables"])))
+        w.fact("deployables", "%s deployables: %s" % (label, counted(figures["deployables"])))
 
 
 def _cohesion_facts(w: _TeamWriter, figures: dict[str, float]) -> None:
@@ -275,7 +274,7 @@ def _cohesion_facts(w: _TeamWriter, figures: dict[str, float]) -> None:
             " - " + pairs if metrics["pairs"] else " - no documented pair"),
         also=("team.synergy_score", "team.synergy_density"))
     w.fact("core_size", "%s synergy core: the largest documented group is %s"
-        % (label, _count(figures["core_size"])))
+        % (label, counted(figures["core_size"])))
     if metrics["isolated"]:
         w.fact("isolated_count", "%s isolated: %s, with no documented partner on the"
             " team" % (label, ", ".join(names(metrics["isolated"]))))
@@ -311,7 +310,7 @@ def _map_facts(w: _TeamWriter, figures: dict[str, float], m: Map) -> None:
         % (label, m.name, figures["map_win_mean"], figures["map_pick_mass"]), "%")
     w.fact("map_specialists", "%s map fit on %s: %s, %d off-map, %d with"
         " this map among their three best by rate"
-        % (label, m.name, _count(figures["map_specialists"], "specialist"),
+        % (label, m.name, counted(figures["map_specialists"], "specialist"),
             figures["map_offmap"], figures["home_map_hits"]),
         also=("team.home_map_hits", "team.map_offmap"))
 
@@ -335,7 +334,7 @@ def _versus_facts(w: _TeamWriter, figures: dict[str, float], enemies: Sequence[H
             also=("team.safe_count",))
     if metrics["double_covered"]:
         w.fact("double_covered", "%s double-covered: %s on %s answered by two or"
-            " more" % (label, _count(figures["double_covered"]), other))
+            " more" % (label, counted(figures["double_covered"]), other))
     if metrics["max_ban_hero"]:
         w.fact("banproof_coverage", "%s ban-resilient coverage: without %s (%.0f%% ban)"
             " still %d/%d answered" % (label, metrics["max_ban_hero"], figures["max_ban_rate"],
@@ -410,7 +409,7 @@ def _heal_floor(fs: FactSet, world: World, blue_t: MetricBag, red_t: MetricBag) 
     shortfall = compute.heal_shortfall(need, blue_n["hps_floor"])
     red = "red"
     if read.filled:
-        red = "red, %s read as the 2-2-2's missing roles at their medians," % _count(
+        red = "red, %s read as the 2-2-2's missing roles at their medians," % counted(
             read.filled, "open slot")
     share = ""
     if read.pool:
@@ -444,28 +443,28 @@ def _matchup_threats(fs: FactSet, matchup: MetricBag, blue_t: MetricBag, red_t: 
         value=blue_t["coverage_share"], also=("matchup.exposure_share",))
     if red_n["mobility_count"]:
         add("dive_pressure", "dive pressure: %s on red carry engage tools; blue peel"
-            " (%s) must hold" % (_count(red_n["mobility_count"]),
-                _count(blue_n["cc_count"], "crowd-control pick")),
+            " (%s) must hold" % (counted(red_n["mobility_count"]),
+                counted(blue_n["cc_count"], "crowd-control pick")),
             value=red_n["mobility_count"], also=("enemy.mobility_count",))
     if red_n["light_flyers"]:
         add("vertical_threat", "vertical threat: %s on red against %s on blue"
-            % (_count(red_n["light_flyers"], "flyer"),
-                _count(blue_n["hitscan"], "hitscan pick")),
+            % (counted(red_n["light_flyers"], "flyer"),
+                counted(blue_n["hitscan"], "hitscan pick")),
             value=red_n["light_flyers"], also=("enemy.light_flyers",))
     if red_n["barrier_hp"]:
         add("barrier_need", "barrier war: red fields %g barrier hp against %s on blue"
             % (red_n["barrier_hp"],
-                _count(blue_n["barrier_piercers"], "barrier-piercer")), "hp",
+                counted(blue_n["barrier_piercers"], "barrier-piercer")), "hp",
             value=red_n["barrier_hp"], also=("enemy.barrier_hp",))
     if red_n["heal_peak_supports"]:
         add("antiheal_need", "sustain war: red supports peak %g heal against %s on blue"
             % (red_n["heal_peak_supports"],
-                _count(blue_n["antiheal"], "anti-heal pick")), "hp",
+                counted(blue_n["antiheal"], "anti-heal pick")), "hp",
             value=red_n["heal_peak_supports"], also=("enemy.heal_peak_supports",))
     if red_n["ult_damage_total"]:
         add("ult_threat", "ult threat: red's damage ultimates total %g against %s on blue"
             % (red_n["ult_damage_total"],
-                _count(matchup_n["ult_answers"], "invulnerability or cleanse answer")), "hp",
+                counted(matchup_n["ult_answers"], "invulnerability or cleanse answer")), "hp",
             value=red_n["ult_damage_total"], also=("matchup.ult_answers", "enemy.ult_damage_total"))
     if red_t["style_lean"] or blue_t["style_lean"]:
         add("style_lean_red", "style war: red leans %s, blue leans %s" % (

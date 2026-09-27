@@ -85,14 +85,14 @@ def _amount(value: Value) -> float:
     raise TypeError("a bonus or penalty reads a number, got %r" % (value,))
 
 
-def _slot_gate(held: list[bool | None], slot: int, h: Strategy, sc: Scope) -> bool:
+def _slot_gate(held: list[bool | None], slot: int, s: Strategy, sc: Scope) -> bool:
     """A gate the candidate decides, read once per slot: the answer a strategy
-    guarded the same way already left in `held`, else h's `when` evaluated on
-    this scope with h's params and kept there."""
+    guarded the same way already left in `held`, else the strategy's `when`
+    evaluated on this scope with its params and kept there."""
     gate = held[slot]
     if gate is None:
-        sc["params"] = h.params_section
-        when = h.when                  # set: a gate the candidate decides has one
+        sc["params"] = s.params_section
+        when = s.when                  # set: a gate the candidate decides has one
         gate = held[slot] = when is None or bool(when.evaluate(sc))
     return gate
 
@@ -237,9 +237,9 @@ class Objective:
         self.catalog = catalog
         # the default engine on this board; None while it is off
         self.base = Base(world, m, red=self.red, banned=banned, weights=base) if base.on else None
-        self.limits = [h for h in catalog if h.form == "limit"]
-        self.heuristics = [h for h in catalog if h.form == "heuristic"]
-        self.scored_constraints = [h for h in catalog if h.form == "scored"]
+        self.limits = [s for s in catalog if s.form == "limit"]
+        self.heuristics = [s for s in catalog if s.form == "heuristic"]
+        self.scored_constraints = [s for s in catalog if s.form == "scored"]
         # the red side's metrics do not change across candidates
         self.red_t = team_metrics(world, self.red, m, ())
         self.static: Namespace = {
@@ -254,8 +254,8 @@ class Objective:
         # a limit with its require:, which every limit has
         gates, slots, self.gate_slots = self._gates()
         self._limits: list[tuple[Strategy, Expr, bool | None, int]] = [
-            (h, h.require, gates[h.id], slots.get(h.id, 0)) for h in self.limits
-            if h.require is not None]
+            (s, s.require, gates[s.id], slots.get(s.id, 0)) for s in self.limits
+            if s.require is not None]
         # the limits prepare() prunes by: a soft one only charges, in score()
         self._hard_limits = [limit for limit in self._limits if not limit[0].soft]
         self._scored = [(r, gates[r.id], slots.get(r.id, 0))
@@ -274,8 +274,8 @@ class Objective:
         for g in self.heuristics:
             if g.id in guards:
                 written[guards[g.id]] = written.get(guards[g.id], 0.0) + g.weight
-        self._needs = {hid: min(1.0, NEED_BUDGET / written[source])
-                       if written[source] else 1.0 for hid, source in guards.items()}
+        self._needs = {sid: min(1.0, NEED_BUDGET / written[source])
+                       if written[source] else 1.0 for sid, source in guards.items()}
         self._freeze_norms()
 
     def _gates(self) -> tuple[dict[str, bool | None], dict[str, int], int]:
@@ -289,21 +289,21 @@ class Objective:
         gates: dict[str, bool | None] = {}
         slots: dict[str, int] = {}
         groups: dict[object, int] = {}
-        for h in self.catalog:
-            if h.when is None:
-                gates[h.id] = True
-            elif settled_by_board(h.when.names):
-                sc["params"] = h.params_section
-                gates[h.id] = bool(h.when.evaluate(sc))
+        for s in self.catalog:
+            if s.when is None:
+                gates[s.id] = True
+            elif settled_by_board(s.when.names):
+                sc["params"] = s.params_section
+                gates[s.id] = bool(s.when.evaluate(sc))
             else:
-                gates[h.id] = None
+                gates[s.id] = None
                 key: object
                 try:
-                    key = (h.when.source, tuple(sorted(h.params.items())))
+                    key = (s.when.source, tuple(sorted(s.params.items())))
                     hash(key)
                 except TypeError:          # a param the dialect read as a list
-                    key = h.id
-                slots[h.id] = groups.setdefault(key, len(groups))
+                    key = s.id
+                slots[s.id] = groups.setdefault(key, len(groups))
         return gates, slots, len(groups)
 
     # --- namespace and preparation -------------------------------------------
@@ -322,13 +322,13 @@ class Objective:
         sc = cand.scope = scope(ns)
         held: list[bool | None] = [None] * self.gate_slots
         violations = []
-        for h, require, gate, slot in self._hard_limits:
+        for s, require, gate, slot in self._hard_limits:
             if gate is None:
-                gate = _slot_gate(held, slot, h, sc)
+                gate = _slot_gate(held, slot, s, sc)
             if gate:
-                sc["params"] = h.params_section
+                sc["params"] = s.params_section
                 if not require.evaluate(sc):
-                    violations.append(h.id)
+                    violations.append(s.id)
         cand.violations = violations
         raw: list[float | None] = []
         keep = raw.append
@@ -436,18 +436,18 @@ class Objective:
                       out: list[Contribution] | None) -> float:
         """The limits' terms: a hard limit costs nothing here (prepare() has
         pruned what breaks it), a soft one charges its penalty where it fails."""
-        for h, require, applies, slot in self._limits:
+        for s, require, applies, slot in self._limits:
             if applies is None:
-                applies = _slot_gate(held, slot, h, sc)
+                applies = _slot_gate(held, slot, s, sc)
             ok, penalty = True, 0.0
             if applies:
-                sc["params"] = h.params_section
+                sc["params"] = s.params_section
                 ok = bool(require.evaluate(sc))
-                if h.soft and not ok and h.penalty is not None:     # a soft limit has one
-                    penalty = _amount(h.penalty.evaluate(sc))
+                if s.soft and not ok and s.penalty is not None:     # a soft limit has one
+                    penalty = _amount(s.penalty.evaluate(sc))
             total -= penalty
             if out is not None:
-                out.append({"id": h.id, "kind": "constraint", "form": "limit",
+                out.append({"id": s.id, "kind": "constraint", "form": "limit",
                             "applies": applies, "ok": ok, "weighted": -penalty,
                             "metric": require.source})
         return total

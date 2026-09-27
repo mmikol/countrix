@@ -71,10 +71,10 @@ def style_anchors(catalog: Iterable[Strategy]) -> list[Strategy]:
     """The finished files the prompt shows as its style: one of each form the
     playbook holds, the first by id."""
     out, forms = [], set()
-    for h in sorted(catalog, key=lambda h: h.id):
-        if h.form not in forms and h.form != "draft":
-            out.append(h)
-            forms.add(h.form)
+    for s in sorted(catalog, key=lambda s: s.id):
+        if s.form not in forms and s.form != "draft":
+            out.append(s)
+            forms.add(s.form)
     return out
 
 
@@ -134,7 +134,7 @@ def vocabulary() -> str:
 
 def prompt(draft: Strategy, catalog: Iterable[Strategy], objection: str = "") -> str:
     """What the model is asked. Three inputs from the person; the rest inferred."""
-    anchors = "\n\n".join(h.raw.split("\n---")[0] + "\n---" for h in style_anchors(catalog))
+    anchors = "\n\n".join(s.raw.split("\n---")[0] + "\n---" for s in style_anchors(catalog))
     fields = (
         '{"metric": "<numeric key>", "direction": "maximize|minimize", "weight": <1-4>}'
         if draft.kind == "heuristic" else
@@ -231,7 +231,7 @@ def run_cli(text: str, timeout: float = TIMEOUT) -> str:
 
 def _pending(catalog: Iterable[Strategy], ids: Collection[str] | None) -> list[Strategy]:
     """The drafts to derive: every one, or the ones ids names."""
-    return [h for h in catalog if h.pending and (not ids or h.id in ids)]
+    return [s for s in catalog if s.pending and (not ids or s.id in ids)]
 
 
 def derive(

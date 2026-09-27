@@ -254,5 +254,5 @@ def test_the_matchup_names_each_side_of_every_trade(synthetic_world):
 
 
 def test_a_count_reads_as_a_sentence():
-    assert team_facts._count(1) == "1 pick" and team_facts._count(0) == "0 picks"
-    assert team_facts._count(3, "flyer") == "3 flyers"
+    assert team_facts.counted(1) == "1 pick" and team_facts.counted(0) == "0 picks"
+    assert team_facts.counted(3, "flyer") == "3 flyers"

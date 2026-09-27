@@ -166,7 +166,7 @@ def handle_board(cx: psycopg.Connection, query: Query) -> web.Reply:
 def handle_strategies() -> web.Reply:
     """The catalog. A playbook that does not load is the server's fault: the
     CatalogError reaches the request boundary, a 500."""
-    return web.Reply({"strategies": [h.to_dict() for h in catalog_module.load()],
+    return web.Reply({"strategies": [s.to_dict() for s in catalog_module.load()],
                       "playbook": catalog_module.playbook_name()}, 200)
 
 
@@ -182,7 +182,7 @@ def handle_health() -> web.Reply:
     except CatalogError as error:
         errors.append(str(error))
     else:
-        out["strategies"], out["pending"] = len(cat), sum(1 for h in cat if h.pending)
+        out["strategies"], out["pending"] = len(cat), sum(1 for s in cat if s.pending)
     # psql.UNREACHABLE: a database out of reach is degraded, never a 500
     try:
         with psycopg.connect(psql.default_dsn()) as cx:

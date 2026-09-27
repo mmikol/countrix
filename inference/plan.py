@@ -15,6 +15,7 @@ from facts.draft import TEAM_SIZE
 from facts.factset import FactSet
 from facts.model import ROLES, Hero, Map, World
 from facts.team import team_metrics, text
+from facts.team_facts import counted
 from inference import base
 from inference.result import Badge, Badges, Momentum, Odds, Result, rates_queue, scores
 
@@ -54,14 +55,14 @@ def momentum(seats: Seats) -> Momentum:
     if blue_why and red_why:                       # neither seat can be a share of anything
         return Momentum(blue=None, red=None, countered=None, partial=False, odds=None,
                         verdict=blue_why, badges=badges)
-    n, m, k = _shares(seats, blue_why, red_why)
-    odds = _odds(n, m)
+    blue_share, red_share, countered_share = _shares(seats, blue_why, red_why)
+    odds = _odds(blue_share, red_share)
     partial = bool((cur.blue and cur.partial) or (red_cur.blue and red_cur.partial))
-    verdict = _verdict_line(cur, red_cur, n, m, partial, odds, blue_why, red_why)
-    if k is not None:
-        verdict += "; if red plays its best counter, your picks hold %d / 100" % k
-    return Momentum(blue=n, red=m, countered=k, partial=partial, odds=odds, verdict=verdict,
-                    badges=badges)
+    verdict = _verdict_line(cur, red_cur, blue_share, red_share, partial, odds, blue_why, red_why)
+    if countered_share is not None:
+        verdict += "; if red plays its best counter, your picks hold %d / 100" % countered_share
+    return Momentum(blue=blue_share, red=red_share, countered=countered_share, partial=partial,
+                    odds=odds, verdict=verdict, badges=badges)
 
 
 def _shares(
@@ -73,12 +74,12 @@ def _shares(
     solved, and the countered case is a fill of blue's picks too, so the
     three are measured the same way."""
     cur, red_cur, countered = seats.current, seats.red_current, seats.countered
-    n = _now(cur, seats.fill).share() if cur.blue and not blue_why else None
-    m = _now(red_cur, seats.red_fill).share() if red_cur.blue and not red_why else None
-    k = None
+    blue_share = _now(cur, seats.fill).share() if cur.blue and not blue_why else None
+    red_share = _now(red_cur, seats.red_fill).share() if red_cur.blue and not red_why else None
+    countered_share = None
     if countered is not None and countered.blue and not countered.unscored():
-        k = countered.share()
-    return n, m, k
+        countered_share = countered.share()
+    return blue_share, red_share, countered_share
 
 
 def _now(current: Result, fill: Result | None) -> Result:
@@ -108,31 +109,33 @@ def _badge(current: Result, fill: Result | None) -> Badge:
     return Badge(label="%d / 100" % share, tip="%s %d%% of %s" % (reach, share, of))
 
 
-def _odds(n: int | None, m: int | None) -> Odds | None:
+def _odds(blue_share: int | None, red_share: int | None) -> Odds | None:
     """The fight odds: the two shares pitted against each other - each side's
     share of the two shares' sum, so the pair reads as a split of 100; defined
     only when both seats score."""
-    if n is None or m is None or n + m <= 0:
+    if blue_share is None or red_share is None or blue_share + red_share <= 0:
         return None
-    blue = round(100.0 * n / (n + m))
+    blue = round(100.0 * blue_share / (blue_share + red_share))
     return Odds(blue=blue, red=100 - blue)
 
 
-def _verdict_line(cur: Result, red_cur: Result, n: int | None, m: int | None, partial: bool,
-                  odds: Odds | None, blue_why: str | None, red_why: str | None) -> str:
+def _verdict_line(
+        cur: Result, red_cur: Result, blue_share: int | None, red_share: int | None,
+        partial: bool, odds: Odds | None, blue_why: str | None, red_why: str | None) -> str:
     """The verdict in words, before the countered hedge."""
     if (blue_why and cur.blue) or (red_why and red_cur.blue):   # one seat scores, the other waits
-        return _one_seat_waits(cur, red_cur, n, m, blue_why, red_why)
-    if n is not None and m is not None:
-        return _gap_line(n, m, partial, odds)
-    if m is not None:
-        return "red has revealed picks and blue has none: red %d / 100 of its best counter" % m
-    if n is not None:
-        return "no red picks revealed yet: blue %d / 100 of its optimal" % n
+        return _one_seat_waits(cur, red_cur, blue_share, red_share, blue_why, red_why)
+    if blue_share is not None and red_share is not None:
+        return _gap_line(blue_share, red_share, partial, odds)
+    if red_share is not None:
+        return ("red has revealed picks and blue has none: red %d / 100 of its best counter"
+                % red_share)
+    if blue_share is not None:
+        return "no red picks revealed yet: blue %d / 100 of its optimal" % blue_share
     return "no picks yet on either side"
 
 
-def _one_seat_waits(cur: Result, red_cur: Result, n: int | None, m: int | None,
+def _one_seat_waits(cur: Result, red_cur: Result, blue_share: int | None, red_share: int | None,
                     blue_why: str | None, red_why: str | None) -> str:
     """Each seat on its own: a seat with picks has its share, unless its
     reason for none waits."""
@@ -140,23 +143,23 @@ def _one_seat_waits(cur: Result, red_cur: Result, n: int | None, m: int | None,
         return "unscored: " + (why or "").split(": ", 1)[-1]
     sides = [
         "no blue picks yet" if not cur.blue else
-        "blue %d / 100 of its optimal" % n if n is not None else
+        "blue %d / 100 of its optimal" % blue_share if blue_share is not None else
         "blue " + waits(blue_why),
         "no red picks revealed yet" if not red_cur.blue else
-        "red %d / 100 of its best counter" % m if m is not None else
+        "red %d / 100 of its best counter" % red_share if red_share is not None else
         "red " + waits(red_why)]
     return "; ".join(sides)
 
 
-def _gap_line(n: int, m: int, partial: bool, odds: Odds | None) -> str:
+def _gap_line(blue_share: int, red_share: int, partial: bool, odds: Odds | None) -> str:
     """Both seats scored: who is ahead and by how much, and the fight odds."""
-    gap = n - m
+    gap = blue_share - red_share
     if abs(gap) < 5:
-        line = "even - blue %d, red %d" % (n, m)
+        line = "even - blue %d, red %d" % (blue_share, red_share)
     elif gap > 0:
-        line = "blue ahead by %d - blue %d, red %d" % (gap, n, m)
+        line = "blue ahead by %d - blue %d, red %d" % (gap, blue_share, red_share)
     else:
-        line = "red ahead by %d - blue %d, red %d" % (-gap, n, m)
+        line = "red ahead by %d - blue %d, red %d" % (-gap, blue_share, red_share)
     if partial:
         line += " (partial picks)"
     if odds:
@@ -418,9 +421,8 @@ def _them(
     n = len(red_h)
     theirs = team_metrics(world, red_h, m, [])
     red_lean = text(theirs["style_lean"]) or text(theirs["style_top"])
-    them = "Their %d pick%s%s (%s)" % (n, "" if n == 1 else "s",
-                                        " so far" if n < TEAM_SIZE else "",
-                                        ", ".join(h.name for h in red_h))
+    them = "Their %s%s (%s)" % (counted(n), " so far" if n < TEAM_SIZE else "",
+                                ", ".join(h.name for h in red_h))
     s = "s" if n == 1 else ""
     if red_lean in THEIR_LEAN and red_lean == lean:
         them += " lean%s %s too: %s." % (s, red_lean, SAME_LEAN[red_lean])
@@ -491,11 +493,11 @@ def _above_all(blue_r: Result, lean: str) -> str | None:
     """What the six is built for: its four heaviest scoring terms - not the
     shape every legal six pays, nor a rule named for another style ("Dive the
     pocket" on a poke six); a rule on the map's style is about the map."""
-    titles = {h.id: h.name for h in blue_r.catalog} | base.TITLES
-    skip = {h.id for h in blue_r.catalog
-            if (h.kind == "constraint" and h.category == "shape")
-            or (h.name.split()[0].lower() in STYLE_PLAY and h.name.split()[0].lower() != lean
-                and not (h.when and "map.style_top" in h.when.names))}
+    titles = {s.id: s.name for s in blue_r.catalog} | base.TITLES
+    skip = {s.id for s in blue_r.catalog
+            if (s.kind == "constraint" and s.category == "shape")
+            or (s.name.split()[0].lower() in STYLE_PLAY and s.name.split()[0].lower() != lean
+                and not (s.when and "map.style_top" in s.when.names))}
     top = sorted((c for c in blue_r.contributions
                   if c["applies"] and c["weighted"] > 0.05
                   and c["id"] not in skip),
@@ -517,9 +519,9 @@ def _basis(
     if side:
         basis.append("the side")
     if bans:
-        basis.append("%d ban%s" % (len(bans), "" if len(bans) == 1 else "s"))
+        basis.append(counted(len(bans), "ban"))
     if yours:
-        basis.append("your %d pick%s" % (yours, "" if yours == 1 else "s"))
+        basis.append("your " + counted(yours))
     if red_h:
-        basis.append("red's %d revealed pick%s" % (len(red_h), "" if len(red_h) == 1 else "s"))
+        basis.append("red's " + counted(len(red_h), "revealed pick"))
     return "Based on: %s." % ", ".join(basis)

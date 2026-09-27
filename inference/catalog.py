@@ -66,23 +66,23 @@ KIND_ORDER = {k: i for i, k in enumerate(KINDS)}
 def _read(directory: str, name: str, ids: set[str]) -> Strategy:
     """One strategy file, validated; any failure is a CatalogError naming the
     file."""
-    hid = name[:-3]                       # the id IS the filename; nothing overrides it
+    sid = name[:-3]                       # the id IS the filename; nothing overrides it
     try:
-        if not ID_RE.fullmatch(hid):
+        if not ID_RE.fullmatch(sid):
             raise CatalogError("%s: the filename must be lowercase-kebab" % name)
         path = os.path.join(directory, name)
         with open(path, encoding="utf-8") as handle:
             raw = handle.read()
         parsed = parse_frontmatter(raw)
-        if "id" in parsed.meta and str(parsed.meta["id"]) != hid:
+        if "id" in parsed.meta and str(parsed.meta["id"]) != sid:
             raise CatalogError("%s: id: is the filename; drop it" % name)
-        if hid in ids:
-            raise CatalogError("%s: duplicate id %r" % (name, hid))
-        return Strategy(hid, parsed.meta, body=parsed.body, raw=raw, path=path)
+        if sid in ids:
+            raise CatalogError("%s: duplicate id %r" % (name, sid))
+        return Strategy(sid, parsed.meta, body=parsed.body, raw=raw, path=path)
     except (CatalogError, FrontmatterError) as error:
         text = str(error)
         raise CatalogError(
-            text if text.startswith((name, hid)) else "%s: %s" % (name, text)) from error
+            text if text.startswith((name, sid)) else "%s: %s" % (name, text)) from error
     except Exception as error:            # bytes that are not text, a directory, ...
         raise CatalogError("%s: %s: %s" % (name, type(error).__name__, error)) from error
 
@@ -109,7 +109,7 @@ def load(directory: str | None = None) -> list[Strategy]:
         out.append(strategy)
     if not out:
         raise CatalogError("no strategies in %s" % directory)
-    out.sort(key=lambda h: (KIND_ORDER[h.kind], FORMS.index(h.form), h.category, h.id))
+    out.sort(key=lambda s: (KIND_ORDER[s.kind], FORMS.index(s.form), s.category, s.id))
     return out
 
 
@@ -121,25 +121,25 @@ def parse_weights(items: Mapping[str, object] | Iterable[object] | None) -> dict
     Refusal, which the board, the service and the board tool answer as the
     caller's error."""
     if isinstance(items, Mapping):
-        pairs = [(str(hid), value) for hid, value in items.items()]
+        pairs = [(str(sid), value) for sid, value in items.items()]
     else:
         pairs = [_weight_entry(item) for item in items or []]
     low, high = WEIGHT_RANGE
     out = {}
-    for hid, value in pairs:
+    for sid, value in pairs:
         weight = finite_number(value)
         if weight is None:
-            raise Refusal("weight %r for %r is not a number" % (value, hid))
-        out[hid.strip()] = min(high, max(low, weight))
+            raise Refusal("weight %r for %r is not a number" % (value, sid))
+        out[sid.strip()] = min(high, max(low, weight))
     return out
 
 
 def _weight_entry(item: object) -> tuple[str, object]:
     """One `id:value` string -> (id, value)."""
-    hid, colon, value = str(item).partition(":")
+    sid, colon, value = str(item).partition(":")
     if not colon:
         raise Refusal("a weight is id:value, got %r" % item)
-    return hid, value
+    return sid, value
 
 
 def weighted(catalog: list[Strategy], weights: Mapping[str, float] | None) -> list[Strategy]:
@@ -150,11 +150,11 @@ def weighted(catalog: list[Strategy], weights: Mapping[str, float] | None) -> li
     if not weights:
         return catalog
     out = []
-    for h in catalog:
-        if h.kind == "heuristic" and h.id in weights and h.weight != weights[h.id]:
-            h = copy.copy(h)
-            h.weight = weights[h.id]
-        out.append(h)
+    for s in catalog:
+        if s.kind == "heuristic" and s.id in weights and s.weight != weights[s.id]:
+            s = copy.copy(s)
+            s.weight = weights[s.id]
+        out.append(s)
     return out
 
 
@@ -164,8 +164,8 @@ def has_scoring_terms(catalog: Iterable[Strategy]) -> bool:
     ties every legal six at zero - the board then says "unscored" rather
     than 100 / 100."""
     return any(
-        h.kind == "heuristic" or h.form == "scored" or (h.form == "limit" and h.soft)
-        for h in catalog)
+        s.kind == "heuristic" or s.form == "scored" or (s.form == "limit" and s.soft)
+        for s in catalog)
 
 
 class KindCounts(TypedDict):
@@ -177,7 +177,7 @@ class KindCounts(TypedDict):
 
 def counts(catalog: Iterable[Strategy]) -> KindCounts:
     """Strategies per kind: {"constraint": n, "heuristic": n, "assumption": n}."""
-    kinds = [h.kind for h in catalog]
+    kinds = [s.kind for s in catalog]
     return KindCounts(constraint=kinds.count("constraint"), heuristic=kinds.count("heuristic"),
                       assumption=kinds.count("assumption"))
 
@@ -218,62 +218,62 @@ def mirror(
     cursor = cx.cursor()
     source_id = register_source(cursor, AUTHORED, now())
     cursor.execute("DELETE FROM strategies")
-    for h in catalog:
+    for s in catalog:
         cursor.execute(
             "INSERT INTO strategies (strategy_id, name, kind, category,"
             " direction, metric, weight, expression, params, body, playbook, source_id)"
             " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
             (
-                h.id, h.name, h.kind, h.category, h.direction, h.metric,
-                h.weight if h.solver_reads else None, h.expressions or None,
-                _params_line(h) or None, h.body, playbook_name(directory), source_id))
+                s.id, s.name, s.kind, s.category, s.direction, s.metric,
+                s.weight if s.solver_reads else None, s.expressions or None,
+                _params_line(s) or None, s.body, playbook_name(directory), source_id))
     cx.commit()
     return MirrorSummary(**counts(catalog), total=len(catalog), tables=["strategies"])
 
 
-def _params_line(h: Strategy) -> str:
+def _params_line(s: Strategy) -> str:
     """A strategy's params as NAME=value, by name."""
-    return ", ".join("%s=%s" % (name, h.params[name]) for name in sorted(h.params))
+    return ", ".join("%s=%s" % (name, s.params[name]) for name in sorted(s.params))
 
 
 def catalog_rendered(catalog: Iterable[Strategy]) -> str:
     """The catalog as text, one line per strategy: kind, form, id, category and
     what it weighs - the `strategies` tool's reply."""
     lines = []
-    for h in catalog:
-        head = "%-10s %-10s %-28s %-9s" % (h.kind, h.form, h.id, h.category)
-        if h.form == "heuristic":
-            head += " %s %s x%g%s" % (h.direction, h.metric, h.weight, " need" if h.need else "")
-        elif h.form == "limit":
-            head += " %s%s" % (h.expressions, " (soft)" if h.soft else "")
-        elif h.form == "scored":
-            head += " %s x%g" % (h.expressions, h.weight)
-        elif h.form == "draft":
+    for s in catalog:
+        head = "%-10s %-10s %-28s %-9s" % (s.kind, s.form, s.id, s.category)
+        if s.form == "heuristic":
+            head += " %s %s x%g%s" % (s.direction, s.metric, s.weight, " need" if s.need else "")
+        elif s.form == "limit":
+            head += " %s%s" % (s.expressions, " (soft)" if s.soft else "")
+        elif s.form == "scored":
+            head += " %s x%g" % (s.expressions, s.weight)
+        elif s.form == "draft":
             head += " (draft: name, kind and prose only - /strategy infers the rest)"
         lines.append(head)
     return "\n".join(lines)
 
 
-def _form_line(h: Strategy, reg: Mapping[str, str]) -> str:
+def _form_line(s: Strategy, reg: Mapping[str, str]) -> str:
     """The line under a strategy's heading in the docs: what it weighs, by form."""
-    when = "; when `%s`" % h.when.source if h.when else ""
-    if h.form == "heuristic":
+    when = "; when `%s`" % s.when.source if s.when else ""
+    if s.form == "heuristic":
         return "`%s %s` - %s. weight %g%s%s" % (
-            h.direction, h.metric, reg.get(h.metric or "", ""), h.weight,
-            ", a need" if h.need else "", when)
-    if h.form == "limit":
+            s.direction, s.metric, reg.get(s.metric or "", ""), s.weight,
+            ", a need" if s.need else "", when)
+    if s.form == "limit":
         # a limit has require:, and a soft one a penalty: (_check_limit)
         return "`require %s`%s%s" % (
-            h.require.source if h.require else "",
-            " (soft, penalty `%s`)" % h.penalty.source if h.soft and h.penalty else " (hard)",
+            s.require.source if s.require else "",
+            " (soft, penalty `%s`)" % s.penalty.source if s.soft and s.penalty else " (hard)",
             when)
-    if h.form == "draft":
+    if s.form == "draft":
         return "*draft* - name, kind and prose only; `/strategy` infers the rest"
-    if h.form == "assumption":
+    if s.form == "assumption":
         return "*assumption* - prose the solver takes as given and the session holds a comp to"
-    return "weight %g; %s" % (h.weight, "; ".join(
+    return "weight %g; %s" % (s.weight, "; ".join(
         "%s `%s`" % (label, expr.source) for label, expr in (
-            ("when", h.when), ("bonus", h.bonus), ("penalty", h.penalty))
+            ("when", s.when), ("bonus", s.bonus), ("penalty", s.penalty))
         if expr is not None))
 
 
@@ -291,7 +291,7 @@ def write_docs(catalog: Sequence[Strategy], path: str = DOCS_PATH) -> str | None
     if strategies_dir() != SHIPPED_DIR:
         return None
     kinds = counts(catalog)
-    forms = {f: sum(1 for h in catalog if h.form == f) for f in FORMS}
+    forms = {f: sum(1 for s in catalog if s.form == f) for f in FORMS}
     reg = compute.registry()
     out = [
         "%d files in `inference/strategies/`: %d constraints (%d limits, %d scored),"
@@ -303,17 +303,17 @@ def write_docs(catalog: Sequence[Strategy], path: str = DOCS_PATH) -> str | None
             "; %d draft(s) awaiting /strategy" % forms["draft"] if forms["draft"] else ""),
         ""]
     for kind in KINDS:
-        items = [h for h in catalog if h.kind == kind]
+        items = [s for s in catalog if s.kind == kind]
         if not items:
             continue
         out += ["#### %ss" % kind.capitalize(), ""]
-        for h in items:
+        for s in items:
             out.append("##### %s (`%s`, %s%s)" % (
-                h.name, h.id, h.category, ", %s" % h.form if h.form != h.kind else ""))
-            out += ["", _form_line(h, reg)]
-            if h.params:
-                out.append("params: " + _params_line(h))
-            out += ["", _without_title(h.body), ""]
+                s.name, s.id, s.category, ", %s" % s.form if s.form != s.kind else ""))
+            out += ["", _form_line(s, reg)]
+            if s.params:
+                out.append("params: " + _params_line(s))
+            out += ["", _without_title(s.body), ""]
     out += ["#### The vocabulary", "",
             "Every key a strategy may reference, with its meaning. `enemy.*` are",
             "the `team.*` metrics computed for the red side.", "",

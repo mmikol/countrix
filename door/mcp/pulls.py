@@ -226,12 +226,12 @@ def pull_counters(connection: psycopg.Connection, pull: fetch.PullContext) -> Pu
 def load_authored(ctx: Context) -> ToolReply:
     with ctx.connect() as cx:
         cat = catalog.load()
-        if any(h.pending for h in cat) and derive.available():
+        if any(s.pending for s in cat) and derive.available():
             # drafts on a host with the CLI: the engine derives them now
             ctx.log(derive.derive_rendered(derive.derive(log=ctx.log)))
             cat = catalog.load()
         summary = catalog.mirror(cx, cat)
-        pending = [h.id for h in cat if h.pending]
+        pending = [s.id for s in cat if s.pending]
         if pending:
             summary["pending"] = len(pending)
     text = "load_authored: strategies " + ", ".join(

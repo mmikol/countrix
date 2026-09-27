@@ -46,7 +46,7 @@ def metrics(ctx: Context) -> ToolReply:
     " and expressions.")
 def strategies(ctx: Context) -> ToolReply:
     cat = catalog.load()
-    pending = [h.id for h in cat if h.pending]
+    pending = [s.id for s in cat if s.pending]
     text = catalog.catalog_rendered(cat)
     if catalog.strategies_dir() != catalog.SHIPPED_DIR:
         text = "playbook in force: %s (the shipped one is %s)\n\n%s" % (
@@ -54,7 +54,7 @@ def strategies(ctx: Context) -> ToolReply:
             os.path.relpath(catalog.SHIPPED_DIR, ROOT), text)
     if pending:
         text += "\n\n%d draft(s) awaiting /strategy: %s" % (len(pending), ", ".join(pending))
-    return ToolReply(text, {"strategies": [h.to_dict() for h in cat], "pending": pending})
+    return ToolReply(text, {"strategies": [s.to_dict() for s in cat], "pending": pending})
 
 
 # the JSON schema type the door declares for each kind of frontmatter field:
@@ -190,20 +190,20 @@ class StrategyResources:
     """The strategies files (and the tuning log), readable as MCP resources."""
 
     def list(self) -> list[Resource]:
-        out = [Resource(uri="strategy://" + h.id, name=h.name,
-                        description="%s (%s)" % (h.kind, h.category),
-                        mimeType="text/markdown") for h in catalog.load()]
+        out = [Resource(uri="strategy://" + s.id, name=s.name,
+                        description="%s (%s)" % (s.kind, s.category),
+                        mimeType="text/markdown") for s in catalog.load()]
         out.append(Resource(uri="strategy://tuning-log", name="tuning log",
                             description="every change to the strategies, with reasons",
                             mimeType="text/markdown"))
         return out
 
     def read(self, uri: str) -> ResourceText:
-        hid = uri.replace("strategy://", "", 1)
-        if hid == "tuning-log":
+        sid = uri.replace("strategy://", "", 1)
+        if sid == "tuning-log":
             return ResourceText(uri=uri, mimeType="text/markdown",
                                 text="\n".join(tune.log_tail(1000)) or "no tuning yet")
-        for h in catalog.load():
-            if h.id == hid:
-                return ResourceText(uri=uri, mimeType="text/markdown", text=h.raw)
+        for s in catalog.load():
+            if s.id == sid:
+                return ResourceText(uri=uri, mimeType="text/markdown", text=s.raw)
         raise NoSuchResourceError(uri)

@@ -45,10 +45,10 @@ def legal_shapes(catalog: Iterable[Strategy], locked: Shape = NO_PICKS) -> list[
 def _shape_limits(catalog: Iterable[Strategy]) -> list[tuple[Strategy, Expr]]:
     """The catalog's hard limits that read only a six's shape, each with its
     require."""
-    return [(h, h.require) for h in catalog
-            if h.form == "limit" and not h.soft and h.require
-            and set(h.require.names) <= SHAPE_KEYS
-            and (h.when is None or set(h.when.names) <= SHAPE_KEYS)]
+    return [(strategy, strategy.require) for strategy in catalog
+            if strategy.form == "limit" and not strategy.soft and strategy.require
+            and set(strategy.require.names) <= SHAPE_KEYS
+            and (strategy.when is None or set(strategy.when.names) <= SHAPE_KEYS)]
 
 
 def _shape_allowed(t: int, d: int, s: int, limits: Sequence[tuple[Strategy, Expr]]) -> bool:
@@ -56,8 +56,9 @@ def _shape_allowed(t: int, d: int, s: int, limits: Sequence[tuple[Strategy, Expr
     `when` holds on it."""
     stub = scope({"team": {"tanks": t, "damage": d, "supports": s,
                            "size": TEAM_SIZE, "open_slots": 0}})
-    for h, require in limits:
-        stub["params"] = h.params_section
-        if (h.when is None or bool(h.when.evaluate(stub))) and not bool(require.evaluate(stub)):
+    for strategy, require in limits:
+        stub["params"] = strategy.params_section
+        when = strategy.when
+        if (when is None or bool(when.evaluate(stub))) and not bool(require.evaluate(stub)):
             return False
     return True

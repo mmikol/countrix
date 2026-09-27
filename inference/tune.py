@@ -147,13 +147,13 @@ def edit_frontmatter(text: str, field: str, value: LineValue) -> tuple[str, str 
     return "---" + "\n".join(lines) + rest, old
 
 
-def validate(directory: str, hid: str, new_text: str) -> list[Strategy]:
+def validate(directory: str, strategy_id: str, new_text: str) -> list[Strategy]:
     """Load a copy of the catalog with this one file replaced; raise on error."""
     tmp = tempfile.mkdtemp(prefix="tune-")
     try:
         for name in catalog_module.strategy_files(directory):
             shutil.copy(os.path.join(directory, name), os.path.join(tmp, name))
-        with open(os.path.join(tmp, hid + ".md"), "w", encoding="utf-8") as handle:
+        with open(os.path.join(tmp, strategy_id + ".md"), "w", encoding="utf-8") as handle:
             handle.write(new_text)
         return catalog_module.load(tmp)
     except CatalogError as error:
@@ -224,17 +224,17 @@ def _reason(reason: str, message: str) -> None:
         raise TuneError(message)
 
 
-def _existing(directory: str, hid: str) -> str:
-    """The path of the strategy file hid names, or a TuneError."""
-    if not catalog_module.ID_RE.fullmatch(hid or ""):
-        raise TuneError("no strategy %r" % hid)          # ids are kebab: no paths here
-    path = os.path.join(directory, hid + ".md")
+def _existing(directory: str, sid: str) -> str:
+    """The path of the strategy file sid names, or a TuneError."""
+    if not catalog_module.ID_RE.fullmatch(sid or ""):
+        raise TuneError("no strategy %r" % sid)          # ids are kebab: no paths here
+    path = os.path.join(directory, sid + ".md")
     if not os.path.exists(path):
-        raise TuneError("no strategy %r" % hid)
+        raise TuneError("no strategy %r" % sid)
     return path
 
 
-def _commit(directory: str, hid: str, text: str,
+def _commit(directory: str, sid: str, text: str,
             what: Callable[[Strategy], str], reason: str,
             by: str) -> tuple[Strategy, str]:
     """The one write order: the catalog loaded with the new text, the file
@@ -247,15 +247,15 @@ def _commit(directory: str, hid: str, text: str,
     break str.splitlines() knows included - so neither opens a second log
     line; who asked is cut to MAX_BY characters, and a blank one is
     BY_SESSION."""
-    loaded = validate(directory, hid, text)
-    strategy = next((h for h in loaded if h.id == hid), None)
+    loaded = validate(directory, sid, text)
+    strategy = next((s for s in loaded if s.id == sid), None)
     if strategy is None:
-        raise TuneError("%s.md lives beside the playbook and is not a strategy" % hid)
-    with open(os.path.join(directory, hid + ".md"), "w", encoding="utf-8") as handle:
+        raise TuneError("%s.md lives beside the playbook and is not a strategy" % sid)
+    with open(os.path.join(directory, sid + ".md"), "w", encoding="utf-8") as handle:
         handle.write(text)
     _document(directory, loaded)
     by = " ".join(by.split())[:MAX_BY] or BY_SESSION
-    line = "- %s `%s` %s (%s) [%s]" % (_stamp(), hid, what(strategy),
+    line = "- %s `%s` %s (%s) [%s]" % (_stamp(), sid, what(strategy),
                                       " ".join(reason.split()), by)
     _log(_where(directory)[1], line)
     return strategy, line
@@ -264,30 +264,30 @@ def _commit(directory: str, hid: str, text: str,
 # --- the three changes -------------------------------------------------------------
 
 def tune(
-        hid: str, field: str, value: object, reason: str, directory: str | None = None,
+        strategy_id: str, field: str, value: object, reason: str, directory: str | None = None,
         by: str = BY_SESSION) -> Change:
     """Apply one change -> the field's old and new text and the log line."""
     directory = _where(directory)[0]
     _reason(reason, "a tuning change needs a reason")
-    path = _existing(directory, hid)
+    path = _existing(directory, strategy_id)
     checked = _coerce(field, value)
     new = field_text(checked)
     with open(path, encoding="utf-8") as handle:
         text, old = edit_frontmatter(handle.read(), field, checked)
-    _, line = _commit(directory, hid, text, lambda _: "%s: %s -> %s" % (
+    _, line = _commit(directory, strategy_id, text, lambda _: "%s: %s -> %s" % (
         field, old if old is not None else "unset", new), reason, by)
-    return {"id": hid, "field": field, "old": old, "new": new, "line": line}
+    return {"id": strategy_id, "field": field, "old": old, "new": new, "line": line}
 
 
 def complete(
-        hid: str, fields: Mapping[str, object] | None, reason: str,
+        strategy_id: str, fields: Mapping[str, object] | None, reason: str,
         directory: str | None = None, by: str = BY_SESSION) -> Completion:
     """Set several frontmatter fields at once - what /strategy infers for a
     draft - validated as a whole, logged as one line -> the form it took and
     each field's text."""
     directory = _where(directory)[0]
     _reason(reason, "an inferred strategy needs a reason")
-    path = _existing(directory, hid)
+    path = _existing(directory, strategy_id)
     pairs = [(f, _coerce(f, v)) for f, v in _flatten(fields)]
     if not pairs:
         raise TuneError("nothing to set")
@@ -295,9 +295,9 @@ def complete(
         text = handle.read()
     for field, value in pairs:
         text, _ = edit_frontmatter(text, field, value)
-    strategy, line = _commit(directory, hid, text, lambda s: "inferred -> %s: %s" % (
+    strategy, line = _commit(directory, strategy_id, text, lambda s: "inferred -> %s: %s" % (
         s.form, _pairs(pairs)), reason, by)
-    return {"id": hid, "form": strategy.form, "set": {f: field_text(v) for f, v in pairs},
+    return {"id": strategy_id, "form": strategy.form, "set": {f: field_text(v) for f, v in pairs},
             "line": line}
 
 
@@ -308,12 +308,12 @@ def sentence_count(body: str) -> int:
     return len(_SENTENCE_END.findall(text.strip()))
 
 
-def _check_new(hid: str, name: str, kind: str, body: str) -> None:
+def _check_new(sid: str, name: str, kind: str, body: str) -> None:
     """What a new strategy must be before any file exists: a kebab id, a known
     kind, a name and prose, the name one line by the rule every field keeps,
     the prose within its length and three sentences at most."""
-    if not catalog_module.ID_RE.fullmatch(hid or ""):
-        raise TuneError("id must be lowercase-kebab, got %r" % hid)
+    if not catalog_module.ID_RE.fullmatch(sid or ""):
+        raise TuneError("id must be lowercase-kebab, got %r" % sid)
     _coerce("kind", kind)
     if not (name or "").strip() or not (body or "").strip():
         raise TuneError("a strategy needs a name and its prose")
@@ -326,7 +326,7 @@ def _check_new(hid: str, name: str, kind: str, body: str) -> None:
                         % (MAX_SENTENCES, count))
 
 
-def add(hid: str, name: str, kind: str, body: str, fields: Mapping[str, object] | None,
+def add(strategy_id: str, name: str, kind: str, body: str, fields: Mapping[str, object] | None,
         reason: str, *, directory: str | None = None,
         by: str = BY_SESSION) -> Addition:
     """A new strategy file from its name, kind, prose and (inferred) fields,
@@ -335,11 +335,11 @@ def add(hid: str, name: str, kind: str, body: str, fields: Mapping[str, object] 
     category among the fields sets it in place, like any other field."""
     directory = _where(directory)[0]
     _reason(reason, "a new strategy needs a reason")
-    _check_new(hid, name, kind, body)
-    path = os.path.join(directory, hid + ".md")
+    _check_new(strategy_id, name, kind, body)
+    path = os.path.join(directory, strategy_id + ".md")
     if os.path.exists(path):
         raise TuneError("%r exists; tune or infer_strategy changes it, deleting it is manual"
-                        % hid)
+                        % strategy_id)
     pairs = [(f, _coerce(f, v)) for f, v in _flatten(fields)]
     body = body.strip("\n")
     if not body.startswith("#"):
@@ -347,9 +347,9 @@ def add(hid: str, name: str, kind: str, body: str, fields: Mapping[str, object] 
     text = "---\nname: %s\nkind: %s\ncategory: general\n---\n%s\n" % (name.strip(), kind, body)
     for field, value in pairs:
         text, _ = edit_frontmatter(text, field, value)
-    strategy, line = _commit(directory, hid, text, lambda s: "added as %s/%s%s" % (
+    strategy, line = _commit(directory, strategy_id, text, lambda s: "added as %s/%s%s" % (
         kind, s.form, ": " + _pairs(pairs) if pairs else ""), reason, by)
-    return {"id": hid, "form": strategy.form, "path": path, "line": line}
+    return {"id": strategy_id, "form": strategy.form, "path": path, "line": line}
 
 
 def log_tail(n: int = 20, log_path: str | None = None) -> list[str]:
