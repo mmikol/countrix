@@ -42,7 +42,7 @@ Code on your subscription, and the board never calls a model.
 
 | folder | what it is | read |
 | --- | --- | --- |
-| `db/` | **DATA LAYER** - `data/` and `psql/` pull every source, clean it and store it, with the schema, its migrations and the embedded cluster; `web.py` is what the three HTTP servers share, from the Host-and-Origin guard to the one MCP client; `matches.py` is the one writer of the recorded matches. The bottom of the import graph: it imports nothing above it, and the layers over it read Postgres directly, over `db.psql.default_dsn()` | [db.md](db.md) |
+| `db/` | **DATA LAYER** - `data/` and `psql/` pull every source, clean it and store it, with the schema, its migrations and the embedded cluster; `web.py` is what the three HTTP servers share, from the Host-and-Origin guard to the one JSON reader; `matches.py` is the one writer of the recorded matches. The bottom of the import graph: it imports nothing above it, and the layers over it read Postgres directly, over `db.psql.default_dsn()` | [db.md](db.md) |
 | `facts/` | **FACTS LAYER** - everything the database knows about a board: the World (the database in memory), the metrics registry, the FactSet. It imports only `db`; the solver, the deriver, the door and the board read the same numbers through it | [`facts/__init__.py`](../facts/__init__.py) |
 | `inference/` | **INFERENCE LAYER** - the playbook of constraints, heuristics and assumptions in markdown, the solver, the tuning loop, the deriver | [inference.md](inference.md) |
 | `door/` | **THE DOOR** over all three layers - `mcp/`, the MCP server and its tools, under which every write runs; `refresh.py`, the clock that runs the tools daily and weekly | [mcp.md](mcp.md) |

@@ -1,5 +1,7 @@
 """The INFERENCE LAYER: facts in, the optimal composition out.
 
+The playbook, which imports nothing from the search:
+
     strategies/   the playbook - STRATEGIES = CONSTRAINTS ∪ HEURISTICS ∪ ASSUMPTIONS:
                   one markdown file per strategy, and tuning-log.md, a line
                   per change. A constraint is a limit
@@ -11,12 +13,17 @@
                   per strategy id, shipped or removed, with the threads a
                   rule was drawn from or the user's word for an assumption
     frontmatter   the dialect a strategy file's frontmatter is written in
+    expr          the safe expression language the frontmatter uses
     strategy      one strategy: its fields, its kind and form, and the rules
                   every file keeps
     catalog       reads the playbook's files into strategies, orders, mirrors
                   and documents them; AUTHORED, the `sources` row the
                   mirror and the recorded matches carry
-    expr          the safe expression language the frontmatter uses
+    tune          one validated, logged edit to a strategy file; add and complete
+    derive        the engine asking the model for a draft's frontmatter
+
+The search, which reads the playbook:
+
     base          the default engine, always on: a six's win rates on the map,
                   the wiki's synergies and its counters against the other
                   side, the terms the playbook's sit on top of
@@ -35,9 +42,12 @@
     parallel      the process pool the board splits its searches across
     supersede     latest wins: a board a newer request replaced stops at its
                   next round
-    tune          one validated, logged edit to a strategy file; add and complete
-    derive        the engine asking the model for a draft's frontmatter
     reach         the board each released hero is optimal on, within a match's bans
+    serve         the engine's handlers, which the board runs in-process, and
+                  the engine over HTTP on its own
+
+The validation, the playbook against the recorded matches:
+
     validate      the playbook against the recorded matches: the verdict from
                   rescore's maps and predict's models, and the data guard
                   that withholds it
@@ -53,6 +63,4 @@
     fit           the statistics validate reads, in pure Python: a ridge
                   logistic fit, log loss and Brier, the bootstrap over
                   sessions, the maps an effect needs
-    serve         the engine's handlers, which the board runs in-process, and
-                  the engine over HTTP on its own
 """

@@ -17,6 +17,9 @@ Postgres or the playbook runs under one of them.
     schema       a tool as the protocol serves it: its arguments as JSON
                  Schema, its reply, and the Tool that checks every call
     audit        the audit line every call leaves, through any door
+    client       the one client that calls the door over HTTP: call_tool, a
+                 tools/call read into a CallReply, for the board and
+                 orchestrator.py
     registry     the one Registry every family declares its tools into, the
                  order it lists the families in, and the Context a call
                  lands in
@@ -36,8 +39,8 @@ Postgres or the playbook runs under one of them.
                  played map before it stores it, list_matches, delete_match
     __main__     the command line above
 
-The protocol and its transports are dependency-free (server, stdio, http,
-schema, audit), so the door has nothing to audit but its own few hundred
-lines; the surface is the standard one - initialize, tools/list,
-tools/call, resources - so any MCP client can drive it.
+The protocol, its transports and its client are dependency-free (server,
+stdio, http, schema, audit, client), so the door has nothing to audit but
+its own few hundred lines; the surface is the standard one - initialize,
+tools/list, tools/call, resources - so any MCP client can drive it.
 """

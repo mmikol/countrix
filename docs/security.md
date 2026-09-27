@@ -72,11 +72,11 @@ tool, each argument's size or type name (never its value), the outcome.
 refusal's reason or 500 with the error's type and message
 (`db.web.failure`), and the traceback goes to stderr; the door's JSON-RPC
 says the same with `isError` and `INTERNAL`. The board's relays,
-`db.web.call_tool` to the door and `ui.board.remote` to the inference
-service, answer 400 for the caller's error, pass a 429 through, and
-answer 502 for any other failure upstream, the door's 401 included, since
-the token it refused is the board's. Each server logs one line to stderr
-for every request that fails and every board it solves.
+`door.mcp.client.call_tool` to the door and `ui.board.remote` to the
+inference service, answer 400 for the caller's error, pass a 429 through,
+and answer 502 for any other failure upstream, the door's 401 included,
+since the token it refused is the board's. Each server logs one line to
+stderr for every request that fails and every board it solves.
 
 **SQL runs as the reader.** The `query` tool in `door/mcp/lifecycle.py`
 runs one read-only statement under a ten-second timeout, refuses names

@@ -24,7 +24,7 @@ read opens its own connection through `db.psql.default_dsn()`.
 ```
 db/
   __init__.py        where things live, and the scope; the package's map
-  web.py             what the three HTTP servers share, the JSON reader and the MCP client
+  web.py             what the three HTTP servers share and the one JSON reader
   matches.py         the one writer of the owner's recorded matches
   data/              the sources, page to table
     blizzard/        overwatch.blizzard.com
@@ -46,7 +46,7 @@ db/
 | `data/__init__.py` | `PullSummary`, what every pull's `run()` returns, and `ArticlePullSummary`, which adds the pages that would not fetch |
 | `data/fetch.py` | the page cache, its freshness and the one request loop: `cached_get`, `cached`, `request` under a `RequestPolicy`, and `PullContext`, what a pull's `run()` takes beside its connection |
 | `data/names.py` | one hero, map or ability across sources: `name_key`, `hero_key` through `RENAMED`, `slug`, `ability_key` and `index` |
-| `web.py` | what the three HTTP servers share: the Host and Origin guard, the reply to a request that raised, `read_json`, and `call_tool`, the door's HTTP client; its docstring holds the relay's status map |
+| `web.py` | what the three HTTP servers share: the Host and Origin guard, the reply to a request that raised, and `read_json`, the one HTTP reader; its docstring holds the relay's status map |
 | `matches.py` | the one writer of `matches` and `match_picks`: `store` takes a match by id - the map's, each hero's - and `delete` removes one with its picks. The door's `record_match` and `delete_match` call it, and `db_rebuild`, which keeps the matches across its drop; `facts/matches.py` reads them back |
 
 ### `data/` - one package per source

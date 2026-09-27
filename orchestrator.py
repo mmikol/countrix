@@ -15,11 +15,11 @@
 
 The agents run on the host, on the subscription (the claude CLI, signed in
 once); without the CLI the run still brings the stack up and says so. It
-imports the standard library, db's ROOT, db.web's JSON reader and MCP
-client, inference.derive, the headless claude recipe, and the catalog, to
-check the playbook before the stack starts; run it with .venv/bin/python,
-since inference.derive loads psycopg. Exit code 0 means
-everything answered.
+imports the standard library, db's ROOT, db.web's JSON reader,
+door.mcp.client's tools/call, inference.derive, the headless claude
+recipe, and the catalog, to check the playbook before the stack starts;
+run it with .venv/bin/python, since inference.derive loads psycopg. Exit
+code 0 means everything answered.
 """
 
 import os
@@ -31,6 +31,7 @@ from datetime import timedelta
 from typing import Any, NamedTuple, TypedDict
 
 from db import ROOT, web
+from door.mcp import client
 from inference import catalog, derive
 from inference.strategy import CatalogError
 
@@ -236,7 +237,7 @@ def mcp(name: str, arguments: dict[str, Any] | None = None, timeout: float = 10 
     """Call one tool on the stack's MCP endpoint -> its text. A reply that is
     not the tool's answer raises RuntimeError with its message: the tool's
     refusal, the door turning the call away, or no server answering."""
-    reply = web.call_tool(MCP_URL, name, arguments or {}, token=token(), timeout=timeout)
+    reply = client.call_tool(MCP_URL, name, arguments or {}, token=token(), timeout=timeout)
     if reply.is_error:
         raise RuntimeError(reply.text)
     return reply.text

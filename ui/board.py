@@ -43,7 +43,7 @@ import psycopg
 from psycopg.rows import TupleRow
 
 from db import psql, web
-from door.mcp import tools
+from door.mcp import client, tools
 from facts import board_facts, tables
 from facts.draft import Query, parse_board
 from facts.roster import roster_of
@@ -173,7 +173,7 @@ def door_call(name: str, arguments: Mapping[str, object], key: str) -> web.Reply
     400, so it reads the same on both paths. A crash inside the tool reads
     500 in-process and 502 remote."""
     if mcp_url():
-        reply = web.call_tool(mcp_url(), name, dict(arguments), token=mcp_token())
+        reply = client.call_tool(mcp_url(), name, dict(arguments), token=mcp_token())
         if reply.is_error:
             return web.Reply({"error": reply.text}, reply.status)
         return web.Reply({"line": reply.text.split("\n")[0], key: reply.structured}, 200)

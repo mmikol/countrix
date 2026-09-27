@@ -97,14 +97,14 @@ def test_storing_a_weight_is_a_tune_call_over_the_door(monkeypatch):
     def fake_call_tool(url, name, arguments, token=None, timeout=60):
         calls.append((name, arguments))
         if arguments["id"] == "no-such":
-            return board.web.CallReply("no strategy 'no-such'", None, 400)
+            return board.client.CallReply("no strategy 'no-such'", None, 400)
         if arguments["value"] > 10:
-            return board.web.CallReply("weight must be within 0..10", None, 400)
-        return board.web.CallReply(
+            return board.client.CallReply("weight must be within 0..10", None, 400)
+        return board.client.CallReply(
             "tuned %s: weight 1 -> %s\n- log line" % (arguments["id"], arguments["value"]),
             {"id": arguments["id"], "field": "weight", "old": 1.0, "new": "9.99"}, 200)
     monkeypatch.setenv("COUNTRIX_MCP_URL", "http://data:8020/mcp")
-    monkeypatch.setattr(board.web, "call_tool", fake_call_tool)
+    monkeypatch.setattr(board.client, "call_tool", fake_call_tool)
     data, code = board.api_weight({"id": "healing-floor", "weight": "9.994"})
     assert code == 200 and data["line"] == "tuned healing-floor: weight 1 -> 9.99"
     assert calls == [("tune", {"id": "healing-floor", "field": "weight", "value": 9.99,
@@ -123,10 +123,10 @@ def test_storing_a_weight_is_a_tune_call_over_the_door(monkeypatch):
         assert board.api_weight({"id": "healing-floor", "weight": low})[1] == 200
         assert calls[-1][1]["value"] == low
     def replying(said, status):
-        return lambda *a, **k: board.web.CallReply(said, None, status)
+        return lambda *a, **k: board.client.CallReply(said, None, status)
     for status, said in ((502, "the MCP server is unreachable: refused"),
                          (429, "the MCP server answered 429: too many calls")):
-        monkeypatch.setattr(board.web, "call_tool", replying(said, status))
+        monkeypatch.setattr(board.client, "call_tool", replying(said, status))
         assert board.api_weight({"id": "healing-floor", "weight": 2}) == ({"error": said}, status)
 
 
@@ -204,12 +204,12 @@ def test_recording_a_match_is_a_record_match_call_over_the_door(monkeypatch):
     def fake_call_tool(url, name, arguments, token=None, timeout=60):
         calls.append((name, arguments))
         if arguments["result"] == "won":
-            return board.web.CallReply("'result' must be one of 'win', 'loss', 'draw'", None,
-                                       400)
-        return board.web.CallReply("recorded match 7: win on Harbor Gate\n#7 ...",
-                                   {"match_id": 7}, 200)
+            return board.client.CallReply("'result' must be one of 'win', 'loss', 'draw'", None,
+                                          400)
+        return board.client.CallReply("recorded match 7: win on Harbor Gate\n#7 ...",
+                                      {"match_id": 7}, 200)
     monkeypatch.setenv("COUNTRIX_MCP_URL", "http://data:8020/mcp")
-    monkeypatch.setattr(board.web, "call_tool", fake_call_tool)
+    monkeypatch.setattr(board.client, "call_tool", fake_call_tool)
     payload = {
         "map": "Harbor Gate", "side": "attack", "result": "win", "blue": BLUE, "red": RED,
         "bans": [], "played_on": "2026-09-24", "note": "", "weights": {"x": 1},
