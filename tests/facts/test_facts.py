@@ -67,13 +67,12 @@ def test_the_rates_half_of_a_maps_style_is_derived_from_its_rates(world):
         mean, sd = statistics.fmean(lifts.values()), statistics.pstdev(lifts.values())
         for m in world.maps.values():
             assert m.rate_lift[style] == pytest.approx((lifts[m.id] - mean) / sd, abs=1e-3)
-            assert m.styles[style][1] is None
         assert statistics.fmean(m.rate_lift[style] for m in world.maps.values()) == \
             pytest.approx(0, abs=1e-3)
     m = world.map("King's Row")
-    ranked = sorted(m.styles, key=lambda s: (-m.styles[s][0], s))
+    ranked = sorted(m.styles, key=lambda s: (-m.styles[s], s))
     assert m.style_top == ranked[0]
-    assert m.style_margin == pytest.approx(m.styles[ranked[0]][0] - m.styles[ranked[1]][0])
+    assert m.style_margin == pytest.approx(m.styles[ranked[0]] - m.styles[ranked[1]])
     fs = board_facts.generate(world, Draft("King's Row"))
     facts = fs.find("map.rate_lift")
     assert [f.value["style"] for f in facts] == ranked
@@ -104,7 +103,7 @@ def test_terrain_and_both_halves_of_the_style_are_facts(world):
         % m.terrain_z["chokes"])
     assert facts[0].value == {"feature": "chokes", "z": m.terrain_z["chokes"],
                               "per_thousand": m.terrain["chokes"]}
-    ranked = sorted(m.styles, key=lambda s: (-m.styles[s][0], s))
+    ranked = sorted(m.styles, key=lambda s: (-m.styles[s], s))
     assert [f.value["style"] for f in fs.find("map.style")] == ranked
     assert {f.value["style"]: f.value["score"] for f in fs.find("map.terrain_lean")} == \
         m.terrain_lean
@@ -113,7 +112,7 @@ def test_terrain_and_both_halves_of_the_style_are_facts(world):
         assert f.value["terrain"] == m.terrain_lean[style]
         assert f.value["rates"] == m.rate_lift[style]
         assert f.text == "%s on King's Row: %+.1f sd (terrain %+.1f, rates %+.1f)" % (
-            style, m.styles[style][0], m.terrain_lean[style], m.rate_lift[style])
+            style, m.styles[style], m.terrain_lean[style], m.rate_lift[style])
     top = fs.find("map.style_top")[0]
     assert top.value == m.style_top and top.text.startswith(
         "King's Row rewards %s: terrain %+.1f, rates %+.1f ("

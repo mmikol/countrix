@@ -35,7 +35,6 @@ from facts.records import (
     Rates,
     Snapshot,
     StageTerrain,
-    StyleScore,
     Synergy,
 )
 from facts.scalars import ally_lifesteal, derive_scalars
@@ -107,8 +106,7 @@ def map_styles(w: World) -> None:
     """Map.rate_lift[S]: for a playstyle S and a map, the mean, over released
     heroes tagged S, each weighted 1/(its tag count), of the hero's win rate
     on the map minus its overall win rate, z-scored across the maps.
-    Map.styles[S]: StyleScore(rate_lift[S] + terrain_lean[S]); a missing half
-    is 0."""
+    Map.styles[S]: rate_lift[S] + terrain_lean[S]; a missing half is 0."""
     rated = sorted(
         ((h, h.win) for h in w.heroes.values() if h.released and h.styles and h.win is not None),
         key=lambda pair: pair[0].id)
@@ -130,7 +128,7 @@ def map_styles(w: World) -> None:
             w.maps[mid].rate_lift[style] = z
     for m in maps:
         m.styles = {
-            s: StyleScore(round(m.rate_lift.get(s, 0.0) + m.terrain_lean.get(s, 0.0), 3), None)
+            s: round(m.rate_lift.get(s, 0.0) + m.terrain_lean.get(s, 0.0), 3)
             for s in sorted(set(m.rate_lift) | set(m.terrain_lean))}
 
 

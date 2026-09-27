@@ -27,7 +27,6 @@ from facts.records import (
     Rates,
     Snapshot,
     StageTerrain,
-    StyleScore,
     Synergy,
 )
 
@@ -178,17 +177,17 @@ class Map:
         self.terrain_z = dict.fromkeys(TERRAIN_FEATURES, 0.0)   # see tables.map_terrain
         self.rate_lift: dict[str, float] = {}                   # style -> z: see tables.map_styles
         self.terrain_lean: dict[str, float] = {}                # style -> z: see tables.map_terrain
-        self.styles: dict[str, StyleScore] = {}     # style -> score: see tables.map_styles
+        self.styles: dict[str, float] = {}                      # style -> sd: see tables.map_styles
 
     @property
     def style_top(self) -> str | None:
         if not self.styles:
             return None
-        return sorted(self.styles, key=lambda s: (-(self.styles[s].score or 0), s))[0]
+        return sorted(self.styles, key=lambda s: (-self.styles[s], s))[0]
 
     @property
     def style_margin(self) -> float:
-        scores = sorted((v.score or 0 for v in self.styles.values()), reverse=True)
+        scores = sorted(self.styles.values(), reverse=True)
         if len(scores) >= 2:
             return round(scores[0] - scores[1], 3)
         return scores[0] if scores else 0

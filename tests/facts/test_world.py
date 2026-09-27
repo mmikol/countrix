@@ -11,7 +11,7 @@ import pytest
 from db import Refusal
 from facts import tables
 from facts.model import Hero, Map
-from facts.records import Rates, StyleScore
+from facts.records import Rates
 
 
 @pytest.mark.invariant
@@ -102,7 +102,7 @@ def test_the_models_lookups_and_derivations(synthetic_world):
     assert (alone.rank_spread, alone.trend) == (0.0, None)
     m = Map(9, "Test Site", "Push")
     assert m.style_top is None and m.style_margin == 0
-    m.styles = {"poke": StyleScore(1.5, None)}
+    m.styles = {"poke": 1.5}
     assert m.style_top == "poke" and m.style_margin == 1.5
-    m.styles["brawl"] = StyleScore(1.5, None)          # a tie goes to the name
+    m.styles["brawl"] = 1.5     # a tie goes to the name
     assert m.style_top == "brawl" and m.style_margin == 0

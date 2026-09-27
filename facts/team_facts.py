@@ -448,7 +448,7 @@ def _matchup_threats(fs: FactSet, matchup: MetricBag, blue_t: MetricBag, red_t: 
                 _count(blue_n["cc_count"], "crowd-control pick")),
             value=red_n["mobility_count"], also=("enemy.mobility_count",))
     if red_n["light_flyers"]:
-        add("flyers", "vertical threat: %s on red against %s on blue"
+        add("vertical_threat", "vertical threat: %s on red against %s on blue"
             % (_count(red_n["light_flyers"], "flyer"),
                 _count(blue_n["hitscan"], "hitscan pick")),
             value=red_n["light_flyers"], also=("enemy.light_flyers",))

@@ -46,9 +46,9 @@ def test_a_styles_rate_lift_is_its_heroes_mean_lift_z_scored_across_the_maps(syn
 
 def test_a_maps_style_is_the_rates_lift_plus_the_terrains_lean(synthetic_world):
     harbor, ember, salt = _maps(synthetic_world)
-    assert harbor.styles == {"brawl": (2.225, None), "dive": (-2.225, None), "poke": (-0.707, None)}
-    assert ember.styles == {"brawl": (-1.0, None), "dive": (2.225, None), "poke": (-0.707, None)}
-    assert salt.styles == {s: (z, None) for s, z in salt.rate_lift.items()}     # the rates alone
+    assert harbor.styles == {"brawl": 2.225, "dive": -2.225, "poke": -0.707}
+    assert ember.styles == {"brawl": -1.0, "dive": 2.225, "poke": -0.707}
+    assert salt.styles == salt.rate_lift     # the rates alone
     assert (harbor.style_top, harbor.style_margin) == ("brawl", 2.932)
     assert (ember.style_top, ember.style_margin) == ("dive", 2.932)
     assert (salt.style_top, salt.style_margin) == ("poke", 1.414)

@@ -9,7 +9,6 @@ import os
 
 from facts import board_facts
 from facts.draft import Draft
-from facts.records import StyleScore
 from facts.team import team_metrics
 from inference import catalog
 from inference.base import OFF
@@ -93,18 +92,27 @@ def test_both_seats_are_read_through_their_fills_while_half_drafted(
 
 
 def test_the_plan_names_every_maps_derived_style(synthetic_world, harbor_gate_board):
-    """Every map's plan names the style its rates reward and cites no note: a
-    map has none. One board is solved through the public path; the other maps'
-    plans are composed from that board's optimal."""
+    """Every map's plan names the style its rates reward. One board is solved
+    through the public path; the other maps' plans are composed from that
+    board's optimal."""
     from inference import plan
     world = synthetic_world
     blue_r = harbor_gate_board.blue
     for m in world.maps.values():
-        assert m.style_top and all(note is None for _, note in m.styles.values()), m.name
+        assert m.style_top, m.name
         said = (harbor_gate_board.plan if m.name == "Harbor Gate"
                 else plan.plan(world, m, "", [], [], blue_r))
         assert "The map rewards %s" % m.style_top in said, m.name
     assert plan._and(["A"]) == "A" and plan._and(["A", "B", "C"]) == "A, B and C"
+
+
+def test_a_style_the_plan_has_no_words_for_still_reads_as_advice(synthetic_world):
+    """A style the wiki adds past dive, brawl and poke reads as plain advice,
+    not a KeyError that fails the board."""
+    from inference import plan
+    m = copy.copy(synthetic_world.map("Harbor Gate"))
+    m.styles = {"flank": 1.0}
+    assert plan._style_read(m, "", [], None) == "The map rewards flank: play to its picks."
 
 
 def test_the_plan_names_the_terrain_the_facts_hold_and_no_other(
@@ -180,8 +188,7 @@ def test_the_plan_says_nothing_the_board_contradicts(synthetic_world):
     from inference.scoring import Contribution
     world = synthetic_world
     m = copy.copy(world.map("Harbor Gate"))
-    m.styles = {"brawl": StyleScore(1.0, None), "dive": StyleScore(-0.5, None),
-                "poke": StyleScore(0.0, None)}     # a brawl map
+    m.styles = {"brawl": 1.0, "dive": -0.5, "poke": 0.0}     # a brawl map
     rules = [
         Ns(
             id="two-supports-hold", name="Two supports hold a six", kind="constraint",

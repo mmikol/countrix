@@ -380,7 +380,7 @@ def _style_read(
     if lean:
         return "The six leans %s%s: %s." % (lean, shape, _advice(lean, roles))
     if map_style:
-        return "The map rewards %s: %s." % (map_style, STYLE_PLAY[map_style])
+        return "The map rewards %s: %s." % (map_style, _advice(map_style, None))
     return None
 
 

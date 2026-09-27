@@ -177,7 +177,8 @@ def test_the_matchup_is_worded_once_both_sides_have_picks(synthetic_world):
         "matchup.coverage_share": "coverage: blue answers 50% of red; red answers 50% of blue",
         "matchup.dive_pressure": "dive pressure: 1 pick on red carry engage tools; blue peel"
             " (1 crowd-control pick) must hold",
-        "matchup.flyers": "vertical threat: 1 flyer on red against 0 hitscan picks on blue",
+        "matchup.vertical_threat": "vertical threat: 1 flyer on red against 0 hitscan picks"
+            " on blue",
         "matchup.ult_threat": "ult threat: red's damage ultimates total 600 against 2"
             " invulnerability or cleanse answers on blue",
         "matchup.style_lean_red": "style war: red leans nothing yet, blue leans brawl",
@@ -190,7 +191,7 @@ def test_the_matchup_is_worded_once_both_sides_have_picks(synthetic_world):
             " so it cancels"}
     # a threat is red's own number: its sentence carries the enemy.* key
     assert [(f.key, f.value) for f in fs.find("enemy.light_flyers", "blue vs red")] == [
-        ("matchup.flyers", 1)]
+        ("matchup.vertical_threat", 1)]
 
 
 def test_the_healing_floor_is_worded_with_every_number_it_reads(synthetic_world):
