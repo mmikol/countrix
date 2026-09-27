@@ -1,7 +1,8 @@
 """The door over Streamable HTTP, the data-layer container's: the real
 server spawned on a free port, and an in-process HttpServer for the guards -
-the origin check, the bearer token, the body and batch caps, the rate limit
-per client address and the audit line each call and each refusal leaves."""
+the origin check, the bearer token, the JSON label, the body and batch caps,
+the rate limit per client address, /health's 500 for a status that raises,
+and the audit line each call and each refusal leaves."""
 
 import http.client
 import json

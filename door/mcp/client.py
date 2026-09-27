@@ -3,8 +3,8 @@ tools/call posted to the door's Streamable HTTP transport and read into a
 CallReply, with the status db.web's relay map gives it - the tool's answer
 200, its refusal 400, the door's 429 as it came, and 502 for the door
 turning the call away otherwise, failing, or not answering. Stdlib only,
-besides db.web's reader, so the board and orchestrator.py call the door
-without loading a tool family.
+besides db.web's reader, so orchestrator.py calls the door without loading
+a tool family.
 """
 
 import json
