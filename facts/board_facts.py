@@ -35,11 +35,30 @@ facts.hero_facts writes a hero's facts, and facts.team_facts a
 team's and the matchup's.
 """
 
+from typing import NotRequired, TypedDict
+
 from facts import compute, hero_facts, team_facts
 from facts.compute import TERRAIN_STANDOUT
-from facts.draft import MAX_BANS, Draft, is_sided, opposite
+from facts.draft import MAX_BANS, Draft, board_side, is_sided, opposite
 from facts.factset import PLAYBOOK_SCOPE, FactSet
 from facts.model import TERRAIN_FEATURES, TERRAIN_LEAN, Map, Resolved, World
+
+
+class TerrainValue(TypedDict):
+    """A map.terrain fact's value, and each feature of a map.stage_terrain
+    fact's: the feature, its z over the ordinary map or stage, and its
+    mentions per thousand words - a stage's with the count behind them."""
+    feature: str
+    z: float
+    per_thousand: float
+    mentions: NotRequired[int]
+
+
+class StageTerrainValue(TypedDict):
+    """A map.stage_terrain fact's value: the stage and the features its own
+    text stresses, largest first."""
+    stage: str
+    features: list[TerrainValue]
 
 
 def _g(value: float) -> str:
@@ -55,7 +74,7 @@ def generate(world: World, draft: Draft) -> FactSet:
     cannot be recommended; every name World.resolve refuses is a Refusal. The
     FactSet's draft holds the resolved names and the side the map keeps."""
     board = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans, allow_announced=True)
-    side = draft.side if is_sided(board.map) else ""
+    side = board_side(board.map, draft.side)
     fs = FactSet(Draft(
         map_name=board.map.name if board.map else None,
         red=tuple(h.name for h in board.red), blue=tuple(h.name for h in board.blue),
@@ -163,9 +182,11 @@ def _map_terrain(fs: FactSet, m: Map) -> None:
                     "%s, %.1f sd above the ordinary stage (%d mentions in the wiki's article)"
                     % (f.replace("_", " "), z, m.stage_terrain[stage][f].mentions)
                     for f, z in standouts)),
-                value={"stage": stage, "features": [
-                    {"feature": f, "z": z, "per_thousand": m.stage_terrain[stage][f].per_thousand,
-                        "mentions": m.stage_terrain[stage][f].mentions} for f, z in standouts]},
+                value=StageTerrainValue(stage=stage, features=[
+                    TerrainValue(
+                        feature=f, z=z, per_thousand=m.stage_terrain[stage][f].per_thousand,
+                        mentions=m.stage_terrain[stage][f].mentions)
+                    for f, z in standouts]),
                 source="stage_terrain")
     if m.terrain:
         for feature in sorted(TERRAIN_FEATURES, key=lambda f: (-abs(m.terrain_z[f]), f)):
@@ -174,7 +195,7 @@ def _map_terrain(fs: FactSet, m: Map) -> None:
                 fs.add("map", m.name, "map.terrain", "%s: %s, %.1f sd %s the ordinary map (the"
                     " wiki's article)" % (m.name, feature.replace("_", " "), abs(z),
                         "below" if z < 0 else "above"),
-                    value={"feature": feature, "z": z, "per_thousand": m.terrain[feature]},
+                    value=TerrainValue(feature=feature, z=z, per_thousand=m.terrain[feature]),
                     source="map_terrain")
     else:
         fs.add("map", m.name, "map.terrain_unread", "%s: the wiki's article has too little on"

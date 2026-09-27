@@ -11,6 +11,7 @@ fit, and words the style from the roles the six holds.
 from collections.abc import Iterable, Mapping, Sequence
 from typing import NamedTuple
 
+from facts.board_facts import StageTerrainValue, TerrainValue
 from facts.draft import TEAM_SIZE
 from facts.factset import FactSet
 from facts.model import ROLES, Hero, Map, World
@@ -349,16 +350,16 @@ def _terrain(m: Map, facts: FactSet) -> list[str]:
     the ordinary map - and the stages whose own text stresses a feature, the
     map.stage_terrain facts."""
     read = []
-    stressed = [f.value["feature"] for f in facts.find("map.terrain", m.name)
-                if f.value["z"] > 0][:TERRAIN_NAMED]
+    terrain: list[TerrainValue] = [f.value for f in facts.find("map.terrain", m.name)]
+    stressed = [t["feature"] for t in terrain if t["z"] > 0][:TERRAIN_NAMED]
     if stressed:
         read.append("The wiki's article stresses %s."
                     % _and(TERRAIN_GROUND[f] for f in stressed))
-    stressing = sorted(facts.find("map.stage_terrain", m.name),
-                       key=lambda f: -f.value["features"][0]["z"])[:STAGES_NAMED]
+    stages: list[StageTerrainValue] = [f.value for f in facts.find("map.stage_terrain", m.name)]
+    stressing = sorted(stages, key=lambda s: -s["features"][0]["z"])[:STAGES_NAMED]
     staged = [
-        (f.value["stage"], _and(TERRAIN_GROUND[x["feature"]] for x in f.value["features"]))
-        for f in sorted(stressing, key=lambda f: m.stages.index(f.value["stage"]))]
+        (s["stage"], _and(TERRAIN_GROUND[x["feature"]] for x in s["features"]))
+        for s in sorted(stressing, key=lambda s: m.stages.index(s["stage"]))]
     if staged:
         read.append("; ".join(("%s has the %s" if i == 0 else "%s the %s") % pair
                               for i, pair in enumerate(staged)) + ".")

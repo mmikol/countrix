@@ -10,6 +10,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from facts import compute
+from facts.draft import Seat
 from facts.factset import FactSet
 from facts.model import SQUISHY_POOL, Hero, Map, Resolved, World
 from facts.team import (
@@ -63,7 +64,7 @@ def write(fs: FactSet, world: World, board: Resolved) -> None:
 class _TeamWriter:
     """One side's facts: each worded around a team metric and valued by it."""
     fs: FactSet
-    team: str
+    team: Seat
     metrics: MetricBag
 
     @property
@@ -86,7 +87,7 @@ class _TeamWriter:
 
 
 def _write_side(
-        fs: FactSet, world: World, *, team: str, heroes: Sequence[Hero], metrics: MetricBag,
+        fs: FactSet, world: World, *, team: Seat, heroes: Sequence[Hero], metrics: MetricBag,
         m: Map | None, enemies: Sequence[Hero]) -> None:
     """One fact per team metric, worded for a reader, a helper per section of
     TEAM_METRICS in registry order."""

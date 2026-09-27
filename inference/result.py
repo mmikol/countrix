@@ -11,9 +11,10 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Literal, NotRequired, TypedDict
 
-from facts.draft import TEAM_SIZE
+from facts.draft import TEAM_SIZE, Seat
 from facts.factset import Fact, FactSet
 from facts.model import ROLES
+from facts.records import Snapshot
 from facts.team import SPECIALIST_DELTA, text
 from inference import base as base_module
 from inference import catalog as catalog_module
@@ -23,9 +24,8 @@ from inference.strategy import Strategy
 
 # A result or a board as to_dict() serves it: a JSON object, read by the shells.
 type Payload = dict[str, object]
-# what a result is, which its heading names, and the seat whose six it is
+# what a result is, which its heading names
 type ResultKind = Literal["infer", "evaluate", "current", "countered", "fill", "expected"]
-type Seat = Literal["blue", "red"]
 
 
 class Pick(TypedDict):
@@ -44,7 +44,8 @@ class Pick(TypedDict):
 
 class Alternative(TypedDict):
     """A runner-up six: its heroes, its score, and its share of the result's
-    best - None until the result is scaled, and where it reads unscored."""
+    best - None until the result is scaled, and where it reads unscored.
+    `blue` is the runner-up six, named as its Result names its own."""
     blue: list[str]
     score: float
     normalized: int | None
@@ -124,7 +125,10 @@ class Result:
     """One seat's six on one board: who is in it and why, what it scores and
     how that breaks down per strategy, the runners-up, and the facts it
     cites. Built empty around the board's names; record_candidate() writes
-    the six onto it and scale_to() sets what 100 means."""
+    the six onto it and scale_to() sets what 100 means. A Result reads from
+    its own seat, as the Draft and the FactSet under it do: `blue` is the
+    seat's six (its picks so far on a partial current comp), `red` the other
+    seat's picks or likely six, and `seat` names which seat that is."""
     kind: ResultKind
     map_name: str | None
     red: list[str]
@@ -399,7 +403,8 @@ def rates_queue(fs: FactSet) -> str:
     board holds none. The source publishes no Open Queue rates, so a pick's
     win rate says which queue it is."""
     for f in fs.find("meta.snapshot"):
-        queue = str(f.value.get("queue") or "")
+        snapshot: Snapshot = f.value
+        queue = snapshot["queue"]
         if queue:
             return queue.removeprefix("competitive_").replace("_", " ").title()
     return ""

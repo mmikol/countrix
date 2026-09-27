@@ -11,7 +11,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from facts.draft import Draft
+from facts.draft import Draft, Seat
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,7 +21,7 @@ class Fact:
     id: str
     scope: str
     subject: str
-    team: str | None
+    team: Seat | None
     key: str
     text: str
     # what the fact states - a number, a name, a list or a record of them -
@@ -66,7 +66,7 @@ class FactSet:
 
     def add(
             self, scope: str, subject: str, key: str, text: str, *, source: str,
-            value: object = None, unit: str | None = None, team: str | None = None,
+            value: object = None, unit: str | None = None, team: Seat | None = None,
             also: Sequence[str] = ()) -> str:
         """`also` names the other metrics this one sentence states, so a caller
         looking for one of them finds the fact that carries it. The fact keeps

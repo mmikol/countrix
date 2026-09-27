@@ -28,8 +28,9 @@ from facts.draft import (
     MAX_TANKS,
     TEAM_SIZE,
     Draft,
+    Seat,
+    board_side,
     check_tanks,
-    is_sided,
     opposite,
 )
 from facts.factset import FactSet
@@ -38,7 +39,7 @@ from inference import catalog as catalog_module
 from inference import parallel, supersede
 from inference.base import DEFAULT, BaseWeights
 from inference.plan import Seats, momentum, plan
-from inference.result import Alternative, Board, Pick, Result, ResultKind, Seat
+from inference.result import Alternative, Board, Pick, Result, ResultKind
 from inference.scoring import Candidate
 from inference.shapes import legal_shapes
 from inference.solver import Infeasible, Solved, Solver, Swept, evaluate_comp
@@ -129,11 +130,6 @@ def _board_facts(world: World, result: Result, side: str) -> FactSet:
         bans=tuple(result.bans), side=side))
 
 
-def _side(m: Map | None, side: str) -> str:
-    """The draft's side where the map has sides; none on any other map."""
-    return side if is_sided(m) else ""
-
-
 def infer(
         world: World, draft: Draft, *, catalog: list[Strategy] | None = None,
         pool_size: int = POOL_DEFAULT, top: int = TOP_DEFAULT,
@@ -179,7 +175,7 @@ def _optimal(
     times the search this call makes."""
     started = time.time() if began is None else began
     m, red_h, blue_h, bans_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
-    side = _side(m, draft.side)
+    side = board_side(m, draft.side)
     _check_teams(red_h, blue_h, seat)
     result = Result(kind=kind, map_name=m.name if m else None, red=[h.name for h in red_h],
                     blue=[], locked=[h.name for h in blue_h], catalog=catalog, base=base,
@@ -212,7 +208,7 @@ def _evaluated(
     from a search the caller already ran on this board."""
     started = time.time()
     m, red_h, blue_h, bans_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
-    side = _side(m, draft.side)
+    side = board_side(m, draft.side)
     _check_teams(red_h, blue_h, seat)
     if len(blue_h) != TEAM_SIZE:
         raise Refusal("evaluate needs exactly %d %s picks (got %d)"
@@ -254,7 +250,7 @@ def _current(
         return result
     started = time.time()
     m, red_h, blue_h, bans_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
-    side = _side(m, draft.side)
+    side = board_side(m, draft.side)
     result = Result(kind=kind, map_name=m.name if m else None, red=[h.name for h in red_h],
                     blue=[h.name for h in blue_h], locked=[h.name for h in blue_h],
                     catalog=catalog, base=base, bans=[h.name for h in bans_h], side=side,
@@ -354,7 +350,7 @@ def _board_once(
     on their seats' scales, the seats merge and are solved, and the countered
     case, which needs red's six, sweeps while the fills merge."""
     m, red_h, blue_h, bans_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
-    draft = dataclasses.replace(draft, side=_side(m, draft.side))
+    draft = dataclasses.replace(draft, side=board_side(m, draft.side))
     _check_teams(red_h, blue_h, "blue")
     expected = _expected(world, m, bans_h, draft, catalog, brief.base)
     enemy = draft.red or tuple(expected.blue)

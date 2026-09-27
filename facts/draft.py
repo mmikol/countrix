@@ -11,6 +11,7 @@ these names from it.
 
 from collections.abc import Iterable, Mapping, Sequence, Sized
 from dataclasses import dataclass
+from typing import Literal
 
 from db import Refusal
 from facts.model import FIVE_V_FIVE, SIX_V_SIX, Hero, Map
@@ -20,6 +21,8 @@ MAX_TANKS = 2             # the queue's own limit, whatever the playbook holds
 MAX_BANS = 5              # each team's two and the lobby's
 SIDED_MODES = ("Escort", "Hybrid")   # modes with an attacking and a defending side
 SIDES = ("attack", "defense")
+# the two seats: blue is the owner's, red the other side's
+type Seat = Literal["blue", "red"]
 EXPECTED_SHAPE = {"tank": 2, "damage": 2, "support": 2}   # what a lobby fields: two of each
 # The format the kit is read in. The shipped playbook's open-queue-ranked
 # assumption makes 6v6 Open Queue the target, so the load lays the wiki's 6v6
@@ -93,6 +96,12 @@ def parse_board(query: Query) -> Draft:
 def is_sided(m: Map | None) -> bool:
     """Whether the map has an attacking and a defending side."""
     return m is not None and (m.mode or "") in SIDED_MODES
+
+
+def board_side(m: Map | None, side: str) -> str:
+    """The side a board keeps: the draft's side where the map has sides, none
+    on any other map."""
+    return side if is_sided(m) else ""
 
 
 def opposite(side: str) -> str:

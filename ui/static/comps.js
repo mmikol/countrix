@@ -176,6 +176,7 @@ function renderInf() {
      optimal alone. The picks' scores are the badges above the pickers */
   renderResult(d.expected, el('inf-red'), 'red - most likely starting comp' + (d.map ? ' on ' + d.map : ''));
   var held = d.current && d.current.blue ? d.current.blue.length : 0;
+  /* each result names its own six blue: red_current.blue is red's picks */
   var revealed = d.red_current && d.red_current.blue ? d.red_current.blue.length : 0;
   var ours = d.fill ? resultHTML(d.fill, 'blue - your picks, the rest filled')
            : held >= TEAM ? resultHTML(d.current, 'blue - your six') : '';
