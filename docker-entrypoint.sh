@@ -48,7 +48,7 @@ case "$role" in
             *)
                 echo "data: database current" ;;
         esac
-        exec python -m door.mcp --http 0.0.0.0:8020 data ;;
+        exec python -m door.mcp --http --host 0.0.0.0 --port 8020 --allow-host data ;;
     ui|refresh)
         # as long as the data healthcheck's start_period: 90 waits of 10 s. The
         # probe runs as its own command, so set -e ends the container when it fails

@@ -1,14 +1,14 @@
-"""The door's entry point and in-process call: `python -m door.mcp list` and
-`call`, the data container's /health, and ctx.call - the refresher's, the
-shell's and the board's path - validated and audited like a call through
-either door."""
+"""The door's entry point and in-process call: `python -m door.mcp list`,
+`call` and `--http`, the data container's /health, and ctx.call - the
+refresher's, the shell's and the board's path - validated and audited like
+a call through either door."""
 
 import json
 
 import pytest
 
 from db import Refusal, psql
-from door.mcp import lifecycle, tools
+from door.mcp import http, lifecycle, tools
 from door.mcp.__main__ import _status, main
 
 
@@ -32,6 +32,24 @@ def test_the_entry_point_lists_tools_and_refuses_nonsense(capsys, tmp_path, monk
     lines = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
     assert [(e["tool"], e["client"], "refused" in e) for e in lines] == [
         ("strategies", "shell", True)]
+
+
+def test_the_http_mode_takes_the_flags_the_other_servers_take(monkeypatch, capsys):
+    """--host, --port and a repeated --allow-host, as the board and the
+    inference service spell them; the old HOST:PORT positional is a usage
+    error like a port that is not a number."""
+    served = []
+    monkeypatch.setattr(http, "serve", lambda server, host, port, status, allowed_hosts=(): (
+        served.append((host, port, list(allowed_hosts)))))
+    assert main(["--http"]) == 0
+    assert main(["--http", "--host", "0.0.0.0", "--port", "9",
+                 "--allow-host", "x", "--allow-host", "y"]) == 0
+    assert served == [("127.0.0.1", 8020, []), ("0.0.0.0", 9, ["x", "y"])]
+    for argv in (["--http", "--port", "x"], ["--http", "127.0.0.1:8020"]):
+        with pytest.raises(SystemExit) as usage:
+            main(argv)
+        assert usage.value.code == 2
+    assert "python -m door.mcp --http" in capsys.readouterr().err
 
 
 @pytest.mark.invariant

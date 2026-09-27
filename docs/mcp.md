@@ -64,7 +64,7 @@ the tool runs. What goes wrong is answered by its cause:
 .venv/bin/python -m door.mcp call db_status                # run one, print its text
 .venv/bin/python -m door.mcp call infer '{"map": "King'"'"'s Row", "red": ["Zarya"]}'
 ./docker-db .venv/bin/python -m door.mcp call db_status    # the same, against the stack's database
-.venv/bin/python -m door.mcp --http 127.0.0.1:8020         # serve over HTTP yourself
+.venv/bin/python -m door.mcp --http --port 8020            # serve over HTTP yourself
 ```
 
 Every tool returns text for a person and a JSON payload for a program;

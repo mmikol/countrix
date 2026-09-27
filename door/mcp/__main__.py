@@ -1,10 +1,11 @@
 """python -m door.mcp                        serve the tools over stdio
-python -m door.mcp --http [HOST:]PORT [NAME ...]
+python -m door.mcp --http [--host HOST] [--port PORT] [--allow-host NAME ...]
                                           serve them over Streamable HTTP (/mcp, /health),
                                           answering to the local names and each NAME
 python -m door.mcp list                   list the tools
 python -m door.mcp call NAME [JSON-ARGS]  run one tool and print its text"""
 
+import argparse
 import json
 import sys
 from collections.abc import Callable
@@ -54,6 +55,19 @@ def _call(ctx: tools.Context, name: str, text: str) -> int:
     return 0
 
 
+def _http_command_line(argv: list[str]) -> argparse.Namespace:
+    """`--http`'s flags, spelled as the board and the inference service spell
+    them: where the door listens, and, repeated, a host name it answers to
+    beside the local ones. A bad flag or port prints the usage and exits 2."""
+    parser = argparse.ArgumentParser(
+        prog="python -m door.mcp --http",
+        description="Serve the tools over Streamable HTTP (/mcp, /health).")
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=8020)
+    parser.add_argument("--allow-host", action="append", default=[], metavar="NAME")
+    return parser.parse_args(argv)
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     ctx = tools.Context(client="shell")
@@ -61,10 +75,9 @@ def main(argv: list[str] | None = None) -> int:
     if not argv:
         stdio.serve(server)
         return 0
-    if argv[0] == "--http" and len(argv) >= 2:
-        host, _, port = argv[1].rpartition(":")
-        http.serve(server, host or "127.0.0.1", int(port), _status(ctx),
-                   allowed_hosts=argv[2:])
+    if argv[0] == "--http":
+        args = _http_command_line(argv[1:])
+        http.serve(server, args.host, args.port, _status(ctx), allowed_hosts=args.allow_host)
         return 0
     if argv[0] == "list":
         for t in tools.REGISTRY.bind(ctx):

@@ -36,7 +36,7 @@ def http_server(tmp_path_factory):
     log = tmp_path_factory.mktemp("mcp_http") / "stderr.log"
     with log.open("wb") as err:
         proc = subprocess.Popen(
-            [sys.executable, "-m", "door.mcp", "--http", "127.0.0.1:%d" % port],
+            [sys.executable, "-m", "door.mcp", "--http", "--port", str(port)],
             cwd=ROOT, stdout=subprocess.DEVNULL, stderr=err,
             env=dict(os.environ, DATABASE_URL="postgresql://127.0.0.1:1/none"))
         try:
@@ -122,11 +122,11 @@ def test_http_transport_guards_get_origin_and_health(http_server):
     assert delete("/nope") == 404
 
 
-def _http_server(tmp_path, token=None, rate_limit=120):
+def _http_server(tmp_path, token=None, rate_limit=120, status=lambda: {"status": "ok"}):
 
     ctx = tools.Context(dsn="postgresql://nowhere", client="test")
     mcp = Server(tools.REGISTRY.bind(ctx), None, audit_path=str(tmp_path / "audit.jsonl"))
-    httpd = HttpServer(("127.0.0.1", 0), mcp, lambda: {"status": "ok"}, token=token,
+    httpd = HttpServer(("127.0.0.1", 0), mcp, status, token=token,
                        rate_limit=rate_limit)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     return httpd, "http://127.0.0.1:%d" % httpd.server_address[1]
@@ -214,3 +214,27 @@ def test_a_missing_content_length_is_refused_as_required(tmp_path):
     httpd.shutdown()
     assert [_refusal(line) for line in _audited(tmp_path)] == [
         ("http:127.0.0.1", None, "400 a positive Content-Length is required")] * 2
+
+
+def test_a_post_that_does_not_claim_json_is_refused_and_audited(tmp_path):
+    """The board's rule on its writes holds at the door: a body not labelled
+    application/json is 415 before it is read, and the refusal leaves a line."""
+    httpd, url = _http_server(tmp_path)
+    assert _knock(url, {"jsonrpc": "2.0", "id": 1, "method": "ping"},
+                  {"Content-Type": "text/plain"}) == (415, {"error": "a JSON body is required"})
+    httpd.shutdown()
+    assert [_refusal(line) for line in _audited(tmp_path)] == [
+        ("http:127.0.0.1", None, "415 a JSON body is required")]
+
+
+def test_health_answers_a_status_that_raises_with_a_500_that_names_it(tmp_path):
+    """/health is a request boundary like every other route: a bug in the
+    status read is a 500 with its type and message, not a dropped connection."""
+    def broken():
+        raise RuntimeError("a bug in read_status")
+    httpd, url = _http_server(tmp_path, status=broken)
+    with pytest.raises(urllib.error.HTTPError) as failed:
+        urllib.request.urlopen(url + "/health", timeout=10)
+    assert failed.value.code == 500
+    assert json.loads(failed.value.read()) == {"error": "RuntimeError: a bug in read_status"}
+    httpd.shutdown()
