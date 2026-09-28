@@ -9,18 +9,19 @@ a seat is no role's, and a damage hero may take a tank's.
 
 The two answers it gives are not symmetric. A board found is a proof: the hero seats
 there, and re-solving that board shows it. A board not found is not a proof of the
-opposite - the search tries a few maps and a few reds, and a board it never visits could
+opposite - the search tries every map but a few reds, and a board it never visits could
 seat the hero. A hero it finds nothing for is one worth looking at: a wrong number, a
 tool no metric reads, a rule that charges it for what it is not, or a board this search
 does not reach. Under the shipped playbook, the default engine and the healing floor,
-forty-eight of the fifty-three released heroes have a board and five do not
+forty-nine of the fifty-three released heroes have a board and four do not
 (tests/inference/test_reach.py names them). Each board's optimal six is exact
 (inference.solver), so a board found is a proof of the hero's seat there. The
 `reach` tool runs the search; `.venv/bin/python -m tests.inference.record_reach`
 records a board per released hero in tests/fixtures/reach.json beside the objective
 it ran under, and the suite checks none is lost.
 
-    maps    the four its map rates lift it most on (its three best maps are among them)
+    maps    every map, the ones its map rates lift it most on first: a board solves in
+            about a tenth of a second, so none is left out
     reds    none (blue counters the likely six); the heroes it answers, two a role, on
             the counter graph the default engine scores (counters.weight: a wiki edge,
             then a derived one); the same without the heroes that answer it back
@@ -34,7 +35,6 @@ from facts.model import ROLES, Hero, Map, World
 from inference import engine
 from inference.solver import Infeasible, Unbounded
 
-MAPS = 4
 CLOSEST = 5         # boards the ban search starts from
 
 
@@ -64,12 +64,13 @@ class _Near(NamedTuple):
 
 
 def maps(world: World, hero: Hero) -> list[Map]:
+    """Every map, the ones its map rates lift it most on first."""
     base = hero.win or 50.0
 
     def lift(m: Map) -> float:
         return (hero.map_win(m.id) or base) - base
 
-    return sorted(world.maps.values(), key=lambda m: (-lift(m), m.name))[:MAPS]
+    return sorted(world.maps.values(), key=lambda m: (-lift(m), m.name))
 
 
 def reds(world: World, hero: Hero) -> list[list[str]]:

@@ -14,7 +14,7 @@ import json
 import pytest
 
 from db import Refusal
-from facts.model import World
+from facts.model import Map, World
 from facts.records import DerivedEdge
 from inference import base, catalog, reach
 from inference.solver import Infeasible
@@ -22,7 +22,7 @@ from tests.inference import FIXTURE_PLAYBOOK, in_force, recorded
 from tests.inference import record_reach as recorder
 
 # named, not waived - see the test
-UNSEATED = {"Emre", "Freja", "Kiriko", "Sojourn", "Zarya"}
+UNSEATED = {"Emre", "Freja", "Kiriko", "Sojourn"}
 
 
 @pytest.mark.invariant
@@ -42,19 +42,20 @@ def test_every_hero_reach_finds_a_board_for_is_still_seated_and_none_is_newly_lo
         else " - recorded under a different objective")
     assert len(fell) <= len(boards) // 5, "the recorded boards have gone stale%s: %s" % (
         stale, fell)
-    # Five heroes the recorder's search found no board for. That is not a proof none
-    # exists - the search tries four maps and a few reds per hero, so a board it
+    # Four heroes the recorder's search found no board for. That is not a proof none
+    # exists - the search tries every map but a few reds per hero, so a board it
     # never visits could seat any of them - but it is what the search establishes,
-    # and they are named rather than waived: a twelfth fails here. The default engine
+    # and they are named rather than waived: a fifth fails here. The default engine
     # and the healing floor score the shipped playbook's boards, and on the boards the
-    # search tries they value none of the five above its rivals for the seat, even
+    # search tries they value none of the four above its rivals for the seat, even
     # with five of them banned; the playbook's rules are what can answer it. They are
-    # not searched again on every run - five searches are a quarter minute, more under
+    # not searched again on every run - four searches are a minute, more under
     # coverage - so one that comes to seat leaves UNSEATED when the recorder
     # re-records. The healing floor seated Illari and Lifeweaver and unseated Cassidy;
     # summed healing seated Kiriko and unseated Zarya; the written pairs' mean for an
     # unwritten synergy pair and the exact search, recorded together, seated Cassidy,
-    # Domina, Hazard, Ramattra, Shion, Sierra and Venture and unseated Kiriko.
+    # Domina, Hazard, Ramattra, Shion, Sierra and Venture and unseated Kiriko; every
+    # map searched, not the four best by rate, seated Zarya on Midtown with one ban.
     assert not UNSEATED - released, "not a released hero: %s" % ", ".join(UNSEATED - released)
     lost = [name for name in sorted((released - on_file - UNSEATED) | set(fell))
             if not reach.search(world, name)["seated"]]
@@ -135,6 +136,19 @@ def test_a_hero_its_best_map_favours_is_seated_there_with_no_ban(synthetic_world
     assert (board["seated"], board["banned"], board["map"], board["red"], board["gap"]) == (
         True, [], "Harbor Gate", [], 0.0)
     assert "Anvil" in board["six"] and reach.seated(synthetic_world, board)
+
+
+def test_the_search_tries_every_map_the_ones_its_rates_lift_it_most_on_first(synthetic_world):
+    """Two maps with no rates join the three: the search tries all five,
+    Harbor Gate first, where Anvil's rate is highest, and Salt Flats last;
+    a map with no rate lifts it by nothing, level with Ember Ruins, and ties
+    go by name. It used to stop at four, and Zarya's seat on Midtown lay
+    past her four."""
+    w = synthetic_world
+    for mid, name in ((901, "Zinc Quay"), (902, "Amber Pier")):
+        w.maps[mid] = Map(mid, name, "Control")
+    assert [m.name for m in reach.maps(w, w.hero("Anvil"))] == [
+        "Harbor Gate", "Amber Pier", "Ember Ruins", "Zinc Quay", "Salt Flats"]
 
 
 def test_the_reds_read_the_counter_graph_the_engine_scores(synthetic_world):

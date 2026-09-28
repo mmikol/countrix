@@ -101,8 +101,8 @@ def _compact(result: Result) -> tuple[str, CompactInfer]:
 
 
 @tool(
-    "reach", "Can the playbook ever pick this hero? A board that suits it - one of"
-    " its maps, a red it answers, the match's bans spent on the rivals holding its seat - on"
+    "reach", "Can the playbook ever pick this hero? A board that suits it - any map,"
+    " its best first, a red it answers, the match's bans spent on the rivals holding its seat - on"
     " which it is in the optimal six; with none, the closest it came. A hero that"
     " cannot be reached is one the facts or the strategies cannot see.",
     {"hero": {"type": "string", "description": "a released hero (any spelling)"}},
