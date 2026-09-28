@@ -1,10 +1,10 @@
 """The engine's handlers, which the board (ui/board.py) runs in its own
 process: handle_board, both seats and the current comp; handle_strategies,
-the catalog; and handle_health, the catalog's size and the database's
-state. ADMISSION holds the boards in flight to one engine.FIELD_BUDGET of
-sixes, and a newer board from the same client supersedes one still
-solving. A handler that raises is answered at the board's request
-boundary, by db.web.failure.
+the catalog and the default engine's weights; and handle_health, the
+catalog's size and the database's state. ADMISSION holds the boards in
+flight to one engine.FIELD_BUDGET of sixes, and a newer board from the same
+client supersedes one still solving. A handler that raises is answered at
+the board's request boundary, by db.web.failure.
 """
 
 import contextlib
@@ -85,8 +85,8 @@ ADMISSION = Admission()
 
 class Health(TypedDict):
     """What /health answers: ok or degraded; the strategy counts where the
-    playbook loads; the heroes where the database answers; and the error,
-    naming each thing out of reach, where either does not."""
+    playbook and its meta.md load; the heroes where the database answers;
+    and the error, naming each thing out of reach, where either does not."""
     status: Literal["ok", "degraded"]
     strategies: NotRequired[int]
     pending: NotRequired[int]
@@ -102,11 +102,12 @@ def _first(query: Query, key: str) -> str | None:
 
 def handle_board(cx: psycopg.Connection, query: Query) -> web.Reply:
     """Both seats and the current comp - what the board's two displays show -
-    under the playbook tab's weights. The page never reads the countered case,
-    so it is not solved here; a newer board from the same `client` (one lane
-    when none is named) supersedes this one, which then answers 400, and a
-    board ADMISSION finds no room for answers 429. The whole query is read
-    before the lane is taken, so a malformed one supersedes nothing."""
+    under the playbook tab's weights, its Meta slider's (meta:value) among
+    them. The page never reads the countered case, so it is not solved
+    here; a newer board from the same `client` (one lane when none is
+    named) supersedes this one, which then answers 400, and a board
+    ADMISSION finds no room for answers 429. The whole query is read before
+    the lane is taken, so a malformed one supersedes nothing."""
     draft = parse_board(query)
     weights = catalog_module.parse_weights(query.get("weights", []))
     pool, _ = engine.clamp_search(_first(query, "pool"))
@@ -122,9 +123,12 @@ def handle_board(cx: psycopg.Connection, query: Query) -> web.Reply:
 
 
 def handle_strategies() -> web.Reply:
-    """The catalog. A playbook that does not load is the server's fault: the
-    CatalogError reaches the request boundary, a 500."""
+    """The catalog, and meta.md - the default engine's weights and prose,
+    what the playbook tab's Meta card shows. A playbook that does not load
+    is the server's fault: the CatalogError reaches the request boundary, a
+    500."""
     return web.Reply({"strategies": [s.to_dict() for s in catalog_module.load()],
+                      "meta": catalog_module.meta_record(catalog_module.read_meta()),
                       "playbook": catalog_module.playbook_name()}, 200)
 
 
@@ -137,6 +141,7 @@ def handle_health() -> web.Reply:
     errors: list[str] = []
     try:
         cat = catalog_module.load()
+        catalog_module.read_meta()
     except CatalogError as error:
         errors.append(str(error))
     else:

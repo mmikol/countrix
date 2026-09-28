@@ -87,7 +87,7 @@ score(x) = base(x)
          + &Sigma; needs n          s_n &middot; w_n &middot; ( norm_n( metric_n(x) ) &minus; 1 )
          + &Sigma; scored r         w_r &middot; ( bonus_r(x) &minus; penalty_r(x) )
 
-base(x)     = %(W_RATE)g &middot; rates(x) + %(W_SYNERGY)g &middot; synergy(x) + %(W_COUNTER)g &middot; counters(x)
+base(x)     = %(W_META)g &middot; ( %(W_RATE)g &middot; rates(x) + %(W_SYNERGY)g &middot; synergy(x) + %(W_COUNTER)g &middot; counters(x) )
 rates(x)    = mean over the picks p of  t_p &middot; ( win_p &minus; 50 )
               t_p = pick_p / ( pick_p + %(RATE_PICK_HALF)g )
               win_p, pick_p: p's rates on the map, all ranks; overall with no map or no row
@@ -102,10 +102,13 @@ norm_h(v) = clamp( (v &minus; min_ref) / (max_ref &minus; min_ref), 0, 1 )
             min_ref, max_ref: over the reference sixes h's guard holds on
             max_ref = min_ref: a reward reads 0.5, a need costs nothing
 s_n       = min( 1, %(NEED_BUDGET)g / &Sigma; w over the needs on n's guard ): one state costs %(NEED_BUDGET)g at most</pre>
-<p id='base-weights'><b>The base's weights.</b> The rate term is in win-rate points and
-weighs %(W_RATE)g. The synergy and counter weights are set so that, on the median board, each
-term spreads the reference sixes about half as far as the rate term does; the calibration is
-in <code>inference/base.py</code>. A heuristic moves a six by its weight at most, since its
+<p id='base-weights'><b>The base's weights.</b> They are the playbook's, not the code's:
+<code>meta.md</code> beside the strategy files holds them, and the tune tool changes them. The
+meta, %(W_META)g, scales the whole engine, and at 0 the playbook scores alone. Under it the rate
+term is in win-rate points and weighs %(W_RATE)g. The synergy and counter weights are set so
+that, on the median board, each term spreads the reference sixes about half as far as the rate
+term does; the calibration is in <code>inference/base.py</code>. The figures that follow are
+at meta 1. A heuristic moves a six by its weight at most, since its
 norm is 0..1, and a base term has no such bound. On the median board a heuristic at weight 1
 moves a six less than any base term spreads the sixes, at 3 about as far as the synergy or
 counter term, and at the slider's 10 further than the three together.</p>
@@ -223,7 +226,9 @@ optimal is solved as the scale for red's score and not shown.</p>
 <p id='weights'><b>The weights.</b> A heuristic's weight is the slider under its card. It stays
 in your browser and rides with every request until reset; the file's weight is the default,
 and only the tune tool changes it. Every heuristic has a slider, 0 to 10, on a metric or
-scored; a constraint is never weighted.</p>
+scored; a constraint is never weighted. The Meta slider, on the meta's card at the head of
+the playbook tab, does the same for meta.md's meta: the whole default engine, scaled for your
+session.</p>
 <h2 id='pieces'>How the pieces fit</h2>
 <pre class='eq'>sources → db/data (fetch) → db/psql (the database) → facts/ (FACTS of a board)
                                                                   &darr;

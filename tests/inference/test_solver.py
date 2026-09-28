@@ -18,9 +18,9 @@ from facts.draft import Draft
 from facts.records import Synergy
 from facts.team import team_metrics
 from inference import catalog
-from inference.base import DEFAULT, OFF
+from inference.base import OFF
 from inference.shapes import legal_shapes
-from tests.inference import FIXTURE_PLAYBOOK, evaluated
+from tests.inference import DEFAULT, FIXTURE_PLAYBOOK, evaluated
 
 # the reference playbook's shape limit tightened to Role Queue's two-two-two
 ROLE_QUEUE = (
@@ -118,11 +118,11 @@ def test_shape_limits_bound_the_search_and_a_stricter_one_narrows_it(synthetic_w
     fix = catalog.load(FIXTURE_PLAYBOOK)
     # two tanks is allowed under the two-tank limit; a third is not, and is the queue's
     r = engine.infer(world, Draft("Harbor Gate", ("Needle",), ("Anvil", "Kite")), pool_size=4,
-                     catalog=fix)
+                     catalog=fix, base=DEFAULT)
     assert {"Anvil", "Kite"} <= set(r.blue)
     with pytest.raises(Refusal, match="the queue allows at most 2 tanks"):
         engine.infer(world, Draft("Harbor Gate", (), ("Anvil", "Kite", "Mortar")),
-                     pool_size=4, catalog=fix)
+                     pool_size=4, catalog=fix, base=DEFAULT)
     # a stricter authored limit narrows the search the same way
     for name in os.listdir(FIXTURE_PLAYBOOK):
         if name != "open-queue-tanks.md":
@@ -130,7 +130,7 @@ def test_shape_limits_bound_the_search_and_a_stricter_one_narrows_it(synthetic_w
     (tmp_path / "shape.md").write_text(ROLE_QUEUE, "utf-8")
     cat = catalog.load(str(tmp_path))
     r = engine.infer(world, Draft("Harbor Gate", ("Needle",), ("Balm",)), pool_size=4,
-                     catalog=cat)
+                     catalog=cat, base=DEFAULT)
     roles = sorted(world.hero(n).role for n in r.blue)
     assert roles == ["damage", "damage", "support", "support", "tank", "tank"]
 
@@ -351,8 +351,9 @@ def test_style_ties_break_by_name_so_hash_order_cannot_reach_the_answer(syntheti
     finally:
         ember.styles = derived
     fix = catalog.load(FIXTURE_PLAYBOOK)
-    once = engine.infer(world, Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm",)), catalog=fix)
-    twice = engine.infer(world, Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm",)), catalog=fix)
+    draft = Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm",))
+    once = engine.infer(world, draft, catalog=fix, base=DEFAULT)
+    twice = engine.infer(world, draft, catalog=fix, base=DEFAULT)
     assert once.blue == twice.blue and abs(once.score - twice.score) < 1e-12
 
 

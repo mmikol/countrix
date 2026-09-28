@@ -251,3 +251,50 @@ def test_a_catalog_error_is_the_operators_fault_and_a_tune_error_the_callers():
     the caller's error; a playbook that does not load is the operator's."""
     assert issubclass(tune.TuneError, Refusal)
     assert not issubclass(CatalogError, Refusal)
+
+
+# --- the default engine's weights ------------------------------------------------------
+
+def test_tune_sets_a_meta_weight_validated_and_logged(catalog_copy):
+    """The id meta names meta.md: a dial or the meta itself is set in place,
+    read back by the rule the engine reads it by, and logged like a
+    strategy's change; the strategies and their digest do not move."""
+    digest = catalog.playbook_digest(catalog_copy)
+    change = tune.tune("meta", "synergy", 0.2, "user: the pairs should count for more",
+                       directory=catalog_copy)
+    assert (change["id"], change["field"], change["old"], change["new"]) == (
+        "meta", "synergy", "0.1", "0.2")
+    tune.tune("meta", "meta", 0, "the playbook alone for a while", directory=catalog_copy)
+    weights = catalog.engine_weights(catalog_copy)
+    assert weights.record() == {"meta": 0.0, "rate": 1.0, "synergy": 0.2, "counter": 0.05}
+    assert not weights.on
+    assert catalog.playbook_digest(catalog_copy) == digest
+    log = tune.log_tail(20, os.path.join(catalog_copy, "tuning-log.md"))
+    assert len(log) == 2
+    assert "`meta` synergy: 0.1 -> 0.2 (user: the pairs should count for more)" in log[0]
+    assert "`meta` meta: 1 -> 0 (the playbook alone for a while)" in log[1]
+
+
+def test_a_meta_weight_the_reader_would_refuse_is_never_written(catalog_copy):
+    """A field that is not one of the four, a value past 0..10 or not a
+    number, and a playbook with no meta.md are refused, and nothing is
+    written or logged; meta is no strategy to add or complete."""
+    path = Path(catalog_copy, catalog.META_FILE)
+    before = path.read_text(encoding="utf-8")
+    for field, value, message in (("weight", 1, "fields are meta, rate, synergy, counter"),
+                                  ("rate", 11, r"within 0\.\.10"),
+                                  ("counter", -0.1, r"within 0\.\.10"),
+                                  ("synergy", "much", "a number"),
+                                  ("meta", float("nan"), "a number")):
+        with pytest.raises(tune.TuneError, match=message):
+            tune.tune("meta", field, value, "r", directory=catalog_copy)
+    assert path.read_text(encoding="utf-8") == before
+    with pytest.raises(tune.TuneError, match="the default engine's weights, and no strategy"):
+        tune.add("meta", "The meta", "assumption", "One.", None, "r", directory=catalog_copy)
+    with pytest.raises(tune.TuneError, match="beside the playbook"):
+        tune.complete("meta", {"category": "general"}, "r", directory=catalog_copy)
+    assert path.read_text(encoding="utf-8") == before
+    assert not Path(catalog_copy, "tuning-log.md").exists()
+    path.unlink()
+    with pytest.raises(tune.TuneError, match=r"meta\.md: missing"):
+        tune.tune("meta", "rate", 1, "r", directory=catalog_copy)

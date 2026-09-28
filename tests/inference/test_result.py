@@ -6,7 +6,7 @@ from facts import board_facts
 from facts.draft import Draft
 from inference import catalog
 from inference.base import OFF
-from tests.inference import FIXTURE_PLAYBOOK, evaluated
+from tests.inference import BRIEF, FIXTURE_PLAYBOOK, evaluated
 
 
 def test_a_playbook_that_scores_nothing_reads_unscored(synthetic_world):
@@ -30,7 +30,7 @@ def test_a_playbook_that_scores_nothing_reads_unscored(synthetic_world):
     assert d["momentum"]["verdict"].startswith("unscored") and d["momentum"]["blue"] is None
     assert {badge["label"] for badge in d["momentum"]["badges"].values()} == {"unscored"}
     assert "(unscored)" in b.current.rendered() and "UNSCORED:" in b.current.rendered()
-    scored = engine.board(world, draft, catalog=reference).to_dict()
+    scored = engine.board(world, draft, catalog=reference, brief=BRIEF).to_dict()
     assert scored["current"]["scoring"] is True
     assert scored["current"]["normalized"] is None   # two picks of six: no share to give
     assert 0 < scored["fill"]["normalized"] <= 100   # the filled six carries it
@@ -46,7 +46,7 @@ def test_the_default_engine_scores_a_playbook_that_scores_nothing(synthetic_worl
     reference = catalog.load(FIXTURE_PLAYBOOK)
     limit_only = [h for h in reference if h.form == "limit"]
     draft = Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm", "Anvil"))
-    d = engine.board(synthetic_world, draft, catalog=limit_only).to_dict()
+    d = engine.board(synthetic_world, draft, catalog=limit_only, brief=BRIEF).to_dict()
     for key in ("blue", "red", "current", "red_current", "fill", "countered"):
         assert d[key]["scoring"] is True and d[key]["unscored"] is None, key
     assert 0 < d["fill"]["normalized"] <= 100 and d["momentum"]["blue"] is not None
@@ -107,7 +107,7 @@ def test_a_pick_and_the_plan_name_the_queue_the_rates_were_captured_in(
     from inference import engine
     from inference.result import rates_queue
     b = engine.board(synthetic_world, Draft("Harbor Gate", ("Anvil",), side="attack"),
-                     catalog=scratch_playbook)
+                     catalog=scratch_playbook, brief=BRIEF)
     assert rates_queue(b.blue.facts) == "Role Queue"
     assert b.plan.split("\n")[-1].startswith("Based on: the Role Queue rates and counters")
     rates = [

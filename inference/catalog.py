@@ -2,8 +2,25 @@
 each file parsed (inference.frontmatter) and checked (inference.strategy)
 into a Strategy, the whole ordered, mirrored into the `strategies` table
 under its own `sources` row (AUTHORED) and written into
-docs/inference.md; and what reads the playbook as a whole - the weights
-one board overrides, the count per kind, the playbook's name and digest.
+docs/inference.md; the default engine's weights, which meta.md beside the
+strategy files holds (read_meta); and what reads the playbook as a whole -
+the weights one board overrides, the count per kind, the playbook's name
+and digest.
+
+    ---
+    meta: 1
+    rate: 1
+    synergy: 0.1
+    counter: 0.05
+    ---
+    prose: what the weights do and why they are set so
+
+meta.md sets the four and nothing else, each a number within the weight
+range (strategy.WEIGHT_RANGE), and every playbook folder holds one: a
+board, an infer and the math page read it, and a folder without it is a
+CatalogError. It is no strategy - the catalog never loads it as one, the
+digest leaves it out (a fixture's stamp, inference.base.stamp, records the
+weights) and no strategy may take its name.
 """
 
 import copy
@@ -11,13 +28,14 @@ import hashlib
 import os
 import re
 from collections.abc import Iterable, Mapping, Sequence
-from typing import NotRequired, TypedDict
+from typing import NamedTuple, NotRequired, TypedDict
 
 import psycopg
 
 from db import ROOT, Refusal, Source, embed
 from db.psql import now, register_source
 from facts import compute
+from inference.base import DIALS, META, BaseRecord, BaseWeights
 from inference.frontmatter import FrontmatterError, parse_frontmatter
 from inference.strategy import (
     FORMS,
@@ -25,6 +43,7 @@ from inference.strategy import (
     WEIGHT_RANGE,
     CatalogError,
     Strategy,
+    field_text,
     finite_number,
 )
 
@@ -48,7 +67,9 @@ def strategies_dir() -> str:
 
 
 DOCS_PATH = os.path.join(ROOT, "docs", "inference.md")
-NOT_STRATEGIES = ("README.md", "tuning-log.md")     # markdown that lives beside the files
+META_FILE = META + ".md"            # the default engine's weights, beside the strategy files
+# markdown that lives beside the files
+NOT_STRATEGIES = ("README.md", "tuning-log.md", META_FILE)
 
 
 def _read(directory: str, name: str) -> Strategy:
@@ -93,12 +114,85 @@ def load(directory: str | None = None) -> list[Strategy]:
     return out
 
 
+class Meta(NamedTuple):
+    """meta.md, read: the default engine's weights and the prose that says
+    what they do and why."""
+    weights: BaseWeights
+    body: str
+
+
+class MetaRecord(BaseRecord):
+    """meta.md as the tools and the board serve it: the weights and the prose."""
+    body: str
+
+
+def meta_dial(field: str, value: object) -> float:
+    """One of meta.md's four weights: a finite number within WEIGHT_RANGE,
+    else a CatalogError with the rule. The reader and the tune tool both
+    check a value by it."""
+    if field not in DIALS:
+        raise CatalogError("%s's fields are %s" % (META_FILE, ", ".join(DIALS)))
+    number = finite_number(value)
+    if number is None or not WEIGHT_RANGE[0] <= number <= WEIGHT_RANGE[1]:
+        raise CatalogError("%s is a number within %g..%g" % (field, *WEIGHT_RANGE))
+    return number
+
+
+def parse_meta(text: str) -> Meta:
+    """meta.md's text -> its weights and prose: the four set, each by
+    meta_dial, and no other key; else a CatalogError naming the file."""
+    try:
+        parsed = parse_frontmatter(text)
+        unknown = sorted(str(key) for key in parsed.meta if key not in DIALS)
+        if unknown:
+            raise CatalogError("%s is not a field (the fields: %s)"
+                               % (", ".join(unknown), ", ".join(DIALS)))
+        missing = [field for field in DIALS if parsed.meta.get(field) is None]
+        if missing:
+            raise CatalogError("%s unset: it sets %s" % (", ".join(missing), ", ".join(DIALS)))
+        dials = {field: meta_dial(field, parsed.meta[field]) for field in DIALS}
+    except (CatalogError, FrontmatterError) as error:
+        raise CatalogError("%s: %s" % (META_FILE, error)) from error
+    return Meta(weights=BaseWeights(**dials), body=parsed.body)
+
+
+def read_meta(directory: str | None = None) -> Meta:
+    """The playbook's meta.md - the playbook in force's unless `directory`
+    names another - read and checked. A folder without one is a
+    CatalogError: the default engine has no weights there."""
+    path = os.path.join(directory or strategies_dir(), META_FILE)
+    try:
+        with open(path, encoding="utf-8") as handle:
+            text = handle.read()
+    except FileNotFoundError as error:
+        raise CatalogError("%s: missing - the playbook's folder holds the default engine's"
+                           " weights there" % META_FILE) from error
+    return parse_meta(text)
+
+
+def engine_weights(directory: str | None = None) -> BaseWeights:
+    """The default engine's weights in force: meta.md's (read_meta)."""
+    return read_meta(directory).weights
+
+
+def meta_record(meta: Meta) -> MetaRecord:
+    """meta.md as the strategies tool and the board's playbook tab serve it."""
+    return MetaRecord(**meta.weights.record(), body=meta.body)
+
+
+def meta_rendered(weights: BaseWeights) -> str:
+    """The weights as one line of text: the meta, and each dial under it."""
+    return "meta %s x (rate %s, synergy %s, counter %s)" % tuple(
+        field_text(getattr(weights, field)) for field in DIALS)
+
+
 def parse_weights(items: Mapping[str, object] | Iterable[object] | None) -> dict[str, float]:
     """`id:value` strings (a query's repeated `weights` parameter) or a mapping
     -> {id: weight}, each clamped to the file's WEIGHT_RANGE. What a board's
-    sliders send. An entry that is not id:value, or a value that is not a
-    finite number (strategy.finite_number: nan and inf are not), is a
-    Refusal, which the board and the board tool answer as the caller's
+    sliders send: a heuristic's id, or META for the default engine's meta
+    (BaseWeights.metered). An entry that is not id:value, or a value that
+    is not a finite number (strategy.finite_number: nan and inf are not), is
+    a Refusal, which the board and the board tool answer as the caller's
     error."""
     if isinstance(items, Mapping):
         pairs = [(str(sid), value) for sid, value in items.items()]
@@ -127,7 +221,8 @@ def weighted(catalog: list[Strategy], weights: Mapping[str, float] | None) -> li
     weights instead of their files' - shallow copies, so the files and the
     loaded catalog stay as they are. Only a heuristic has a weight to set -
     on a metric or scored alike; a constraint has none, and an unknown id is
-    ignored."""
+    ignored, META among them: the meta is the engine's
+    (BaseWeights.metered)."""
     if not weights:
         return catalog
     out = []
@@ -261,6 +356,7 @@ def write_docs(catalog: Sequence[Strategy], path: str = DOCS_PATH) -> str | None
     the shipped one, and this returns None."""
     if strategies_dir() != SHIPPED_DIR:
         return None
+    meta = read_meta(SHIPPED_DIR)
     kinds = counts(catalog)
     forms = {f: sum(1 for s in catalog if s.form == f) for f in FORMS}
     reg = compute.registry()
@@ -268,12 +364,15 @@ def write_docs(catalog: Sequence[Strategy], path: str = DOCS_PATH) -> str | None
         "%s in `inference/strategies/`: %s (%s), %s (%d on a metric, %d scored) and %s%s."
         " Regenerated by `.venv/bin/python -m door.mcp call db_docs`."
         % (
-            _counted(len(catalog), "file"), _counted(kinds["constraint"], "constraint"),
+            _counted(len(catalog), "strategy file"), _counted(kinds["constraint"], "constraint"),
             "a limit" if kinds["constraint"] == 1 else "limits",
             _counted(kinds["heuristic"], "heuristic"), forms["heuristic"], forms["scored"],
             _counted(kinds["assumption"], "assumption"),
             "; %d draft(s) awaiting /strategy" % forms["draft"] if forms["draft"] else ""),
-        ""]
+        "", "#### The meta", "",
+        "`%s`: %s - the default engine's weights, which the tune tool changes (id `%s`)"
+        % (META_FILE, meta_rendered(meta.weights), META),
+        "", _without_title(meta.body), ""]
     for kind in KINDS:
         items = [s for s in catalog if s.kind == kind]
         if not items:

@@ -108,12 +108,15 @@ db <- facts <- inference <- door <- ui.
   fields, `soft:` among them, is refused. `inference/catalog.py` reads it,
   each file parsed by `frontmatter.py` and checked by `strategy.py`
   (`Strategy`, `CatalogError`); one bad file makes `catalog.load` raise
-  everywhere. The shipped playbook is six assumptions, one heuristic,
+  everywhere. `meta.md` beside the strategy files is no strategy and no
+  strategy may take its name: it holds the default engine's weights
+  (below). The shipped playbook is six assumptions, one heuristic,
   `heal-rate`, scored (the healing floor, `matchup.heal_shortfall`,
   docs/inference.md), and one limit, `at-most-three-supports`, while
   it is rebuilt rule by rule from the citation record in
   `inference/README.md`. Solver behaviour is tested against the 19-file
-  reference playbook in `tests/fixtures/playbook/`, or its four assumptions
+  reference playbook in `tests/fixtures/playbook/` and its own `meta.md`
+  (`DEFAULT` and `BRIEF` in tests/inference/__init__.py), or its four assumptions
   alone (`ASSUMPTIONS_ONLY` in tests/inference/__init__.py) where a test
   needs a playbook that scores nothing; no solver test reads
   `inference/strategies/`.
@@ -124,11 +127,18 @@ db <- facts <- inference <- door <- ui.
   pair the wiki leaves out a kit-derived one 1 (`facts/counters.py`, which
   the team.* counter metrics never read) - and the playbook's terms
   sit on top, so the shipped playbook's boards are scored, never
-  *unscored*. A `BaseWeights` rides the `Brief` (`base=` on `infer`,
-  `Objective`, `Solver` and the pool's `Spec`); the board and the tools
-  run `base.DEFAULT`. `base.OFF` is the playbook alone, byte for
-  byte the engine before it had a base: a test that pins the reference
-  playbook's sixes or scores passes it.
+  *unscored*. Its weights are the playbook's, in `meta.md`: `meta`, which
+  scales the whole engine, over the `rate`, `synergy` and `counter` dials
+  (1, 1, 0.1, 0.05 shipped); `tune` with id `meta` changes them, and the
+  playbook tab's Meta slider (`weights=meta:<v>`) sets the meta for a
+  session. No weight lives in code. A `BaseWeights` rides the `Brief`
+  (`base=` on `infer`, `Objective`, `Solver` and the pool's `Spec`); left
+  unset it is the playbook in force's `meta.md` (`engine.weights_in_force`),
+  and every result and `base.stamp` record it. A test that runs the engine
+  names the reference playbook's weights, never the live file's.
+  `base.OFF`, the meta at 0, is the playbook alone, byte for byte the
+  engine before it had a base: a test that pins the reference playbook's
+  sixes or scores passes it.
 - **The kit is read in 6v6.** `facts.draft.KIT_FORMAT` names the format;
   `tables.load` lays the wiki's 6v6 pools and lines (`heroes.*_6v6`,
   `kit_6v6`) over the 5v5 rows before `derive_scalars` (`facts/kit_format.py`).
@@ -242,8 +252,8 @@ db <- facts <- inference <- door <- ui.
 
 ## House rules
 
-- A session never hand-edits the playbook. Changes go through `tune`,
-  `add_strategy` or `infer_strategy`. They validate, rewrite the docs
+- A session never hand-edits the playbook. Changes go through `tune`
+  (`meta.md`'s weights too), `add_strategy` or `infer_strategy`. They validate, rewrite the docs
   catalog for the shipped playbook and append a reasoned line to
   `tuning-log.md` beside the playbook in force. A draft the user drops in
   by hand (name, kind, prose) is input; `/strategy` fills its frontmatter

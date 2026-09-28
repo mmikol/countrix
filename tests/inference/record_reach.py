@@ -1,11 +1,12 @@
 """Record a board per released hero that seats it, for the reach test.
 
 Runs inference.reach.search for every released hero, in name order, on the
-built database, the playbook in force and the default engine, and writes the
-boards it finds to tests/fixtures/reach.json beside that playbook's digest and
-the engine's stamp (inference.base.stamp). Minutes of solving in one process.
-Run from the repo root, as a module of the tests' package; pytest does not
-collect it, and test_reach.py runs it on the synthetic World:
+built database, the playbook in force and the default engine at its meta.md's
+weights, and writes the boards it finds to tests/fixtures/reach.json beside
+that playbook's digest and the engine's stamp (inference.base.stamp).
+Minutes of solving in one process. Run from the repo root, as a module of
+the tests' package; pytest does not collect it, and test_reach.py runs it
+on the synthetic World:
 
     .venv/bin/python -m tests.inference.record_reach
 
@@ -38,8 +39,8 @@ def main() -> int:
             seated.append(found)
     playbook = catalog.playbook_digest()
     with open(OUT, "w", encoding="utf-8") as handle:
-        json.dump({"playbook": playbook, "base": base.stamp(base.DEFAULT), "boards": seated},
-                  handle, indent=1)
+        json.dump({"playbook": playbook, "base": base.stamp(catalog.engine_weights()),
+                   "boards": seated}, handle, indent=1)
     print(
         "recorded %d seated heroes under playbook %s and the default engine, %d of them after"
         " bans; unseated: %s"

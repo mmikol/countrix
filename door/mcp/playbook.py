@@ -1,6 +1,7 @@
 """The playbook through the door: the metric vocabulary a strategy may
-reference, the catalog, the tools that write a strategy file - tune,
-add_strategy, infer_strategy - and the tuning log.
+reference, the catalog and the default engine's weights, the tools that
+write a strategy file or meta.md - tune, add_strategy, infer_strategy - and
+the tuning log.
 
 Every write validates through the catalog, rewrites the docs catalog for the
 shipped playbook and logs a reasoned line (inference.tune does all three),
@@ -17,6 +18,7 @@ from door.mcp.registry import Context, tool
 from door.mcp.schema import Properties, Property, ToolReply
 from facts import compute
 from inference import catalog, tune
+from inference.base import DIALS, META
 from inference.strategy import FIELDS, TUNABLE, Field, FieldKind
 
 
@@ -39,18 +41,23 @@ def metrics(ctx: Context) -> ToolReply:
     "strategies", "The inference layer's catalog - STRATEGIES = CONSTRAINTS ∪ HEURISTICS"
     " ∪ ASSUMPTIONS: every markdown strategy with its kind (constraint, heuristic or"
     " assumption), its form (a constraint's limit; a heuristic on a metric, or scored on"
-    " bonus/penalty; draft), metric, direction, weight and expressions.")
+    " bonus/penalty; draft), metric, direction, weight and expressions - and, first,"
+    " meta.md: the default engine's weights, the meta that scales it and its rate,"
+    " synergy and counter dials.")
 def strategies(ctx: Context) -> ToolReply:
     cat = catalog.load()
+    meta = catalog.read_meta()
     pending = [s.id for s in cat if s.pending]
-    text = catalog.catalog_rendered(cat)
+    text = "%-10s %-10s %-28s %s\n%s" % (
+        "engine", "meta", META, catalog.meta_rendered(meta.weights), catalog.catalog_rendered(cat))
     if catalog.strategies_dir() != catalog.SHIPPED_DIR:
         text = "playbook in force: %s (the shipped one is %s)\n\n%s" % (
             os.path.relpath(catalog.strategies_dir(), ROOT),
             os.path.relpath(catalog.SHIPPED_DIR, ROOT), text)
     if pending:
         text += "\n\n%d draft(s) awaiting /strategy: %s" % (len(pending), ", ".join(pending))
-    return ToolReply(text, {"strategies": [s.to_dict() for s in cat], "pending": pending})
+    return ToolReply(text, {"strategies": [s.to_dict() for s in cat],
+                            "meta": catalog.meta_record(meta), "pending": pending})
 
 
 # the JSON schema type the door declares for each kind of frontmatter field:
@@ -91,14 +98,22 @@ def _remirror(ctx: Context) -> None:
 
 @tool(
     "tune", "Change one strategy's frontmatter - its weight, a params dial, or"
-    " a when/require/bonus/penalty expression - validated through the"
-    " catalog before it is written, mirrored into the database, and logged"
-    " with the reason in inference/strategies/tuning-log.md.",
+    " a when/require/bonus/penalty expression - or, with id meta, one of"
+    " meta.md's default engine weights: meta, which scales the whole engine"
+    " (0 turns it off), or its rate, synergy or counter dial. Validated"
+    " through the catalog before it is written, mirrored into the database,"
+    " and logged with the reason in inference/strategies/tuning-log.md.",
     {
-        "id": {"type": "string", "description": "the strategy's id (its filename)"},
-        "field": {"type": "string", "description": " | ".join((*TUNABLE, "params.NAME"))},
+        "id": {
+            "type": "string",
+            "description": "the strategy's id (its filename), or %s for meta.md" % META},
+        "field": {
+            "type": "string",
+            "description": "%s; for id %s: %s" % (
+                " | ".join((*TUNABLE, "params.NAME")), META, " | ".join(DIALS))},
         "value": {"description": "the new value: a number, a word (kind, category, metric,"
-                                 " direction) or an expression"},
+                                 " direction) or an expression; meta.md's weights are"
+                                 " numbers within 0..10"},
         "reason": {"type": "string", "description": "why, in a sentence"},
         **BY},
     ["id", "field", "value", "reason"])
@@ -160,8 +175,8 @@ def infer_strategy(
 
 
 @tool(
-    "tuning_log", "The record of every change to the strategies'"
-    " frontmatter, newest last.",
+    "tuning_log", "The record of every change to the playbook's frontmatter -"
+    " the strategies' and meta.md's - newest last.",
     {"lines": {"type": "integer", "description": "how many, 1 or more (default 20)"}})
 def tuning_log(ctx: Context, lines: int = 20) -> ToolReply:
     if lines < 1:

@@ -3,10 +3,11 @@
 The playbook, which imports nothing from the search:
 
     strategies/   the playbook - STRATEGIES = CONSTRAINTS ∪ HEURISTICS ∪ ASSUMPTIONS:
-                  one markdown file per strategy, and tuning-log.md, a line
-                  per change. A constraint is a limit (require: always
-                  holds, never weighted); a heuristic weighs what is left,
-                  a metric maximised or minimised or a bonus/penalty while a
+                  one markdown file per strategy, meta.md, the default
+                  engine's weights, and tuning-log.md, a line per change. A
+                  constraint is a limit (require: always holds, never
+                  weighted); a heuristic weighs what is left, a metric
+                  maximised or minimised or a bonus/penalty while a
                   condition holds; an assumption is prose the agent holds a
                   comp to
     README.md     the citation record the playbook is rebuilt from: a line
@@ -17,15 +18,16 @@ The playbook, which imports nothing from the search:
     strategy      one strategy: its fields, its kind and form, and the rules
                   every file keeps
     catalog       reads the playbook's files into strategies, orders, mirrors
-                  and documents them; AUTHORED, the `sources` row the
-                  mirror carries
-    tune          one validated, logged edit to a strategy file; add and complete
+                  and documents them, and meta.md into the default engine's
+                  weights; AUTHORED, the `sources` row the mirror carries
+    tune          one validated, logged edit to a strategy file or to
+                  meta.md; add and complete
 
 The search, which reads the playbook:
 
-    base          the default engine, always on: a six's win rates on the map,
-                  the wiki's synergies and its counters against the other
-                  side, the terms the playbook's sit on top of
+    base          the default engine: a six's win rates on the map, the
+                  wiki's synergies and its counters against the other side,
+                  under one meta weight, the terms the playbook's sit on top of
     scoring       the objective: what one six scores on one board, the
                   default engine's terms and then the playbook's
     shapes        the legal shapes: the role counts a six may take around the

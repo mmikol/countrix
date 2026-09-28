@@ -8,6 +8,8 @@ stands in for the database and the reference playbook for the live one,
 and every board solves in this process."""
 
 import contextlib
+import os
+import shutil
 
 import pytest
 
@@ -15,7 +17,7 @@ from db import Refusal
 from door.mcp import tools
 from facts import tables
 from facts.draft import Draft
-from inference import engine, serve
+from inference import catalog, engine, serve
 from tests.inference import FIXTURE_PLAYBOOK
 from ui import board as page
 
@@ -104,6 +106,7 @@ def test_every_infer_refuses_locked_picks_its_limits_rule_out(
         "---\nname: At most three supports\nkind: constraint\nrequire: team.supports <= 3\n"
         "---\n# At most three supports\n\nA six fields at most three supports.\n",
         encoding="utf-8")
+    shutil.copy(os.path.join(FIXTURE_PLAYBOOK, catalog.META_FILE), tmp_path)
     monkeypatch.setenv("COUNTRIX_STRATEGIES", str(tmp_path))
     board = {"red": ("Mortar",), "blue": ("Balm", "Myrrh", "Sorrel", "Tansy", "Anvil", "Rook")}
     # the engine's own door under the playbook in force: the fixture's passes catalog=[]

@@ -4,7 +4,7 @@
     STRATEGIES = CONSTRAINTS ∪ HEURISTICS ∪ ASSUMPTIONS
 
 The default engine's three terms come first (inference.base), unless the
-board's BaseWeights are OFF; then the playbook's: limits prune and never
+board's BaseWeights are off, at meta 0; then the playbook's: limits prune and never
 score, heuristics on a metric normalise and weigh, scored heuristics add
 their weight times bonus less penalty; assumptions are the agent's. A
 `when` reading only the enemy, the map and the world is settled once per
@@ -185,7 +185,7 @@ def _score_base(base: Base, cand: Candidate, out: list[Contribution] | None) -> 
     if terms is None:
         raise RuntimeError("score() takes a prepared candidate: its base terms are unset")
     if out is not None:
-        w = base.weights
+        w = base.scaled                     # each term's weight, the meta applied
         for key, weight, raw in ((RATES, w.rate, terms.rates), (SYNERGY, w.synergy, terms.synergy),
                                  (COUNTERS, w.counter, float(terms.counters))):
             out.append({"id": key, "kind": "base", "form": "base", "applies": bool(weight),

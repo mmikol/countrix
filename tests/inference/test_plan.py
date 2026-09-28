@@ -13,7 +13,7 @@ from inference import catalog
 from inference.base import OFF
 from inference.expr import Expr
 from inference.result import Result
-from tests.inference import FIXTURE_PLAYBOOK
+from tests.inference import BRIEF, FIXTURE_PLAYBOOK
 
 FIX = catalog.load(FIXTURE_PLAYBOOK)
 
@@ -80,7 +80,7 @@ def test_both_seats_are_read_through_their_fills_while_half_drafted(
     is the same board from either side, and reads even."""
     from inference import engine
     b = engine.board(synthetic_world, Draft("Ember Ruins", ("Anvil",), ("Anvil",)),
-                     catalog=scratch_playbook)
+                     catalog=scratch_playbook, brief=BRIEF)
     assert b.current.partial and b.red_current.partial
     assert b.momentum["blue"] == b.momentum["red"] == b.fill.to_dict()["normalized"]
     assert b.momentum["verdict"].startswith("even - blue %d, red %d (partial picks)"

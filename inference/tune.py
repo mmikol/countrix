@@ -25,6 +25,14 @@ accepted change is one line in inference/strategies/tuning-log.md. The log
 lives beside the files: the compose stack bind-mounts that directory, so a
 change made through a container lands on the host and in git with the file
 it changed.
+
+    tune("meta", "synergy", 0.2, "the wiki's pairs should count for more")
+
+The id `meta` names meta.md, the default engine's weights beside the
+strategy files: its fields are meta, rate, synergy and counter
+(base.DIALS), each checked by catalog.meta_dial and the file read back by
+catalog.parse_meta before it is written, then documented and logged like
+any other change (_tune_meta). No strategy may take the name.
 """
 
 import os
@@ -37,6 +45,7 @@ from typing import TypedDict
 
 from db import Refusal
 from inference import catalog as catalog_module
+from inference.base import META
 from inference.strategy import (
     FIELD_RULE,
     TUNABLE,
@@ -126,10 +135,10 @@ def _set_scalar(lines: list[str], field: str, value: LineValue) -> str | None:
     return None
 
 
-def edit_frontmatter(text: str, field: str, value: LineValue) -> tuple[str, str | None]:
-    """The file's text with one frontmatter field set -> (new text, old
-    value). The value is one _coerce passed, so it is one line, and the
-    field is a tunable one or a params.NAME dial."""
+def _edited(
+        text: str, edit: Callable[[list[str]], str | None]) -> tuple[str, str | None]:
+    """The file's text with its frontmatter's lines changed by `edit` ->
+    (new text, the old value `edit` returns)."""
     if not text.startswith("---"):
         raise TuneError("no frontmatter")
     end = text.find("\n---", 3)
@@ -137,13 +146,19 @@ def edit_frontmatter(text: str, field: str, value: LineValue) -> tuple[str, str 
         raise TuneError("unterminated frontmatter")
     header, rest = text[3:end], text[end:]
     lines = header.split("\n")
-    if field.startswith("params."):
-        old = _set_param(lines, field[len("params."):], value)
-    elif field in TUNABLE:
-        old = _set_scalar(lines, field, value)
-    else:
-        raise TuneError(FIELD_RULE)
+    old = edit(lines)
     return "---" + "\n".join(lines) + rest, old
+
+
+def edit_frontmatter(text: str, field: str, value: LineValue) -> tuple[str, str | None]:
+    """The file's text with one frontmatter field set -> (new text, old
+    value). The value is one _coerce passed, so it is one line, and the
+    field is a tunable one or a params.NAME dial."""
+    if field.startswith("params."):
+        return _edited(text, lambda lines: _set_param(lines, field[len("params."):], value))
+    if field in TUNABLE:
+        return _edited(text, lambda lines: _set_scalar(lines, field, value))
+    raise TuneError(FIELD_RULE)
 
 
 def _trial_load(directory: str, strategy_id: str, new_text: str) -> list[Strategy]:
@@ -253,11 +268,16 @@ def _commit(directory: str, sid: str, text: str,
     with open(os.path.join(directory, sid + ".md"), "w", encoding="utf-8") as handle:
         handle.write(text)
     _document(directory, loaded)
+    return strategy, _logged(directory, sid, what(strategy), reason, by)
+
+
+def _logged(directory: str, sid: str, what: str, reason: str, by: str) -> str:
+    """One accepted change's line, appended to the log beside the playbook
+    -> the line: the reason and who asked folded onto it (_commit)."""
     by = " ".join(by.split())[:MAX_BY] or BY_SESSION
-    line = "- %s `%s` %s (%s) [%s]" % (_stamp(), sid, what(strategy),
-                                      " ".join(reason.split()), by)
+    line = "- %s `%s` %s (%s) [%s]" % (_stamp(), sid, what, " ".join(reason.split()), by)
     _log(_where(directory)[1], line)
-    return strategy, line
+    return line
 
 
 # --- the three changes -------------------------------------------------------------
@@ -265,9 +285,12 @@ def _commit(directory: str, sid: str, text: str,
 def tune(
         strategy_id: str, field: str, value: object, reason: str, directory: str | None = None,
         by: str = BY_SESSION) -> Change:
-    """Apply one change -> the field's old and new text and the log line."""
+    """Apply one change -> the field's old and new text and the log line.
+    The id META changes one of meta.md's weights (_tune_meta)."""
     directory = _where(directory)[0]
     _reason(reason, "a tuning change needs a reason")
+    if strategy_id == META:
+        return _tune_meta(directory, field, value, reason, by)
     path = _existing(directory, strategy_id)
     checked = _coerce(field, value)
     new = field_text(checked)
@@ -276,6 +299,32 @@ def tune(
     _, line = _commit(directory, strategy_id, text, lambda _: "%s: %s -> %s" % (
         field, old if old is not None else "unset", new), reason, by)
     return {"id": strategy_id, "field": field, "old": old, "new": new, "line": line}
+
+
+def _tune_meta(directory: str, field: str, value: object, reason: str, by: str) -> Change:
+    """One of meta.md's weights set -> the change: the value checked by the
+    rule the reader keeps (catalog.meta_dial), the new text read back
+    through catalog.parse_meta and the strategies loaded before anything is
+    written, then the file written, the docs regenerated and one line
+    logged."""
+    path = os.path.join(directory, catalog_module.META_FILE)
+    try:
+        checked = catalog_module.meta_dial(field, value)
+        with open(path, encoding="utf-8") as handle:
+            text, old = _edited(handle.read(), lambda lines: _set_scalar(lines, field, checked))
+        catalog_module.parse_meta(text)
+        loaded = catalog_module.load(directory)
+    except FileNotFoundError as error:
+        raise TuneError("%s: missing - the playbook's folder holds the default engine's weights"
+                        " there" % catalog_module.META_FILE) from error
+    except CatalogError as error:
+        raise TuneError(str(error)) from error
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write(text)
+    _document(directory, loaded)
+    new = field_text(checked)
+    line = _logged(directory, META, "%s: %s -> %s" % (field, old or "unset", new), reason, by)
+    return {"id": META, "field": field, "old": old, "new": new, "line": line}
 
 
 def complete(
@@ -313,6 +362,9 @@ def _check_new(sid: str, name: str, kind: str, body: str) -> None:
     the prose within its length and three sentences at most."""
     if not catalog_module.ID_RE.fullmatch(sid or ""):
         raise TuneError("id must be lowercase-kebab, got %r" % sid)
+    if sid == META:
+        raise TuneError("%s is %s, the default engine's weights, and no strategy: tune"
+                        " changes them" % (META, catalog_module.META_FILE))
     _coerce("kind", kind)
     if not (name or "").strip() or not (body or "").strip():
         raise TuneError("a strategy needs a name and its prose")

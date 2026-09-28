@@ -14,11 +14,11 @@ import pytest
 
 from facts import board_facts, compute
 from facts.draft import Draft
-from inference import base, catalog, engine, scale, scoring, solver
+from inference import base, catalog, engine, scale, scoring, serve, solver
 from inference.result import Badge, Momentum, Pick
 from inference.scoring import Contribution
 from inference.strategy import WEIGHT_RANGE, StrategyRecord
-from tests.inference import FIXTURE_PLAYBOOK
+from tests.inference import BRIEF, FIXTURE_PLAYBOOK
 from ui import board, pages
 
 
@@ -203,7 +203,7 @@ def test_the_scripts_read_payload_keys_the_server_writes(synthetic_world, monkey
             assert key in written, key
             assert re.search(r"\.%s\b" % key, script), key
     solved = engine.board(synthetic_world, Draft("Harbor Gate", ("Mortar",), ("Balm",)),
-                          catalog=catalog.load(FIXTURE_PLAYBOOK)).to_dict()
+                          catalog=catalog.load(FIXTURE_PLAYBOOK), brief=BRIEF).to_dict()
     read("plan momentum shapes current red_current fill expected blue map side", solved)
     read(
         "picks contributions alternatives considered seconds playstyle cited scoring unscored"
@@ -217,6 +217,10 @@ def test_the_scripts_read_payload_keys_the_server_writes(synthetic_world, monkey
     read(
         "id name kind form weight direction metric need when require penalty bonus params body",
         StrategyRecord.__annotations__)
+    monkeypatch.setenv("COUNTRIX_STRATEGIES", FIXTURE_PLAYBOOK)
+    playbook = serve.handle_strategies().body
+    read("strategies meta", playbook)
+    read("meta rate synergy counter body", playbook["meta"])
     fact = board_facts.generate(synthetic_world, Draft()).to_dict()["facts"][0]
     read("id key subject text scope team source", fact)
     monkeypatch.setattr(board.tables, "load", lambda cx: synthetic_world)
@@ -225,6 +229,22 @@ def test_the_scripts_read_payload_keys_the_server_writes(synthetic_world, monkey
     read("name role subrole portrait status release_date", roster["heroes"][0])
     read("name mode style sided", roster["maps"][0])
     assert not re.search(r"\.score\b", script)
+
+
+def test_the_meta_slider_rides_the_weights_key_under_the_name_the_engine_reads():
+    """The playbook tab's Meta slider is a weight row like a heuristic's: its
+    id is base.META, which parse_weights passes through beside the
+    heuristics' ids and BaseWeights.metered reads, so it rides the one
+    weights=id:value key, is never pruned as a stale heuristic, and starts
+    at meta.md's meta."""
+    script = scripts()
+    assert "var META = '%s';" % base.META in script
+    assert "live[META] = true;" in function(script, "pruneWeights")
+    render = function(script, "renderPlaybook")
+    assert "weightRow({ id: META, name: 'the meta', weight: m.meta }, 'meta')" in render
+    assert catalog.parse_weights(["%s:0.5" % base.META, "coverage:2"]) == {
+        base.META: 0.5, "coverage": 2.0}
+    assert catalog.META_FILE == base.META + ".md" and base.META in base.DIALS
 
 
 def test_a_reply_to_an_older_request_is_dropped_and_its_board_cancelled():
@@ -249,11 +269,29 @@ def test_an_apostrophe_cannot_close_a_single_quoted_attribute():
     assert "title='each side\\'s" not in script and "title='each side&#39;s" in script
 
 
+@pytest.mark.parametrize(("dial", "phrase"), [
+    ("meta", "base(x) = %s &middot; ( "),
+    ("meta", "The meta, %s, scales the whole engine"),
+    ("rate", "&middot; ( %s &middot; rates(x)"),
+    ("rate", "Under it the rate term is in win-rate points and weighs %s."),
+    ("synergy", "+ %s &middot; synergy(x)"),
+    ("counter", "+ %s &middot; counters(x) )"),
+])
+def test_the_math_page_quotes_each_weight_from_the_playbooks_meta_file(
+        monkeypatch, tmp_path, dial, phrase):
+    """The default engine's weights are the playbook's: the math page reads
+    them from the meta.md in force on every call, so a tuned weight changes
+    the page, and a phrase that stops quoting it fails here."""
+    with open(os.path.join(FIXTURE_PLAYBOOK, catalog.META_FILE), encoding="utf-8") as handle:
+        text = handle.read()
+    (tmp_path / catalog.META_FILE).write_text(
+        re.sub(r"^%s: .*$" % dial, "%s: 3.7" % dial, text, count=1, flags=re.M),
+        encoding="utf-8")
+    monkeypatch.setenv("COUNTRIX_STRATEGIES", str(tmp_path))
+    assert phrase % "3.7" in " ".join(pages.view_math().split())
+
+
 @pytest.mark.parametrize(("module", "name", "phrase"), [
-    (base, "W_RATE", "base(x) = %s &middot; rates(x)"),
-    (base, "W_RATE", "The rate term is in win-rate points and weighs %s."),
-    (base, "W_SYNERGY", "+ %s &middot; synergy(x)"),
-    (base, "W_COUNTER", "+ %s &middot; counters(x)"),
     (base, "RATE_PICK_HALF", "t_p = pick_p / ( pick_p + %s )"),
     (compute, "SYNERGY_PULL", "likelihood(h) = pick(h, map) + %s &times; partners"),
     (scale, "REFERENCE_SIZE", "against %s random legal sixes"),

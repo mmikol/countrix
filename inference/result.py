@@ -302,6 +302,8 @@ class Result:
                 "score": None if self.barred else round(self.score, 3),
                 "scoring": scoring, "unscored": unscored,
                 "weights": {s.id: s.weight for s in self.catalog if s.kind == "heuristic"},
+                # the default engine's weights it was scored under: the meta and its dials
+                "base": self.base.record(),
                 # a partial team has no share to report: the sum runs over the picks
                 # it has, so a perfectly played draft reads 16 after one pick and can
                 # fall when the right third pick lands. The fill result carries the
@@ -319,8 +321,9 @@ class Result:
         each for the picks, the breakdown and the alternatives."""
         counts = catalog_module.counts(self.catalog)
         unscored = self.unscored()
-        under = (" under %d constraints, %d heuristics and %d assumptions"
-                 % (counts["constraint"], counts["heuristic"], counts["assumption"]))
+        under = (" under the meta at %g, %d constraints, %d heuristics and %d assumptions"
+                 % (self.base.meta, counts["constraint"], counts["heuristic"],
+                    counts["assumption"]))
         six = "%s%s" % (", ".join(self.blue), " (%s)" % self.playstyle if self.playstyle else "")
         if self.barred:
             lines = [self._headline(), "  %s - %s" % (six, NOT_ALLOWED),

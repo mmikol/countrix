@@ -144,7 +144,9 @@ def reach_tool(ctx: Context, hero: str) -> ToolReply:   # _tool: inference.reach
         "weights": {"type": "object",
                     "description": "{heuristic id: 0..10} - weights to score this"
                                    " board under instead of the files' (the playbook"
-                                   " tab's sliders); the files are untouched"}})
+                                   " tab's sliders), and meta: 0..10 in place of"
+                                   " meta.md's meta, which scales the default engine"
+                                   " (the Meta slider); the files are untouched"}})
 def board(
         ctx: Context, draft: Draft, pool: int | None = None,
         weights: Mapping[str, object] | None = None) -> ToolReply:

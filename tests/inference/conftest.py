@@ -10,13 +10,14 @@ import pytest
 
 from facts.draft import Draft
 from inference import catalog
-from tests.inference import FIXTURE_PLAYBOOK
+from tests.inference import BRIEF, FIXTURE_PLAYBOOK
 
 
 @pytest.fixture()
 def catalog_copy(tmp_path):
-    """A private copy of the reference playbook to tune without touching the repo."""
-    for name in catalog.strategy_files(FIXTURE_PLAYBOOK):
+    """A private copy of the reference playbook - its strategy files and its
+    meta.md - to tune without touching the repo."""
+    for name in [*catalog.strategy_files(FIXTURE_PLAYBOOK), catalog.META_FILE]:
         shutil.copy(os.path.join(FIXTURE_PLAYBOOK, name), tmp_path / name)
     return str(tmp_path)
 
@@ -38,4 +39,4 @@ def harbor_gate_board(synthetic_world):
     from inference import engine
     return engine.board(synthetic_world,
                         Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm", "Anvil")),
-                        catalog=catalog.load(FIXTURE_PLAYBOOK))
+                        catalog=catalog.load(FIXTURE_PLAYBOOK), brief=BRIEF)

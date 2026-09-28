@@ -15,7 +15,7 @@ import pytest
 
 from db import Refusal
 from facts.model import World
-from inference import base, reach
+from inference import base, catalog, reach
 from inference.solver import Infeasible
 from tests.inference import FIXTURE_PLAYBOOK, in_force, recorded
 from tests.inference import record_reach as recorder
@@ -228,7 +228,8 @@ def test_the_recorder_writes_every_seated_hero_beside_the_objective_it_ran_under
     assert searched == released and "Wisp" not in searched
     with open(tmp_path / "reach.json", encoding="utf-8") as handle:
         written = json.load(handle)
-    assert written["playbook"] == "ab" * 32 and written["base"] == base.stamp(base.DEFAULT)
+    assert written["playbook"] == "ab" * 32
+    assert written["base"] == base.stamp(catalog.engine_weights())
     assert [b["hero"] for b in written["boards"]] == [n for n in released if n != "Quarry"]
     assert capsys.readouterr().out == (
         "recorded 11 seated heroes under playbook abababababab and the default engine, 1 of"

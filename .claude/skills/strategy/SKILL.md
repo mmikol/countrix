@@ -167,6 +167,11 @@ as above and store it through `infer_strategy`.
 
 - Three inputs from the colleague, everything else inferred, standardized
   and explained: never ask for a metric key, a weight or an expression.
+- The default engine's weights are no strategy. A note that the win
+  rates, the synergy pairs or the counters as a whole should count for
+  more or less is a change to meta.md - its meta or its rate, synergy or
+  counter dial - which `/tune` makes through `tune` with the id meta;
+  never write a strategy to restate or cancel the engine.
 - The claim stays theirs; the words become the playbook's. Every change
   to the prose is shown before it is stored.
 - One file per strategy; never overwrite - `tune` and `infer_strategy`

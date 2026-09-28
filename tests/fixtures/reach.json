@@ -1,6 +1,7 @@
 {
  "playbook": "7e8adac720387ba85c7875c5ad26059a74892ce96bb0a23efe1be644e09eebce",
  "base": {
+  "meta": 1.0,
   "rate": 1.0,
   "synergy": 0.1,
   "counter": 0.05,

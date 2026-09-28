@@ -32,7 +32,8 @@ hide the rate figures: Blizzard licenses those for personal use only.*
   A default engine scores every candidate on its win rates on the map, the
   wiki's synergies and its counters to the other side - the wiki's, and
   where the wiki says nothing, answers derived from the two kits and named
-  on the board with the mechanism that fired; the playbook's
+  on the board with the mechanism that fired - under weights the playbook
+  sets, one meta weight scaling the three; the playbook's
   constraints cut the space and its heuristics adjust that score. The best six comes back with
   the alternatives and why.
 - **Serves it two ways.** A web board and an MCP (Model Context Protocol)
@@ -70,11 +71,12 @@ reaches up a layer. Every write goes through one door, the MCP server. Every
 metric is defined once, so the number on the board and the number the solver
 maximises come from the same function.
 The playbook is markdown: each strategy is a file with a few lines of
-frontmatter, and the solver reads nothing else.
+frontmatter, `meta.md` beside them holds the default engine's weights, and
+the solver reads nothing else.
 
 ## Engineering
 
-- **793 tests.** CI runs ruff, mypy and the 677 that need no database on
+- **810 tests.** CI runs ruff, mypy and the 694 that need no database on
   every push to main and every pull request; they cover 93% of the lines,
   held to 78%. With the database built, all of them run against a 75% floor.
 - **The search is held to brute force.** A CI gate enumerates every legal six

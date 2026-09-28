@@ -6,6 +6,7 @@ assumptions alone scored by it, its best six the enumerated maximum. Every
 board is the synthetic World's: no database."""
 
 import copy
+import dataclasses
 import itertools
 import os
 import shutil
@@ -18,8 +19,8 @@ from facts.draft import Draft
 from facts.factset import FactSet
 from facts.records import DerivedEdge, Fired, MapRate
 from inference import base, catalog, engine, scoring
-from inference.base import DEFAULT, OFF, W_COUNTER
-from tests.inference import ASSUMPTIONS_ONLY, FIXTURE_PLAYBOOK, timeless
+from inference.base import OFF
+from tests.inference import ASSUMPTIONS_ONLY, BRIEF, DEFAULT, FIXTURE_PLAYBOOK, timeless
 from tests.inference.tracing import TRACED
 
 SIX = ("Anvil", "Kite", "Rook", "Needle", "Balm", "Tansy")
@@ -100,9 +101,9 @@ def test_the_synergy_and_counter_terms_read_the_wikis_pairs_and_edges(synthetic_
         heroes=tuple(heroes(synthetic_world, ("Mortar", "Gale"))), likely=False)
     terms = {c["id"]: c for c in cand.contributions}
     assert list(terms) == [base.RATES, base.SYNERGY, base.COUNTERS]    # nothing else scores
-    for key, raw, weight in ((base.RATES, cand.terms.rates, base.W_RATE),
-                             (base.SYNERGY, 4, base.W_SYNERGY),
-                             (base.COUNTERS, 2, base.W_COUNTER)):
+    for key, raw, weight in ((base.RATES, cand.terms.rates, DEFAULT.rate),
+                             (base.SYNERGY, 4, DEFAULT.synergy),
+                             (base.COUNTERS, 2, DEFAULT.counter)):
         c = terms[key]
         assert c["kind"] == c["form"] == "base" and c["applies"]
         assert c["raw"] == pytest.approx(raw) and c["weight"] == weight
@@ -159,7 +160,7 @@ def test_each_seat_reads_the_other_sides_likely_six_or_its_picks(synthetic_world
     blue's likely six as blue's optimal reads red's; once blue locks a pick,
     red's reads that pick. Each counter term cites the fact that says which."""
     empty = engine.board(synthetic_world, Draft("Harbor Gate", side="attack"),
-                         catalog=ASSUMPTIONS_ONLY)
+                         catalog=ASSUMPTIONS_ONLY, brief=BRIEF)
     likely = empty.expected.blue
     # the plan says the six counters it, and names the engine's terms it is built on
     assert "No red pick yet: the six counters their likely six (" in empty.plan
@@ -172,7 +173,7 @@ def test_each_seat_reads_the_other_sides_likely_six_or_its_picks(synthetic_world
                 other, ", ".join(c["against"]), c["answers"], c["exposures"],
                 c["answers"] - c["exposures"])
     held = engine.board(synthetic_world, Draft("Harbor Gate", (), ("Balm",), side="attack"),
-                        catalog=ASSUMPTIONS_ONLY)
+                        catalog=ASSUMPTIONS_ONLY, brief=BRIEF)
     [c] = [c for c in held.red.contributions if c["id"] == base.COUNTERS]
     assert c["against"] == ["Balm"] and not c["likely"]
     assert c["text"].startswith("counters read blue as it stands: Balm - ")
@@ -205,20 +206,21 @@ def test_the_sliced_board_agrees_with_one_process(monkeypatch, synthetic_world, 
     folder = FIXTURE_PLAYBOOK
     if playbook == "assumptions":
         folder = str(tmp_path)
-        for s in ASSUMPTIONS_ONLY:
-            shutil.copy(os.path.join(FIXTURE_PLAYBOOK, s.id + ".md"), tmp_path)
+        for name in [s.id + ".md" for s in ASSUMPTIONS_ONLY] + [catalog.META_FILE]:
+            shutil.copy(os.path.join(FIXTURE_PLAYBOOK, name), tmp_path)
     monkeypatch.setenv("COUNTRIX_STRATEGIES", folder)
     in_force = catalog.load()
     brief = engine.Brief()
-    assert brief.base == DEFAULT
+    weights = engine.weights_in_force(brief.base)
+    assert weights == DEFAULT
     for draft in (Draft("Harbor Gate", side="attack"), TRACED,
                   Draft("Harbor Gate", ("Mortar",), SIX, side="attack"),
                   Draft("Harbor Gate", SIX, side="attack")):
         sliced = engine._board_once(
-            synthetic_world, draft, catalog=in_force, brief=brief,
+            synthetic_world, draft, catalog=in_force, brief=brief, base=weights,
             workers=parallel.Workers(Inline(), 4), watch=supersede.Watch(None))
         alone = engine._board_once(
-            synthetic_world, draft, catalog=in_force, brief=brief, workers=None,
+            synthetic_world, draft, catalog=in_force, brief=brief, base=weights, workers=None,
             watch=supersede.Watch(None))
         assert any(c["kind"] == "base" for c in sliced.blue.contributions)
         assert timeless(sliced.to_dict()) == timeless(alone.to_dict()), draft
@@ -229,7 +231,7 @@ def test_every_base_term_cites_a_fact_the_result_carries(synthetic_world):
     board's; the synergy term cites the board's cohesion fact. The page reads
     them through `cited`."""
     r = engine.infer(synthetic_world, Draft("Harbor Gate", ("Mortar",), side="attack"),
-                     catalog=ASSUMPTIONS_ONLY)
+                     catalog=ASSUMPTIONS_ONLY, base=DEFAULT)
     board_facts = engine._board_facts(synthetic_world, r, "attack").facts
     cited = r.to_dict()["cited"]
     for c in r.contributions:
@@ -249,7 +251,7 @@ def test_a_playbook_of_assumptions_scores_by_the_engine_and_its_best_six_is_the_
     tie-break after them, found by enumeration."""
     w = synthetic_world
     draft = Draft("Ember Ruins", ("Mortar",), side="")
-    b = engine.board(w, draft, catalog=ASSUMPTIONS_ONLY)
+    b = engine.board(w, draft, catalog=ASSUMPTIONS_ONLY, brief=BRIEF)
     d = b.to_dict()
     for key in ("blue", "red", "current", "red_current"):
         assert d[key]["scoring"] is True and d[key]["unscored"] is None, key
@@ -298,6 +300,81 @@ def test_a_derived_edge_counts_half_a_wiki_edge_and_the_fact_names_it(synthetic_
 
 
 def test_the_stamp_holds_a_derived_edges_weight_against_a_wiki_edges():
-    stamped = base.stamp(base.DEFAULT)
-    assert stamped is not None and stamped["derived"] == 0.5 and stamped["counter"] == W_COUNTER
+    stamped = base.stamp(DEFAULT)
+    assert stamped is not None and stamped["derived"] == 0.5
+    assert (stamped["meta"], stamped["counter"]) == (DEFAULT.meta, DEFAULT.counter)
     assert base.stamp(OFF) is None
+
+
+def test_the_reference_weights_are_the_calibrated_engine_and_off_is_meta_zero():
+    """The reference playbook's meta.md holds the weights the engine was
+    calibrated at - the rate term in win-rate points, synergy and counter at
+    half its median spread each - under a meta of 1; OFF is the meta at 0,
+    and a meta of 0 over any dials scores nothing, as OFF does."""
+    assert DEFAULT.record() == {"meta": 1.0, "rate": 1.0, "synergy": 0.1, "counter": 0.05}
+    assert DEFAULT.on and OFF.meta == 0 and not OFF.on
+    assert not DEFAULT.metered({base.META: 0.0}).on
+    assert DEFAULT.scaled() == base.TermWeights(rate=1.0, synergy=0.1, counter=0.05)
+
+
+def test_the_meta_scales_every_term_and_nothing_else(synthetic_world):
+    """At meta 2 each base term weighs twice its dial and the engine's value
+    doubles, bit for bit; the playbook's terms do not move. A board's
+    weights set the meta for that board alone (BaseWeights.metered), and
+    leave a weights mapping without it as they found it."""
+    fix = catalog.load(FIXTURE_PLAYBOOK)
+    doubled = DEFAULT.metered({base.META: 2.0, "coverage": 3.0})
+    assert doubled.record() == dict(DEFAULT.record(), meta=2.0)
+    assert DEFAULT.metered({"coverage": 3.0}) is DEFAULT and DEFAULT.metered(None) is DEFAULT
+    one_objective, one = prepared(synthetic_world, "Harbor Gate", ("Mortar", "Gale"), SIX, fix)
+    two_objective, two = prepared(synthetic_world, "Harbor Gate", ("Mortar", "Gale"), SIX, fix,
+                                  doubled)
+    assert two_objective.base.value(two.terms) == 2 * one_objective.base.value(one.terms)
+    assert two.score - one.score == pytest.approx(one_objective.base.value(one.terms))
+    ones = {c["id"]: c for c in one.contributions}
+    for c in two.contributions:
+        if c["kind"] == "base":
+            assert c["weight"] == 2 * ones[c["id"]]["weight"]
+            assert c["weighted"] == 2 * ones[c["id"]]["weighted"]
+        else:
+            assert c["weighted"] == ones[c["id"]]["weighted"], c["id"]
+
+
+def test_a_board_at_meta_zero_is_the_board_off(synthetic_world):
+    """The Meta slider at 0 is OFF: every seat of the board scores, ranks and
+    reads as it does with the engine off, and only the weights each result
+    records say which it was."""
+    fix = catalog.load(FIXTURE_PLAYBOOK)
+    draft = Draft("Harbor Gate", ("Mortar",), ("Balm",), side="attack")
+    zero = engine.board(synthetic_world, draft, catalog=fix,
+                        brief=engine.Brief(base=DEFAULT, weights={base.META: 0.0})).to_dict()
+    off = engine.board(synthetic_world, draft, catalog=fix, brief=engine.Brief(base=OFF)).to_dict()
+    seats = ("blue", "red", "current", "red_current", "fill", "countered", "expected")
+    assert [zero[k]["base"] for k in seats] == [dict(DEFAULT.record(), meta=0.0)] * len(seats)
+    assert [off[k]["base"] for k in seats] == [OFF.record()] * len(seats)
+    for payload in (zero, off):
+        for k in seats:
+            payload[k].pop("base")
+    assert timeless(zero) == timeless(off)
+
+
+def test_a_board_that_names_no_weights_reads_the_playbooks_meta_file(
+        synthetic_world, monkeypatch, tmp_path):
+    """No base on the brief is the playbook in force's meta.md: a copy of the
+    reference playbook whose meta.md says 0.5 scores every seat at half the
+    engine, and says so in every result."""
+    for name in os.listdir(FIXTURE_PLAYBOOK):
+        shutil.copy(os.path.join(FIXTURE_PLAYBOOK, name), tmp_path)
+    meta = tmp_path / catalog.META_FILE
+    meta.write_text(meta.read_text(encoding="utf-8").replace("meta: 1\n", "meta: 0.5\n"),
+                    encoding="utf-8")
+    monkeypatch.setenv("COUNTRIX_STRATEGIES", str(tmp_path))
+    monkeypatch.setenv("COUNTRIX_PARALLEL", "0")
+    halved = dataclasses.replace(DEFAULT, meta=0.5)
+    assert catalog.engine_weights() == halved == engine.weights_in_force(None)
+    b = engine.board(synthetic_world, Draft("Harbor Gate", ("Mortar",), side="attack"))
+    assert b.blue.base == halved and b.to_dict()["blue"]["base"]["meta"] == 0.5
+    rates = next(c for c in b.blue.contributions if c["id"] == base.RATES)
+    assert rates["weight"] == 0.5 * DEFAULT.rate
+    assert engine.infer(synthetic_world, Draft("Harbor Gate")).base == halved
+    assert "under the meta at 0.5," in b.blue.rendered()

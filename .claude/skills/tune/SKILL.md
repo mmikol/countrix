@@ -1,14 +1,15 @@
 ---
 name: tune
-description: Change how Countrix's inference engine scores compositions - a strategy's weight, a params dial, or an expression. Use when the user says the solver over- or under-values something, wants a rule changed, asks to "tune", "reweight" or "adjust".
+description: Change how Countrix's inference engine scores compositions - a strategy's weight, a params dial, an expression, or the default engine's weights in meta.md (the meta that scales it, and its rate, synergy and counter dials). Use when the user says the solver over- or under-values something, wants a rule changed, asks to "tune", "reweight" or "adjust".
 ---
 
 You are editing the brain: the playbook in `inference/strategies/`,
 STRATEGIES = CONSTRAINTS ∪ HEURISTICS ∪ ASSUMPTIONS - a constraint is a
 limit (`require`) that always holds and is never weighted, a heuristic a
 weighted metric or a scored adjustment (`bonus`/`penalty` times its
-weight), an assumption prose. Every change goes through the
-`tune` tool on the `countrix` (or
+weight), an assumption prose - and `meta.md` beside them, the default
+engine's weights, which score every six before the playbook does. Every
+change goes through the `tune` tool on the `countrix` (or
 `countrix-docker`) MCP server, which validates it against
 the catalog, writes the file, re-mirrors the table, and logs it with your
 reason in `inference/strategies/tuning-log.md`. Nothing is edited by hand.
@@ -36,12 +37,37 @@ reason in `inference/strategies/tuning-log.md`. Nothing is edited by hand.
    looking at and say what moved. One change per request unless they ask
    for more; never touch a strategy they did not name.
 
+## The default engine's weights ("it trusts the win rates too much")
+
+Before any strategy scores, the default engine scores every six on three
+terms: each pick's win rate on the map, trusted by its pick rate; the
+wiki's synergy scores among the six; and the counter graph against the
+other side. Its weights live in `inference/strategies/meta.md`, and
+`strategies` lists them on its first line:
+
+- **meta** scales the whole engine: 0 is the playbook alone, 1 the
+  engine as calibrated, 2 twice as loud against the playbook's rules.
+- **rate**, **synergy** and **counter** weigh the three terms under it:
+  rate 1 puts its term in win-rate points, and synergy and counter were
+  calibrated so that each term spreads a typical board's sixes about half
+  as far as the rates do.
+
+Each is a number within 0..10. When the user names one term ("the synergy
+pairs count for too little"), turn its dial; when they mean the engine as
+a whole against their rules ("it ignores my rules", "trust the meta
+less"), turn the meta. Call `tune` with the id `meta`: `{"id": "meta",
+"field": "synergy", "value": 0.2, "reason": "user: the synergy pairs count
+for too little"}`. It is validated, written, documented and logged like a
+strategy's change. The playbook tab's Meta slider sets the meta for one
+browser session without touching the file; `tune` is the lasting change.
+
 ## Ground rules
 
 - Players are assumed to play optimally; do not add a strategy to encode
   a lobby's habits.
-- A weight of 0 silences a heuristic without deleting it; deleting a file
-  is a human decision, not a tune.
+- A weight of 0 silences a heuristic without deleting it, and a meta of 0
+  silences the default engine; deleting a file is a human decision, not a
+  tune.
 - The `tuning_log` tool is the record of every change - show it when the
   user asks how the weights got here.
 - At most two tanks is the queue's own rule: the solver keeps every six

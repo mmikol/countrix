@@ -1,4 +1,5 @@
-"""The inference layer's tests, the reference playbook they prove the solver against, its
+"""The inference layer's tests, the reference playbook they prove the solver against and
+its default engine weights (DEFAULT, its meta.md), its
 assumptions alone (ASSUMPTIONS_ONLY) for a test that needs a playbook that scores nothing,
 the shipped healing floor's fields (HEAL_RATE) and heal_rate(), a playbook of that rule
 alone written where a test says, so no solver test reads inference/strategies/, the
@@ -29,6 +30,11 @@ FIXTURE_PLAYBOOK = os.path.join(FIXTURES, "playbook")
 # vintage): a playbook that scores nothing and writes no limit. A board's weights
 # reach heuristics alone, so the shared list is never weighted in place
 ASSUMPTIONS_ONLY = [s for s in catalog.load(FIXTURE_PLAYBOOK) if s.kind == "assumption"]
+# the reference playbook's meta.md: the default engine at the weights it was calibrated
+# at, which every test that runs the engine names, so none reads the live meta.md the
+# owner tunes
+DEFAULT = catalog.engine_weights(FIXTURE_PLAYBOOK)
+BRIEF = engine.Brief(base=DEFAULT)         # a board's brief at those weights
 DIGEST_RE = re.compile(r"[0-9a-f]{64}\Z")
 # the frontmatter of inference/strategies/heal-rate.md, which test_catalog holds
 # the shipped file to
@@ -74,13 +80,14 @@ def recorded(name: str) -> Recorded:
 
 def in_force() -> tuple[str, base.BaseStamp | None]:
     """The objective a board is solved under by default: the playbook in
-    force's digest and the default engine's stamp, as a fixture records them."""
-    return catalog.playbook_digest(), base.stamp(base.DEFAULT)
+    force's digest and the stamp of its meta.md's weights, as a fixture
+    records them."""
+    return catalog.playbook_digest(), base.stamp(catalog.engine_weights())
 
 
 def evaluated(
         world: World, draft: Draft, *, catalog: list[Strategy],
-        base: base.BaseWeights = base.DEFAULT) -> Result:
+        base: base.BaseWeights = DEFAULT) -> Result:
     """Blue's full six (`draft.blue`) scored and ranked against the field its
     seat would search, as the board scores its current comp, without the
     board's other seats."""

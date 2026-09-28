@@ -39,12 +39,12 @@ first and the playbook's on top:
 
 ```
 score(six) = base(six) + the playbook's terms (How a strategy file works)
-base(six)  = W_RATE x rates + W_SYNERGY x synergy + W_COUNTER x counters
+base(six)  = meta x (rate x rates + synergy x synergy + counter x counters)
 ```
 
-`base` is the default engine, `inference/base.py`. It is always on and
-needs no playbook, so a playbook of assumptions alone gets the sixes its
-three terms favour, scored and explained:
+`base` is the default engine, `inference/base.py`. It is on unless its
+meta is 0 and needs no strategy, so a playbook of assumptions alone gets
+the sixes its three terms favour, scored and explained:
 
 - **rates**: each pick's all-ranks win rate on the map - its overall rate
   with no map, or no row for it there - as points over 50, times
@@ -74,20 +74,52 @@ three terms favour, scored and explained:
   names every derived edge it counts with the mechanism and the numbers
   that fired.
 
-`W_RATE` is 1, so the rate term is in win-rate points. `W_SYNERGY` and
-`W_COUNTER` are set so that each term's median spread across a board's
-reference sample is about half the rate term's; the module docstring holds
-the calibration. A heuristic still moves a six by its weight at most; the
-math page says how that compares with the base's spread. Each term is a bar of the breakdown,
-with the fact it read: the counter bar's fact names the six it read.
+The weights are the playbook's. `meta.md`, beside the strategy files,
+holds four numbers, each within 0..10: `meta`, which scales the whole
+engine, and under it `rate`, `synergy` and `counter`, each term's points
+per unit. The shipped file sets 1, 1, 0.1 and 0.05. `rate` is 1, so the
+rate term is in win-rate points; `synergy` and `counter` are set so that
+each term's median spread across a board's reference sample is about
+half the rate term's, about 2.1 points on a typical board; the module
+docstring holds the calibration. A heuristic still moves a six by its
+weight at most; the math page says how that compares with the base's
+spread. Each term is a bar of the breakdown, with the fact it read and
+its weight with the meta applied: the counter bar's fact names the six it
+read.
 
 A `BaseWeights` rides the `Brief`, and `infer`'s `base`, into every
-`Objective` and every worker's `Spec`; `base.OFF` turns the engine off,
-and a board is the playbook's alone, as it was before the engine had a
-base. The board and the MCP tools run `DEFAULT`. The tests
-that pin the reference playbook's sixes turn it off. With the engine off
-and a playbook that scores nothing, every six ties at zero and a board
-reads *unscored*.
+`Objective` and every worker's `Spec`. Left unset it is the playbook in
+force's `meta.md` (`catalog.engine_weights`), with a board's own meta
+over it where the playbook tab's Meta slider sets one
+(`weights=meta:<0..10>`). Every result records the weights it was scored
+under (`base` in its payload, and "under the meta at" in its text), and a
+recorded fixture's stamp (`base.stamp`) records them beside the
+playbook's digest, which leaves `meta.md` out. A folder with no
+`meta.md`, or one that breaks a rule, is a `CatalogError` wherever the
+weights are read. `base.OFF`, the meta at 0, turns the engine off, and a
+board is the playbook's alone, as it was before the engine had a base; a
+board at meta 0 is that board, bit for bit, but for the weights its
+results record. The board and the MCP tools run the playbook's weights;
+the tests name the reference playbook's (`tests/fixtures/playbook/meta.md`),
+so tuning the live file moves none of them, and the tests that pin the
+reference playbook's sixes turn the engine off. With the engine off and
+a playbook that scores nothing, every six ties at zero and a board reads
+*unscored*.
+
+### Why the weights are the playbook's
+
+The owner's rule is that constraints prune and never weigh, and that the
+heuristics and the meta carry every weight, each one his to turn. The
+heuristics' weights already lived in their files; the engine's three
+were constants in `inference/base.py`, where only a commit could move
+them and no slider reached them. They moved into `meta.md` so that the
+`tune` tool changes them as it changes a strategy's weight - validated,
+documented and logged - and one meta weight was put over them so that
+the whole engine can be leaned on or silenced at once, from the file for
+good or from the Meta slider for a session. The shipped file holds the
+calibrated values under a meta of 1, and 1.0 x w is w in floating point,
+so no score moved: the pinned boards and the reach fixture's boards stand
+as they were.
 
 ## The share
 
@@ -127,7 +159,10 @@ The `infer` tool refuses such picks in the same words.
 Drop a markdown file into `strategies/` and it is live: the solver reads
 the directory on every call, the board's playbook panel shows it, the
 `strategies` tool serves it, and `load_authored` mirrors it into the
-`strategies` table. The frontmatter is the whole contract:
+`strategies` table. Three markdown files there are no strategy:
+`README.md`, `tuning-log.md`, and `meta.md`, the default engine's weights
+([The objective](#the-objective)), whose name no strategy may take. The
+frontmatter is the whole contract:
 
 ```markdown
 ---
@@ -194,13 +229,16 @@ completes it through `infer_strategy`. No API key anywhere.
 
 ## How the weights move
 
-The default engine's weights are constants in `inference/base.py`, and no
-slider moves them. The board's sliders override a weight for one board -
-`weights=<id>:<0..10>` on `/api/board`, `weights` on the `board` tool -
-and every result names the weights it was scored under; the board writes
-none of them. Three tools write a strategy file - `tune`, `add_strategy`
-and `infer_strategy` - each validated through the catalog before it
-writes and logged with its reason in `strategies/tuning-log.md`.
+The default engine's weights are `meta.md`'s, and the `tune` tool moves
+them: `{"id": "meta", "field": "synergy", "value": 0.2, "reason": ...}`,
+the field one of `meta`, `rate`, `synergy` and `counter`. The board's
+sliders override a weight for one board - `weights=<id>:<0..10>` on
+`/api/board`, `weights` on the `board` tool - the Meta slider among them
+as `meta:<0..10>`, and every result names the weights it was scored
+under; the board writes none of them. Three tools write a strategy file -
+`tune`, `add_strategy` and `infer_strategy` - and `tune` writes
+`meta.md`, each validated through the catalog before it writes and
+logged with its reason in `strategies/tuning-log.md`.
 
 ## Sustained healing
 
@@ -389,7 +427,13 @@ with three 7%.
 ## The catalog
 
 <!-- generated:catalog -->
-8 files in `inference/strategies/`: 1 constraint (a limit), 1 heuristic (0 on a metric, 1 scored) and 6 assumptions. Regenerated by `.venv/bin/python -m door.mcp call db_docs`.
+8 strategy files in `inference/strategies/`: 1 constraint (a limit), 1 heuristic (0 on a metric, 1 scored) and 6 assumptions. Regenerated by `.venv/bin/python -m door.mcp call db_docs`.
+
+#### The meta
+
+`meta.md`: meta 1 x (rate 1, synergy 0.1, counter 0.05) - the default engine's weights, which the tune tool changes (id `meta`)
+
+The default engine scores every six before the playbook's rules do: each pick's win rate on the map, trusted by its pick rate (rate), the wiki's synergy scores among the six (synergy), and the counter graph against the other side (counter). The meta scales the three together - 0 is the playbook alone, 1 the engine as calibrated - and the board's Meta slider sets it for a session without touching this file. Rate is 1, so its term is in win-rate points, and synergy and counter are set so that each term spreads a typical board's sixes about half as far as the rates do.
 
 #### Constraints
 

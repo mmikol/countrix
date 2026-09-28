@@ -185,6 +185,13 @@ few match-ups the wiki rates (the counters table is a list).
 
 ## Done
 
+- **Every weight is the playbook's, under one meta.** The default
+  engine's rate, synergy and counter weights leave `inference/base.py`
+  for `meta.md` beside the strategy files, with a meta weight over the
+  three; `tune` with id `meta` writes it, the playbook tab's Meta slider
+  sets the meta for a session (`weights=meta:<v>`), and every result and
+  `base.stamp` record the weights. The shipped values are the calibrated
+  ones, so no score moved.
 - **The engine keeps only what a board reads** - `3c78ae8`. The
   unscored-by-strategy paths, the heuristic confidence field and dead
   branches in the catalog, the solver and the frontmatter reader go.

@@ -6,6 +6,7 @@ supersede tests a stale board that stops and keeps the pool."""
 from concurrent.futures.process import BrokenProcessPool
 
 from facts.draft import Draft
+from tests.inference import DEFAULT
 
 
 class Call:
@@ -29,7 +30,8 @@ def traced_board(
         monkeypatch, world, playbook, *, pooled, breaks_after=None, brief=None, trace=None,
         draft=TRACED):
     """board() for real, in this process, on the synthetic World, on `draft`
-    under `brief`. Pooled, a recording Split with the real one's constructor
+    under `brief`, at the reference playbook's engine weights where it names
+    none. Pooled, a recording Split with the real one's constructor
     stands in for the workers: it checks the board's watch and traces each
     round, hands back None from solved() and swept() so each seat searches
     for itself, and after `breaks_after` rounds a worker dies. Only the pool
@@ -73,4 +75,7 @@ def traced_board(
                         lambda: parallel.Workers(executor=None, size=6))
     monkeypatch.setattr(parallel.POOL, "drop", lambda: trace.append(Call("drop")))
     monkeypatch.setattr(parallel, "Split", Split)
+    brief = engine.Brief() if brief is None else brief
+    if brief.base is None:
+        brief = brief._replace(base=DEFAULT)
     return engine.board(world, draft, catalog=playbook, brief=brief), trace

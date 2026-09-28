@@ -335,3 +335,50 @@ def test_weights_override_a_heuristic_for_one_board_and_never_the_file():
     assert heuristic.weight == before                        # the loaded one is untouched
     assert next(h for h in over if h.id == limit.id) is limit  # a constraint's stays its own
     assert catalog.weighted(cat, {}) is cat and len(over) == len(cat)
+
+
+def test_meta_md_holds_the_engines_weights_and_is_no_strategy(catalog_copy):
+    """meta.md beside the strategy files is the default engine's weights and
+    its prose: the catalog never loads it as a strategy, and the digest
+    leaves it out - a fixture's stamp records the weights. The live
+    playbook holds one the engine can read."""
+    meta = catalog.read_meta(catalog_copy)
+    assert meta.weights.record() == {"meta": 1.0, "rate": 1.0, "synergy": 0.1, "counter": 0.05}
+    assert meta.body.startswith("# The meta\n")
+    assert catalog.META_FILE not in catalog.strategy_files(catalog_copy)
+    assert "meta" not in {s.id for s in catalog.load(catalog_copy)}
+    digest = catalog.playbook_digest(catalog_copy)
+    path = Path(catalog_copy, catalog.META_FILE)
+    path.write_text(path.read_text(encoding="utf-8").replace("rate: 1\n", "rate: 2\n"),
+                    encoding="utf-8")
+    assert catalog.engine_weights(catalog_copy).rate == 2.0
+    assert catalog.playbook_digest(catalog_copy) == digest
+    assert catalog.meta_record(catalog.read_meta(catalog_copy))["rate"] == 2.0
+    assert catalog.meta_rendered(meta.weights) == "meta 1 x (rate 1, synergy 0.1, counter 0.05)"
+    assert catalog.read_meta(catalog.SHIPPED_DIR).weights.on
+
+
+@pytest.mark.parametrize(("text", "message"), [
+    ("---\nmeta: 1\nrate: 1\nsynergy: 0.1\n---\nx\n", "counter unset"),
+    ("---\nmeta: 1\nrate: 1\nsynergy: 0.1\ncounter: 0.05\nweight: 2\n---\n", "weight is not"),
+    ("---\nmeta: 11\nrate: 1\nsynergy: 0.1\ncounter: 0.05\n---\nx\n", r"within 0\.\.10"),
+    ("---\nmeta: 1\nrate: -1\nsynergy: 0.1\ncounter: 0.05\n---\nx\n", r"within 0\.\.10"),
+    ("---\nmeta: 1\nrate: one\nsynergy: 0.1\ncounter: 0.05\n---\nx\n", "rate is a number"),
+    ("meta: 1\n", "no frontmatter"),
+])
+def test_a_meta_file_that_breaks_a_rule_is_refused_by_name(tmp_path, text, message):
+    (tmp_path / catalog.META_FILE).write_text(text, encoding="utf-8")
+    with pytest.raises(CatalogError, match="^meta.md: .*%s" % message):
+        catalog.read_meta(str(tmp_path))
+
+
+def test_a_playbook_without_a_meta_file_has_no_engine_weights(tmp_path, monkeypatch):
+    """Every playbook folder holds its meta.md: a folder without one is a
+    CatalogError wherever the weights are read, the playbook in force's
+    included, so a lost file stops the board rather than scoring quietly
+    without the engine."""
+    shutil.copy(os.path.join(FIXTURE_PLAYBOOK, "open-queue-tanks.md"), tmp_path)
+    monkeypatch.setenv("COUNTRIX_STRATEGIES", str(tmp_path))
+    assert [s.id for s in catalog.load()] == ["open-queue-tanks"]
+    with pytest.raises(CatalogError, match=r"meta\.md: missing"):
+        catalog.engine_weights()

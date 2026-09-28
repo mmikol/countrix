@@ -12,15 +12,15 @@ from db import Refusal
 from facts import board_facts
 from facts.draft import Draft
 from inference import catalog
-from inference.base import DEFAULT, OFF
-from tests.inference import ASSUMPTIONS_ONLY, FIXTURE_PLAYBOOK, evaluated
+from inference.base import OFF
+from tests.inference import ASSUMPTIONS_ONLY, BRIEF, DEFAULT, FIXTURE_PLAYBOOK, evaluated
 
 
 def test_infer_keeps_locked_picks_and_the_open_queue_shape(synthetic_world):
     from inference import engine
     world = synthetic_world
     r = engine.infer(world, Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm",)),
-                     catalog=catalog.load(FIXTURE_PLAYBOOK))
+                     catalog=catalog.load(FIXTURE_PLAYBOOK), base=DEFAULT)
     assert len(r.blue) == 6 and "Balm" in r.blue
     roles = [world.hero(n).role for n in r.blue]
     assert roles.count("tank") <= 2
@@ -41,7 +41,7 @@ def test_infer_honours_a_hitscan_answer_to_a_flier(synthetic_world):
     from inference import engine
     world = synthetic_world
     r = engine.infer(world, Draft("Harbor Gate", ("Gale", "Balm")),
-                     catalog=catalog.load(FIXTURE_PLAYBOOK))
+                     catalog=catalog.load(FIXTURE_PLAYBOOK), base=DEFAULT)
     assert any(world.hero(n).hitscan for n in r.blue)
     anti = next(c for c in r.contributions if c["id"] == "anti-air")
     assert not anti["applies"] and anti["weighted"] == 0.0      # answered: nothing to charge
@@ -69,11 +69,11 @@ def test_a_board_no_six_satisfies_is_refused_by_infer_and_the_board_alike(
         "---\nname: seven tanks\nkind: constraint\nrequire: team.tanks == 7\n---\nx\n", "utf-8")
     scratch = catalog.load(str(tmp_path))
     with pytest.raises(Refusal, match="relax a constraint"):
-        engine.infer(world, Draft("Harbor Gate", ("Mortar",)), catalog=scratch)
+        engine.infer(world, Draft("Harbor Gate", ("Mortar",)), catalog=scratch, base=DEFAULT)
     with pytest.raises(Refusal, match="relax a constraint"):
         engine.board(world, Draft("Harbor Gate", ("Mortar",),
                                   ("Anvil", "Kite", "Rook", "Needle", "Balm", "Tansy")),
-                     catalog=scratch)
+                     catalog=scratch, brief=BRIEF)
 
 
 def test_infer_never_drafts_a_banned_hero(synthetic_world):
@@ -81,12 +81,13 @@ def test_infer_never_drafts_a_banned_hero(synthetic_world):
     world = synthetic_world
     fix = catalog.load(FIXTURE_PLAYBOOK)
     r = engine.infer(world, Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm",),
-                                  ("Needle", "Rook", "Anvil")), catalog=fix)
+                                  ("Needle", "Rook", "Anvil")), catalog=fix, base=DEFAULT)
     assert not {"Needle", "Rook", "Anvil"} & set(r.blue)
     assert r.bans == ["Needle", "Rook", "Anvil"] and "banned" in r.rendered()
     assert r.facts.draft.bans == tuple(r.bans)
     with pytest.raises(Refusal, match="banned this match"):
-        engine.infer(world, Draft(None, ("Mortar",), ("Balm",), ("Mortar",)), catalog=fix)
+        engine.infer(world, Draft(None, ("Mortar",), ("Balm",), ("Mortar",)), catalog=fix,
+                     base=DEFAULT)
 
 
 def test_scores_share_one_scale_per_board(synthetic_world):
@@ -98,24 +99,25 @@ def test_scores_share_one_scale_per_board(synthetic_world):
     red = ("Mortar", "Gale")
     # no lock: a full six is ranked against the whole unlocked field, and the best six
     # that keeps a locked pick need not be the best of that field
-    r = engine.infer(world, Draft("Harbor Gate", red), catalog=fix)
+    r = engine.infer(world, Draft("Harbor Gate", red), catalog=fix, base=DEFAULT)
     e = evaluated(world, Draft("Harbor Gate", red, tuple(r.blue)), catalog=fix)
     assert abs(r.score - e.score) < 1e-9 and e.rank == 1
-    held = engine.infer(world, Draft("Harbor Gate", red, ("Balm",)), catalog=fix)
+    held = engine.infer(world, Draft("Harbor Gate", red, ("Balm",)), catalog=fix, base=DEFAULT)
     again = evaluated(world, Draft("Harbor Gate", red, tuple(held.blue)), catalog=fix)
     assert "Balm" in held.blue and abs(held.score - again.score) < 1e-9
     assert r.to_dict()["normalized"] == 100 and e.to_dict()["normalized"] == 100
     assert all(0 <= a["normalized"] <= 100 for a in r.alternatives)
     assert r.alternatives[0]["score"] < r.score        # below the optimum, if only by a hair
     assert r.alternatives[0]["normalized"] <= 100
-    best = engine.infer(world, Draft("Harbor Gate", red), catalog=fix)
-    b = engine.board(world, Draft("Harbor Gate", red, tuple(best.blue)), catalog=fix)
+    best = engine.infer(world, Draft("Harbor Gate", red), catalog=fix, base=DEFAULT)
+    b = engine.board(world, Draft("Harbor Gate", red, tuple(best.blue)), catalog=fix, brief=BRIEF)
     assert abs(b.current.score - best.score) < 1e-9 and b.blue.blue == best.blue
     assert b.current.to_dict()["normalized"] == 100 and b.red.to_dict()["normalized"] == 100
     # around Balm
-    b = engine.board(world, Draft("Harbor Gate", red, tuple(r.blue)), catalog=fix)
+    b = engine.board(world, Draft("Harbor Gate", red, tuple(r.blue)), catalog=fix, brief=BRIEF)
     assert b.blue.blue == best.blue and b.current.to_dict()["normalized"] <= 100
-    again = engine.infer(world, Draft("Harbor Gate", red, ("Balm",)), pool_size=4, catalog=fix)
+    again = engine.infer(world, Draft("Harbor Gate", red, ("Balm",)), pool_size=4, catalog=fix,
+                         base=DEFAULT)
     rescored = evaluated(world, Draft("Harbor Gate", red, tuple(again.blue)), catalog=fix)
     assert abs(again.score - rescored.score) < 1e-9
 
@@ -130,16 +132,16 @@ def test_an_announced_hero_is_described_but_never_picked(synthetic_world):
     fs = board_facts.generate(world, Draft(blue=(h.name,)))       # the facts may describe it
     assert fs.find("hero.announced", h.name)
     with pytest.raises(Refusal, match="announced, not yet playable"):
-        engine.infer(world, Draft(blue=(h.name,)), catalog=fix)      # a pick may not
+        engine.infer(world, Draft(blue=(h.name,)), catalog=fix, base=DEFAULT)      # a pick may not
     with pytest.raises(Refusal, match="announced"):
-        engine.board(world, Draft(red=(h.name,)), catalog=fix)
-    r = engine.infer(world, Draft(), catalog=fix)
+        engine.board(world, Draft(red=(h.name,)), catalog=fix, brief=BRIEF)
+    r = engine.infer(world, Draft(), catalog=fix, base=DEFAULT)
     assert h.name not in r.blue and all(a["blue"] for a in r.alternatives)
     assert not any(h.name in a["blue"] for a in r.alternatives)   # nor does the field hold it
     # and under a playbook that ties most sixes, where the local search swaps freely:
     # the announced hero reached the alternatives through refine once
     limit_only = [s for s in fix if s.form == "limit"]
-    r = engine.infer(world, Draft(), catalog=limit_only)
+    r = engine.infer(world, Draft(), catalog=limit_only, base=DEFAULT)
     assert h.name not in r.blue and not any(h.name in a["blue"] for a in r.alternatives)
 
 

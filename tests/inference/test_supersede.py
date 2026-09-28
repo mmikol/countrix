@@ -5,7 +5,7 @@ queued tasks all the same."""
 
 import pytest
 
-from inference.base import DEFAULT
+from tests.inference import BRIEF, DEFAULT
 from tests.inference.tracing import TRACED, Call, traced_board
 
 
@@ -76,7 +76,7 @@ def test_a_pooled_board_that_refuses_mid_pass_cancels_every_task_it_queued(
     monkeypatch.setattr(parallel.POOL, "drop", lambda: dropped.append("drop"))
     monkeypatch.setattr(parallel.Split, "rank_roster", refuse)
     with pytest.raises(Refusal, match="no composition satisfies the limits"):
-        engine.board(synthetic_world, TRACED, catalog=scratch_playbook)
+        engine.board(synthetic_world, TRACED, catalog=scratch_playbook, brief=BRIEF)
     assert len(queued) == 3 + 3                  # blue's and red's reference samples
     assert all(f.cancelled() for f in queued)
     assert dropped == []

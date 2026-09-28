@@ -1,6 +1,6 @@
 """The default engine: what a six scores before the playbook adds a term.
 
-    base(six) = W_RATE x rates + W_SYNERGY x synergy + W_COUNTER x counters
+    base(six) = meta x (rate x rates + synergy x synergy + counter x counters)
 
     rates       each pick's win rate on the map, all ranks (its overall rate
                 where there is no map or no row for it), in points over 50,
@@ -38,23 +38,36 @@ sample and is a function of the six and the board alone; the pull toward 50
 for a rarely picked hero shrinks to that same zero; and a comp's share of
 the optimal reads as its share of the optimal's edge over a coin flip.
 
-The weights. W_RATE is 1: the rate term is in win-rate points. The other two
-are set so that each term's median range within one board is about half the
-rate term's, measured over the reference sample (inference.scale.sample,
-1,200 legal sixes a board) on each of the 30 maps, each board's other side
-its likely six, the side the term reads until one is revealed. The synergy
-score's median range is 21 and the counter graph's 42.5 - the wiki's edges
-at 2 and the kit's fill at 1 - so each term spreads a typical board's sixes
-about 2.1 points. The rate term's own range reads Blizzard's rates, which
-are licensed for personal use, so its figures stay out of the repo. OFF
-zeroes all three, and a board scored under it is the playbook's alone,
-exactly as before the engine had a base.
+The weights are the playbook's, not the code's: meta.md beside the strategy
+files holds them (inference.catalog.engine_weights), and the tune tool
+changes them, validated and logged, as it changes a strategy. `meta` scales
+the whole engine - 0 turns it off, 1 is the engine as calibrated - and
+`rate`, `synergy` and `counter` weigh its three terms under it; a board's
+own `meta` (the playbook tab's Meta slider, a weights query's meta:value)
+stands in for the file's on that board alone. The owner's rule is that the
+heuristics and the meta carry every weight and each one is his to turn, so
+none is left in code, where only a commit could move it.
+
+The shipped values, and why. rate is 1: the rate term is in win-rate
+points. The other two are set so that each term's median range within one
+board is about half the rate term's, measured over the reference sample
+(inference.scale.sample, 1,200 legal sixes a board) on each of the 30 maps,
+each board's other side its likely six, the side the term reads until one
+is revealed. The synergy score's median range is 21 and the counter graph's
+42.5 - the wiki's edges at 2 and the kit's fill at 1 - so synergy 0.1 and
+counter 0.05 spread a typical board's sixes about 2.1 points each. The rate
+term's own range reads Blizzard's rates, which are licensed for personal
+use, so its figures stay out of the repo. At meta 1 each term's weight is
+the file's exactly (1.0 x w is w in floating point), so moving the numbers
+out of code moved no score. OFF is meta 0 with every dial at 0, and a board
+scored under it is the playbook's alone, exactly as before the engine had a
+base.
 """
 
+import dataclasses
 import math
-from collections.abc import Sequence
-from dataclasses import dataclass
-from typing import NamedTuple, TypedDict
+from collections.abc import Mapping, Sequence
+from typing import NamedTuple, Self, TypedDict
 
 from facts import compute, counters
 from facts.draft import Seat
@@ -62,9 +75,6 @@ from facts.factset import Fact, FactSet
 from facts.model import Hero, Map, World
 from facts.records import DerivedEdge
 
-W_RATE = 1.0            # points of score per point of trusted win-rate edge
-W_SYNERGY = 0.1         # per point of the wiki's synergy scores among the six
-W_COUNTER = 0.05        # per net point of the counter graph: a wiki edge 2, a derived one 1
 COIN_FLIP = 50.0        # the win rate the rate term is centred on
 # The pick rate at which a hero's edge is trusted by half: trust = p / (p +
 # RATE_PICK_HALF). A rarely picked hero's rate is read off few matches and
@@ -87,32 +97,74 @@ TITLES = {
     COUNTERS: "Answers to the other side"}
 
 
-@dataclass(frozen=True, slots=True)
-class BaseWeights:
-    """The default engine's weights, each term's points per unit. A board,
-    the objective and every result carry one, so a board says what it was
-    scored under; OFF zeroes all three."""
-    rate: float = W_RATE
-    synergy: float = W_SYNERGY
-    counter: float = W_COUNTER
-
-    @property
-    def on(self) -> bool:
-        """Whether any term scores."""
-        return bool(self.rate or self.synergy or self.counter)
+# the weight that scales the whole engine: meta.md's name in the playbook
+# folder, its first field, and its key in a board's weights beside the
+# heuristics' ids - no strategy can take it, as the file holds the name
+META = "meta"
+# meta.md's fields, in the order the file sets them: the meta and the three dials
+DIALS = (META, "rate", "synergy", "counter")
 
 
-DEFAULT = BaseWeights()
-OFF = BaseWeights(rate=0.0, synergy=0.0, counter=0.0)
-
-
-class BaseStamp(TypedDict):
-    """The default engine as a recorded fixture holds it: the weights, the
-    pick rate that halves an edge, and a derived counter edge's weight
-    against a wiki edge's, which with the playbook fix what a six scores."""
+class BaseRecord(TypedDict):
+    """The default engine's weights as a result's payload and meta.md's
+    reader serve them: the meta and each term's weight under it."""
+    meta: float
     rate: float
     synergy: float
     counter: float
+
+
+class TermWeights(NamedTuple):
+    """Each term's points per unit once the meta scales it: what a six's
+    terms are multiplied by."""
+    rate: float
+    synergy: float
+    counter: float
+
+
+@dataclasses.dataclass(frozen=True, slots=True, kw_only=True)
+class BaseWeights:
+    """The default engine's weights: `meta`, which scales the whole engine,
+    and each term's points per unit under it. The playbook's meta.md sets
+    them (catalog.engine_weights), and nothing in code does. A board, the
+    objective and every result carry one, so a board says what it was
+    scored under; OFF is meta 0."""
+    meta: float
+    rate: float
+    synergy: float
+    counter: float
+
+    @property
+    def on(self) -> bool:
+        """Whether any term scores: the meta and at least one dial are set."""
+        return bool(self.meta and (self.rate or self.synergy or self.counter))
+
+    def scaled(self) -> TermWeights:
+        """Each term's weight times the meta. At meta 1 each is its dial
+        exactly, so the engine scores as it did with the dials in code."""
+        return TermWeights(rate=self.meta * self.rate, synergy=self.meta * self.synergy,
+                           counter=self.meta * self.counter)
+
+    def metered(self, weights: Mapping[str, float] | None) -> Self:
+        """These weights under a board's own meta where its weights set one
+        (META, the playbook tab's Meta slider), for that board alone."""
+        if not weights or META not in weights:
+            return self
+        return dataclasses.replace(self, meta=weights[META])
+
+    def record(self) -> BaseRecord:
+        """The weights as a payload holds them."""
+        return BaseRecord(meta=self.meta, rate=self.rate, synergy=self.synergy,
+                          counter=self.counter)
+
+
+OFF = BaseWeights(meta=0.0, rate=0.0, synergy=0.0, counter=0.0)
+
+
+class BaseStamp(BaseRecord):
+    """The default engine as a recorded fixture holds it: the weights, the
+    pick rate that halves an edge, and a derived counter edge's weight
+    against a wiki edge's, which with the playbook fix what a six scores."""
     pick_half: float
     derived: float
 
@@ -122,8 +174,7 @@ def stamp(weights: BaseWeights) -> BaseStamp | None:
     with it off, as a fixture recorded before the engine had a base reads."""
     if not weights.on:
         return None
-    return BaseStamp(rate=weights.rate, synergy=weights.synergy, counter=weights.counter,
-                     pick_half=RATE_PICK_HALF,
+    return BaseStamp(**weights.record(), pick_half=RATE_PICK_HALF,
                      derived=counters.DERIVED_WEIGHT / counters.WIKI_WEIGHT)
 
 
@@ -200,6 +251,7 @@ class Base:
     def __init__(self, world: World, m: Map | None, *, red: Sequence[Hero],
                  banned: Sequence[Hero], weights: BaseWeights) -> None:
         self.weights = weights
+        self.scaled = weights.scaled()
         self.world = world
         self.opponent = opponent(world, m, red, banned)
         against = self.opponent.heroes
@@ -228,8 +280,9 @@ class Base:
                      exposures=sum(self._edges[h.id].exposures for h in heroes))
 
     def value(self, terms: Terms) -> float:
-        """The weighted sum, in one order everywhere it is taken."""
-        w = self.weights
+        """The weighted sum, each term's weight scaled by the meta, in one
+        order everywhere it is taken."""
+        w = self.scaled
         return w.rate * terms.rates + w.synergy * terms.synergy + w.counter * terms.counters
 
 

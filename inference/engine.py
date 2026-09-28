@@ -10,10 +10,11 @@ strategy's, and the alternatives. board() does it for both seats - blue's
 absolute optimal, red around its revealed ones, on opposite sides of a
 sided map - and scores the current blue picks as they stand. Both refuse
 a team past the queue's tanks, on either seat, and score under the
-default engine unless the caller passes base.OFF. The limits bind blue's
-own picks: the board reads a six that breaks one as not allowed, and infer
-refuses locked picks no six completes. The records are result.py's, the
-prose plan.py's and the process pool parallel.py's.
+default engine at the playbook's weights (its meta.md) unless the caller
+names others; base.OFF, the meta at 0, is the playbook alone. The limits
+bind blue's own picks: the board reads a six that breaks one as not
+allowed, and infer refuses locked picks no six completes. The records are
+result.py's, the prose plan.py's and the process pool parallel.py's.
 """
 
 import contextlib
@@ -40,7 +41,7 @@ from facts.factset import FactSet
 from facts.model import ROLES, Hero, Map, World
 from inference import catalog as catalog_module
 from inference import parallel, supersede
-from inference.base import DEFAULT, OFF, BaseWeights
+from inference.base import OFF, BaseWeights
 from inference.plan import Seats, momentum, plan
 from inference.result import (
     Alternative,
@@ -117,16 +118,26 @@ BOARD_TOP = 5               # the alternatives each of a board's seats keeps
 
 class Brief(NamedTuple):
     """What a caller asks of one board beyond the draft: the candidates per
-    role, the playbook tab's weights ({heuristic id: 0..10}, for this board
-    only), whether to solve the countered case - the MCP board prints it, the
-    page never reads it - the check that says a newer request from the
-    same client has superseded this one, and the default engine's weights,
-    DEFAULT unless a caller turns it OFF."""
+    role, the playbook tab's weights ({heuristic id: 0..10}, and META, the
+    default engine's meta - for this board only), whether to solve the
+    countered case - the MCP board prints it, the page never reads it - the
+    check that says a newer request from the same client has superseded
+    this one, and the default engine's weights, the playbook's meta.md's
+    (None) unless a caller names others (OFF turns it off)."""
     pool_size: int = POOL_DEFAULT
     weights: Mapping[str, float] | None = None
     countered: bool = True
     superseded: Callable[[], bool] | None = None
-    base: BaseWeights = DEFAULT
+    base: BaseWeights | None = None
+
+
+def weights_in_force(
+        base: BaseWeights | None, weights: Mapping[str, float] | None = None) -> BaseWeights:
+    """The default engine's weights a board or an infer scores under: the
+    caller's `base`, else the playbook in force's meta.md
+    (catalog.engine_weights), with a board's own meta on top where its
+    `weights` set one (BaseWeights.metered)."""
+    return (catalog_module.engine_weights() if base is None else base).metered(weights)
 
 
 def _order(heroes: Iterable[Hero]) -> list[str]:
@@ -144,14 +155,16 @@ def _board_facts(world: World, result: Result, side: str) -> FactSet:
 def infer(
         world: World, draft: Draft, *, catalog: list[Strategy] | None = None,
         pool_size: int = POOL_DEFAULT, top: int = TOP_DEFAULT,
-        base: BaseWeights = DEFAULT) -> Result:
+        base: BaseWeights | None = None) -> Result:
     """Blue's optimal six around its locked picks (`draft.blue`) against red's
     revealed ones, on the draft's side of a sided map. No catalog is the
     playbook in force; a catalog given, [] included, is the caller's. The
-    default engine scores under `base`; OFF leaves the playbook alone.
-    Locked picks no six can complete within the limits are refused as not
-    allowed, in the words the board uses."""
+    default engine scores under `base`, the playbook in force's meta.md
+    where it is None; OFF leaves the playbook alone. Locked picks no six can
+    complete within the limits are refused as not allowed, in the words the
+    board uses."""
     catalog = catalog_module.load() if catalog is None else catalog
+    base = weights_in_force(base)
     try:
         return _optimal(world, draft, catalog=catalog, base=base, pool_size=pool_size,
                         top=top, seat="blue", kind="infer", solved=None, began=None).result
@@ -369,9 +382,10 @@ def board(
                      reveals a pick
 
     The brief's weights override the files' for this board only - the
-    playbook tab's sliders; the files stay as they are and every result says
-    the weights it was scored under. The brief's base is the default
-    engine's weights every seat scores under, the likely six its counter
+    playbook tab's sliders, its Meta slider among them; the files stay as
+    they are and every result says the weights it was scored under. The
+    brief's base is the default engine's weights every seat scores under -
+    the playbook's meta.md where it names none - the likely six its counter
     term reads where the other seat has no picks.
 
     Across the pool the searches are split and walked through their rounds
@@ -386,12 +400,13 @@ def board(
     pooled = parallel.available(catalog)
     catalog = catalog_module.weighted(
         catalog_module.load() if catalog is None else catalog, brief.weights)
+    base = weights_in_force(brief.base, brief.weights)
     watch = supersede.Watch(brief.superseded)
     if not pooled:
-        return _board_once(world, draft, catalog=catalog, brief=brief, workers=None,
-                           watch=watch)
+        return _board_once(world, draft, catalog=catalog, brief=brief, base=base,
+                           workers=None, watch=watch)
     try:
-        return _board_once(world, draft, catalog=catalog, brief=brief,
+        return _board_once(world, draft, catalog=catalog, brief=brief, base=base,
                            workers=parallel.POOL.executor(), watch=watch)
     except BrokenProcessPool as error:
         sys.stderr.write("countrix: a solver worker died (%s: %s); the board solves again in"
@@ -401,22 +416,24 @@ def board(
         # a whole pass read or settled every task it sent, so this cancels only
         # what an interrupted one left queued
         watch.cancel_all()
-    return _board_once(world, draft, catalog=catalog, brief=brief, workers=None, watch=watch)
+    return _board_once(world, draft, catalog=catalog, brief=brief, base=base, workers=None,
+                       watch=watch)
 
 
 def _board_once(
         world: World, draft: Draft, *, catalog: list[Strategy], brief: Brief,
-        workers: parallel.Workers | None, watch: supersede.Watch) -> Board:
+        base: BaseWeights, workers: parallel.Workers | None, watch: supersede.Watch) -> Board:
     """The board, its searches split across `workers`, or each run in this
     process where there are none, every round asking `watch` whether the
-    board is superseded. The rounds go in the order that keeps the pool
-    full: the two optimal seats rank their rosters and sweep, the fills sweep
-    on their seats' scales, the seats merge and are solved, and the countered
-    case, which needs red's six, sweeps while the fills merge."""
+    board is superseded and every seat scored under `base`. The rounds go in
+    the order that keeps the pool full: the two optimal seats rank their
+    rosters and sweep, the fills sweep on their seats' scales, the seats
+    merge and are solved, and the countered case, which needs red's six,
+    sweeps while the fills merge."""
     m, red_h, blue_h, bans_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
     draft = dataclasses.replace(draft, side=board_side(m, draft.side))
     _check_teams(red_h, blue_h, "blue")
-    expected = _expected(world, m, bans_h, draft, catalog, brief.base)
+    expected = _expected(world, m, bans_h, draft, catalog, base)
     enemy = draft.red or tuple(expected.blue)
     # each seat's draft, from that seat's perspective: its own picks are `blue`
     blue_seat = dataclasses.replace(draft, red=enemy, blue=())
@@ -425,7 +442,7 @@ def _board_once(
     ours = dataclasses.replace(draft, red=enemy)       # blue's current comp and fill
     theirs = Draft(map_name=draft.map_name, red=draft.blue, blue=draft.red, bans=draft.bans,
                    side=opposite(draft.side))
-    solve = _Pass(world, catalog, brief, workers, watch)
+    solve = _Pass(world, catalog, brief, base, workers, watch)
     blue_split, red_split = solve.split(blue_seat, solve.half), solve.split(red_seat, solve.rest)
     blue_split.rank_roster()
     red_split.rank_roster()
@@ -497,15 +514,16 @@ type Searching = parallel.Split | parallel.NullSplit
 
 
 class _Pass:
-    """One pass of a board: the world, the weighted playbook and the brief it
-    is solved under, the board's Watch, and the searches it sends out -
+    """One pass of a board: the world, the weighted playbook, the brief and
+    the default engine's weights it is solved under, the board's Watch, and
+    the searches it sends out -
     blue's and its fill's over half the pool's workers, red's, its fill's
     and the countered case's over the rest - or each seat searching for
     itself where there are none."""
 
-    def __init__(self, world: World, catalog: list[Strategy], brief: Brief,
+    def __init__(self, world: World, catalog: list[Strategy], brief: Brief, base: BaseWeights,
                  workers: parallel.Workers | None, watch: supersede.Watch) -> None:
-        self.world, self.catalog, self.brief = world, catalog, brief
+        self.world, self.catalog, self.brief, self.base = world, catalog, brief, base
         self.watch = watch
         size = workers.size if workers is not None else 0
         self.half = max(1, size // 2)
@@ -523,7 +541,7 @@ class _Pass:
         if self.run is None or not wanted:
             return parallel.NullSplit(self.watch)
         spec = parallel.Spec(draft, self.brief.pool_size if pool_size is None else pool_size,
-                             self.brief.base)
+                             self.base)
         if scale_of is None:
             return parallel.Split(self.run, spec, slices)
         return parallel.Split(self.run, spec, slices, scale_of.bounds, scale_of.standing)
@@ -533,7 +551,7 @@ class _Pass:
             pool_size: int | None = None) -> _Optimal:
         """`seat`'s optimal six on `draft`, taken from `search` where it ran
         across the pool and timed from when it was sent out."""
-        return _optimal(self.world, draft, catalog=self.catalog, base=self.brief.base,
+        return _optimal(self.world, draft, catalog=self.catalog, base=self.base,
                         pool_size=self.brief.pool_size if pool_size is None else pool_size,
                         top=BOARD_TOP, seat=seat, kind=kind, solved=search.solved(),
                         began=search.started)
@@ -550,7 +568,7 @@ class _Pass:
         barred = None if stuck is None else _barred(self.world, draft, optimal, stuck)
         swept = search.swept() if len(draft.blue) == TEAM_SIZE and barred is None else None
         return _current(self.world, draft, optimal=optimal, catalog=self.catalog,
-                        base=self.brief.base, pool_size=self.brief.pool_size, seat=seat,
+                        base=self.base, pool_size=self.brief.pool_size, seat=seat,
                         kind="current", swept=swept, barred=barred)
 
     def filled(
@@ -599,7 +617,7 @@ class _Pass:
             return self.filled(draft, answer, seat="blue", span=top.span,
                                kind="countered", pool_size=self.countered_pool)
         return _current(self.world, draft, optimal=top, catalog=self.catalog,
-                        base=self.brief.base, pool_size=self.countered_pool, seat="blue",
+                        base=self.base, pool_size=self.countered_pool, seat="blue",
                         kind="countered", swept=against.swept())
 
 
