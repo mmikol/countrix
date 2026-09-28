@@ -75,7 +75,7 @@ flowchart LR
 
     subgraph USER["FACTS LAYER - facts/, and the board - ui/board.py"]
         WORLD["World<br/>the database in memory,<br/>per request"]
-        FACTS["FactSet<br/>F1.. hero · map · meta ·<br/>team · matchup<br/>S1.. the playbook's record"]
+        FACTS["FactSet<br/>F1.. hero · map · meta ·<br/>team · matchup"]
         BOARD["the board<br/>map + red/blue rosters"]
     end
 
@@ -199,10 +199,9 @@ roles, at most two tanks. The kit is read in 6v6 too
 6v6 lines ("Cooldown increased from 7 to 10 seconds"), which `pull_kits`
 stores beside the 5v5 figures the Cargo table publishes, and the load lays
 over them; a line whose 5v5 figure has moved since the wiki wrote it is
-left unapplied and named on the board. The 5v5 figures stay stored, so a
-5v5 reading of the kit is one constant away. No source publishes Open
-Queue rates, so META is Competitive Role Queue on console (Americas), and
-every snapshot fact says so. Rates carry the patch they were captured
+left unapplied and named on the board. No source publishes Open Queue
+rates, so META is Competitive Role Queue on console (Americas), and every
+snapshot fact says so. Rates carry the patch they were captured
 under, and the board warns when patches shipped since. Judgements
 (counters, synergies, playstyles) are tier- and region-agnostic by design, and a
 table is a table: every row carries its source, and that is the only

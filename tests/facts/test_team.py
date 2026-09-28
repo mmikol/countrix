@@ -138,7 +138,7 @@ def test_the_map_section_reads_each_picks_rates_on_the_map(synthetic_world):
     w = synthetic_world
     assert SPECIALIST_DELTA == 2.5
     t = team_metrics(w, _picks(w, "Anvil", "Rook", "Gale"), w.map("Harbor Gate"))
-    assert t["map_known"] == 1 and t["map_pick_mass"] == 24.5
+    assert t["map_pick_mass"] == 24.5
     assert t["map_win_mean"] == pytest.approx((52.5 + 53.5 + 46.5) / 3)
     # Anvil runs exactly SPECIALIST_DELTA over: a specialist; Gale 3 under
     assert t["map_specialists"] == 1 and t["map_offmap"] == 1
@@ -172,16 +172,15 @@ def test_the_versus_section_counts_counter_edges_both_ways(synthetic_world):
     assert t["exposed"] == ["Anvil"] and t["exposure_edges"] == 1 and t["exposed_count"] == 1
     assert t["safe_count"] == 2 and t["net_edges"] == 1 and t["double_covered"] == 0
     assert t["banproof_coverage"] == 1                    # Gale falls with Needle's ban
-    assert t["_answered"] == {"Mortar": ["Anvil"], "Gale": ["Needle"], "Balm": []}
     alone = team_metrics(w, blue)
     assert (alone["coverage"], alone["safe_count"], alone["banproof_coverage"]) == (0, 0, 0)
 
 
 def test_a_metric_read_as_the_wrong_kind_is_the_callers_error():
     """The readers hand a bag's value on as the kind asked for - a number, a
-    name, the names, the synergy pairs, the tally, the answers - and a value
-    of another kind raises: the catalog keeps text metrics out of every place
-    a number is read."""
+    name, the names, the synergy pairs, the tally - and a value of another
+    kind raises: the catalog keeps text metrics out of every place a number
+    is read."""
     from facts import team
     assert team.number(3) == 3 and team.number(2.5) == 2.5
     assert team.numbers({"a": 1, "b": "dive", "c": 2.5, "d": ["x"]}) == {"a": 1, "c": 2.5}
@@ -190,12 +189,10 @@ def test_a_metric_read_as_the_wrong_kind_is_the_callers_error():
     pair = team.SynergyPair("Anvil", "Balm", 2)
     assert team.synergy_pairs([pair]) == [pair]
     assert team.style_tally({"brawl": 2, "dive": 1}) == {"brawl": 2, "dive": 1}
-    assert team.answers({"Mortar": ["Anvil"]}) == {"Mortar": ["Anvil"]}
     for reader, wrong in (
             (team.number, "dive"), (team.number, ["x"]), (team.text, 3),
             (team.names, ["Anvil", 3]), (team.names, "Anvil"),
             (team.synergy_pairs, ["Anvil+Balm"]), (team.synergy_pairs, {}),
-            (team.style_tally, {"brawl": "2"}), (team.style_tally, []),
-            (team.answers, {"Mortar": "Anvil"}), (team.answers, [])):
+            (team.style_tally, {"brawl": "2"}), (team.style_tally, [])):
         with pytest.raises(TypeError, match="a metric read as"):
             reader(wrong)

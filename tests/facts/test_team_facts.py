@@ -26,7 +26,7 @@ def _said(fs, team=None):
     """{key: sentence} for one side's team facts, or the matchup's."""
     if team is None:
         return {f.key: f.text for f in fs.facts if f.scope == "matchup"}
-    return {f.key: f.text for f in fs.facts if f.team == team and f.key != "team.answer"}
+    return {f.key: f.text for f in fs.facts if f.team == team}
 
 
 def test_a_side_is_worded_metric_by_metric(synthetic_world):
@@ -99,17 +99,11 @@ def test_every_team_fact_carries_the_number_the_solver_scores(synthetic_world):
     m = w.map("Harbor Gate")
     for team, own, other in (("red", red, blue), ("blue", blue, red)):
         metrics = team_metrics(w, [w.hero(n) for n in own], m, [w.hero(n) for n in other])
-        facts = [f for f in fs.facts if f.team == team and f.key != "team.answer"]
+        facts = [f for f in fs.facts if f.team == team]
         assert facts
         for f in facts:
             key = f.key.split(".", 1)[1]
             assert f.value == metrics[key] and f.source == "derived:" + f.key, f.key
-    # each enemy's answerers, by name
-    assert [f.text for f in fs.find("team.answer", "blue")] == [
-        "red Gale is answered by blue Needle, Flint"]
-    assert [f.text for f in fs.find("team.answer", "red")] == [
-        "blue Anvil is answered by red Gale", "blue Needle is answered by red Kite",
-        "blue Balm is answered by red Rook"]
 
 
 def test_the_healing_and_the_saves_read_against_the_rosters_bench(synthetic_world):
@@ -172,8 +166,6 @@ def test_the_matchup_is_worded_once_both_sides_have_picks(synthetic_world):
             " re-engages first; make each fight decisive",
         "matchup.range_diff": "poke war: blue median reach 5m vs red 30m - red outranges;"
             " close fast or trade cover",
-        "matchup.net_edges": "board net matchup: 1 blue answer-edges into red vs 1 red into"
-            " blue (+0) - dead even",
         "matchup.coverage_share": "coverage: blue answers 50% of red; red answers 50% of blue",
         "matchup.dive_pressure": "dive pressure: 1 pick on red carry engage tools; blue peel"
             " (1 crowd-control pick) must hold",
@@ -226,10 +218,10 @@ def test_the_matchup_names_each_side_of_every_trade(synthetic_world):
     Needle and cycle faster; red brings a barrier and a heal. Two mirrored
     supports trade evenly on every count."""
     w = synthetic_world
-    ahead = _said(_facts(w, "Harbor Gate", ("Anvil", "Balm", "Needle"), ("Gale", "Rook", "Kite")))
-    assert ahead["matchup.net_edges"] == (
-        "board net matchup: 3 blue answer-edges into red vs 1 red into blue (+2) - the draft"
-        " is ahead")
+    fs = _facts(w, "Harbor Gate", ("Anvil", "Balm", "Needle"), ("Gale", "Rook", "Kite"))
+    ahead = _said(fs)
+    assert _said(fs, "blue")["team.net_edges"] == (
+        "blue team net matchup: 3 answer-edges into red vs 1 red answer-edges back (+2)")
     assert ahead["matchup.tempo_diff"] == (
         "tempo war: blue median cooldown 7s vs red 9s - blue re-engages first; force fight"
         " frequency")
@@ -238,10 +230,10 @@ def test_the_matchup_names_each_side_of_every_trade(synthetic_world):
     assert ahead["matchup.antiheal_need"] == (
         "sustain war: red supports peak 70 heal against 0 anti-heal picks on blue")
     assert ahead["matchup.style_lean_red"] == "style war: red leans brawl, blue leans dive"
-    behind = _said(_facts(w, "Harbor Gate", ("Gale", "Kite", "Rook"),
-                          ("Anvil", "Mortar", "Needle", "Flint", "Balm", "Myrrh")))
-    assert behind["matchup.net_edges"].endswith(
-        "(-1) - the draft is behind; the open slots must swing it")
+    fs = _facts(w, "Harbor Gate", ("Gale", "Kite", "Rook"),
+                ("Anvil", "Mortar", "Needle", "Flint", "Balm", "Myrrh"))
+    behind = _said(fs)
+    assert _said(fs, "blue")["team.net_edges"].endswith("3 red answer-edges back (-1)")
     assert behind["matchup.range_diff"] == (
         "poke war: blue median reach 30m vs red 20m - blue outranges; open fights at distance")
     even = _said(_facts(w, None, ("Tansy", "Sorrel"), ("Tansy", "Sorrel")))

@@ -18,14 +18,22 @@ from facts.records import MapRate, StageTerrain
 from facts.team import TEAM_METRICS, team_metrics
 
 
+def _namespace(w, m, red, blue):
+    """The namespace a strategy reads on a board, built as the solver builds
+    it: blue facing red, red facing no one."""
+    blue_t, red_t = team_metrics(w, blue, m, red), team_metrics(w, red, m, ())
+    return {"team": blue_t, "enemy": red_t,
+            "matchup": compute.matchup_metrics(w, blue_t, red_t),
+            "map": compute.map_metrics(m, ban_count=0), "world": compute.world_metrics(w)}
+
+
 def test_metrics_cover_the_registry_exactly(synthetic_world):
     w = synthetic_world
     m = w.map("Harbor Gate")
     blue = [w.hero("Balm"), w.hero("Anvil")]
     red = [w.hero("Mortar"), w.hero("Gale")]
-    ns = compute.namespace(w, m, red, blue, ban_count=0)
-    team_keys = {k for k in ns["team"] if not k.startswith("_")}
-    assert team_keys == set(TEAM_METRICS)
+    ns = _namespace(w, m, red, blue)
+    assert set(ns["team"]) == set(TEAM_METRICS)
     assert set(ns["matchup"]) == set(compute.MATCHUP_METRICS)
     assert set(ns["map"]) == set(compute.MAP_METRICS)
     assert ns["team"]["tanks"] == 1 and ns["team"]["supports"] == 1
@@ -36,23 +44,14 @@ def test_metrics_cover_the_registry_exactly(synthetic_world):
     assert fliers["flyers"] == 2 and fliers["light_flyers"] == 1
     assert compute.registry()["enemy.light_flyers"] == TEAM_METRICS["light_flyers"]
     assert ns["team"]["coverage"] == 1                    # Anvil answers Mortar
-    # the benches are the builder's inputs; the roster counts the announced hero
-    assert ns["world"] == {"heal_bench": 145.0, "hps_bench": 130.0, "pool_ref": 2250.0,
-                           "roster_size": 13}
+    # the benches are the builder's inputs
+    assert ns["world"] == {"heal_bench": 145.0, "hps_bench": 130.0}
     # a text metric is exactly a registry key whose value is not a number
     values = {
         "%s.%s" % (section, key): value
         for section, bag in ns.items() for key, value in bag.items()}
     assert {k for k in compute.registry()
             if not isinstance(values[k], (int, float))} == compute.TEXT_METRICS
-    # the solver builds its bag lean: every key a strategy can name reads the same there
-    full = team_metrics(w, blue, m, red)
-    lean = team_metrics(w, blue, m, red, lean=True)
-    for key in compute.registry():
-        if key.startswith("team."):
-            name = key.split(".", 1)[1]
-            assert lean[name] == full[name], key
-    assert full["_answered"] == {"Mortar": ["Anvil"], "Gale": []} and lean["_answered"] == {}
 
 
 def test_the_versus_keys_are_the_team_metrics_that_read_the_other_side(synthetic_world):
@@ -70,8 +69,8 @@ def test_the_versus_keys_are_the_team_metrics_that_read_the_other_side(synthetic
 
 def test_metrics_without_a_map_fall_back_honestly(synthetic_world):
     w = synthetic_world
-    ns = compute.namespace(w, None, [], [w.hero("Balm")], ban_count=0)
-    assert ns["map"]["known"] == 0 and ns["team"]["map_known"] == 0
+    ns = _namespace(w, None, [], [w.hero("Balm")])
+    assert ns["map"]["known"] == 0
     assert ns["team"]["map_win_mean"] == ns["team"]["win_mean"] == 50.0      # Balm's own
     assert ns["team"]["map_pick_mass"] == 9.5
     assert ns["team"]["coverage_share"] == 0.0
@@ -258,8 +257,7 @@ def test_the_world_metrics_and_the_registry_the_catalog_validates_against(synthe
     """The world's benches are its own; the registry offers every team metric
     on both sides but the versus keys on red's, which the solver would read as
     zero."""
-    assert compute.world_metrics(synthetic_world) == {
-        "heal_bench": 145.0, "hps_bench": 130.0, "pool_ref": 2250.0, "roster_size": 13}
+    assert compute.world_metrics(synthetic_world) == {"heal_bench": 145.0, "hps_bench": 130.0}
     reg = compute.registry()
     assert len(reg) == (2 * len(TEAM_METRICS) - len(compute.VERSUS_KEYS)
                         + len(compute.MATCHUP_METRICS) + len(compute.MAP_METRICS)
@@ -282,12 +280,13 @@ def _heal(w, blue, red=()):
 
 
 def test_an_unrevealed_side_is_a_two_two_two_of_role_medians(synthetic_world):
-    """Red empty reads as the bench's 130 a second on pool_ref, 2 x (650 +
-    237.5 + 237.5) = 2250, all six slots filled. A bigger six needs 130 /
-    2250 of its own pool, a smaller one the 130 in full, and a six on exactly
-    that pool, healing exactly the bench, is at parity and pays nothing."""
+    """Red empty reads as the bench's 130 a second on a 2-2-2 of role-median
+    pools, 2 x (650 + 237.5 + 237.5) = 2250, all six slots filled. A bigger
+    six needs 130 / 2250 of its own pool, a smaller one the 130 in full, and
+    a six on exactly that pool, healing exactly the bench, is at parity and
+    pays nothing."""
     w = synthetic_world
-    assert compute.pool_ref(w) == 2250.0
+    assert 2 * sum(w.pool_medians.values()) == 2250.0
     assert compute.heal_read(w, team_metrics(w, [])) == compute.HealRead(
         healing=130.0, pool=2250.0, filled=6)
     # 650 + 650 + 200 + 300 + 250 + 250 = 2300 pool, 80 + 70 = 150 a second

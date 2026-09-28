@@ -16,11 +16,12 @@ from facts.records import Rates
 
 @pytest.mark.invariant
 def test_every_data_table_is_read_by_the_load(world, rows):
-    """Every data table is named in the load, the ledger aside, and read whole."""
+    """Every data table is named in the load, and read whole: the ledger and
+    the playbook's mirror, which are not data, aside."""
     src = pathlib.Path(tables.__file__).read_text(encoding="utf-8")
     unread = [
         t for (t,) in rows("select tablename from pg_tables where schemaname='public'")
-        if t != "schema_migrations" and not re.search(r"\b%s\b" % t, src)]
+        if t not in ("schema_migrations", "strategies") and not re.search(r"\b%s\b" % t, src)]
     assert unread == [], unread
     perks = sum(len(h.perks) for h in world.heroes.values())
     assert perks == rows("select count(*) from perks")[0][0]

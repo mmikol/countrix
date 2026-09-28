@@ -1,13 +1,13 @@
 """The kit in the format in force, facts/kit_format.py: the wiki's 6v6
 figures laid over the 5v5 rows on a hero built by hand, a row that holds
 the figure twice and a stale line left alone and said so; then on the built
-database, where 6v6 is the format the load reads by default and 5v5 reads
-the kit as stored."""
+database, which the load reads in 6v6, each change naming the 5v5 figure
+it moved."""
 
 import pytest
 
 from facts import board_facts, kit_format, tables
-from facts.draft import FIVE_V_FIVE, KIT_FORMAT, SIX_V_SIX, Draft
+from facts.draft import KIT_FORMAT, Draft
 from facts.kit import KitPiece, Stat
 from facts.model import Hero, World
 from facts.records import KitLine
@@ -55,9 +55,9 @@ def test_the_6v6_kit_moves_the_pool_and_every_row_it_names_once():
     moves nothing. Each is kept, applied or not."""
     hero = _hero()
     w = _world(hero)
-    kit_format.apply(w, SIX_V_SIX)
+    kit_format.apply(w)
     barrier, shield = hero.abilities
-    assert (w.kit_format, hero.health, hero.armor) == (SIX_V_SIX, 325, 300)
+    assert (hero.health, hero.armor) == (325, 300)
     assert barrier.max_stat("barrier_health") == 1800.0
     assert barrier.max_stat("cooldown") == 5.0
     assert shield.max_stat("overhealth") == 100.0
@@ -68,35 +68,23 @@ def test_the_6v6_kit_moves_the_pool_and_every_row_it_names_once():
         ("Rocket Hammer", "spread", True), ("Rocket Hammer", None, False)]
 
 
-def test_the_5v5_format_reads_the_kit_as_stored():
-    hero = _hero()
-    w = _world(hero)
-    kit_format.apply(w, FIVE_V_FIVE)
-    assert (w.kit_format, hero.health, hero.kit_changes) == (FIVE_V_FIVE, 250, [])
-    assert hero.abilities[0].max_stat("barrier_health") == 1500.0
-
-
 def test_the_kit_is_read_in_6v6():
     """The shipped playbook's open-queue-ranked assumption: the format is one
     constant, 6v6."""
-    assert KIT_FORMAT == SIX_V_SIX
+    assert KIT_FORMAT == "6v6"
 
 
 @pytest.mark.invariant
-def test_the_built_world_reads_the_6v6_kit_and_keeps_the_5v5_one(db):
-    """Reinhardt's barrier holds 1800 in 6v6 and 1500 as stored, his pool is
-    6v6's, and a board names what 6v6 moved in his kit."""
-    six = tables.load(db)
-    five = tables.load(db, FIVE_V_FIVE)
+def test_the_built_world_reads_the_6v6_kit(db):
+    """Reinhardt's barrier holds 1800 in 6v6, his pool is 6v6's, and a board
+    names what 6v6 moved in his kit from the 1500, 250 and 300 stored."""
+    world = tables.load(db)
     db.rollback()
-    rein6, rein5 = six.hero("Reinhardt"), five.hero("Reinhardt")
-    assert (rein6.barrier_hp, rein5.barrier_hp) == (1800.0, 1500.0)
-    assert (rein6.health, rein6.armor) == (325, 225)
-    assert (rein5.health, rein5.armor) == (250, 300)
-    assert five.kit_format == FIVE_V_FIVE and not rein5.kit_changes
-    moved = [c for h in six.heroes.values() for c in h.kit_changes if c.applied]
+    rein = world.hero("Reinhardt")
+    assert rein.barrier_hp == 1800.0 and (rein.health, rein.armor) == (325, 225)
+    moved = [c for h in world.heroes.values() for c in h.kit_changes if c.applied]
     assert len(moved) >= 50
-    fs = board_facts.generate(six, Draft(map_name="King's Row", red=("Reinhardt",)))
+    fs = board_facts.generate(world, Draft(map_name="King's Row", red=("Reinhardt",)))
     (fact,) = fs.find("hero.kit_format")
     assert fact.text.startswith("Reinhardt in 6v6: health 250 -> 325, armor 300 -> 225,")
     assert "Barrier Field barrier health 1500 -> 1800" in fact.text

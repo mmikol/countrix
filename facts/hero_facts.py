@@ -8,7 +8,7 @@ teammates. facts.board_facts calls write() once per pick, red first.
 
 from facts import counters
 from facts.compute import TREND_POINTS
-from facts.draft import Seat
+from facts.draft import KIT_FORMAT, Seat
 from facts.factset import FactSet
 from facts.model import Hero, Map, Resolved, World
 from facts.team import RANK_SENSITIVE, SPECIALIST_DELTA
@@ -30,7 +30,7 @@ def write(fs: FactSet, world: World, board: Resolved, hero: Hero, team: Seat) ->
     own, opponents = (board.red, board.blue) if team == "red" else (board.blue, board.red)
     teammates = [x for x in own if x is not hero]
     _hero_identity(fs, world, hero, team)
-    _hero_kit_format(fs, world, hero, team)
+    _hero_kit_format(fs, hero, team)
     _hero_traits(fs, hero, team)
     _hero_abilities(fs, hero, team)
     _hero_weapons(fs, hero, team)
@@ -81,14 +81,14 @@ def _figure(value: float | None) -> str:
     return "%g" % value if value is not None else "?"
 
 
-def _hero_kit_format(fs: FactSet, world: World, h: Hero, team: Seat) -> None:
+def _hero_kit_format(fs: FactSet, h: Hero, team: Seat) -> None:
     """What the format in force changed in the hero's kit, as the wiki words
     it: the numbers that moved, then the lines that moved none."""
     name = h.name
     moved = [c for c in h.kit_changes if c.applied]
     if moved:
         fs.add("hero", name, "hero.kit_format", "%s in %s: %s" % (
-            name, world.kit_format, ", ".join(
+            name, KIT_FORMAT, ", ".join(
                 "%s%s %s -> %s" % (c.piece + " " if c.piece else "",
                                    (c.stat or "").replace("_", " "), _figure(c.before),
                                    _figure(c.after)) for c in moved)),
@@ -96,7 +96,7 @@ def _hero_kit_format(fs: FactSet, world: World, h: Hero, team: Seat) -> None:
     unread = [c.text for c in h.kit_changes if not c.applied]
     if unread:
         fs.add("hero", name, "hero.kit_format_notes", "%s in %s, no number moved: %s"
-            % (name, world.kit_format, "; ".join(unread)), value=unread,
+            % (name, KIT_FORMAT, "; ".join(unread)), value=unread,
             source="kit_6v6", team=team)
 
 
@@ -274,11 +274,6 @@ def _hero_best_maps(fs: FactSet, world: World, h: Hero, team: Seat) -> None:
     """With no map on the board: one line of where the hero does best, not a
     line per map - with a map, the facts on it are the whole story."""
     name = h.name
-    if h.map_rates:
-        best = sorted(h.map_rates.items(), key=lambda kv: -kv[1].win)[:3]
-        fs.add("hero", name, "hero.rate_maps", "%s's best maps: %s" % (name, ", ".join(
-            "%s (%.1f%%)" % (world.maps[mid].name, win) for mid, (win, _) in best)),
-            value=[world.maps[mid].name for mid, _ in best], source="map_meta", team=team)
     if h.best_maps and h.win is not None:
         # the same intersection rule as the rates. best_maps is filled only for
         # a hero with a win rate, from maps it has a rate on.

@@ -17,7 +17,6 @@ from facts.team import (
     RANK_SENSITIVE,
     TEAM_METRICS,
     MetricBag,
-    answers,
     names,
     number,
     numbers,
@@ -317,8 +316,8 @@ def _map_facts(w: _TeamWriter, figures: dict[str, float], m: Map) -> None:
 
 
 def _versus_facts(w: _TeamWriter, figures: dict[str, float], enemies: Sequence[Hero]) -> None:
-    """The side against the other: coverage, the answer edges, the exposed
-    picks, and each enemy's answerers."""
+    """The side against the other: coverage, the answer edges and the
+    exposed picks."""
     label, metrics, other = w.label, w.metrics, w.other_team
     w.fact("coverage", "%s coverage: answers %d/%d %s picks%s" % (
         label, figures["coverage"], len(enemies), other,
@@ -340,11 +339,6 @@ def _versus_facts(w: _TeamWriter, figures: dict[str, float], enemies: Sequence[H
         w.fact("banproof_coverage", "%s ban-resilient coverage: without %s (%.0f%% ban)"
             " still %d/%d answered" % (label, metrics["max_ban_hero"], figures["max_ban_rate"],
                 figures["banproof_coverage"], len(enemies)))
-    for enemy_name, answerers in answers(metrics["_answered"]).items():
-        if answerers:
-            w.fs.add("team", w.team, "team.answer", "%s %s is answered by %s %s"
-                % (other, enemy_name, w.team, ", ".join(answerers)),
-                value=answerers, source="counters", team=w.team)
 
 
 # --- the matchup --------------------------------------------------------------
@@ -428,17 +422,11 @@ def _heal_floor(fs: FactSet, world: World, blue_t: MetricBag, red_t: MetricBag) 
 
 
 def _matchup_threats(fs: FactSet, matchup: MetricBag, blue_t: MetricBag, red_t: MetricBag) -> None:
-    """The draft's answer edges and coverage, then red's threats, each against
+    """The draft's coverage both ways, then red's threats, each against
     blue's answer to it, and the style war. A threat is red's own team metric,
     so its sentence carries the enemy.* key a strategy reads it by."""
     add = functools.partial(_add_matchup, fs, matchup)
     blue_n, red_n, matchup_n = numbers(blue_t), numbers(red_t), numbers(matchup)
-    net = blue_n["net_edges"]
-    add("net_edges", "board net matchup: %d blue answer-edges into red vs %d red into blue"
-        " (%+d) - %s" % (blue_n["answer_edges"], blue_n["exposure_edges"], net,
-            "the draft is ahead" if net > 0 else
-            "the draft is behind; the open slots must swing it"
-            if net < 0 else "dead even"), value=net)
     add("coverage_share", "coverage: blue answers %.0f%% of red; red answers %.0f%% of blue"
         % (100 * blue_n["coverage_share"], 100 * matchup_n["exposure_share"]),
         value=blue_t["coverage_share"], also=("matchup.exposure_share",))

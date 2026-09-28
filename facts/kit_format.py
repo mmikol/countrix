@@ -1,24 +1,23 @@
-"""The kit in the format in force: the wiki's 6v6 figures laid over the 5v5
-rows the kit tables hold, before derive_scalars reads them.
+"""The kit in the format in force, draft.KIT_FORMAT: the wiki's 6v6 figures
+laid over the 5v5 rows the kit tables hold, before derive_scalars reads them.
 
-    kit_format.apply(world, KIT_FORMAT)
+    kit_format.apply(world)
 
 The load reads each hero's 6v6 pools (heroes.health_6v6, shield_6v6,
-armor_6v6) and 6v6 lines (kit_6v6) onto the hero whatever the format, so
-the facts can say what 6v6 changes. Under SIX_V_SIX a pool the wiki gives
-replaces the 5v5 one, and a line that moves a stat from A to B moves each
-row of that stat on the piece it names whose value is A and whose words
-hold A once: "100 base + 100 per enemy" holds 100 twice, and a line about
-the per-enemy part must not move the base. A line whose A no stat row holds
-- the 5v5 figure has moved since the wiki wrote it, or the piece keeps no
-such row - is left unapplied and said so, and so is a line with no figure.
-Every change is kept on the hero as a KitChange for the facts to word.
+armor_6v6) and 6v6 lines (kit_6v6) onto the hero, so the facts can say what
+6v6 changes. A pool the wiki gives replaces the 5v5 one, and a line that
+moves a stat from A to B moves each row of that stat on the piece it names
+whose value is A and whose words hold A once: "100 base + 100 per enemy"
+holds 100 twice, and a line about the per-enemy part must not move the
+base. A line whose A no stat row holds - the 5v5 figure has moved since the
+wiki wrote it, or the piece keeps no such row - is left unapplied and said
+so, and so is a line with no figure. Every change is kept on the hero as a
+KitChange for the facts to word.
 """
 
 import re
 
 from db.data.normalizer import ability_key
-from facts.draft import SIX_V_SIX
 from facts.kit import KitPiece, Stat
 from facts.model import Hero, World
 from facts.records import KitChange, KitLine
@@ -29,12 +28,9 @@ FIGURE_RE = re.compile(r"\d+(?:\.\d+)?")
 SAME = 0.01
 
 
-def apply(w: World, kit_format: str) -> None:
-    """Set the World's format and, under SIX_V_SIX, lay each hero's 6v6
-    figures over its kit, recording what moved and what did not."""
-    w.kit_format = kit_format
-    if kit_format != SIX_V_SIX:
-        return
+def apply(w: World) -> None:
+    """Lay each hero's 6v6 figures over its kit, recording what moved and
+    what did not."""
     for hero in w.heroes.values():
         hero.kit_changes = [*_pools(hero), *(_line(hero, line) for line in hero.six_lines)]
 

@@ -3,7 +3,7 @@ the facts layer always reads what the data layer stored.
 
     world = tables.load(cx)
 
-Loading is 27 queries and a few thousand rows; cheap enough to do per
+Loading is 24 queries and a few thousand rows; cheap enough to do per
 click, and it is what lets the inference layer's solver evaluate thousands
 of candidate compositions without a query each. Each read step fills one
 part of the World from its tables, and load runs them in the order each
@@ -19,9 +19,8 @@ from psycopg.rows import TupleRow
 
 from db import KIND_WEAPON
 from db.data.normalizer import name_key
-from facts import counters
-from facts import kit_format as kit_format_module
-from facts.draft import EXPECTED_SHAPE, KIT_FORMAT
+from facts import counters, kit_format
+from facts.draft import EXPECTED_SHAPE
 from facts.kit import KitPiece, Stat
 from facts.model import ROLES, TERRAIN_FEATURES, TERRAIN_LEAN, Hero, Map, World
 from facts.records import (
@@ -340,8 +339,8 @@ def _read_relations(cx: Connection, w: World) -> None:
 
 
 def _read_provenance(cx: Connection, w: World) -> None:
-    """Where the rates come from: each source's newest capture, the patches
-    shipped since, and the strategies mirror's shape."""
+    """Where the rates come from: each source's newest capture, and the
+    patches shipped since."""
     w.snapshots = [
         Snapshot(
             source=src, captured=str(cap), patch=patch, released=str(rel) if rel else None,
@@ -362,10 +361,6 @@ def _read_provenance(cx: Connection, w: World) -> None:
             where p.released > (select coalesce(max(pp.released), '1900-01-01')
                 from meta_snapshots ms join patches pp using(patch_id))
             order by p.released desc""")]
-    if _rows(cx, "select to_regclass('strategies')")[0][0]:
-        w.catalog_counts = dict(_rows(cx, "select kind, count(*) from strategies group by kind"))
-        named = [p for (p,) in _rows(cx, "select distinct playbook from strategies")]
-        w.playbook = named[0] if len(named) == 1 and named[0] != "inference/strategies" else ""
 
 
 def _ally_lifesteal(w: World) -> None:
@@ -407,21 +402,21 @@ def _benches(w: World) -> None:
         hero.cap_ult(w.ult_cap)
 
 
-def load(cx: Connection, kit_format: str = KIT_FORMAT) -> World:
-    """The whole database -> World, its kit read in `kit_format`. `cx` is an
-    open psycopg connection; this module never opens one of its own. The
-    steps run in the order each relies on: the kit, and the format laid over
-    it, before derive_scalars, the rates before derive_rates, best_maps and
-    map_styles, the terrain before map_styles, the teammates' lifesteal and
-    the benches over the derived roster, and the counter matrix over the
-    derived kit and the wiki's counters, last."""
+def load(cx: Connection) -> World:
+    """The whole database -> World, its kit read in 6v6 (draft.KIT_FORMAT).
+    `cx` is an open psycopg connection; this module never opens one of its
+    own. The steps run in the order each relies on: the kit, and the 6v6
+    laid over it, before derive_scalars, the rates before derive_rates,
+    best_maps and map_styles, the terrain before map_styles, the teammates'
+    lifesteal and the benches over the derived roster, and the counter
+    matrix over the derived kit and the wiki's counters, last."""
     w = World()
     _read_heroes(cx, w)
     _read_abilities(cx, w)
     _read_weapons(cx, w)
     _read_perks(cx, w)
     _read_kit_6v6(cx, w)
-    kit_format_module.apply(w, kit_format)
+    kit_format.apply(w)
     _read_rates(cx, w)
     _read_maps(cx, w)
     _read_map_rates(cx, w)

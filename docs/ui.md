@@ -28,7 +28,7 @@ endpoints behind the host guard `db/web.py` puts on both servers
 | `/` | the board: the map selector, the attack/defense switch (Escort and Hybrid maps), the bans bar, the red and blue rosters grouped by role, and three panels - **comps**, **facts**, **playbook** |
 | `/static/<file>` | `board.css`, `board.js`, `comps.js`, `playbook.js` and `bebas-neue.woff2`, nothing else |
 | `/api/roster` | the roster `facts/roster.py` builds, which the door's `roster` tool lists too: every hero (role, subrole, health pool, portrait, status, release day) and every map (mode, top style, sided or not), with the role icons and the patches newer than the rates |
-| `/api/facts?map=&side=&red=&blue=&bans=` | the FactSet for the board as JSON: the facts, their count and the playbook's record |
+| `/api/facts?map=&side=&red=&blue=&bans=` | the FactSet for the board as JSON: the facts and their count |
 | `/api/board?map=&side=&red=&blue=&bans=[&weights=&client=&pool=]` | the board solved at any stage under the playbook tab's weights: the `board` tool's answer ([mcp.md](mcp.md#the-tools)) without the countered case, which the page never reads, from `serve.handle_board`. A board waits while the boards in flight hold one `FIELD_BUDGET`'s worth of sixes, and answers 429 after a minute (`serve.Admission`) |
 | `/api/strategies` | the catalog: every constraint, heuristic and assumption with its kind, form, frontmatter and body, from `serve.handle_strategies` |
 | `/health` | the engine's health, from `serve.handle_health`: ok or degraded, the strategies, the drafts pending and the heroes, and the error naming what is out of reach. The ui container's healthcheck and `orchestrator.py` read it |
@@ -172,7 +172,7 @@ sequenceDiagram
 
     You->>Board: pick the map and your side, set the bans,<br/>click red picks as they reveal, lock your blue picks
     Board->>Facts: /api/facts (map, side, red, blue, bans)
-    Facts->>DB: load the World (27 queries)
+    Facts->>DB: load the World (24 queries)
     Facts-->>Board: F1..Fn - every fact about those heroes,<br/>the map, each team, the matchup
     Board->>Solver: /api/board (map, side, red, blue, bans)
     Solver->>Solver: blue's seat: shapes the limits allow · per-role pools ·<br/>every candidate scored · local search

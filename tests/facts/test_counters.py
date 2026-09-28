@@ -301,9 +301,27 @@ def test_every_released_hero_has_a_derived_answer_and_the_fill_leaves_the_wikis_
     assert all(any(loser == h.id for loser, _ in world.derived) for h in bare)
 
 
+def _auc(world):
+    """How well the matrix's score ranks the wiki's edges above every other
+    ordered pair of released heroes: the Mann-Whitney AUC, ties counted
+    half."""
+    scores = sorted((pair.score, (lose, win) in world.counters)
+                    for (win, lose), pair in world.matrix.items())
+    positives = sum(1 for _, edge in scores if edge)
+    negatives = len(scores) - positives
+    rank_sum, i = 0.0, 0
+    while i < len(scores):
+        j = i
+        while j < len(scores) and scores[j][0] == scores[i][0]:
+            j += 1
+        rank_sum += (i + j + 1) / 2.0 * sum(1 for k in range(i, j) if scores[k][1])
+        i = j
+    return (rank_sum - positives * (positives + 1) / 2.0) / (positives * negatives)
+
+
 @pytest.mark.invariant
 def test_the_matrix_agrees_with_the_wikis_graph_beyond_chance(world):
     """AUC of the score on the wiki's edges against every other ordered pair:
     0.60 sits above the best of 2,000 hero-label shuffles the research drew
     (0.581), so a pull or a rule that breaks the agreement fails here."""
-    assert counters.auc(world) >= 0.60
+    assert _auc(world) >= 0.60

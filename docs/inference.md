@@ -351,13 +351,14 @@ share of a third. A complete red that heals nothing needs nothing. The
 likely six is not read: it rests on pick rates.
 
 **The threshold.** With red empty, red is the 2-2-2 of role-median
-heroes: H_r = `world.hps_bench` = 139.87 hp/s and P_r = `world.pool_ref`
-= 2 x (525 + 250 + 237.5) = 2025, the 6v6 kit as of 2026-09-26. A six
-must heal 6.91% of its own pool a second, and never less than 139.87
-hp/s. Everything in it is kit data; no rate enters. The sources hold no
-absolute winning threshold - no fight length, no ultimate charge - so
-the rule promises parity with the other side's healing and nothing more.
-At parity the race is the damage half's, which no shipped rule prices.
+heroes: H_r = `world.hps_bench` = 139.87 hp/s and P_r = twice the sum of
+`World.pool_medians` = 2 x (525 + 250 + 237.5) = 2025, the 6v6 kit as of
+2026-09-26. A six must heal 6.91% of its own pool a second, and never less
+than 139.87 hp/s. Everything in it is kit data; no rate enters. The
+sources hold no absolute winning threshold - no fight length, no ultimate
+charge - so the rule promises parity with the other side's healing and
+nothing more. At parity the race is the damage half's, which no shipped
+rule prices.
 
 **What it moves.** A six with one support falls under the bar against
 any red that heals, so the engine answers with a second support and keeps
@@ -537,7 +538,6 @@ the `team.*` metrics computed for the red side.
 | `team.max_ban_hero` (text) | who carries the highest ban rate |
 | `team.rank_sensitive_count` | picks whose win rate swings 6+ points across ranks |
 | `team.trend_sum` | summed win-rate movement since the rates last changed |
-| `team.map_known` | 1 if a map is set |
 | `team.map_win_mean` | mean win rate on the map (the all-ranks mean without a map) |
 | `team.map_pick_mass` | summed pick rate on the map |
 | `team.map_specialists` | picks running 2.5+ points over their own baseline here |
@@ -586,6 +586,4 @@ the `team.*` metrics computed for the red side.
 | `map.cover` | cover: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text) |
 | `world.heal_bench` | 2 x the median peak heal across the released supports |
 | `world.hps_bench` | 2 x the median sustained healing across the released supports |
-| `world.pool_ref` | the pool of a 2-2-2 of role-median heroes: 2 x each role's median pool, a form's armor in, summed |
-| `world.roster_size` | heroes in the roster |
 <!-- /generated:catalog -->

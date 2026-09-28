@@ -15,12 +15,12 @@ which the description says) and `map.known` tells a strategy which.
 """
 
 from collections import OrderedDict
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from typing import NamedTuple, TypedDict
 
 from facts.draft import EXPECTED_SHAPE, is_sided
 from facts.model import ROLES, TERRAIN_FEATURES, Hero, Map, World
-from facts.team import TEAM_METRICS, VERSUS_METRICS, MetricBag, number, team_metrics
+from facts.team import TEAM_METRICS, VERSUS_METRICS, MetricBag, number
 
 TREND_POINTS = 1.5
 TERRAIN_STANDOUT = 0.75   # sd from the ordinary map at which a terrain feature is a fact
@@ -75,9 +75,6 @@ MAP_METRICS.update((f, "%s: the wiki article's mentions per thousand words, in s
 WORLD_METRICS = OrderedDict([
     ("heal_bench", "2 x the median peak heal across the released supports"),
     ("hps_bench", "2 x the median sustained healing across the released supports"),
-    ("pool_ref", "the pool of a 2-2-2 of role-median heroes: 2 x each role's median pool,"
-                 " a form's armor in, summed"),
-    ("roster_size", "heroes in the roster"),
 ])
 
 SYNERGY_PULL = 2.0        # pick-rate points a hero gains per synergy partner already on the six
@@ -164,12 +161,6 @@ class HealRead(NamedTuple):
     healing: float
     pool: float
     filled: int
-
-
-def pool_ref(world: World) -> float:
-    """The pool of a 2-2-2 of role-median heroes: what an unrevealed side
-    brings, from the kit alone."""
-    return sum(n * world.pool_medians.get(role, 0.0) for role, n in EXPECTED_SHAPE.items())
 
 
 def heal_read(world: World, red_t: MetricBag) -> HealRead:
@@ -286,20 +277,7 @@ def map_metrics(m: Map | None, side: str = "", *, ban_count: int) -> MetricBag:
 
 
 def world_metrics(world: World) -> MetricBag:
-    return {"heal_bench": world.heal_bench, "hps_bench": world.hps_bench,
-            "pool_ref": pool_ref(world), "roster_size": len(world.heroes)}
-
-
-def namespace(
-        world: World, m: Map | None, red: Iterable[Hero], blue: Iterable[Hero],
-        side: str = "", *, ban_count: int) -> dict[str, MetricBag]:
-    """The whole evaluation namespace for a board: {team, enemy, matchup,
-    map, world} - `team` is blue's seat, `enemy` is red's, `side` blue's."""
-    blue_t = team_metrics(world, blue, m, red)
-    red_t = team_metrics(world, red, m, blue)
-    return {"team": blue_t, "enemy": red_t,
-            "matchup": matchup_metrics(world, blue_t, red_t),
-            "map": map_metrics(m, side, ban_count=ban_count), "world": world_metrics(world)}
+    return {"heal_bench": world.heal_bench, "hps_bench": world.hps_bench}
 
 
 # team metrics that read the other side. The solver builds red's metrics once,

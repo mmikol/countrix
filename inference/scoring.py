@@ -306,7 +306,7 @@ class Objective:
     # --- namespace and preparation -------------------------------------------
 
     def namespace(self, heroes: Sequence[Hero]) -> Namespace:
-        team = team_metrics(self.world, heroes, self.m, self.red, lean=True)
+        team = team_metrics(self.world, heroes, self.m, self.red)
         ns = dict(self.static)
         ns["team"] = team
         ns["matchup"] = compute.matchup_metrics(self.world, team, self.red_t)

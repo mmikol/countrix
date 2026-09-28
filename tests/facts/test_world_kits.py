@@ -10,8 +10,6 @@ import statistics
 
 import pytest
 
-from facts import compute
-
 pytestmark = pytest.mark.invariant
 
 
@@ -96,7 +94,8 @@ def test_sustained_healing_sums_the_pieces_over_the_teammates_they_reach(world):
     for hero in released:
         assert hero.hps == pytest.approx(sum(hero.hps_pieces.values()))
     assert world.hps_bench == pytest.approx(139.87, abs=0.005)
-    assert world.hps_bench / compute.pool_ref(world) == pytest.approx(0.0691, abs=0.00005)
+    reference = 2 * sum(world.pool_medians.values())          # a 2-2-2 of role medians
+    assert world.hps_bench / reference == pytest.approx(0.0691, abs=0.00005)
     cluster = [world.hero(n).hps for n in ("Illari", "Mizuki", "Moira")]
     assert max(cluster) - min(cluster) < 0.7 < world.hero("Kiriko").hps - max(cluster)
     # a beam at what its energy sustains; Wuyang's wave refunds 33% of the stream
@@ -192,14 +191,14 @@ def test_an_announced_hero_sets_no_roster_wide_figure(world):
 def test_the_role_median_pools_count_a_forms_armor_and_set_the_reference_pool(world):
     """Each role's median pool is read as team.pool_total reads a pool, a
     form's armor in, over the released heroes; the 6v6 kit gives 525, 250 and
-    237.5, and a 2-2-2 of them, pool_ref, is 2025. Ramattra's form moves the
-    tanks' median: without it the median is 500."""
+    237.5, and a 2-2-2 of them is 2025. Ramattra's form moves the tanks'
+    median: without it the median is 500."""
     released = [h for h in world.heroes.values() if h.released]
     for role in ("tank", "damage", "support"):
         assert world.pool_medians[role] == statistics.median(
             h.pool + h.form_armor for h in released if h.role == role), role
     assert world.pool_medians == {"tank": 525.0, "damage": 250.0, "support": 237.5}
-    assert compute.pool_ref(world) == 2 * sum(world.pool_medians.values()) == 2025.0
+    assert 2 * sum(world.pool_medians.values()) == 2025.0
     assert statistics.median(h.pool for h in released if h.role == "tank") == 500.0
 
 

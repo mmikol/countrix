@@ -659,8 +659,7 @@ one module that imports the pipeline.
   and named in `rejected_6v6`, never stored. Both kits stay stored:
   `facts.tables.load` lays `kit_6v6` and the `heroes.*_6v6` pools over the
   5v5 rows in the format `facts.draft.KIT_FORMAT` names
-  (`facts/kit_format.py`), and `tables.load(cx, FIVE_V_FIVE)` reads the
-  5v5 figures.
+  (`facts/kit_format.py`).
 - **`measurements.py`.** A stat value split into rows, each a
   `Measurement(value, numerator, denominator, window, condition, text)`.
   A wiki value is rarely one number: it carries conditions in parentheses,

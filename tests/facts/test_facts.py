@@ -44,7 +44,7 @@ def test_every_named_hero_gets_a_deep_stack_of_independent_facts(world):
 def test_the_whole_database_becomes_facts(world):
     fs = board_facts.generate(world, Draft("King's Row", ("Zarya",), ("Ana",)))
     keys = {f.key for f in fs.facts}
-    assert {"hero.perk_stat", "playbook.catalog"} <= keys, keys
+    assert "hero.perk_stat" in keys, keys
     # one population of rates, Blizzard's
     assert {s["source"] for s in world.snapshots} == {"blizzard"}
     assert any("Americas" in f.text for f in fs.facts if f.key == "meta.snapshot")
@@ -73,20 +73,12 @@ def test_the_rates_half_of_a_maps_style_is_derived_from_its_rates(world):
     ranked = sorted(m.styles, key=lambda s: (-m.styles[s], s))
     assert m.style_top == ranked[0]
     assert m.style_margin == pytest.approx(m.styles[ranked[0]] - m.styles[ranked[1]])
-    fs = board_facts.generate(world, Draft("King's Row"))
-    facts = fs.find("map.rate_lift")
-    assert [f.value["style"] for f in facts] == ranked
-    top, lead = facts[0], m.rate_lift[ranked[0]]
-    assert top.source == "playstyle+map_meta" and top.text == (
-        "%s heroes win %.1f sd %s on King's Row than on other maps"
-        % (ranked[0], abs(lead), "less" if lead < 0 else "more"))
 
 
 def test_a_map_without_text_gets_no_terrain_fact(world):
     bare = next(m for m in world.maps.values() if not m.terrain)
     fs = board_facts.generate(world, Draft(bare.name))
     assert fs.find("map.terrain_unread") and not fs.find("map.terrain")
-    assert not fs.find("map.terrain_lean")
     assert "no terrain" in fs.find("map.style_top")[0].text
 
 
@@ -105,8 +97,6 @@ def test_terrain_and_both_halves_of_the_style_are_facts(world):
                               "per_thousand": m.terrain["chokes"]}
     ranked = sorted(m.styles, key=lambda s: (-m.styles[s], s))
     assert [f.value["style"] for f in fs.find("map.style")] == ranked
-    assert {f.value["style"]: f.value["score"] for f in fs.find("map.terrain_lean")} == \
-        m.terrain_lean
     for f in fs.find("map.style"):
         style = f.value["style"]
         assert f.value["terrain"] == m.terrain_lean[style]
@@ -177,14 +167,11 @@ def test_map_rates_are_the_intersection_with_the_board(world):
     """With a map, a hero's rate facts are about that map alone; without
     one, a single line of where the hero does best - never a line per map."""
     with_map = board_facts.generate(world, Draft("King's Row", ("Sombra",), ("Ana",)))
-    assert not with_map.find("hero.rate_map") and not with_map.find("hero.rate_maps")
     assert len(with_map.find("hero.map_win", "Sombra")) == 1
     assert any("King's Row (this map)" in f.text for f in with_map.find("hero.map_win", "Sombra"))
     no_map = board_facts.generate(world, Draft(None, ("Sombra",), ("Ana",)))
-    best = no_map.find("hero.rate_maps", "Sombra")
-    assert len(best) == 1 and len(best[0].value) <= 3
-    assert best[0].text.startswith("Sombra's best maps: ")
-    assert len(no_map.find("hero.best_map", "Sombra")) <= 1 and not with_map.find("hero.best_map")
+    best = no_map.find("hero.best_map", "Sombra")
+    assert len(best) == 1 and len(best[0].value) <= 3 and not with_map.find("hero.best_map")
     assert not no_map.find("hero.map_win")
 
 
@@ -245,7 +232,7 @@ def _heal(world, blue, red=()):
     (KINGS_ROW_SIX, (), 139.87, 0.7498),
     # Baptiste and Zenyatta heal 146.76 on 1775, over the bench
     (("Reinhardt", "Genji", "Hanzo", "Widowmaker", "Baptiste", "Zenyatta"), (), 139.87, 0.0),
-    # a second tank lifts the pool to 2100, over pool_ref: the need grows with it
+    # a second tank lifts the pool to 2100, over the 2-2-2's 2025: the need grows with it
     (("Reinhardt", "D.Va", "Genji", "Hanzo", "Baptiste", "Zenyatta"), (), 145.05, 0.0),
     # Ana and Kiriko revealed heal 174.22; the four open slots are tanks and damage
     (KINGS_ROW_SIX, ("Ana", "Kiriko"), 174.22, 0.7991),
@@ -260,8 +247,8 @@ def _heal(world, blue, red=()):
     "lucio-brigitte", "illari-zenyatta"])
 def test_the_healing_floor_on_the_6v6_kit(world, blue, red, need, shortfall):
     """The research's figures from the built World: hps_bench 139.87 and
-    pool_ref 2025 set the bar with red empty, 6.91% of a six's pool a
-    second and never less than 139.87."""
+    the pool of a 2-2-2 of role medians, 2025, set the bar with red empty,
+    6.91% of a six's pool a second and never less than 139.87."""
     got_need, got_shortfall = _heal(world, blue, red)
     assert got_need == pytest.approx(need, abs=0.005)
     assert got_shortfall == pytest.approx(shortfall, abs=0.00005)

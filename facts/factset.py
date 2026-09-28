@@ -1,4 +1,4 @@
-"""The FactSet: a board's facts numbered F1.. and the playbook's record S1..
+"""The FactSet: a board's facts numbered F1..
 
 A Fact is one sentence and the structured claim behind it (scope, subject,
 key, value, unit, source); the FactSet numbers them in emission order and
@@ -48,21 +48,14 @@ def _plain(value: object) -> object:
     return str(value)
 
 
-PLAYBOOK_SCOPE = "playbook"
-PLAYBOOK_DIVIDER = "-- the playbook's record: what it holds - not facts --"
-
-
 class FactSet:
-    """The facts (F1..) and the playbook's record (S1..) of one board, and
-    `draft`, the board they describe with its names resolved. Both live in
-    `facts` in order, so a citation of either resolves; `count` is the facts
-    alone."""
+    """The facts (F1..) of one board, in emission order, and `draft`, the
+    board they describe with its names resolved."""
 
     def __init__(self, draft: Draft) -> None:
         self.draft = draft
         self.facts: list[Fact] = []
         self._by_key: dict[str, list[Fact]] = {}
-        self._n = {"F": 0, "S": 0}
 
     def add(
             self, scope: str, subject: str, key: str, text: str, *, source: str,
@@ -71,9 +64,7 @@ class FactSet:
         """`also` names the other metrics this one sentence states, so a caller
         looking for one of them finds the fact that carries it. The fact keeps
         the key it is worded around; `also` only adds index entries."""
-        prefix = "S" if scope == PLAYBOOK_SCOPE else "F"
-        self._n[prefix] += 1
-        fid = "%s%d" % (prefix, self._n[prefix])
+        fid = "F%d" % (len(self.facts) + 1)
         fact = Fact(id=fid, scope=scope, subject=subject, team=team, key=key, text=text,
             value=value, unit=unit, source=source)
         self.facts.append(fact)
@@ -83,11 +74,7 @@ class FactSet:
 
     @property
     def count(self) -> int:
-        return self._n["F"]
-
-    @property
-    def playbook(self) -> list[Fact]:
-        return [f for f in self.facts if f.scope == PLAYBOOK_SCOPE]
+        return len(self.facts)
 
     def find(self, key: str, subject: str | None = None) -> list[Fact]:
         """Facts that state this metric - worded around it or carrying it in
@@ -98,15 +85,10 @@ class FactSet:
         return [f for f in stating if f.subject == subject]
 
     def rendered(self) -> str:
-        lines = ["[%s] %s" % (f.id, f.text) for f in self.facts if f.scope != PLAYBOOK_SCOPE]
-        side = self.playbook
-        if side:
-            lines += [PLAYBOOK_DIVIDER] + ["[%s] %s" % (f.id, f.text) for f in side]
-        return "\n".join(lines)
+        return "\n".join("[%s] %s" % (f.id, f.text) for f in self.facts)
 
     def to_dict(self) -> dict[str, object]:
         draft = self.draft
         return {"map": draft.map_name, "red": list(draft.red), "blue": list(draft.blue),
                 "bans": list(draft.bans), "side": draft.side, "count": self.count,
-                "playbook_count": self._n["S"],
                 "facts": [f.to_dict() for f in self.facts]}

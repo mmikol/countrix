@@ -60,7 +60,7 @@ stays an integer.
 
 import math
 import re
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import NamedTuple
 
@@ -746,24 +746,3 @@ def said(world: World, edge: DerivedEdge) -> str:
     return "%s answers %s - derived: %s" % (
         world.heroes[edge.winner].name, world.heroes[edge.loser].name,
         "; ".join("%s (%s)" % (f.phrase, f.numbers) for f in edge.fired))
-
-
-def auc(world: World, edges: Iterable[tuple[int, int]] | None = None) -> float:
-    """How well the matrix's score ranks the wiki's edges above every other
-    ordered pair of released heroes: the Mann-Whitney AUC, ties counted
-    half. edges are (loser, winner), the wiki's counters by default."""
-    wiki = set(world.counters if edges is None else edges)
-    scores = [(pair.score, (lose, win) in wiki) for (win, lose), pair in world.matrix.items()]
-    scores.sort()
-    positives = sum(1 for _, edge in scores if edge)
-    negatives = len(scores) - positives
-    if not positives or not negatives:
-        return math.nan
-    rank_sum, i = 0.0, 0
-    while i < len(scores):
-        j = i
-        while j < len(scores) and scores[j][0] == scores[i][0]:
-            j += 1
-        rank_sum += (i + j + 1) / 2.0 * sum(1 for k in range(i, j) if scores[k][1])
-        i = j
-    return (rank_sum - positives * (positives + 1) / 2.0) / (positives * negatives)

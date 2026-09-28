@@ -296,8 +296,8 @@ function refresh() {
    network comes back */
 ['online', 'focus'].forEach(function (ev) { window.addEventListener(ev, function () { if (STALE) refresh(); }); });
 
-var SCOPES = ['meta', 'bans', 'map', 'hero', 'team', 'matchup', 'playbook'];
-var scopeOn = { meta: true, bans: true, map: true, hero: true, team: true, matchup: true, playbook: true };
+var SCOPES = ['meta', 'bans', 'map', 'hero', 'team', 'matchup'];
+var scopeOn = { meta: true, bans: true, map: true, hero: true, team: true, matchup: true };
 function renderFacts() {
   if (!FACTS) return;
   var f = el('filter').value.toLowerCase(), out = '', last = null, shown = 0;
@@ -306,8 +306,6 @@ function renderFacts() {
     if (f && (x.id + ' ' + x.key + ' ' + x.subject + ' ' + x.text).toLowerCase().indexOf(f) < 0) return;
     shown++;
     var head = x.scope === 'hero' ? (x.team + ' · ' + x.subject) : x.scope === 'team' ? (x.subject + ' team') : x.scope;
-    if (x.scope === 'bans') head = 'bans';
-    if (x.scope === 'playbook') head = 'the playbook\'s record · what it holds - not facts';
     if (head !== last) { out += "<tr class='h'><td colspan='3' class='head'>" + esc(head) + '</td></tr>'; last = head; }
     var cls = (x.team || '') + (/^(WARNING|CAUTION)/.test(x.text) ? ' warn' : '') + (x.source.indexOf('derived:') === 0 ? ' derived' : '');
     out += "<tr class='" + cls + "'><td class='tag'>[" + x.id + "]</td><td class='text'>" + esc(x.text) + "</td><td class='src'>" + esc(x.source) + '</td></tr>';

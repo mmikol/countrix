@@ -133,7 +133,6 @@ TEAM_METRICS = OrderedDict([
         "picks whose win rate swings %g+ points across ranks" % RANK_SENSITIVE),
     ("trend_sum", "summed win-rate movement since the rates last changed"),
     # map
-    ("map_known", "1 if a map is set"),
     ("map_win_mean", "mean win rate on the map (the all-ranks mean without a map)"),
     ("map_pick_mass", "summed pick rate on the map"),
     ("map_specialists", "picks running %g+ points over their own baseline here" % SPECIALIST_DELTA),
@@ -154,11 +153,9 @@ class SynergyPair(NamedTuple):
 
 
 # A metric's value: a count or a figure, a name, the names it lists, the
-# synergy pairs, the picks per style tag, or the answering picks per enemy.
-# The registry test pins which key holds which.
-type MetricValue = (
-    int | float | str | list[str] | list[SynergyPair] | dict[str, int]
-    | dict[str, list[str]])
+# synergy pairs, or the picks per style tag. The registry test pins which key
+# holds which.
+type MetricValue = int | float | str | list[str] | list[SynergyPair] | dict[str, int]
 type MetricBag = dict[str, MetricValue]
 # the types a numeric metric holds: one tuple, built once, since the solver
 # tests a value against it for every heuristic of every candidate
@@ -214,15 +211,6 @@ def style_tally(value: MetricValue) -> dict[str, int]:
     raise TypeError("a metric read as a style tally holds %r" % (value,))
 
 
-def answers(value: MetricValue) -> dict[str, list[str]]:
-    """_answered: the picks answering each enemy, by the enemy's name."""
-    if isinstance(value, dict):
-        by_enemy = {k: v for k, v in value.items() if isinstance(v, list)}
-        if len(by_enemy) == len(value):
-            return by_enemy
-    raise TypeError("a metric read as answers holds %r" % (value,))
-
-
 def _median(values: Iterable[float | None]) -> float:
     known = [v for v in values if v is not None]
     return statistics.median(known) if known else 0.0
@@ -234,12 +222,10 @@ def _mean(values: Iterable[float | None]) -> float:
 
 
 def team_metrics(world: World, heroes: Iterable[Hero], m: Map | None = None,
-                 enemies: Iterable[Hero] = (), lean: bool = False) -> MetricBag:
-    """Every TEAM_METRICS key for these picks, on this map, vs these enemies,
-    and _answered, the answering picks per enemy that the facts engine words.
-    lean=True leaves _answered empty: no strategy can name it, so the solver
-    never reads it. Each section's helper returns its keys in registry order,
-    and the bag keeps that order."""
+                 enemies: Iterable[Hero] = ()) -> MetricBag:
+    """Every TEAM_METRICS key for these picks, on this map, vs these
+    enemies. Each section's helper returns its keys in registry order, and
+    the bag keeps that order."""
     heroes, enemies = list(heroes), list(enemies)
     # the most-banned pick: max_ban_* name it and banproof_coverage takes its
     # answers away; with no ban rate on the team it is the first pick
@@ -248,7 +234,7 @@ def team_metrics(world: World, heroes: Iterable[Hero], m: Map | None = None,
     return {**_shape(heroes, m), **_durability(heroes), **_damage(heroes),
             **_sustain(world, heroes), **_tools(heroes), **_cohesion(world, heroes),
             **meta, **_on_map(heroes, m, number(meta["win_mean"]), number(meta["pick_mass"])),
-            **_versus(world, heroes, enemies, top_ban, lean)}
+            **_versus(world, heroes, enemies, top_ban)}
 
 
 def _shape(heroes: list[Hero], m: Map | None) -> MetricBag:
@@ -422,22 +408,21 @@ def _on_map(heroes: list[Hero], m: Map | None, win_mean: float,
     """The picks on this map's rates; without a map, the all-ranks figures the
     meta section read, and zeros."""
     if m is None:
-        return {"map_known": 0, "map_win_mean": win_mean, "map_pick_mass": pick_mass,
+        return {"map_win_mean": win_mean, "map_pick_mass": pick_mass,
                 "map_specialists": 0, "map_offmap": 0, "home_map_hits": 0}
     wins = [h.map_win(m.id) for h in heroes]
     deltas = [
         win - h.win for h, win in zip(heroes, wins, strict=True)
         if win is not None and h.win is not None]
-    return {"map_known": 1,
-            "map_win_mean": _mean(wins) if any(w is not None for w in wins) else win_mean,
+    return {"map_win_mean": _mean(wins) if any(w is not None for w in wins) else win_mean,
             "map_pick_mass": sum(h.map_pick(m.id) or 0 for h in heroes),
             "map_specialists": sum(1 for d in deltas if d >= SPECIALIST_DELTA),
             "map_offmap": sum(1 for d in deltas if d <= -SPECIALIST_DELTA),
             "home_map_hits": sum(1 for h in heroes if m.id in h.best_maps)}
 
 
-def _versus(world: World, heroes: list[Hero], enemies: list[Hero], top_ban: Hero | None,
-            lean: bool) -> MetricBag:
+def _versus(world: World, heroes: list[Hero], enemies: list[Hero],
+            top_ban: Hero | None) -> MetricBag:
     """The counter edges between the picks and the other team: all zeros while
     that team is empty."""
     # enemy id -> the picks answering it; pick id -> the enemies answering it
@@ -459,8 +444,7 @@ def _versus(world: World, heroes: list[Hero], enemies: list[Hero], top_ban: Hero
             "double_covered": sum(1 for v in answered.values() if len(v) >= 2),
             "banproof_coverage": (
                 sum(1 for e in enemies if any(x != top_ban.name for x in answered[e.id]))
-                if enemies and top_ban is not None else 0),
-            "_answered": {} if lean else {e.name: answered[e.id] for e in enemies}}
+                if enemies and top_ban is not None else 0)}
 
 
 def _largest_component(adjacency: dict[int, set[int]]) -> int:

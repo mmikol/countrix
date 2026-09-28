@@ -8,8 +8,6 @@ FactSet.
         DEPENDENT(D)   = ⋃ facts(s ⋈ t)  over the other selections t  s joined with t
         FACTS(D)       = INDEPENDENT(D) ∪ DEPENDENT(D)
     FACTS       = FACTS(HEROES) ∪ FACTS(MAPS) ∪ FACTS(META)      F1..
-    STRATEGIES  = CONSTRAINTS ∪ HEURISTICS ∪ ASSUMPTIONS         the playbook
-    (the playbook's record)                                      S1..  what it holds
 
 FACTS are derived from the authoritative data - what the sources say about
 the heroes, the maps and the meta, pulled and set - for this board, and
@@ -21,18 +19,13 @@ heroes, the team is the six joined, the matchup the twelve, the bans join
 both teams), and a join belongs to every domain it touches - the
 dependent facts are where the domains' fact sets intersect.
 Independent facts per hero and for the map come first; the joins per team
-appear once a team has picks, and the matchup once both teams do.
-Below them, numbered S1.., rides the PLAYBOOK's record: how many
-constraints, heuristics and assumptions it holds - citable, never mistaken
-for data, and not the strategies themselves (those are the constraints and
-heuristics the solver reads). Both sides are
+appear once a team has picks, and the matchup once both teams do. Each is
 structured (scope, subject, key, value) so the inference layer can read
-them by key, and rendered as sentences so a person - or the /comp skill -
-can read them as evidence. Ids are dense and stable within a board.
+it by key, and rendered as a sentence so a person - or the /comp skill -
+can read it as evidence. Ids are dense and stable within a board.
 
-This module writes the meta, the bans, the map and the playbook's record;
-facts.hero_facts writes a hero's facts, and facts.team_facts a
-team's and the matchup's.
+This module writes the meta, the bans and the map; facts.hero_facts writes
+a hero's facts, and facts.team_facts a team's and the matchup's.
 """
 
 from typing import NotRequired, TypedDict
@@ -40,8 +33,8 @@ from typing import NotRequired, TypedDict
 from facts import compute, hero_facts, team_facts
 from facts.compute import TERRAIN_STANDOUT
 from facts.draft import MAX_BANS, Draft, board_side, is_sided, opposite
-from facts.factset import PLAYBOOK_SCOPE, FactSet
-from facts.model import TERRAIN_FEATURES, TERRAIN_LEAN, Map, Resolved, World
+from facts.factset import FactSet
+from facts.model import TERRAIN_FEATURES, Map, Resolved, World
 
 
 class TerrainValue(TypedDict):
@@ -89,7 +82,6 @@ def generate(world: World, draft: Draft) -> FactSet:
     for h in board.blue:
         hero_facts.write(fs, world, board, h, "blue")
     team_facts.write(fs, world, board)
-    _playbook_record(fs, world)
     return fs
 
 
@@ -204,23 +196,9 @@ def _map_terrain(fs: FactSet, m: Map) -> None:
 
 
 def _map_styles(fs: FactSet, m: Map) -> None:
-    """The styles the map rewards: the rates' half, the terrain's half, the
-    sum, and the style on top."""
-    ranked_styles = sorted(m.styles, key=lambda s: (-m.styles[s], s))
-    for style in ranked_styles:
-        if style in m.rate_lift:
-            score = m.rate_lift[style]
-            fs.add("map", m.name, "map.rate_lift", "%s heroes win %.1f sd %s on %s than on other"
-                " maps" % (style, abs(score), "less" if score < 0 else "more", m.name),
-                value={"style": style, "score": score}, source="playstyle+map_meta")
-    for style in ranked_styles:
-        if style in m.terrain_lean:
-            fs.add("map", m.name, "map.terrain_lean", "%s's terrain leans %+.1f sd to %s (%s)"
-                % (m.name, m.terrain_lean[style], style,
-                    ", ".join(f.replace("_", " ") for f in TERRAIN_LEAN[style])),
-                value={"style": style, "score": m.terrain_lean[style]},
-                source="map_terrain")
-    for style in ranked_styles:
+    """The styles the map rewards, each score with its terrain and rates
+    halves, and the style on top."""
+    for style in sorted(m.styles, key=lambda s: (-m.styles[s], s)):
         fs.add("map", m.name, "map.style", "%s on %s: %+.1f sd (%s)"
             % (style, m.name, m.styles[style], _halves(m, style)),
             value={"style": style, "score": m.styles[style],
@@ -266,19 +244,3 @@ def _map_heroes(fs: FactSet, world: World, m: Map) -> None:
                 % (style, m.name, ", ".join(
                     "%s (%.1f%%)" % (h.name, wins[h.id]) for h in fits)),
                 value=[h.name for h in fits], source="playstyle+map_meta")
-
-
-# --- the playbook's record -------------------------------------------------
-
-def _playbook_record(fs: FactSet, world: World) -> None:
-    """S1..: the playbook's record - what it holds - never what the sources
-    say, and not the constraints and heuristics themselves."""
-    scope = PLAYBOOK_SCOPE
-    if world.catalog_counts:
-        c = world.catalog_counts
-        fs.add(scope, "catalog", "playbook.catalog",
-            "the playbook%s holds %d constraints, %d heuristics and %d assumptions"
-            " (STRATEGIES = CONSTRAINTS ∪ HEURISTICS ∪ ASSUMPTIONS)"
-            % (" (%s)" % world.playbook if world.playbook else "",
-                c.get("constraint", 0), c.get("heuristic", 0), c.get("assumption", 0)),
-            value=c, source="strategies")

@@ -95,9 +95,9 @@ db <- facts <- inference <- door <- ui.
   board and the number the solver maximises cannot drift. `facts/` is a
   shared library: `inference/`, the door's `facts`, `solver`, `boards` and
   `playbook` modules, the board and the tests' reach recorder import it.
-- **Facts are numbered.** `FactSet` numbers facts F1.. and the playbook's
-  record S1.. in emission order; a solver contribution cites a fact by metric
-  key (`also=` on `FactSet.add`). Adding a fact renumbers every later id.
+- **Facts are numbered.** `FactSet` numbers facts F1.. in emission order;
+  a solver contribution cites a fact by metric key (`also=` on
+  `FactSet.add`). Adding a fact renumbers every later id.
 - **The playbook is markdown.** `inference/strategies/*.md` - the filename is
   the id; frontmatter sets the kind (constraint, heuristic, assumption).
   Constraints cut the space; heuristics weigh what is left. The form is
@@ -132,7 +132,7 @@ db <- facts <- inference <- door <- ui.
 - **The kit is read in 6v6.** `facts.draft.KIT_FORMAT` names the format;
   `tables.load` lays the wiki's 6v6 pools and lines (`heroes.*_6v6`,
   `kit_6v6`) over the 5v5 rows before `derive_scalars` (`facts/kit_format.py`).
-  The 5v5 figures stay stored; `tables.load(cx, FIVE_V_FIVE)` reads them.
+  The 5v5 figures stay stored, and each change names the one it moved.
 - **The solver is deterministic.** `engine.board()` returns a Board of up to
   seven Results (blue, red, current, red_current, fill, countered, expected);
   fill is None unless one to five blue picks are locked, countered is None

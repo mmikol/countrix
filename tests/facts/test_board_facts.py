@@ -5,7 +5,7 @@ and the sides, each worded from what tests/synthetic.py sets. No database."""
 import pytest
 
 from db import Refusal
-from facts import board_facts, factset
+from facts import board_facts
 from facts.draft import Draft
 
 
@@ -15,29 +15,18 @@ def test_every_fact_is_keyed_and_the_meta_comes_first(synthetic_world):
     assert fs.facts[0].scope == "meta" and fs.facts[0].text == (
         "blizzard rates: captured 2026-09-01, September 1, 2026 Patch (2026-09-01)"
         " - role queue, pc, Americas")
-    assert {"map", "hero", "team", "matchup", "playbook"} <= {f.scope for f in fs.facts}
+    assert {"map", "hero", "team", "matchup"} <= {f.scope for f in fs.facts}
 
 
-def test_facts_are_the_authoritative_data_and_the_playbook_record_is_numbered_apart(
-        synthetic_world):
-    # FACTS = INDEPENDENT ∪ DEPENDENT (F1..); the playbook's record rides below as S1..
+def test_facts_are_numbered_densely_in_the_order_they_are_written(synthetic_world):
+    # FACTS = INDEPENDENT ∪ DEPENDENT, F1..
     fs = board_facts.generate(synthetic_world, Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm",)))
-    facts = [f for f in fs.facts if f.scope != factset.PLAYBOOK_SCOPE]
-    side = fs.playbook
-    assert facts and side
-    assert all(f.id.startswith("F") for f in facts) and all(f.id.startswith("S") for f in side)
-    assert [f.id for f in facts] == ["F%d" % i for i in range(1, len(facts) + 1)]
-    assert [f.id for f in side] == ["S%d" % i for i in range(1, len(side) + 1)]
-    assert {f.scope for f in facts} <= {"meta", "bans", "map", "hero", "team", "matchup"}
-    assert [f.key for f in side] == ["playbook.catalog"]
-    assert fs.count == len(facts) and fs.to_dict()["playbook_count"] == len(side)
-    text = fs.rendered()
-    assert text.startswith("[F1]") and factset.PLAYBOOK_DIVIDER in text
-    divider = text.index(factset.PLAYBOOK_DIVIDER)
-    assert text.index("[S1]") > divider > text.index("[F%d]" % len(facts))
-    assert side[0].text == (
-        "the playbook holds 2 constraints, 3 heuristics and 2 assumptions"
-        " (STRATEGIES = CONSTRAINTS ∪ HEURISTICS ∪ ASSUMPTIONS)")
+    assert [f.id for f in fs.facts] == ["F%d" % i for i in range(1, len(fs.facts) + 1)]
+    assert {f.scope for f in fs.facts} <= {"meta", "bans", "map", "hero", "team", "matchup"}
+    assert fs.count == len(fs.facts) == fs.to_dict()["count"]
+    lines = fs.rendered().splitlines()
+    assert lines[0].startswith("[F1] ") and lines[-1].startswith("[F%d] " % fs.count)
+    assert len(lines) == fs.count
 
 
 def test_team_facts_appear_per_side_and_matchup_only_with_both(synthetic_world):
@@ -47,14 +36,14 @@ def test_team_facts_appear_per_side_and_matchup_only_with_both(synthetic_world):
     assert "team" in scopes and "matchup" not in scopes
     assert fs.find("team.tanks", "red")
     fs = board_facts.generate(w, Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm", "Anvil")))
-    assert fs.find("team.coverage", "blue") and fs.find("matchup.net_edges")
+    assert fs.find("team.coverage", "blue") and fs.find("matchup.coverage_share")
     # the crowd-control line names every blue pick that carries a tool, read off the picks
     (cc,) = fs.find("team.cc_count", "blue")
     assert cc.text == "blue team crowd control: 1 pick; Anvil: Quake Slam"
     # the builder's counter: Mortar is answered by Anvil
     fs = board_facts.generate(w, Draft("Harbor Gate", ("Mortar",), ("Anvil",)))
-    assert [f.text for f in fs.find("team.answer", "blue")] == [
-        "red Mortar is answered by blue Anvil"]
+    assert [f.text for f in fs.find("hero.vs_answered_by", "Mortar")] == [
+        "NOTE: red Mortar is answered by blue Anvil"]
 
 
 def test_board_context_facts_warn_and_cite(synthetic_world):

@@ -41,10 +41,8 @@ shows). Prefer whichever is connected; they expose the same tools.
    every fact the database holds about those heroes, the map, each team
    and the matchup, numbered F1.. and citable: every domain's independent
    facts (a selection's own row) and dependent ones (its joins: hero ⋈
-   map, hero ⋈ enemy, hero ⋈ ally, the team, the matchup). Below a
-   divider comes the playbook's record, numbered S1.. and just as
-   citable: the catalog's shape. The game is 6v6 Open
-   Queue: six picks, at most two tanks. The playbook itself - STRATEGIES
+   map, hero ⋈ enemy, hero ⋈ ally, the team, the matchup). The game is
+   6v6 Open Queue: six picks, at most two tanks. The playbook itself - STRATEGIES
    = CONSTRAINTS ∪ HEURISTICS ∪ ASSUMPTIONS - is three kinds of markdown
    file (read them with the `strategies` tool):
    constraints (a limit that always holds), heuristics (a weighted metric

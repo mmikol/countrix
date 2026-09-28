@@ -30,9 +30,6 @@ from facts.records import (
 
 REMECH = ("Call Mech",)     # climbing back into the mech: an ultimate by kind, not a fight tool
 SQUISHY_POOL = 250
-# the formats a kit is read in (draft.KIT_FORMAT picks one): the kit tables
-# hold 5v5's figures, and kit_6v6 what 6v6 changes
-SIX_V_SIX, FIVE_V_FIVE = "6v6", "5v5"
 
 
 @dataclass(eq=False, kw_only=True)
@@ -54,7 +51,7 @@ class Hero:
     weapons: list[KitPiece] = field(default_factory=list)
     perks: list[KitPiece] = field(default_factory=list)
     # the wiki's 6v6 kit as stored - a pool's 6v6 figure, the 6v6 lines - and
-    # what the format in force did with each (facts.kit_format)
+    # what laying it over the 5v5 rows did with each (facts.kit_format)
     six_pools: dict[str, int] = field(default_factory=dict)
     six_lines: list[KitLine] = field(default_factory=list)
     kit_changes: list[KitChange] = field(default_factory=list)
@@ -232,9 +229,6 @@ class World:
         # across the released heroes: what an unrevealed slot of that role brings
         self.pool_medians: dict[str, float] = {}
         self.ult_cap = 0.0           # the largest single figure an ultimate publishes
-        self.catalog_counts: dict[str, int] = {}     # the strategies mirror: kind -> count
-        self.kit_format = FIVE_V_FIVE    # as the kit tables hold it, until the load reads 6v6
-        self.playbook = ""           # the folder the mirror came from, when not the shipped one
 
     # --- lookups -------------------------------------------------------
 

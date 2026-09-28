@@ -60,7 +60,7 @@ def test_an_announced_hero_is_flagged_with_its_release_day(synthetic_world):
         "CAUTION: Wisp is announced, not yet playable (releases 2026-12-01) - the kit is"
         " the wiki's preview and there are no rates")
     assert announced.value == "2026-12-01"
-    assert not fs.find("hero.rate") and not fs.find("hero.rate_maps")     # no rates
+    assert not fs.find("hero.rate") and not fs.find("hero.best_map")      # no rates
     wisp.release_date = None
     fs = FactSet(Draft(blue=("Wisp",)))
     hero_facts.write(fs, w, Resolved(None, [], [wisp], []), wisp, "blue")
@@ -197,15 +197,13 @@ def test_a_heros_tiers_are_stated_up_the_ladder_by_name(synthetic_world):
 
 def test_with_no_map_a_hero_names_where_it_does_best(synthetic_world):
     """Anvil: 52.5 on Harbor Gate, 50 on Ember Ruins, 47 on Salt Flats, over
-    its own 50 - one line of its best rates and one of its positive lifts."""
+    its own 50 - one line of its positive lifts."""
     w = synthetic_world
     fs = _facts(w, "Anvil")
-    assert _texts(fs, "hero.rate_maps", "Anvil") == [
-        "Anvil's best maps: Harbor Gate (52.5%), Ember Ruins (50.0%), Salt Flats (47.0%)"]
     assert _texts(fs, "hero.best_map", "Anvil") == [
         "Anvil's three best maps by Blizzard's map rates, over its own 50.0%: Harbor Gate (+2.5)"]
     on_map = _facts(w, "Anvil", map_name="Ember Ruins")
-    assert not on_map.find("hero.rate_maps") and not on_map.find("hero.best_map")
+    assert not on_map.find("hero.best_map")
 
 
 def test_the_wikis_counters_and_partners_are_told_whoever_else_is_picked(synthetic_world):
