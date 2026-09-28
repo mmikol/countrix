@@ -36,7 +36,7 @@ steps.
 | `wiki/patches.py` - `pull_patches` | `patches` | - |
 | `blizzard/meta.py` - `pull_rates` | `regions`, `competitive_tiers`, `meta_snapshots`, `hero_meta`, `map_meta` | `pull_heroes`, `pull_maps`, `pull_patches` |
 | `wiki/playstyles.py` - `pull_playstyles` | `playstyle` | `pull_heroes` |
-| `wiki/synergies.py` - `pull_synergies` | `synergies` | `pull_heroes` |
+| `wiki/synergies.py` - `pull_synergies` | `synergies`, `synergy_cells` | `pull_heroes` |
 | `wiki/matchups.py` - `pull_counters` | `counters` | `pull_heroes` |
 
 `wiki/kits/` is the kit pipeline `pull_kits` runs; `wiki/markup.py`,
@@ -47,7 +47,7 @@ markup and store nothing.
 
 | folder | what it holds |
 | --- | --- |
-| `migrations/` | The schema as a sequence, one file per step: `001` sources and the foundation, `002` heroes, `003` maps, `004` meta, `005` playbook, `006` inference, `007` the three layers, `008` the ledger, `009` and `014` the tables that recorded matches, added and dropped again, `010` constraints and heuristics (the `strategies` table), `011` and `012` the `matrix_reader` login the `query` tool connects as, with the dynamic-SQL functions withdrawn from `PUBLIC`, `013` the assumption kind, `015` announced heroes, `016` the playbook each `strategies` row was mirrored from, `017` that column's comment, `018` `map_playstyle` and `comp_archetypes` dropped, `seasons` and `synergies` pulled from the wiki, `019` `map_strategy` and the third source's rates, snapshots and `sources` row dropped, `counters` pulled from the wiki, `020` `map_terrain`, the terrain features each map's wiki article names, `021` `stage_terrain`, with every Hybrid map's two phases and an Escort map's named stretches stored as stages, `022` the `strategies.playbook` comment under the Countrix name, `023` the columns nothing read dropped - `raw_value` on the three stat tables, `patches.platform` and `url`, `subroles.icon_url`, `stat_keys.label` and `unit`, `roles.name`, `024` and `027` the tables that recorded the owner's games, added and dropped again, `025` the 6v6 kit beside the 5v5 one: `heroes.health_6v6`, `shield_6v6` and `armor_6v6`, and `kit_6v6`, each 6v6 line of a hero's article, `026` `counters.basis` and `evidence`: each counter edge marked with the part of the article it was read in, the Match-Up column or the Strategy section, a Strategy edge with its sentence, `028` the data nothing read dropped - `seasons` and `meta_snapshots.season_id`, `ability_modifiers`, `perk_ability_effects`. A statement in an applied migration is never edited; a change is a new file, and a populated database catches up with `db_migrate`. The `--` prose above each `CREATE TABLE` is the data dictionary's text, and is kept current. |
+| `migrations/` | The schema as a sequence, one file per step: `001` sources and the foundation, `002` heroes, `003` maps, `004` meta, `005` playbook, `006` inference, `007` the three layers, `008` the ledger, `009` and `014` the tables that recorded matches, added and dropped again, `010` constraints and heuristics (the `strategies` table), `011` and `012` the `matrix_reader` login the `query` tool connects as, with the dynamic-SQL functions withdrawn from `PUBLIC`, `013` the assumption kind, `015` announced heroes, `016` the playbook each `strategies` row was mirrored from, `017` that column's comment, `018` `map_playstyle` and `comp_archetypes` dropped, `seasons` and `synergies` pulled from the wiki, `019` `map_strategy` and the third source's rates, snapshots and `sources` row dropped, `counters` pulled from the wiki, `020` `map_terrain`, the terrain features each map's wiki article names, `021` `stage_terrain`, with every Hybrid map's two phases and an Escort map's named stretches stored as stages, `022` the `strategies.playbook` comment under the Countrix name, `023` the columns nothing read dropped - `raw_value` on the three stat tables, `patches.platform` and `url`, `subroles.icon_url`, `stat_keys.label` and `unit`, `roles.name`, `024` and `027` the tables that recorded the owner's games, added and dropped again, `025` the 6v6 kit beside the 5v5 one: `heroes.health_6v6`, `shield_6v6` and `armor_6v6`, and `kit_6v6`, each 6v6 line of a hero's article, `026` `counters.basis` and `evidence`: each counter edge marked with the part of the article it was read in, the Match-Up column or the Strategy section, a Strategy edge with its sentence, `028` the data nothing read dropped - `seasons` and `meta_snapshots.season_id`, `ability_modifiers`, `perk_ability_effects`, `029` `synergy_cells`, the Team Synergy cells each article writes, so a pair neither article writes is told apart from one written off. A statement in an applied migration is never edited; a change is a new file, and a populated database catches up with `db_migrate`. The `--` prose above each `CREATE TABLE` is the data dictionary's text, and is kept current. |
 
 ## The order of a build
 
@@ -191,7 +191,7 @@ was read. Every table but `sources` and `schema_migrations` carries both;
 | **HEROES** | `abilities` · `ability_kinds` · `ability_stats` · `heroes` · `kit_6v6` · `perk_stats` · `perk_tiers` · `perks` · `roles` · `stat_keys` · `subroles` · `weapon_config_slots` · `weapon_configs` · `weapon_stats` · `weapons` |
 | **MAPS** | `game_modes` · `map_modes` · `map_stages` · `map_terrain` · `maps` · `stage_terrain` |
 | **META** | `competitive_tiers` · `hero_meta` · `map_meta` · `meta_snapshots` · `patches` · `regions` |
-| **PLAYBOOK** | `counters` · `playstyle` · `synergies` |
+| **PLAYBOOK** | `counters` · `playstyle` · `synergies` · `synergy_cells` |
 | **INFERENCE** | `strategies` |
 
 
@@ -572,7 +572,7 @@ The ten subroles, each belonging to exactly one role, each carrying the passive 
 
 *PLAYBOOK · `005_playbook.sql`*
 
-Which heroes work WITH which. Pulled from the Team Synergy column of the "Match-Ups and Team Synergy" section of every released hero's wiki article (pull_synergies). A cell is a claim unless it is a placeholder, rated below GOOD or MIRROR, or unrated and saying there is no synergy. score is 2 when both articles claim the pair, 1 when one does; note is the advice's first sentence, cut to a clause under 120 characters. No snapshot, region or tier: a judgement has no population behind it. Reloaded whole. Bidirectional, unlike counters. Synergy is a property of the PAIR: if Mei works with Tracer then Tracer works with Mei - one fact, one row. A counter is an arrow: Mei answering Tracer says nothing about the reverse. So each pair is stored once, lower hero_id first (a CHECK holds it), and read from either side.
+Which heroes work WITH which. Pulled from the Team Synergy column of the "Match-Ups and Team Synergy" section of every released hero's wiki article (pull_synergies). A cell is a claim unless it is a placeholder, rated below GOOD or MIRROR, or unrated and saying there is no synergy; a cell rated GOOD or better is a claim with no advice written too. score is 2 when both articles claim the pair, 1 when one does; note is the advice's first sentence, cut to a clause under 120 characters, or says the rating came with no advice. A pair no article claims has no row: synergy_cells says whether an article wrote it off or neither wrote it at all. No snapshot, region or tier: a judgement has no population behind it. Reloaded whole. Bidirectional, unlike counters. Synergy is a property of the PAIR: if Mei works with Tracer then Tracer works with Mei - one fact, one row. A counter is an arrow: Mei answering Tracer says nothing about the reverse. So each pair is stored once, lower hero_id first (a CHECK holds it), and read from either side.
 
 | column | type | null | references |
 | --- | --- | --- | --- |
@@ -580,6 +580,17 @@ Which heroes work WITH which. Pulled from the Team Synergy column of the "Match-
 | `other_id` | integer | no | `heroes.hero_id` |
 | `score` | smallint | yes |  |
 | `note` | text | yes |  |
+
+#### `synergy_cells`
+
+*PLAYBOOK · `029_synergy_cells.sql`*
+
+Which teammates each released hero's wiki article writes a Team Synergy cell for, one row per cell (pull_synergies, from the cells synergies is read from): hero_id's article writes a cell about other_id. A written cell is any that is not a placeholder - a claim, a rating below GOOD, an unrated "no synergy" - so a pair of released heroes with no row either way is one neither article writes, and facts/tables.py reads it at the mean score of the pairs that have one. Reloaded whole with synergies.
+
+| column | type | null | references |
+| --- | --- | --- | --- |
+| `hero_id` | integer | no | `heroes.hero_id` |
+| `other_id` | integer | no | `heroes.hero_id` |
 
 #### `weapon_config_slots`
 

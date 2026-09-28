@@ -20,6 +20,14 @@ keeps it current.
   scored under. Cost: two days - a migration, the tool's `map` argument,
   the layering, the tab, the facts line that names the set - and a test
   that the same six scores differently under two maps' sets.
+- **The synergy weight's calibration.** Reading an unwritten synergy
+  pair at the written pairs' mean narrowed the synergy score's median
+  range from 21 to 12.8, so meta.md's synergy of 0.1 now spreads a
+  typical board's sixes about 1.3 points, not the 2.1 the calibration
+  aimed at (half the rate term's spread, as counter still does). The
+  rule gives 0.16; whether to move it is the owner's, through `tune`
+  (id `meta`, field `synergy`), measured on the 30 maps first. Cost: an
+  hour.
 - **What the healing figures leave out.** `Hero.hps` now sums every
   piece over the teammates it reaches and holds a beam to its resource
   (docs/inference.md, Sustained healing). Three limits stand: the bench
@@ -185,6 +193,13 @@ few match-ups the wiki rates (the counters table is a list).
 
 ## Done
 
+- **An unwritten synergy pair is unknown, not zero.** `pull_synergies`
+  keeps every written Team Synergy cell in `synergy_cells` (migration
+  029) and keeps a rating GOOD or better that has no advice text; the
+  load reads a pair neither article writes at the written pairs' mean,
+  1.06, which `team.synergy_score` and the default engine's synergy term
+  read, and `team.unwritten_pairs` and the cohesion fact name
+  (docs/inference.md, Why an unwritten synergy pair is not zero).
 - **Every weight is the playbook's, under one meta.** The default
   engine's rate, synergy and counter weights leave `inference/base.py`
   for `meta.md` beside the strategy files, with a meta weight over the

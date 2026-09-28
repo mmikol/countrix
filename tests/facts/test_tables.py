@@ -101,3 +101,24 @@ def test_a_heros_best_maps_are_its_largest_positive_lifts_ties_by_name(synthetic
     tables.best_maps(w)
     assert [w.maps[mid].name for mid in kite.best_maps] == [
         "Anchor Bay", "Ember Ruins", "Harbor Gate"]
+
+
+def test_a_pair_neither_article_writes_reads_the_written_pairs_mean(synthetic_world):
+    """The prior is the mean score of the written pairs, a pair written off
+    counting 0: the five claims sum to 8, and with three pairs written off
+    the eight written pairs mean 1. A claim is a written cell whether or not
+    the cells name it. With no cell on record the prior is 0 and no pair is
+    unwritten, as a database migrated and not pulled again reads."""
+    w = synthetic_world
+    anvil, balm, mortar, rook = (w.hero(n) for n in ("Anvil", "Balm", "Mortar", "Rook"))
+    tables.impute_synergy(w)
+    assert w.synergy_prior == 0.0 and not w.synergy_unwritten(anvil.id, rook.id)
+    off = {frozenset((w.hero(a).id, w.hero(b).id)) for a, b in (
+        ("Anvil", "Mortar"), ("Kite", "Rook"), ("Balm", "Tansy"))}
+    for written in (off, off | set(w.synergies)):
+        w.synergy_written = written
+        tables.impute_synergy(w)
+        assert w.synergy_prior == 1.0
+    assert w.synergy_unwritten(anvil.id, rook.id)
+    assert not w.synergy_unwritten(anvil.id, mortar.id)         # written off
+    assert not w.synergy_unwritten(balm.id, anvil.id)           # claimed

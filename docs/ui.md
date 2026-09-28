@@ -172,7 +172,7 @@ sequenceDiagram
 
     You->>Board: pick the map and your side, set the bans,<br/>click red picks as they reveal, lock your blue picks
     Board->>Facts: /api/facts (map, side, red, blue, bans)
-    Facts->>DB: load the World (24 queries)
+    Facts->>DB: load the World (25 queries)
     Facts-->>Board: F1..Fn - every fact about those heroes,<br/>the map, each team, the matchup
     Board->>Solver: /api/board (map, side, red, blue, bans)
     Solver->>Solver: blue's seat: shapes the limits allow · per-role pools ·<br/>every candidate scored · local search

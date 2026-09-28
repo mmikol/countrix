@@ -299,11 +299,32 @@ def test_a_derived_edge_counts_half_a_wiki_edge_and_the_fact_names_it(synthetic_
                               " derived: hitscan against a flier (Longshot, hitscan, 60 m)")
 
 
-def test_the_stamp_holds_a_derived_edges_weight_against_a_wiki_edges():
+def test_the_stamp_holds_a_derived_edges_weight_and_what_an_unwritten_pair_reads():
     stamped = base.stamp(DEFAULT)
     assert stamped is not None and stamped["derived"] == 0.5
+    assert stamped["unwritten"] == base.UNWRITTEN_SYNERGY == "the written pairs' mean"
     assert (stamped["meta"], stamped["counter"]) == (DEFAULT.meta, DEFAULT.counter)
     assert base.stamp(OFF) is None
+
+
+def test_the_synergy_term_reads_a_pair_neither_article_writes_at_the_prior(synthetic_world):
+    """SIX holds two claimed pairs (Anvil+Balm, Needle+Tansy, 4 in all) and
+    thirteen pairs no article claims. Written off, each reads 0; written by
+    neither, each reads the written pairs' mean, and the term and its fact
+    say so."""
+    w = synthetic_world
+    six = heroes(w, SIX)
+    others = [
+        frozenset((a.id, b.id)) for a, b in itertools.combinations(six, 2)
+        if w.synergy(a.id, b.id) is None]
+    assert len(others) == 13
+    w.synergy_written = set(w.synergies) | set(others[:10])
+    w.synergy_prior = 0.5
+    _, cand = prepared(w, "Harbor Gate", ("Mortar", "Gale"), SIX)
+    assert cand.terms.synergy == cand.ns["team"]["synergy_score"] == 4 + 3 * 0.5
+    [c] = [c for c in cand.contributions if c["id"] == base.SYNERGY]
+    assert c["raw"] == 5.5 and c["weighted"] == pytest.approx(DEFAULT.synergy * 5.5)
+    assert "neither article writes at the written pairs' mean" in c["metric"]
 
 
 def test_the_reference_weights_are_the_calibrated_engine_and_off_is_meta_zero():

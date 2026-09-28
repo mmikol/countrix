@@ -59,7 +59,7 @@ class Recorded(TypedDict):
     (base.stamp, None with the engine off) - and its boards as the recorder
     wrote them."""
     playbook: str
-    base: dict[str, float] | None
+    base: dict[str, float | str] | None
     boards: list[dict[str, Any]]
 
 

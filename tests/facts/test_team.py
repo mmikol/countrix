@@ -124,6 +124,26 @@ def test_the_synergy_graph_finds_pairs_the_core_and_the_isolated(synthetic_world
     assert team_metrics(w, _picks(w, "Flint", "Rook"))["isolated"] == []
 
 
+def test_a_pair_neither_article_writes_scores_the_prior_and_is_named(synthetic_world):
+    """Anvil+Balm is claimed (2), Anvil+Mortar written off (0) and Balm+Mortar
+    written by neither article: it scores the prior, is named, and draws no
+    edge. The sum is the same in any pick order."""
+    w = synthetic_world
+    anvil, mortar = w.hero("Anvil"), w.hero("Mortar")
+    w.synergy_written = set(w.synergies) | {frozenset((anvil.id, mortar.id))}
+    w.synergy_prior = 1.25
+    t = team_metrics(w, _picks(w, "Anvil", "Balm", "Mortar"))
+    assert t["synergy_score"] == 3.25 and t["unwritten_pairs"] == ["Balm+Mortar"]
+    assert t["pairs"] == [("Anvil", "Balm", 2)] and t["synergy_edges"] == 1
+    assert t["isolated"] == ["Mortar"] and t["core_size"] == 2
+    turned = team_metrics(w, _picks(w, "Mortar", "Balm", "Anvil"))
+    assert turned["synergy_score"] == 3.25 and turned["unwritten_pairs"] == ["Mortar+Balm"]
+    # no cell on record: nothing is unwritten, and an unclaimed pair reads 0
+    w.synergy_written = set()
+    t = team_metrics(w, _picks(w, "Anvil", "Balm", "Mortar"))
+    assert t["synergy_score"] == 2 and t["unwritten_pairs"] == []
+
+
 def test_the_meta_reads_the_rates_their_spread_and_their_movement(synthetic_world):
     w = synthetic_world
     t = team_metrics(w, _picks(w, "Needle", "Gale", "Rook"))

@@ -4,16 +4,22 @@ Every hero article's "Match-Ups and Team Synergy" section has, per other
 hero, a Team Synergy cell of advice, in either markup matchup_tables.py
 reads; a template rates the cell in <Hero>_synergy_rating.
 
-A cell is a claim when it holds advice for the pair: not a placeholder
-("To be added"), not rated below GOOD (SITUATIONAL, OK, WEAK, POOR, BAD) or
-MIRROR, and, unrated, not opening with "no notable synergy" or the like. A
-pair is stored once, lower hero_id first. score 2 when both articles claim the pair, 1
-when one does. note is the first sentence of the advice, cut to a clause
-under 120 characters. The table is reloaded wholesale.
+A cell is written when it is not a placeholder: it has a rating, or advice
+that is not "To be added" or empty. A written cell is a claim unless it is
+rated below GOOD (SITUATIONAL, OK, WEAK, POOR, BAD) or MIRROR, or, unrated,
+opens with "no notable synergy" or the like; a cell rated GOOD or better
+with no advice written is a claim. A pair is stored once, lower hero_id
+first. score 2 when both articles claim the pair, 1 when one does. note is
+the first sentence of the advice, cut to a clause under 120 characters, or
+NO_ADVICE where no claim writes any. synergy_cells keeps every written
+cell, a claim or not, so the facts layer can tell a pair an article wrote
+off from one neither article wrote (facts/tables.py reads the second at
+the written pairs' mean). Both tables are reloaded wholesale.
 """
 
 import re
 from collections.abc import Mapping, Sequence
+from typing import NamedTuple
 
 import psycopg
 
@@ -33,6 +39,8 @@ from db.data.wiki.matchup_tables import (
 # --- extract: markup -> Python ---------------------------------------------
 
 NOTE_LIMIT = 120
+# the note of a pair whose claims are ratings with no advice written
+NO_ADVICE = "Rated GOOD or better, with no advice written"
 
 # "STRONG SYNERGY advice", or "(6v6 Exclusive Pairing - Weak Synergy) advice".
 RATING_RE = re.compile(r"^(?:\s|<[^>]+>|'{2,5})*(?:([A-Z ]*?)\s*SYNERGY\b"
@@ -92,22 +100,46 @@ def clause(text: str) -> str:
     return sentence[:NOTE_LIMIT].rsplit(" ", 1)[0].rstrip(".;:, ")
 
 
-def parse_synergies(text: str) -> list[Row]:
-    """[Row(teammate name, advice)] - the claims one article's synergy cells make."""
-    claims = []
+class Cell(NamedTuple):
+    """One written Team Synergy cell: the teammate it is about, its plain
+    advice ('' for a rating alone) and whether it claims the pair."""
+    hero: str
+    advice: str
+    claim: bool
+
+
+def read_cells(text: str) -> list[Cell]:
+    """Every written cell of one article's Team Synergy column: a
+    placeholder with no rating is not written, and is left out."""
+    cells = []
     for row in section_rows(text):
         rating, advice = split_rating(row.cell)
         advice = plain(advice)
-        if name_key(advice) in PLACEHOLDERS or rating in NOT_A_SYNERGY:
-            continue
-        if rating is None and NO_SYNERGY_RE.search(first_sentence(advice)):
-            continue
-        claims.append(Row(hero=row.hero, cell=advice))
-    return claims
+        if name_key(advice) in PLACEHOLDERS:
+            if rating is None:
+                continue
+            advice = ""             # a rating alone: written, with no advice
+        claim = rating not in NOT_A_SYNERGY and not (
+            rating is None and NO_SYNERGY_RE.search(first_sentence(advice)))
+        cells.append(Cell(hero=row.hero, advice=advice, claim=claim))
+    return cells
+
+
+def claimed(cells: Sequence[Cell]) -> list[Row]:
+    """[Row(teammate name, advice)] - the cells that claim their pair, a
+    rating with no advice among them as ''."""
+    return [Row(hero=c.hero, cell=c.advice) for c in cells if c.claim]
+
+
+def parse_synergies(text: str) -> list[Row]:
+    """[Row(teammate name, advice)] - the claims one article's synergy cells make."""
+    return claimed(read_cells(text))
 
 
 # {(low id, high id): (score, note)}
 type Pairs = dict[tuple[int, int], tuple[int, str]]
+# {(article's hero id, teammate's id)}: the written cells, each way
+type Written = set[tuple[int, int]]
 
 
 def pair_up(claims_by_hero: Mapping[str, Sequence[Row]],
@@ -115,8 +147,9 @@ def pair_up(claims_by_hero: Mapping[str, Sequence[Row]],
     """Claims per hero -> ({(low id, high id): (score, note)}, unresolved names).
 
     claims_by_hero is {hero name: [Row(teammate name, advice)]}; hero_ids is
-    {name_key: hero_id}. The note comes from an article whose first sentence
-    fits uncut when there is one, else from the first article by hero name.
+    {name_key: hero_id}. The note comes from an article that writes advice,
+    one whose first sentence fits uncut when there is one, else the first by
+    hero name; NO_ADVICE where every claim is a rating alone.
     """
     stated: dict[tuple[int, int], dict[int, str]] = {}
     unmatched: list[str] = []
@@ -132,10 +165,29 @@ def pair_up(claims_by_hero: Mapping[str, Sequence[Row]],
 
     pairs: Pairs = {}
     for pair, advice_by_hero in stated.items():
-        notes = list(advice_by_hero.values())
+        notes = [n for n in advice_by_hero.values() if n]
         uncut = [n for n in notes if clause(n) == first_sentence(n)]
-        pairs[pair] = (len(advice_by_hero), clause((uncut or notes)[0]))
+        note = clause((uncut or notes)[0]) if notes else NO_ADVICE
+        pairs[pair] = (len(advice_by_hero), note)
     return pairs, unmatched
+
+
+def written_cells(cells_by_hero: Mapping[str, Sequence[Cell]],
+                  hero_ids: Mapping[str, int]) -> tuple[Written, list[str]]:
+    """Cells per hero -> ({(article's hero id, teammate's id)}, unresolved
+    names): every written cell about another released hero, a claim or not,
+    and each teammate name no released hero keys to."""
+    written: Written = set()
+    unmatched: list[str] = []
+    for hero in sorted(cells_by_hero):
+        hero_id = hero_ids[name_key(hero)]
+        for cell in cells_by_hero[hero]:
+            other_id = hero_ids.get(hero_key(cell.hero))
+            if other_id is None:
+                unmatched.append("%s: %s" % (hero, cell.hero))
+            elif other_id != hero_id:
+                written.add((hero_id, other_id))
+    return written, unmatched
 
 
 # --- store ---------------------------------------------------------------------
@@ -144,19 +196,28 @@ class SynergiesSummary(ArticlePullSummary):
     synergies: int
     mutual: int
     articles: int
+    cells: int
+    unwritten_pairs: int
     unpaired: list[str]
     unmatched: list[str]
+    unwritten: list[str]
 
 
 def run(connection: psycopg.Connection, pull: cache.PullContext) -> SynergiesSummary:
-    """Reload synergies from the Team Synergy column of every released hero's
-    article -> the pairs stored, the mutual ones and the heroes left unpaired."""
+    """Reload synergies and synergy_cells from the Team Synergy column of
+    every released hero's article -> the pairs stored, the mutual ones, the
+    cells written, the pairs neither article writes and the heroes left
+    unpaired."""
     cursor = connection.cursor()
     released, articles = released_articles(cursor, pull)
-    claims = {name: parse_synergies(text) for name, text in articles.found.items()}
+    cells = {name: read_cells(text) for name, text in articles.found.items()}
+    claims = {name: claimed(read) for name, read in cells.items()}
     if not any(claims.values()):
         raise WikiError("no hero article has a synergy claim")
-    pairs, unmatched = pair_up(claims, index(released))
+    ids = index(released)
+    pairs, _ = pair_up(claims, ids)
+    # every written cell's names, the claims' among them
+    written, unmatched = written_cells(cells, ids)
 
     source_id = psql.register_source(cursor, WIKI, psql.now())
     cursor.execute("DELETE FROM synergies")
@@ -165,6 +226,11 @@ def run(connection: psycopg.Connection, pull: cache.PullContext) -> SynergiesSum
             "INSERT INTO synergies (hero_id, other_id, score, note, source_id)"
             " VALUES (%s, %s, %s, %s, %s)",
             (hero_id, other_id, score, note, source_id))
+    cursor.execute("DELETE FROM synergy_cells")
+    for hero_id, other_id in sorted(written):
+        cursor.execute(
+            "INSERT INTO synergy_cells (hero_id, other_id, source_id) VALUES (%s, %s, %s)",
+            (hero_id, other_id, source_id))
     connection.commit()
 
     paired = {hero_id for pair in pairs for hero_id in pair}
@@ -176,9 +242,17 @@ def run(connection: psycopg.Connection, pull: cache.PullContext) -> SynergiesSum
                       "no advice in its article or about it in another")
             unpaired.append("%s: %s" % (name, reason))
     mutual = sum(1 for score, _ in pairs.values() if score == 2)
-    pull.log("  synergies  %d pairs (%d mutual) from %d articles; %d heroes unpaired" % (
-        len(pairs), mutual, sum(1 for c in claims.values() if c), len(unpaired)))
+    possible = len(released) * (len(released) - 1) // 2
+    unwritten_pairs = possible - len({frozenset(cell) for cell in written})
+    writers = {hero_id for hero_id, _ in written}
+    unwritten = [name for name, hero_id in released.items() if hero_id not in writers]
+    pull.log(
+        "  synergies  %d pairs (%d mutual) from %d articles; %d cells written, %d of %d"
+        " pairs in neither article; %d heroes unpaired" % (
+            len(pairs), mutual, sum(1 for c in claims.values() if c), len(written),
+            unwritten_pairs, possible, len(unpaired)))
     return {"synergies": len(pairs), "mutual": mutual,
             "articles": sum(1 for c in claims.values() if c),
-            "unpaired": unpaired, "unmatched": unmatched, "missing": articles.missing,
-            "tables": ["synergies"]}
+            "cells": len(written), "unwritten_pairs": unwritten_pairs,
+            "unpaired": unpaired, "unmatched": unmatched, "unwritten": unwritten,
+            "missing": articles.missing, "tables": ["synergies", "synergy_cells"]}

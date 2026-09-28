@@ -30,8 +30,9 @@ hide the rate figures: Blizzard licenses those for personal use only.*
 - **Solves the comp.** A deterministic search enumerates the sixes each role's
   strongest heroes allow, then climbs by local search over the whole roster.
   A default engine scores every candidate on its win rates on the map, the
-  wiki's synergies and its counters to the other side - the wiki's, and
-  where the wiki says nothing, answers derived from the two kits and named
+  wiki's synergies, a pair no article writes at the written pairs' mean,
+  and its counters to the other side - the wiki's, and where the wiki says
+  nothing, answers derived from the two kits and named
   on the board with the mechanism that fired - under weights the playbook
   sets, one meta weight scaling the three; the playbook's
   constraints cut the space and its heuristics adjust that score. The best six comes back with

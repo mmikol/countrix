@@ -171,6 +171,24 @@ def test_synergies_are_canonical_pairs(one):
     assert one("select count(*) from synergies where hero_id >= other_id") == 0
 
 
+def test_every_claimed_pair_is_a_written_cell_between_released_heroes(one):
+    """A claim is a cell its article wrote, so synergy_cells holds a row for
+    every pair synergies holds, both ways where both articles claim it; a
+    pair with no row either way is one neither article writes."""
+    assert one("""select count(*) from synergies s where not exists (
+                  select 1 from synergy_cells c
+                  where (c.hero_id, c.other_id) in ((s.hero_id, s.other_id),
+                                                   (s.other_id, s.hero_id)))""") == 0
+    assert one("""select count(*) from synergies s where s.score = 2 and 2 <> (
+                  select count(*) from synergy_cells c
+                  where (c.hero_id, c.other_id) in ((s.hero_id, s.other_id),
+                                                   (s.other_id, s.hero_id)))""") == 0
+    assert one("""select count(*) from synergy_cells c
+                  join heroes a on a.hero_id = c.hero_id
+                  join heroes b on b.hero_id = c.other_id
+                  where a.status <> 'released' or b.status <> 'released'""") == 0
+
+
 def test_counters_are_directed_edges_between_released_heroes(one):
     # one row = countered_by_id answers hero_id
     assert one("select count(*) from counters") >= 100

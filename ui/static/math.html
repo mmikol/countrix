@@ -60,7 +60,8 @@ same board gives the same six.</p>
 tab's own numbers.</p>
 <p id='default-engine'><b>The default engine</b> scores every six before the playbook reads
 it, whatever the playbook holds: the six's win rates on this map, the wiki's synergy pairs
-among its picks, and the counter graph between it and the other side. A pick's win rate is
+among its picks, a pair neither hero's article writes counted at the mean of the pairs one
+does, and the counter graph between it and the other side. A pick's win rate is
 read as its edge over a coin flip, trusted by its pick rate, so a hero picked in few matches
 counts for less. The counter graph is the wiki's edges, its Match-Up tables' and its
 Strategy sections', and where the wiki has no edge either way, the answers the kit derives:
@@ -91,7 +92,9 @@ base(x)     = %(W_META)g &middot; ( %(W_RATE)g &middot; rates(x) + %(W_SYNERGY)g
 rates(x)    = mean over the picks p of  t_p &middot; ( win_p &minus; 50 )
               t_p = pick_p / ( pick_p + %(RATE_PICK_HALF)g )
               win_p, pick_p: p's rates on the map, all ranks; overall with no map or no row
-synergy(x)  = the wiki's synergy scores, summed over the pairs in x
+synergy(x)  = &Sigma; over the pairs in x of the wiki's score: 2 where both articles claim
+              the pair, 1 where one does, 0 where one writes it off, and where neither
+              writes a cell, the mean score of the pairs an article writes
 counters(x) = &Sigma; over x's picks p and the other side's heroes e of  w(e, p) &minus; w(p, e)
               w(l, a) = %(WIKI_WEIGHT)d where the wiki reads a answering l, 0 where it reads the
               reverse, else %(DERIVED_WEIGHT)d for a derived answer, else 0
@@ -105,13 +108,15 @@ s_n       = min( 1, %(NEED_BUDGET)g / &Sigma; w over the needs on n's guard ): o
 <p id='base-weights'><b>The base's weights.</b> They are the playbook's, not the code's:
 <code>meta.md</code> beside the strategy files holds them, and the tune tool changes them. The
 meta, %(W_META)g, scales the whole engine, and at 0 the playbook scores alone. Under it the rate
-term is in win-rate points and weighs %(W_RATE)g. The synergy and counter weights are set so
+term is in win-rate points and weighs %(W_RATE)g. The synergy and counter weights were set so
 that, on the median board, each term spreads the reference sixes about half as far as the rate
-term does; the calibration is in <code>inference/base.py</code>. The figures that follow are
-at meta 1. A heuristic moves a six by its weight at most, since its
-norm is 0..1, and a base term has no such bound. On the median board a heuristic at weight 1
-moves a six less than any base term spreads the sixes, at 3 about as far as the synergy or
-counter term, and at the slider's 10 further than the three together.</p>
+term does; since an unwritten synergy pair reads at the mean, the synergy term spreads them
+about two thirds as far as the counter term. The calibration is in
+<code>inference/base.py</code>. The figures that follow are at meta 1 and the shipped weights.
+A heuristic moves a six by its weight at most, since its norm is 0..1, and a base term has no
+such bound. On the median board a heuristic at weight 1 moves a six less than any base term
+spreads the sixes, at 2 about as far as the counter term and further than the synergy term,
+and at the slider's 10 further than the three together.</p>
 <p id='sustained-healing'><b>Sustained healing.</b> A hero's <code>hps</code> is what it lands
 on teammates a second, summed over every piece that runs beside its weapon and over every
 teammate each piece reaches; its own healing is out. A beam that spends energy counts what the

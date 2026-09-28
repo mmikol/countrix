@@ -218,6 +218,11 @@ class World:
         self.answers: defaultdict[int, set[int]] = defaultdict(set)         # winner -> {losers}
         self.synergies: dict[frozenset[int], Synergy] = {}      # frozenset({a, b}) -> the pair's
         self.partners: defaultdict[int, dict[int, Synergy]] = defaultdict(dict)     # a -> {b: pair}
+        # the pairs an article writes a Team Synergy cell for, a claim or not
+        # (synergy_cells), and the score a pair neither article writes reads
+        # as: the written pairs' mean (tables.impute_synergy)
+        self.synergy_written: set[frozenset[int]] = set()
+        self.synergy_prior = 0.0
         self.snapshots: list[Snapshot] = []
         self.newer_patches: list[Patch] = []
         self.subrole_passives: dict[str, str] = {}              # subrole -> its passive's text
@@ -290,6 +295,16 @@ class World:
 
     def synergy(self, a: int, b: int) -> Synergy | None:
         return self.synergies.get(frozenset((a, b)))
+
+    def synergy_unwritten(self, a: int, b: int) -> bool:
+        """Whether neither article writes a Team Synergy cell for the pair: its
+        score is unknown, not zero, and team.synergy_score reads it at
+        synergy_prior. With no cell on record - a World built by hand, or a
+        database migrated and not yet pulled again - no pair is known to be
+        unwritten, and every pair no article claims reads 0."""
+        pair = frozenset((a, b))
+        return bool(self.synergy_written) and (
+            pair not in self.synergies and pair not in self.synergy_written)
 
     def is_countered_by(self, loser: int, winner: int) -> bool:
         """Whether the wiki reads `winner` as an answer to `loser`."""

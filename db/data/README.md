@@ -155,7 +155,7 @@ out of sight:
 | `skipped` | pull_patches | a count, not a list: the patch pages with no date |
 | `unpaired` | pull_synergies | a released hero in no pair, with the reason |
 | `contradicted` | pull_counters | a pair two articles' Match-Up cells read opposite ways |
-| `unwritten` | pull_counters | a released hero whose article gives no Match-Up reading |
+| `unwritten` | pull_synergies, pull_counters | a released hero whose article writes no Team Synergy cell, or gives no Match-Up reading; pull_synergies counts the pairs neither article writes in `unwritten_pairs` |
 | `no_edge` | pull_counters | a released hero in no counter edge |
 | `strategy_dropped` | pull_counters | a pair the Strategy sections read as ambiguous or contradicted |
 
@@ -578,12 +578,36 @@ Each ends in `run()`, and each docstring opens "Pull + clean + store".
   appears under every playstyle it suits, so the lists overlap by design.
   Reloaded whole: the page is the whole truth about styles.
 - **`synergies.py` - pull_synergies.** The Team Synergy column of every
-  released hero's article. A cell is a claim unless it is a placeholder,
-  is rated below GOOD or MIRROR, or is unrated and opens by saying there
-  is no synergy. A pair is stored once, the lower hero id first: score 2
+  released hero's article. A cell is written unless it is a placeholder
+  with no rating: "To be added", an empty cell. A written cell is a claim
+  unless it is rated below GOOD or MIRROR, or is unrated and opens by
+  saying there is no synergy; a cell rated GOOD or better with no advice
+  is a claim. A pair is stored once, the lower hero id first: score 2
   when both articles claim it, 1 when one does, and as its note the first
-  sentence of the advice, cut to a clause under 120 characters. Reloaded
-  whole.
+  sentence of the advice, cut to a clause under 120 characters, or
+  `NO_ADVICE` where every claim is a rating alone. Every written cell,
+  a claim or not, is kept in `synergy_cells`, one row per article and
+  teammate. Both tables are reloaded whole.
+
+  *Why the written cells are kept.* `synergies` alone cannot tell a pair
+  an article wrote off from one no article wrote, and the second is the
+  common case: at the pull of 2026-09-28, 747 of the 1,378 pairs of
+  released heroes had no cell in either article. The newest heroes'
+  articles are near blank - no written pair at all for D.Mon or Shion,
+  two to five of 52 for Sierra, Venture, Emre, Freja and Hazard, where
+  the median hero has 24 - and ten articles write no cell, Junkrat's,
+  Orisa's and Tracer's among them. Read as zero, every missing pair said
+  "these two do not work together" where the truth was "nobody wrote it
+  down", and the synergy term charged the newest heroes for being new.
+  The facts layer now reads a pair neither article writes at the mean
+  score of the written pairs, 1.06 at that pull, the neutral prior, and
+  a written "no synergy" stays 0 ([Why an unwritten synergy pair is not
+  zero](../../docs/inference.md#why-an-unwritten-synergy-pair-is-not-zero)).
+  The same rerun kept eleven cells that are a rating GOOD or better with
+  no advice written - seven in Wuyang's article, two in Jetpack Cat's,
+  one each in Pharah's and Sierra's - which the pull had dropped as
+  empty: eight new pairs and three made mutual, 551 pairs and 119 mutual
+  in all.
 - **`matchups.py` - pull_counters.** The Match-Up column of every released
   hero's article, each written cell a verdict from the article hero's
   seat: +1 it answers the enemy, -1 the enemy answers it, 0 neither. The
@@ -717,7 +741,7 @@ it:
 | 5 | `pull_patches` | wiki | `wiki/patches.py` | patches | a snapshot links to the patch live at capture |
 | 6 | `pull_rates` | blizzard | `blizzard/meta.py` | regions, competitive_tiers, meta_snapshots, hero_meta, map_meta | it needs the heroes, the maps and the patches |
 | 7 | `pull_playstyles` | wiki | `wiki/playstyles.py` | playstyle | a style lists heroes on the roster |
-| 8 | `pull_synergies` | wiki | `wiki/synergies.py` | synergies | a synergy is a pair of released heroes |
+| 8 | `pull_synergies` | wiki | `wiki/synergies.py` | synergies, synergy_cells | a synergy is a pair of released heroes |
 | 9 | `pull_counters` | wiki | `wiki/matchups.py` | counters | a counter is a pair of released heroes, read beside their stored abilities |
 
 Three tools wear a name other than their module's: pull_kits runs

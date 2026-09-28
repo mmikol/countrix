@@ -290,7 +290,8 @@ VERSUS_KEYS = frozenset(VERSUS_METRICS)
 TEXT_METRICS = {
     "team.subroles", "team.shape_flags", "team.style_counts", "team.style_top",
     "team.style_lean", "team.weakest", "team.squishies", "team.burst_hero",
-    "team.isolated", "team.pairs", "team.max_ban_hero", "team.unanswered", "team.exposed",
+    "team.isolated", "team.pairs", "team.unwritten_pairs", "team.max_ban_hero",
+    "team.unanswered", "team.exposed",
     "map.style_top", "map.mode", "map.side",
 }
 TEXT_METRICS |= {n.replace("team.", "enemy.", 1) for n in TEXT_METRICS

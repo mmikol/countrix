@@ -21,10 +21,11 @@ COMP           = ARGMAX[ STRATEGIES( FACTS ) ]            the solver searches, t
 
 The function the argmax takes is two layers. The default engine
 (`inference/base.py`) scores a six on its win rates on the map, the
-wiki's synergy pairs among its picks and the wiki's counter edges against
-the other side, so a playbook of assumptions alone still gets scored
-sixes. Its weights are the playbook's - `meta.md` beside the strategy
-files, one meta weight over the three terms' - and at meta 0 it is off.
+wiki's synergy pairs among its picks - a pair neither article writes at
+the mean of the written ones - and the wiki's counter edges against the
+other side, so a playbook of assumptions alone still gets scored sixes.
+Its weights are the playbook's - `meta.md` beside the strategy files,
+one meta weight over the three terms' - and at meta 0 it is off.
 The playbook's terms sit on top and adjust that answer
 ([inference.md](inference.md#the-objective)).
 

@@ -106,6 +106,23 @@ def test_every_team_fact_carries_the_number_the_solver_scores(synthetic_world):
             assert f.value == metrics[key] and f.source == "derived:" + f.key, f.key
 
 
+def test_the_cohesion_fact_names_each_pair_neither_article_writes(synthetic_world):
+    """A pair neither article writes is scored at the written pairs' mean,
+    and the fact the synergy term cites names it apart from the wiki's, so
+    no reason passes it off as a documented pair."""
+    w = synthetic_world
+    anvil, mortar = w.hero("Anvil"), w.hero("Mortar")
+    w.synergy_written = set(w.synergies) | {frozenset((anvil.id, mortar.id))}
+    w.synergy_prior = 1.0618
+    fs = _facts(w, "Harbor Gate", (), ("Anvil", "Balm", "Mortar", "Myrrh"))
+    [fact] = [f for f in fs.facts if f.key == "team.synergy_edges" and f.team == "blue"]
+    assert fact.text == (
+        "blue team cohesion: 2 of 6 possible synergy edges (density 0.33, score sum 6.19)"
+        " - Anvil+Balm; Mortar+Myrrh; 3 pairs neither article writes, each read at the"
+        " written pairs' mean 1.06: Anvil+Myrrh, Balm+Mortar, Balm+Myrrh")
+    assert fs.find("team.unwritten_pairs")[-1] is fact
+
+
 def test_the_healing_and_the_saves_read_against_the_rosters_bench(synthetic_world):
     """Balm alone heals 60 a second and 70 a cast against benches of 130 and
     145; two supports under UNDER_HEALED of the bench are flagged."""

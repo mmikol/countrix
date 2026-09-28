@@ -56,7 +56,11 @@ the sixes its three terms favour, scored and explained:
   board and needs no sample. A score is therefore signed, and a share is
   read from the seat's floor, not from zero ([The share](#the-share)).
 - **synergy**: `team.synergy_score`, the wiki's synergy scores among the
-  six.
+  six: 2 for a pair both heroes' articles claim, 1 for a pair one claims,
+  0 for a pair an article writes off, and for a pair neither article
+  writes a cell for, the mean score of the pairs one does, computed at
+  load ([Why an unwritten synergy pair is not
+  zero](#why-an-unwritten-synergy-pair-is-not-zero)).
 - **counters**: the counter graph between the six and the other side,
   the weight of its answers less the weight of its exposures. A wiki
   edge, from the Match-Up tables or the Strategy sections, weighs 2.
@@ -78,14 +82,17 @@ The weights are the playbook's. `meta.md`, beside the strategy files,
 holds four numbers, each within 0..10: `meta`, which scales the whole
 engine, and under it `rate`, `synergy` and `counter`, each term's points
 per unit. The shipped file sets 1, 1, 0.1 and 0.05. `rate` is 1, so the
-rate term is in win-rate points; `synergy` and `counter` are set so that
+rate term is in win-rate points; `synergy` and `counter` were set so that
 each term's median spread across a board's reference sample is about
 half the rate term's, about 2.1 points on a typical board; the module
-docstring holds the calibration. A heuristic still moves a six by its
-weight at most; the math page says how that compares with the base's
-spread. Each term is a bar of the breakdown, with the fact it read and
-its weight with the meta applied: the counter bar's fact names the six it
-read.
+docstring holds the calibration. Reading an unwritten synergy pair at the
+mean narrowed the synergy score's median range from 21 to 12.8, so at 0.1
+the synergy term now spreads about 1.3 points; the calibration's rule
+would set it near 0.16, a change for the `tune` tool. A heuristic still
+moves a six by its weight at most; the math page says how that compares
+with the base's spread. Each term is a bar of the breakdown, with the
+fact it read and its weight with the meta applied: the counter bar's fact
+names the six it read.
 
 A `BaseWeights` rides the `Brief`, and `infer`'s `base`, into every
 `Objective` and every worker's `Spec`. Left unset it is the playbook in
@@ -120,6 +127,60 @@ good or from the Meta slider for a session. The shipped file holds the
 calibrated values under a meta of 1, and 1.0 x w is w in floating point,
 so no score moved: the pinned boards and the reach fixture's boards stand
 as they were.
+
+### Why an unwritten synergy pair is not zero
+
+The wiki's synergy data is the Team Synergy column of each hero's
+article: a cell per teammate, rated, written in prose, or left as a
+placeholder. `synergies` holds the pairs an article claims, and until
+2026-09-28 a pair it lacked read 0 wherever a six was scored, whether an
+article had written it off ("no notable synergy", rated POOR) or no
+article had written a word about it. The two are not the same, and the
+second is the common case: at that day's pull, 747 of the 1,378 pairs of
+released heroes had no cell in either article. The holes are not spread
+evenly. The newest heroes' articles are near blank - no article writes a
+pair for D.Mon or Shion, and Sierra, Venture, Emre, Freja and Hazard have
+two to five written pairs each of 52, where the median hero has 24 - so
+a six holding one of them read "these heroes do not work together" where
+the truth was "nobody has written it down yet". The synergy term charged
+the newest heroes for being new, and nothing on the board said so.
+
+A pair neither article writes is unknown, and reads the neutral prior:
+the mean score of the pairs an article does write, 1.06 at that pull (670
+points of claim over 631 written pairs). `pull_synergies` records every
+written cell, a claim or not, in `synergy_cells`, and the load computes
+the mean from it (`facts.tables.impute_synergy`). A written "no synergy"
+stays 0, and a claim stays 1 or 2. The mean is over the written pairs
+alone: over all 1,378 it would be 0.49, deflated by the very zeros it
+stands in for. Nor does the choice of what gets written inflate it: of
+the pairs the three articles that write a cell for 40 or more teammates
+write, 90% are claims, and they score 1.17 on average, above the prior.
+
+`team.synergy_score` reads it, and with it the default engine's synergy
+term and any heuristic on the score. `team.unwritten_pairs` names the
+pairs, and the cohesion fact the synergy term cites names them apart
+from the wiki's, with the mean they read at, so a reason never passes an
+unwritten pair off as a documented one. The graph metrics -
+`team.synergy_edges`, `synergy_density`, `core_size`, `isolated` and
+`pairs` - count the pairs the wiki claims, and describe what is
+documented; so do the other side's likely six, which adds `SYNERGY_PULL`
+for each documented partner, and the solver's pool ranking by locked
+partners. A fixture's stamp (`base.stamp`) names the reading, so one
+recorded while an unwritten pair read 0 reads as another objective.
+
+What it moved, on the shipped playbook at the shipped weights, blue's
+optimal six per map with red unrevealed: all 30 boards changed. D.Mon,
+whose every pair is unwritten, gains 5 x 1.06 x 0.1 = 0.53 points on
+every six he is in, and is seated on 28 maps where he was on 15; Juno,
+35 of whose 52 pairs are unwritten, on 21 where she was on 1; Vendetta on
+10 where he was on 2; Baptiste, 36 of whose pairs are written, on 6 where
+he was on 22. Of the eleven heroes the reach fixture names unseated, ten
+come closer to a seat on their two best maps with red unrevealed - all
+but Zarya - and none takes one there; 34 of the fixture's 42 boards still
+seat their hero. The synergy term was honest about the documented pairs
+and silent about the rest; the prior makes it neutral about the rest, and
+the rates and the counter graph decide between heroes the wiki has not
+compared.
 
 ## The share
 
@@ -566,12 +627,13 @@ the `team.*` metrics computed for the red side.
 | `team.pierce_dps` | summed damage of the picks whose kit ignores barriers |
 | `team.deployables` | picks with deployables |
 | `team.synergy_edges` | the wiki's synergy pairs among the picks |
-| `team.synergy_score` | summed synergy scores among the picks |
+| `team.synergy_score` | summed synergy scores among the picks, a pair neither article writes at the written pairs' mean |
 | `team.synergy_density` | synergy edges / possible pairs |
 | `team.isolated_count` | picks with a documented partner somewhere and none on the team |
 | `team.isolated` (text) | the isolated picks |
 | `team.core_size` | largest connected group in the team's synergy graph |
 | `team.pairs` (text) | the synergy pairs present |
+| `team.unwritten_pairs` (text) | the pairs among the picks neither article writes a synergy cell for, read in synergy_score at the written pairs' mean |
 | `team.win_mean` | mean all-ranks win rate |
 | `team.pick_mass` | summed all-ranks pick rate |
 | `team.availability` | chance every pick survives the ban screen: product of (1 - ban) |

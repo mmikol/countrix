@@ -133,6 +133,40 @@ def test_a_matchup_template_is_read_by_its_synergy_parameters_and_rating():
     assert (claims[1].hero, claims[1].cell) == ("jetpackcat", "Lifeline tows her behind the enemy.")
 
 
+BARE_RATINGS = """
+== Match-Ups and Team Synergy ==
+{{MatchupTable/Damage
+| Pharah_synergy_rating = GOOD SYNERGY
+| Pharah_synergy =
+| Hanzo_synergy_rating = WEAK SYNERGY
+| Hanzo_synergy =
+| Mei_synergy = (To be added)
+}}
+"""
+
+
+def test_every_cell_but_a_placeholder_is_written_and_a_rating_alone_claims():
+    """A cell is written unless it is a placeholder with no rating; a claim
+    is a written cell rated GOOD or better, or unrated advice that does not
+    say there is none. A rating with no advice is written, and claims its
+    pair when it is GOOD or better - Pharah's cell, once dropped for its
+    empty text."""
+    assert synergies.read_cells(WIKITABLE) == [
+        ("Ramattra", "The combined power of Nano Boost and Annihilation is incredible."
+                     " Synchronize your attacks.", True),
+        ("Sigma", "There are no notable synergies between these heroes.", False),
+        ("Genji", "Nano-Boost and Dragonblade is popular for a reason.", True),
+        ("Echo", "She flies out of your sight.", False),
+        ("Mauga", "Frankly, this is not a good pairing.", False),
+        ("Orisa", "A match made in heaven.", True),
+    ]
+    assert [(c.hero, c.claim) for c in synergies.read_cells(TEMPLATE)] == [
+        ("ana", True), ("baptiste", False), ("jetpackcat", True), ("lucio", False)]
+    assert synergies.read_cells(BARE_RATINGS) == [
+        ("pharah", "", True), ("hanzo", "", False)]
+    assert synergies.parse_synergies(BARE_RATINGS) == [("pharah", "")]
+
+
 def test_an_article_without_the_section_claims_nothing():
     assert synergies.parse_synergies("==Abilities==\n[[Genji]] is fast.") == []
 
@@ -183,6 +217,33 @@ def test_pairs_are_stored_once_and_scored_by_how_many_articles_claim_them():
     assert unmatched == ["Ana: Sym"]
 
 
+def test_a_rating_alone_takes_the_note_only_where_no_claim_writes_advice():
+    ids = {"ana": 1, "genji": 2, "dva": 3}
+    pairs, _ = synergies.pair_up({
+        "Ana": [("Genji", ""), ("D.Va", "")],
+        "Genji": [("Ana", "Ask for Nano Boost before you draw the blade.")],
+    }, ids)
+    assert pairs == {(1, 2): (2, "Ask for Nano Boost before you draw the blade"),
+                     (1, 3): (1, synergies.NO_ADVICE)}
+    assert 10 <= len(synergies.NO_ADVICE) < synergies.NOTE_LIMIT
+
+
+def test_the_written_cells_are_kept_each_way_whether_they_claim_or_not():
+    """Every written cell about another released hero, claim or not, keyed
+    by the article's hero first; its own row and an unknown name are not
+    kept, and the unknown name is reported."""
+    ids = {"ana": 1, "genji": 2, "dva": 3, "cassidy": 4}
+    cell = synergies.Cell
+    written, unmatched = synergies.written_cells({
+        "Genji": [cell("Ana", "Ask for Nano Boost.", True)],
+        "Ana": [cell("Genji", "Nano-Blade.", True), cell("Ana", "", False),
+                cell("D.Va", "Poor synergy.", False), cell("Sym", "Teleport.", True)],
+        "Cassidy": [],
+    }, ids)
+    assert written == {(2, 1), (1, 2), (1, 3)}
+    assert unmatched == ["Ana: Sym"]
+
+
 # --- the page cache -> the tables ----------------------------------------------
 
 @needs_cache
@@ -192,7 +253,8 @@ def test_synergies_pull_from_the_cache(sandbox):
     rows = sandbox.execute(
         "select s.hero_id, s.other_id, s.score, s.note, src.code"
         " from synergies s join sources src using (source_id)").fetchall()
-    assert data["tables"] == ["synergies"] and data["synergies"] == len(rows) > 100
+    assert data["tables"] == ["synergies", "synergy_cells"]
+    assert data["synergies"] == len(rows) > 100
     assert data["mutual"] == sum(1 for row in rows if row[2] == 2) > 0
     assert data["unmatched"] == [] and data["missing"] == []
 
@@ -213,6 +275,18 @@ def test_synergies_pull_from_the_cache(sandbox):
                              if hero_id not in paired}
     assert all(unpaired.values())
 
+    # every claim is a written cell, and a pair with none either way is unwritten
+    cells = sandbox.execute(
+        "select c.hero_id, c.other_id, src.code"
+        " from synergy_cells c join sources src using (source_id)").fetchall()
+    assert data["cells"] == len(cells) > len(rows) and {row[2] for row in cells} == {"wiki"}
+    written = {frozenset(row[:2]) for row in cells}
+    assert set(pairs) <= written and all(pair <= set(released) for pair in written)
+    possible = len(released) * (len(released) - 1) // 2
+    assert data["unwritten_pairs"] == possible - len(written) > 0
+    writers = {row[0] for row in cells}
+    assert set(data["unwritten"]) == {n for i, n in released.items() if i not in writers}
+
 
 @needs_cache
 @pytest.mark.invariant
@@ -226,3 +300,11 @@ def test_the_wiki_states_the_well_known_pairs(sandbox):
     assert frozenset(("zarya", "hanzo")) in stated
     assert frozenset(("brigitte", "hanzo")) not in stated      # "no notable team synergy"
     assert frozenset(("anran", "baptiste")) not in stated       # rated SITUATIONAL
+    # rated with no advice written: a claim all the same
+    assert frozenset(("sierra", "pharah")) in stated and frozenset(("wuyang", "genji")) in stated
+    written = {frozenset((name_key(a), name_key(b))) for a, b in sandbox.execute(
+        "select h.name, o.name from synergy_cells c"
+        " join heroes h on h.hero_id = c.hero_id join heroes o on o.hero_id = c.other_id")}
+    # written off, and so written; not written at all by either article
+    assert {frozenset(("brigitte", "hanzo")), frozenset(("anran", "baptiste"))} <= written
+    assert frozenset(("dmon", "shion")) not in written

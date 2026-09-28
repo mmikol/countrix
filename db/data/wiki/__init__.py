@@ -16,8 +16,8 @@ Page to table, each ends in run(connection, pull):
                     Match-Up column and its Strategy section
     patches         game versions from the Patches cargo table
     playstyles      the team-composition playstyles (dive, brawl, poke)
-    synergies       pairs that work together, from the same section's
-                    Synergy column
+    synergies       pairs that work together, and every cell an article
+                    writes, from the same section's Synergy column
 
 The heroes pull's kit pipeline, no run():
 

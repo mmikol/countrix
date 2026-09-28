@@ -98,7 +98,7 @@ def _write_side(
     _damage_facts(w, figures, heroes)
     _sustain_facts(w, figures, world)
     _tool_facts(w, figures, heroes)
-    _cohesion_facts(w, figures)
+    _cohesion_facts(w, figures, world)
     _meta_facts(w, figures, m)
     if m is not None:
         _map_facts(w, figures, m)
@@ -261,18 +261,25 @@ def _tool_facts(w: _TeamWriter, figures: dict[str, float], heroes: Sequence[Hero
         w.fact("deployables", "%s deployables: %s" % (label, counted(figures["deployables"])))
 
 
-def _cohesion_facts(w: _TeamWriter, figures: dict[str, float]) -> None:
-    """The synergy graph among the picks, once there are two."""
+def _cohesion_facts(w: _TeamWriter, figures: dict[str, float], world: World) -> None:
+    """The synergy graph among the picks, once there are two, and the pairs
+    neither article writes, named apart with the mean they read at, so the
+    synergy the default engine scores never passes an unwritten pair off as
+    the wiki's."""
     if figures["size"] < 2:
         return
     label, metrics = w.label, w.metrics
     pairs = "; ".join("%s+%s" % (p.first, p.second) for p in synergy_pairs(metrics["pairs"]))
+    unwritten = names(metrics["unwritten_pairs"])
     w.fact("synergy_edges", "%s cohesion: %d of %d possible synergy edges (density %.2f,"
-        " score sum %d)%s" % (label, figures["synergy_edges"],
+        " score sum %g)%s%s" % (label, figures["synergy_edges"],
             figures["size"] * (figures["size"] - 1) // 2,
-            figures["synergy_density"], figures["synergy_score"],
-            " - " + pairs if metrics["pairs"] else " - no documented pair"),
-        also=("team.synergy_score", "team.synergy_density"))
+            figures["synergy_density"], round(figures["synergy_score"], 2),
+            " - " + pairs if metrics["pairs"] else " - no documented pair",
+            "; %s neither article writes, each read at the written pairs' mean %.2f: %s"
+            % (counted(len(unwritten), "pair"), world.synergy_prior, ", ".join(unwritten))
+            if unwritten else ""),
+        also=("team.synergy_score", "team.synergy_density", "team.unwritten_pairs"))
     w.fact("core_size", "%s synergy core: the largest documented group is %s"
         % (label, counted(figures["core_size"])))
     if metrics["isolated"]:

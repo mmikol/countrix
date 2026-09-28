@@ -7,7 +7,9 @@
                 times the share of that edge its pick rate earns - p / (p +
                 RATE_PICK_HALF), the map's pick rate on a map - and averaged
                 over the six
-    synergy     team.synergy_score: the wiki's synergy scores among the six
+    synergy     team.synergy_score: the wiki's synergy scores among the six,
+                a pair neither hero's article writes a cell for at the mean
+                score of the pairs one does (facts.tables.impute_synergy)
     counters    the counter graph between the six and the other side
                 (facts.counters): the weight of the edges by which its picks
                 answer that side less the weight of those by which that side
@@ -53,11 +55,15 @@ points. The other two are set so that each term's median range within one
 board is about half the rate term's, measured over the reference sample
 (inference.scale.sample, 1,200 legal sixes a board) on each of the 30 maps,
 each board's other side its likely six, the side the term reads until one
-is revealed. The synergy score's median range is 21 and the counter graph's
-42.5 - the wiki's edges at 2 and the kit's fill at 1 - so synergy 0.1 and
-counter 0.05 spread a typical board's sixes about 2.1 points each. The rate
-term's own range reads Blizzard's rates, which are licensed for personal
-use, so its figures stay out of the repo. At meta 1 each term's weight is
+is revealed. The synergy score's median range was 21 and the counter
+graph's 42.5 - the wiki's edges at 2 and the kit's fill at 1 - so synergy
+0.1 and counter 0.05 spread a typical board's sixes about 2.1 points each.
+The 21 was measured while a pair neither article writes read 0; read at
+the written pairs' mean, as it now is, the range is 12.8, and at 0.1 the
+synergy term spreads about 1.3 points. The rule would put synergy near
+0.16; meta.md keeps 0.1 until the tune tool moves it. The rate term's own
+range reads Blizzard's rates, which are licensed for personal use, so its
+figures stay out of the repo. At meta 1 each term's weight is
 the file's exactly (1.0 x w is w in floating point), so moving the numbers
 out of code moved no score. OFF is meta 0 with every dial at 0, and a board
 scored under it is the playbook's alone, exactly as before the engine had a
@@ -89,11 +95,12 @@ RATES, SYNERGY, COUNTERS = "base.rates", "base.synergy", "base.counters"
 # what each term reads, as the breakdown words it, and its name in the game plan
 READS = {
     RATES: "the six's win rates on the map, each trusted by its pick rate",
-    SYNERGY: "team.synergy_score, the wiki's synergy scores among the six",
+    SYNERGY: "team.synergy_score, the wiki's synergy scores among the six, a pair"
+                " neither article writes at the written pairs' mean",
     COUNTERS: "the counter graph between the six and the other side: a wiki edge 2, a derived"
                 " one 1"}
 TITLES = {
-    RATES: "Win rates here", SYNERGY: "The wiki's synergy pairs",
+    RATES: "Win rates here", SYNERGY: "Synergy among the six",
     COUNTERS: "Answers to the other side"}
 
 
@@ -160,13 +167,20 @@ class BaseWeights:
 
 OFF = BaseWeights(meta=0.0, rate=0.0, synergy=0.0, counter=0.0)
 
+# what the synergy term reads a pair neither article writes a cell for at
+# (facts.tables.impute_synergy), as a fixture's stamp names it: one recorded
+# while such a pair read 0 names none, and reads as another objective
+UNWRITTEN_SYNERGY = "the written pairs' mean"
+
 
 class BaseStamp(BaseRecord):
     """The default engine as a recorded fixture holds it: the weights, the
-    pick rate that halves an edge, and a derived counter edge's weight
-    against a wiki edge's, which with the playbook fix what a six scores."""
+    pick rate that halves an edge, a derived counter edge's weight against
+    a wiki edge's and what an unwritten synergy pair reads at, which with
+    the playbook fix what a six scores."""
     pick_half: float
     derived: float
+    unwritten: str
 
 
 def stamp(weights: BaseWeights) -> BaseStamp | None:
@@ -175,7 +189,8 @@ def stamp(weights: BaseWeights) -> BaseStamp | None:
     if not weights.on:
         return None
     return BaseStamp(**weights.record(), pick_half=RATE_PICK_HALF,
-                     derived=counters.DERIVED_WEIGHT / counters.WIKI_WEIGHT)
+                     derived=counters.DERIVED_WEIGHT / counters.WIKI_WEIGHT,
+                     unwritten=UNWRITTEN_SYNERGY)
 
 
 class Opponent(NamedTuple):

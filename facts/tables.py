@@ -3,7 +3,7 @@ the facts layer always reads what the data layer stored.
 
     world = tables.load(cx)
 
-Loading is 24 queries and a few thousand rows; cheap enough to do per
+Loading is 25 queries and a few thousand rows; cheap enough to do per
 click, and it is what lets the inference layer's solver evaluate thousands
 of candidate compositions without a query each. Each read step fills one
 part of the World from its tables, and load runs them in the order each
@@ -322,9 +322,22 @@ def _read_terrain(cx: Connection, w: World) -> None:
     stage_terrain(w)
 
 
+def impute_synergy(w: World) -> None:
+    """World.synergy_prior: the mean score of the pairs an article writes a
+    Team Synergy cell for, a written pair no article claims counting 0 -
+    what team.synergy_score reads a pair neither article writes at, since
+    its score is unknown, not zero. It is 0 while no cell is on record, as
+    in a database migrated and not yet pulled again, where no pair is known
+    to be unwritten (World.synergy_unwritten)."""
+    written = w.synergy_written | set(w.synergies)
+    w.synergy_prior = (sum(s.score or 0 for s in w.synergies.values()) / len(written)
+                       if w.synergy_written else 0.0)
+
+
 def _read_relations(cx: Connection, w: World) -> None:
-    """The wiki's counters, both ways, each with where it was read, and its
-    synergy pairs."""
+    """The wiki's counters, both ways, each with where it was read, its
+    synergy pairs, the pairs its articles write a synergy cell for and the
+    score a pair neither writes reads as."""
     for loser, winner, basis in _rows(
             cx, "select hero_id, countered_by_id, basis from counters order by 1, 2, 3"):
         w.counters.add((loser, winner))
@@ -336,6 +349,9 @@ def _read_relations(cx: Connection, w: World) -> None:
         w.synergies[frozenset((a, b))] = pair
         w.partners[a][b] = pair
         w.partners[b][a] = pair
+    for a, b in _rows(cx, "select hero_id, other_id from synergy_cells"):
+        w.synergy_written.add(frozenset((a, b)))
+    impute_synergy(w)
 
 
 def _read_provenance(cx: Connection, w: World) -> None:

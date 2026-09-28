@@ -296,7 +296,7 @@ def test_the_sources_are_blizzard_the_wiki_and_the_playbook(rows):
 
 @pytest.mark.invariant
 def test_patches_synergies_and_counters_come_from_the_wiki(rows):
-    for table in ("patches", "synergies", "counters"):
+    for table in ("patches", "synergies", "synergy_cells", "counters"):
         assert {c for (c,) in rows(
             "select distinct s.code from %s t join sources s using (source_id)"
             % table)} == {"wiki"}, table
