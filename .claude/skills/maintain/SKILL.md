@@ -125,7 +125,7 @@ is a lesson the next run relearns.
   each `-rs` skip reason, and deletes what can never fail rather than
   keeping it for the count.
 - **A number where there was nothing to measure.** With a playbook of
-  one hard limit in force, every legal six tied at zero and
+  one limit in force, every legal six tied at zero and
   the board showed 0 and 100 / 100 for every comp; the user read it as
   scoring being broken, and it was the display being confident about
   nothing. Now: a state the board cannot compute reads as what it is

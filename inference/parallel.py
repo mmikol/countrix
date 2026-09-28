@@ -16,7 +16,8 @@ A board runs up to six searches. Blue's and red's go first. A seat's fill
 is that seat's board (same map, side, enemies and bans), so it takes the
 seat's bounds and standing and draws no sample of its own; the countered
 case's two - blue's best counter to red's six, and blue's picks filled on
-its scale - follow red's six. A full six is ranked against the field its
+its scale - follow red's six, and a board that finds blue's picks not
+allowed settles them unread. A full six is ranked against the field its
 seat's search already swept.
 
 Each round first asks the board's Watch (inference.supersede) whether a
@@ -440,6 +441,13 @@ class Split:
         return Swept(self._scaled_solver(), self.size,
                      [_revive(self.run.world, v) for v in self.verdicts])
 
+    def settle(self) -> None:
+        """Drop a search the board no longer reads: its tail cancelled where
+        no worker has taken it, else waited out, so no worker is still busy
+        on this board once it returns."""
+        if self.tail is not None and not self.tail.cancel():
+            concurrent.futures.wait([self.tail])
+
 
 class NullSplit:
     """A search not split: each round only checks that the board has not
@@ -473,3 +481,6 @@ class NullSplit:
         """None, after the check: the seat sweeps its own field."""
         self.watch.check()
         return None
+
+    def settle(self) -> None:
+        """Nothing was sent out, so nothing is left running."""

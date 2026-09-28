@@ -12,7 +12,9 @@
 #               source weekly, and on start when the caches are 20 hours old
 #   backup      the nightly pg_dump into ./backups at COUNTRIX_BACKUP_AT
 #               (04:30 container time), the newest 14 kept: the dated rates
-#               history a rebuild drops and no source gives back
+#               history a rebuild drops and no source gives back; before
+#               data rebuilds a stale schema it asks for one more, which
+#               the rotation keeps
 #
 # Every container but db runs as an unprivileged user on a read-only root
 # filesystem, with every capability dropped, no new privileges and process
@@ -99,6 +101,7 @@ services:
       - ./.cache-wiki:/app/.cache-wiki
       - ./inference/strategies:/app/inference/strategies
       - ./docs:/app/docs
+      - ./backups:/backups           # a rebuild's request for backup's dump, and its answer
     ports:
       - "127.0.0.1:8020:8020"        # MCP over HTTP: /mcp, /health
     depends_on:
@@ -196,12 +199,18 @@ services:
       db:
         condition: service_healthy
     entrypoint: ["/bin/sh", "-c"]
-    # A dump on start when today's is missing, then one a night at
-    # COUNTRIX_BACKUP_AT: pg_dump's custom format into a hidden .part file,
-    # renamed once whole, 0600 under umask 077, the newest 14 kept. The sleep
-    # runs as `sleep N & wait` so TERM and INT end it at once, exit 0. The
-    # block folds its lines together, so every statement ends in `;` and none
-    # is a shell comment; `$$` is compose's escape for the shell's `$`.
+    # A dump on start when today's is missing, then one a night once the
+    # clock passes COUNTRIX_BACKUP_AT: pg_dump's custom format into a hidden
+    # .part file, renamed once whole, 0600 under umask 077, the newest 14
+    # countrix-*.dump kept. A dump that fails is tried twice more, a minute
+    # and two apart. The loop wakes every 15 s and reads the wall clock, so
+    # a host that slept past the time dumps on waking. A request from data
+    # (/backups/.predump: a rebuild is about to drop the rates history) is
+    # answered with prerebuild-<date>T<time>.dump, which no rotation prunes,
+    # and the result in /backups/.predump.done. Every sleep runs as
+    # `sleep N & wait` so TERM and INT end it at once, exit 0. The block
+    # folds its lines together, so every statement ends in `;` and none is
+    # a shell comment; `$$` is compose's escape for the shell's `$`.
     command:
       - >
         umask 077;
@@ -211,31 +220,58 @@ services:
         esac;
         trap 'exit 0' TERM INT;
         dump() {
-            day=$$(date +%Y-%m-%d);
-            file=/backups/countrix-$$day.dump;
-            part=/backups/.countrix-$$day.dump.part;
-            if pg_dump -h db -U overwatch -d overwatch -Fc -f "$$part"; then
-                mv "$$part" "$$file";
-                ls -1 /backups/countrix-*.dump | sort -r | tail -n +15 | xargs -r rm -f;
-                echo "backup: $$file, $$(du -k "$$file" | cut -f1) KB";
-            else
+            case "$$1" in
+                countrix) stamp=$$(date +%Y-%m-%d) ;;
+                *) stamp=$$(date +%Y-%m-%dT%H%M%S) ;;
+            esac;
+            file=/backups/$$1-$$stamp.dump;
+            part=/backups/.$$1-$$stamp.dump.part;
+            tries=1;
+            until pg_dump -h db -U overwatch -d overwatch -Fc -f "$$part"; do
                 rm -f "$$part";
-                echo "backup: pg_dump failed, $$file not written" >&2;
+                if [ "$$tries" -ge 3 ]; then
+                    echo "backup: pg_dump failed $$tries times, $$file not written" >&2;
+                    return 1;
+                fi;
+                echo "backup: pg_dump failed, trying again in $$((tries * 60)) s" >&2;
+                sleep $$((tries * 60)) & wait;
+                tries=$$((tries + 1));
+            done;
+            mv "$$part" "$$file";
+            ls -1 /backups/countrix-*.dump | sort -r | tail -n +15 | xargs -r rm -f;
+            echo "backup: $$file, $$(du -k "$$file" | cut -f1) KB";
+        };
+        answer() {
+            [ -e /backups/.predump ] || return 0;
+            if dump prerebuild; then
+                echo "ok $$file" > /backups/.predump.done;
+            else
+                echo "failed" > /backups/.predump.done;
             fi;
+            rm -f /backups/.predump;
         };
         echo "backup: daily at $$COUNTRIX_BACKUP_AT ($$TZ), the newest 14 kept";
-        rm -f /backups/.countrix-*.dump.part;
-        [ -e "/backups/countrix-$$(date +%Y-%m-%d).dump" ] || dump;
+        rm -f /backups/.*.dump.part;
+        [ -e "/backups/countrix-$$(date +%Y-%m-%d).dump" ] || dump countrix;
+        due=$$(date -d "$$COUNTRIX_BACKUP_AT" +%s) || exit 1;
+        last=;
+        [ "$$(date +%s)" -lt "$$due" ] || last=$$(date +%Y-%m-%d);
         while :; do
-            now=$$(date +%s);
-            next=$$(date -d "$$COUNTRIX_BACKUP_AT" +%s) || exit 1;
-            [ "$$next" -gt "$$now" ] || next=$$((next + 86400));
-            sleep $$((next - now)) & wait;
-            dump;
+            answer;
+            today=$$(date +%Y-%m-%d);
+            if [ "$$last" != "$$today" ]; then
+                due=$$(date -d "$$COUNTRIX_BACKUP_AT" +%s) || exit 1;
+                if [ "$$(date +%s)" -ge "$$due" ]; then
+                    dump countrix;
+                    last=$$today;
+                fi;
+            fi;
+            sleep 15 & wait;
         done
     healthcheck:
       # healthy while the newest dump is under 26 hours old, so a missed
-      # night shows. Nothing waits on it; `docker compose ps` reads it
+      # night shows. Nothing waits on it; `docker compose ps` and
+      # orchestrator.py read it
       test: ["CMD-SHELL", "find /backups -name 'countrix-*.dump' -mmin -1560 | grep -q ."]
       interval: 5m
       timeout: 10s

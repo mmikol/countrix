@@ -26,12 +26,13 @@ TRACED = Draft("Harbor Gate", ("Anvil",), ("Balm",), side="attack")
 
 
 def traced_board(
-        monkeypatch, world, playbook, *, pooled, breaks_after=None, brief=None, trace=None):
-    """board() for real, in this process, on the synthetic World, under
-    `brief`. Pooled, a recording Split with the real one's constructor stands
-    in for the workers: it checks the board's watch and traces each round,
-    hands back None from solved() and swept() so each seat searches for
-    itself, and after `breaks_after` rounds a worker dies. Only the pool
+        monkeypatch, world, playbook, *, pooled, breaks_after=None, brief=None, trace=None,
+        draft=TRACED):
+    """board() for real, in this process, on the synthetic World, on `draft`
+    under `brief`. Pooled, a recording Split with the real one's constructor
+    stands in for the workers: it checks the board's watch and traces each
+    round, hands back None from solved() and swept() so each seat searches
+    for itself, and after `breaks_after` rounds a worker dies. Only the pool
     module's public names are patched. -> (the Board, the trace)."""
     from inference import engine, parallel
     trace = [] if trace is None else trace
@@ -64,9 +65,12 @@ def traced_board(
         def swept(self):
             self._round("swept")
 
+        def settle(self):
+            self._round("settle")
+
     monkeypatch.setattr(parallel, "available", lambda catalog=None: pooled)
     monkeypatch.setattr(parallel.POOL, "executor",
                         lambda: parallel.Workers(executor=None, size=6))
     monkeypatch.setattr(parallel.POOL, "drop", lambda: trace.append(Call("drop")))
     monkeypatch.setattr(parallel, "Split", Split)
-    return engine.board(world, TRACED, catalog=playbook, brief=brief), trace
+    return engine.board(world, draft, catalog=playbook, brief=brief), trace

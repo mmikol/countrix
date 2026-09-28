@@ -121,7 +121,7 @@ def sample(objective: Objective, size: int = REFERENCE_SIZE) -> list[Candidate]:
 
 
 def _prepared(objective: Objective, index: int = 0, count: int = 1) -> list[Candidate]:
-    """One slice of the sample prepared, minus what the hard limits refuse:
+    """One slice of the sample prepared, minus what the limits refuse:
     what every heuristic is normalised against."""
     return [c for c in (objective.prepare(c) for c in sample(objective)[index::count])
             if not c.violations]

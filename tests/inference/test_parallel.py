@@ -1,8 +1,8 @@
 """The process pool the board splits its searches across: the round order,
-a dying worker's board run again in this process, the pooled board against
-the sequential one, the workers' start, a worker's exit with its parent,
-and the two settings. A superseded board's cancelled rounds are
-test_supersede's."""
+a dying worker's board run again in this process, the countered case of
+picks the limits rule out, the pooled board against the sequential one,
+the workers' start, a worker's exit with its parent, and the two settings.
+A superseded board's cancelled rounds are test_supersede's."""
 
 import os
 import shutil
@@ -86,6 +86,28 @@ def test_a_board_without_the_countered_case_sends_none_of_its_rounds(
     hedged = ("countered", "momentum")
     assert ({k: v for k, v in timeless(lean.to_dict()).items() if k not in hedged}
             == {k: v for k, v in timeless(full.to_dict()).items() if k not in hedged})
+
+
+def test_picks_the_limits_rule_out_leave_no_countered_search_running(
+        monkeypatch, synthetic_world, tmp_path):
+    """A full six that breaks a limit is not allowed, so its countered case is
+    never sent out. Half-drafted picks no six completes are found out only
+    once their fill merges, after the countered case went out, so its two
+    searches are settled - cancelled, or waited out where a worker has one -
+    and none is left running once the board returns."""
+    (tmp_path / "three-supports.md").write_text(
+        "---\nname: At most three supports\nkind: constraint\nrequire: team.supports <= 3"
+        "\n---\nx\n", "utf-8")
+    cat = catalog.load(str(tmp_path))
+    supports = ("Balm", "Myrrh", "Sorrel", "Tansy")
+    six, trace = traced_board(monkeypatch, synthetic_world, cat, pooled=True,
+                              draft=Draft("Harbor Gate", ("Mortar",), (*supports, "Anvil", "Rook")))
+    assert six.current.barred and not [c for c in trace if c.kw.get("pool") == 4]
+    half, trace = traced_board(monkeypatch, synthetic_world, cat, pooled=True,
+                               draft=Draft("Harbor Gate", ("Mortar",), supports))
+    assert half.current.barred and half.countered is None
+    countered = [c.what for c in trace if c.kw.get("pool") == 4]
+    assert countered == ["sweep", "sweep", "merge", "merge", "settle", "settle"]
 
 
 @pytest.mark.invariant

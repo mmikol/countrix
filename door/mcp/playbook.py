@@ -28,7 +28,7 @@ from inference.strategy import FIELDS, TUNABLE, Field, FieldKind
     "metrics", "The vocabulary a strategy may reference: every metric key with its"
     " meaning - team.*, enemy.* (the same for the red side), matchup.*, map.*,"
     " world.* - and which are text. What /strategy reads to infer a heuristic's"
-    " metric or a constraint's expression from prose.")
+    " metric or expression, or a constraint's limit, from prose.")
 def metrics(ctx: Context) -> ToolReply:
     reg = compute.registry()
     numeric = {k: v for k, v in reg.items() if k not in compute.TEXT_METRICS}
@@ -101,7 +101,8 @@ def _remirror(ctx: Context) -> None:
     {
         "id": {"type": "string", "description": "the strategy's id (its filename)"},
         "field": {"type": "string", "description": " | ".join((*TUNABLE, "params.NAME"))},
-        "value": {"description": "the new value: a number, a boolean, or an expression"},
+        "value": {"description": "the new value: a number, a word (kind, category, metric,"
+                                 " direction) or an expression"},
         "reason": {"type": "string", "description": "why, in a sentence"},
         **BY},
     ["id", "field", "value", "reason"])

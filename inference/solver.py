@@ -2,7 +2,7 @@
 A Solver is the board's Objective (inference.scoring) on the board's scale
 (inference.scale), searched around the locked picks.
 
-    legal_sixes     every shape the queue and the hard limits allow, filled around
+    legal_sixes     every shape the queue and the shape limits allow, filled around
                     the locked picks from a per-role pool of released heroes (an
                     announced hero waits) ranked by standing, PARTNER_POINTS for
                     each locked partner (six per role by default)
@@ -38,6 +38,9 @@ SEEDS = 6                         # the local search's starts, whatever `top` as
 RESTARTS = 24                     # in-shape random starts: the SEEDS are near-duplicates
 SHAPE_REACH = 4.0                 # a shape starts too when its best six is this close
 PAIR_TRIES = 800                  # the most new sixes one refine scores bringing pairs in
+# the most sixes completes() tries over the whole roster before it gives up on an
+# answer: about two seconds at 40 microseconds a six prepared
+COMPLETION_BUDGET = 50_000
 
 
 class Infeasible(Refusal):
@@ -113,7 +116,7 @@ class Solver(Objective):
     # --- enumeration ---------------------------------------------------------------
 
     def shapes(self) -> list[Shape]:
-        """(tanks, damage, supports) triples the queue and the shape-only hard
+        """(tanks, damage, supports) triples the queue and the shape-only
         limits allow, that can still seat the locked picks."""
         locked = self._locked_by_role
         return legal_shapes(self.catalog, Shape(
@@ -160,6 +163,31 @@ class Solver(Objective):
             choices = [list(itertools.combinations(pools[r], need[r])) for r in ROLES]
             for combo in itertools.product(*choices):
                 yield self.locked + [h for part in combo for h in part]
+
+    def completes(self, budget: int = COMPLETION_BUDGET) -> bool | None:
+        """Whether any six around the locked picks meets every limit, its open
+        slots drawn from the whole roster - released and unbanned - not the
+        pools the search cuts: True at the first that does, False once every
+        legal shape's sixes are tried and none does, None when `budget`
+        sixes pass without an answer. No shape seats the picks: False at
+        once, the answer a shape limit gives."""
+        taken = {h.id for h in self.locked} | self.banned
+        roster = {r: [h for h in sorted(self.world.heroes.values(), key=lambda h: h.id)
+                      if h.role == r and h.released and h.id not in taken] for r in ROLES}
+        locked_by_role = self._locked_by_role
+        tried = 0
+        for shape in self.shapes():
+            need = dict(zip(ROLES, shape, strict=True))
+            choices = [itertools.combinations(roster[r], need[r] - len(locked_by_role[r]))
+                       for r in ROLES]
+            for combo in itertools.product(*choices):
+                if tried >= budget:
+                    return None
+                tried += 1
+                six = self.locked + [h for part in combo for h in part]
+                if not self.prepare(Candidate(six)).violations:
+                    return True
+        return False
 
     # --- the search -------------------------------------------------------------------
 
@@ -254,7 +282,7 @@ class Solver(Objective):
 
     def _try(self, heroes: Sequence[Hero],
                 known: dict[SixKey, Candidate]) -> Candidate | None:
-        """The six prepared, scored and slimmed once; None where a hard limit
+        """The six prepared, scored and slimmed once; None where a limit
         refuses it."""
         cand = Candidate(heroes)
         if cand.key in known:

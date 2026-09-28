@@ -56,8 +56,10 @@ class CompactInfer(TypedDict):
     " the default engine (win rates, synergies, counters) and the"
     " markdown strategies in inference/strategies/ on top (players assumed"
     " to play optimally). Locked blue picks are kept; the rest is"
-    " searched. Returns the comp, per-pick reasons with fact citations,"
-    " the score breakdown per engine term and strategy, and alternatives.",
+    " searched, and picks no six completes within the playbook's limits"
+    " are refused as not allowed, the limits named. Returns the comp,"
+    " per-pick reasons with fact citations, the score breakdown per engine"
+    " term and strategy, and alternatives.",
     {
         "top": TOP,
         "pool": POOL,

@@ -1,6 +1,6 @@
 ---
 name: strategy
-description: Add a strategy to Countrix's playbook from three things a colleague gives, however roughly - a name, a kind (constraint, heuristic or assumption) and a prose description - then clean them into the playbook's standard form and grammar, derive the insight and the mathematics (a constraint's limit; a heuristic's metric, direction and weight, or its when/bonus/penalty; the dials; nothing for an assumption), validate and store it, and show what it changes on a board. Use when the user wants to add a rule, a constraint, a heuristic or a strategy, says "the solver should ...", "add a strategy", "make it prefer/avoid ...", pastes a note about the game, or asks to finish a draft strategy file.
+description: Add a strategy to Countrix's playbook from three things a colleague gives, however roughly - a name, a kind (constraint, heuristic or assumption) and a prose description - then clean them into the playbook's standard form and grammar, derive the insight and the mathematics (a constraint's limit; a heuristic's metric, direction and weight, or its when/bonus/penalty and weight; the dials; nothing for an assumption), validate and store it, and show what it changes on a board. Use when the user wants to add a rule, a constraint, a heuristic or a strategy, says "the solver should ...", "add a strategy", "make it prefer/avoid ...", pastes a note about the game, or asks to finish a draft strategy file.
 ---
 
 The solver is deterministic arithmetic: `inference/scoring.py` scores
@@ -81,9 +81,9 @@ question is allowed.
    a person might want to turn.
 3. **Decide, from the prose, and show your working** - the insight in one
    line, then the mathematics in one line of words and one of expression:
-   - **heuristic**: one numeric `metric`, its `direction`, a `weight` on
-     this scale: 0.25 a whisper, 1 the default, 2.5 strong, 4 dominant
-     (nothing above 4 without the colleague asking). "More sustain" is
+   - **heuristic, on a metric**: one numeric `metric`, its `direction`, a
+     `weight` on this scale: 0.25 a whisper, 1 the default, 2.5 strong, 4
+     dominant (nothing above 4 without the colleague asking). "More sustain" is
      `team.heal_peak_total maximize`; "fewer one-dive targets" is
      `team.squish_count minimize`. If no single metric captures it, say
      which comes closest and why, or say that no metric exists yet - that
@@ -98,11 +98,13 @@ question is allowed.
      adding a rule, read `strategies` for the ones already on its metric:
      a trait paid by several rules wants a small weight, not another 1.
    - **constraint**: a `require` that always holds ("at most two tanks"
-     is `team.tanks <= 2`), and nothing else - no `when`, no `weight`, no
-     `penalty`. A rule that should cost rather than forbid is not a
-     constraint: it is a scored heuristic, `when: not (<the rule>)` with a
-     numeric `penalty`.
-   - **heuristic, scored**: a `when` guard and a `bonus` and/or
+     is `team.tanks <= 2`), and nothing weighted - no `when`, `bonus`,
+     `penalty`, `metric`, `direction`, `weight` or `confidence`. `params:`
+     may hold its threshold ("never more than three supports" is
+     `team.supports <= params.MAX_SUPPORTS`, `MAX_SUPPORTS: 3`). A rule
+     that should cost rather than forbid is not a constraint: it is a
+     scored heuristic, `when: not (<the rule>)` with a numeric `penalty`.
+   - **heuristic, scored**: an optional `when` guard and a `bonus` and/or
      `penalty` expression, times its `weight`, with `params:` for
      thresholds ("one anti-heal against a heavy heal line" is
      `when: enemy.heal_ratio >= params.HEAL_RATIO`,
@@ -148,11 +150,11 @@ enough". Standardized: **Peel when they dive** (heuristic, matchup):
 jumped. Crowd control - stuns, sleeps, immobilizes, knockbacks, read from
 the kits' keywords - is what turns a dive into a dead diver. Up to three
 peel tools are rewarded." The kind stays heuristic: a reward is weighed,
-however conditional, and the condition on the enemy's shape makes it the
-scored form. Mathematics: when the enemy fields two or more mobility
-tools, reward each crowd-control tool, capped at three -
-`when: enemy.mobility_count >= 2`, `bonus: min(team.cc_count, 3) * 0.75`,
-weight 1.
+however conditional, and the cap at three peel tools makes it the scored
+form; as a metric it would be normalised, uncapped. Mathematics: when the
+enemy fields two or more mobility tools, reward each crowd-control tool,
+capped at three - `when: enemy.mobility_count >= 2`,
+`bonus: min(team.cc_count, 3) * 0.75`, weight 1.
 
 ## Drafts the engine derives itself
 

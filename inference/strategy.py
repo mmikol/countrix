@@ -129,8 +129,8 @@ FIELDS: dict[str, Field] = {
     "direction": Field("choice", "heuristics: which end of the metric is good", DIRECTIONS),
     "weight": Field("number", "heuristics: 0..10; 1-4 is the working range"),
     "confidence": Field(
-        "line", "heuristics: a numeric metric that scales the term by how strongly its"
-        " premise holds"),
+        "line", "heuristics on a metric: a numeric metric that scales the term by how"
+        " strongly its premise holds"),
     "when": Field("expression", "heuristics: a guard expression; optional"),
     "require": Field("expression", "constraints: the limit, an expression that always holds"),
     "bonus": Field(
@@ -355,7 +355,8 @@ class Strategy:
             raise CatalogError("%s: confidence %r is text, not a number"
                                % (self.id, self.confidence))
         if self.form != "heuristic":
-            raise CatalogError("%s: only a heuristic scales by a confidence" % self.id)
+            raise CatalogError("%s: only a heuristic on a metric scales by a confidence"
+                               % self.id)
 
     def _check_kind(self, meta: Frontmatter) -> None:
         """What each kind may not carry: an assumption anything to score, a

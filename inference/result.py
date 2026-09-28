@@ -9,7 +9,7 @@ render as JSON-ready data (to_dict) and as text (rendered).
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from typing import Literal, NamedTuple, NotRequired, TypedDict
+from typing import Literal, NotRequired, TypedDict
 
 from facts.draft import TEAM_SIZE, Seat
 from facts.factset import Fact, FactSet
@@ -89,11 +89,12 @@ class Momentum(TypedDict):
     badges: Badges
 
 
-class Span(NamedTuple):
+@dataclass(frozen=True, slots=True)
+class Span:
     """What a seat's shares are read on: its optimal six's score, the 100,
     and its floor, the 0 - the lowest score among the reference sixes the
     seat's scale drew (Solver.floor); None where none was legal, and zero
-    stands in."""
+    stands in. Built by the engine and read by name, never unpacked."""
     best: float
     floor: float | None
 
@@ -112,6 +113,15 @@ def _pct(score: float, best: float, floor: float) -> int:
 
 # what a comp its own picks rule out reads, before the rules it breaks
 NOT_ALLOWED = "not allowed"
+
+
+def not_allowed(rules: list[str]) -> str:
+    """Why picks are ruled out, in the words every door uses: the limits
+    they break, named, or - an empty list - that no six keeping them meets
+    the limits."""
+    if rules:
+        return "%s: breaks %s" % (NOT_ALLOWED, ", ".join(rules))
+    return "%s: no six that keeps these picks meets the playbook's limits" % NOT_ALLOWED
 
 
 # what each kind of result is, as its rendered heading names it
@@ -186,7 +196,7 @@ class Result:
         and write each alternative's share of the span, None while the result
         reads unscored. An unscored field ties, where no six ranks above
         another, so the rank goes too: every six would read first."""
-        self.best, self.floor = span
+        self.best, self.floor = span.best, span.floor
         scoring = self.unscored() is None
         for alt in self.alternatives:
             alt["normalized"] = _pct(alt["score"], self.best, self._zero()) if scoring else None
@@ -210,9 +220,7 @@ class Result:
         empty list - no six that keeps them meets the limits. It carries no
         score, no share and no rank, and says why; its breakdown keeps the
         limits alone, each saying whether the picks keep it."""
-        self.barred = ("%s: breaks %s" % (NOT_ALLOWED, ", ".join(rules)) if rules else
-                       "%s: no six that keeps these picks meets the playbook's limits"
-                       % NOT_ALLOWED)
+        self.barred = not_allowed(rules)
         self.contributions = [c for c in self.contributions if c["form"] == "limit"]
         self.alternatives, self.rank, self.considered = [], None, 0
 

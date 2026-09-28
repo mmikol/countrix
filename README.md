@@ -33,7 +33,7 @@ hide the rate figures: Blizzard licenses those for personal use only.*
   wiki's synergies and its counters to the other side - the wiki's, and
   where the wiki says nothing, answers derived from the two kits and named
   on the board with the mechanism that fired; the playbook's
-  constraints and heuristics adjust that score. The best six comes back with
+  constraints cut the space and its heuristics adjust that score. The best six comes back with
   the alternatives and why.
 - **Serves it two ways.** A web board and an MCP (Model Context Protocol)
   server, the tool interface a Claude Code session uses to draft comps and
@@ -135,7 +135,9 @@ which scores the sixes on their win rates, synergies and counters.
 
 The stack dumps its database into `backups/` every night, the newest 14 kept:
 the dated rates history, which a rebuild drops and no source gives back.
-[docs/db.md](docs/db.md#the-nightly-dump) has the restore.
+Before the data container rebuilds a stale schema it takes one more, which
+the rotation keeps. [docs/db.md](docs/db.md#the-nightly-dump) has the
+restore.
 
 Without Docker, an embedded PostgreSQL (`pgserver`, macOS and Linux x86_64)
 holds the database:

@@ -142,9 +142,10 @@ db <- facts <- inference <- door <- ui.
   string seed, the map and the side, bounded against the enemy; the lowest
   of their scores is the seat's floor, a share's 0, as its optimal is the
   100. current shares blue's optimal's scale, red_current red's, so within
-  a seat infer, evaluate and current are comparable. Blue's picks that break
-  a limit - a full six, or picks no fill can complete - are not allowed:
-  no score, no share, no odds; red's picks are never ruled out. Only
+  a seat infer, evaluate and current are comparable. Blue's picks the
+  limits rule out - a full six that breaks one, or picks no six on the
+  roster completes (`Solver.completes`) - are not allowed: no score, no
+  share, no odds; red's picks are never ruled out. Only
   `board()` uses the process pool, and the pooled and sequential answers
   must agree bit for bit: string-seeded RNGs, integer tallies, a least
   floor, ties broken by `map_win_mean` and then sorted names.
@@ -162,9 +163,9 @@ db <- facts <- inference <- door <- ui.
   nightly `pg_dump` into `backups/` on postgres's image (`compose.yaml`,
   `docker-entrypoint.sh`). Migrations ship in the image, not a mount: once
   `orchestrator.py up` rebuilds it, any new migration file makes the `data`
-  container `db_rebuild` on start, which drops the dated rates history; a
-  dump from before it gives the history back (docs/db.md, The nightly
-  dump).
+  container `db_rebuild` on start, which drops the dated rates history;
+  it first asks `backup` for a `prerebuild-*` dump the rotation keeps,
+  which gives the history back (docs/db.md, The nightly dump).
 
 ## What the tests hold you to
 

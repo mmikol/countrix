@@ -1,6 +1,8 @@
 """orchestrator.py's verdict on the stack: the three health replies read into
-lines, the data layer's state, a layer that answers with an error, and the
-one board the readiness probe solves. The network is stubbed out."""
+lines, the data layer's state, a layer that answers with an error, the one
+board the readiness probe solves, an image older than the checkout, and the
+backup container as compose reports it. The network and docker are stubbed
+out."""
 
 import json
 
@@ -97,3 +99,76 @@ def test_readiness_solves_one_board_on_the_board(monkeypatch):
     assert ok and any(line.endswith("a board in 2.4s") for line in lines)
     ok, lines = orchestrator.verdict(dict(served, board=None))
     assert not ok and any("a board did not solve" in line for line in lines)
+
+
+def test_a_playbook_the_image_refuses_and_the_checkout_loads_names_the_old_image():
+    """The board's container reads the bind-mounted playbook with the image's
+    code: a file that code refuses while this checkout loads it means the
+    image predates the checkout, and the verdict says `up` rebuilds it. A
+    file the checkout refuses too is the file's fault, and a stale mount is
+    the mount's: neither gets the line."""
+    refused = {
+        "status": "degraded", "heroes": 54,
+        "error": "heal-rate: a heuristic weighs a metric; require/bonus/penalty belong to a"
+                 " constraint"}
+    served = {
+        "data": {"status": "ok", "state": "current", "table_count": 36, "heroes": 54},
+        "inference": refused, "ui": {"heroes": [{}] * 54, "maps": [{}] * 30}, "board": None}
+    ok, lines = orchestrator.verdict(dict(served, playbook=None))
+    assert not ok and lines[1] == "inference: " + refused["error"]
+    assert "the image's code predates it - `orchestrator.py up` rebuilds the image" in lines[2]
+    for host in ({"playbook": "heal-rate: bad"}, {}):
+        ok, lines = orchestrator.verdict(dict(served, **host))
+        assert not ok and not any("predates" in line for line in lines)
+    stale = {"status": "degraded", "error": "no strategies in /app/inference/strategies"}
+    ok, lines = orchestrator.verdict(dict(served, inference=stale, playbook=None))
+    assert not any("predates" in line for line in lines)
+
+
+def test_the_verdict_warns_when_no_nightly_dump_is_being_taken():
+    """The backup container not running, or unhealthy once its newest dump is
+    26 hours old, is a warning line after the layers'; the board works
+    without it, so the stack stays ready. Docker not answering says
+    nothing."""
+    served = {
+        "data": {"status": "ok", "state": "current", "table_count": 36, "heroes": 54},
+        "inference": {"status": "ok", "strategies": 38, "heroes": 54},
+        "ui": {"heroes": [{}] * 54, "maps": [{}] * 30}, "board": {"seconds": 1.0, "picks": []}}
+    for backup, said in (({"state": "running", "health": "healthy"}, None),
+                         (None, None),
+                         ({"state": "running", "health": "unhealthy"},
+                          "backup: unhealthy - the newest dump in backups/ is over 26 hours old"),
+                         ({"state": "exited", "health": ""},
+                          "backup: exited - no nightly dump is being taken"),
+                         ({"state": "", "health": ""},
+                          "backup: no container - no nightly dump is being taken")):
+        ok, lines = orchestrator.verdict(dict(served, backup=backup))
+        assert ok and len(lines) == (3 if said is None else 4), backup
+        assert said is None or lines[-1].startswith(said), backup
+
+
+def test_the_backup_service_is_read_from_compose_in_either_format(monkeypatch):
+    """`docker compose ps --format json` prints an object a line since 2.21
+    and one array before it; either reads as the container's state and
+    health, and docker failing or printing nothing JSON reads as None."""
+    import subprocess
+    printed = {}
+
+    def ps(argv, **kw):
+        assert argv[:3] == ["docker", "compose", "ps"] and argv[-1] == "backup"
+        if printed.get("raise"):
+            raise FileNotFoundError("docker")
+        return subprocess.CompletedProcess(argv, printed.get("code", 0), printed["out"], "")
+    monkeypatch.setattr(subprocess, "run", ps)
+    row = {"Service": "backup", "State": "running", "Health": "unhealthy"}
+    for out in (json.dumps(row) + "\n", json.dumps([row])):
+        printed["out"] = out
+        assert orchestrator.service("backup") == {"state": "running", "health": "unhealthy"}
+    printed["out"] = ""
+    assert orchestrator.service("backup") == {"state": "", "health": ""}
+    printed["out"] = "not json"
+    assert orchestrator.service("backup") is None
+    printed.update(out="", code=1)
+    assert orchestrator.service("backup") is None
+    printed["raise"] = True
+    assert orchestrator.service("backup") is None

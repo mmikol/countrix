@@ -42,7 +42,15 @@ from inference import catalog as catalog_module
 from inference import parallel, supersede
 from inference.base import DEFAULT, OFF, BaseWeights
 from inference.plan import Seats, momentum, plan
-from inference.result import NOT_ALLOWED, Alternative, Board, Pick, Result, ResultKind, Span
+from inference.result import (
+    Alternative,
+    Board,
+    Pick,
+    Result,
+    ResultKind,
+    Span,
+    not_allowed,
+)
 from inference.scoring import Candidate, Objective
 from inference.shapes import legal_shapes
 from inference.solver import Infeasible, Solved, Solver, Swept, evaluate_comp
@@ -140,11 +148,18 @@ def infer(
     """Blue's optimal six around its locked picks (`draft.blue`) against red's
     revealed ones, on the draft's side of a sided map. No catalog is the
     playbook in force; a catalog given, [] included, is the caller's. The
-    default engine scores under `base`; OFF leaves the playbook alone."""
-    return _optimal(world, draft,
-                    catalog=catalog_module.load() if catalog is None else catalog,
-                    base=base, pool_size=pool_size, top=top, seat="blue", kind="infer",
-                    solved=None, began=None).result
+    default engine scores under `base`; OFF leaves the playbook alone.
+    Locked picks no six can complete within the limits are refused as not
+    allowed, in the words evaluate and the board use."""
+    catalog = catalog_module.load() if catalog is None else catalog
+    try:
+        return _optimal(world, draft, catalog=catalog, base=base, pool_size=pool_size,
+                        top=top, seat="blue", kind="infer", solved=None, began=None).result
+    except Infeasible as error:
+        ruled = _ruled_out(world, draft, catalog) if draft.blue else None
+        if ruled is None:
+            raise                   # no picks, or a six past the pools the search cut
+        raise Infeasible(not_allowed(ruled)) from error
 
 
 def evaluate(
@@ -239,7 +254,7 @@ def _evaluated(
         broken = _broken(Objective(world, m, red=red_h, banned=bans_h, side=side,
                                    catalog=catalog, base=OFF), blue_h)
         if broken:
-            raise Refusal("%s: breaks %s" % (NOT_ALLOWED, ", ".join(broken)))
+            raise Refusal(not_allowed(broken))
     result = Result(kind=kind, map_name=m.name if m else None, red=[h.name for h in red_h],
                     blue=[h.name for h in blue_h], locked=[], catalog=catalog, base=base,
                     bans=[h.name for h in bans_h], side=side, seat=seat)
@@ -301,16 +316,27 @@ def _current(
 
 def _barred(world: World, draft: Draft, optimal: _Optimal, stuck: bool) -> list[str] | None:
     """The limits a seat's own picks (`draft.blue`) break when its comp is not
-    allowed, or None where it is: a full six that breaks one, or picks no six
-    that keeps them meets the limits with (`stuck`: its fill was infeasible),
-    named by the limits they break as they stand - none where they break none
-    alone. A half-drafted seat that breaks a limit it can still meet (one tank
-    under a two-tank rule) is allowed: the picks to come can mend it."""
-    blue_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)[2]
-    broken = _broken(optimal.solver, blue_h)
-    if stuck or (len(blue_h) == TEAM_SIZE and broken):
-        return broken
-    return None
+    allowed, or None where it is. Not allowed: a full six that breaks one, or
+    picks the fill's search found no six for in its pools (`stuck`) that
+    _ruled_out confirms on the whole roster. A half-drafted seat that breaks
+    a limit it can still meet (one tank under a two-tank rule) is allowed,
+    as are picks whose completion lies past the pools or past the check's
+    budget: the picks to come can mend them."""
+    if len(draft.blue) == TEAM_SIZE:
+        blue_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)[2]
+        return _broken(optimal.solver, blue_h) or None
+    return _ruled_out(world, draft, optimal.solver.catalog) if stuck else None
+
+
+def _ruled_out(world: World, draft: Draft, catalog: list[Strategy]) -> list[str] | None:
+    """The limits blue's picks (`draft.blue`) break as they stand - none where
+    they break none alone - when no six on the whole roster that keeps them
+    meets the limits (Solver.completes); None where one does, or where the
+    check's budget runs out first."""
+    m, red_h, blue_h, bans_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
+    around = Solver(world, m, red=red_h, locked=blue_h, banned=bans_h,
+                    side=board_side(m, draft.side), catalog=catalog, base=OFF)
+    return _broken(around, blue_h) if around.completes() is False else None
 
 
 def board(
@@ -329,9 +355,9 @@ def board(
                      comp is measured on
         current      blue's picks as they stand, scored against red's
                      selection on blue's optimal's scale - or not allowed, with
-                     no score, where they break one of the playbook's limits:
-                     a full six that breaks one, or picks no six that keeps
-                     them can meet the limits with
+                     no score, where the playbook's limits rule them out: a
+                     full six that breaks one, or picks that no six keeping
+                     them completes within the limits
         red_current  red's picks as they stand, scored against blue's
                      selection on red's optimal's scale; red's picks are the
                      other side's facts, never ruled out
@@ -344,7 +370,8 @@ def board(
         fill         blue's locked picks with the empty slots filled by the
                      solver - the best six that keeps what you hold, on
                      blue's optimal's scale (None unless one to five are
-                     locked, or when no six that keeps them meets the limits)
+                     locked, or when the search's pools hold no six that keeps
+                     them and meets the limits)
         momentum     the verdict from the two current comps, each
                      half-drafted seat read through its fill; red's fill is
                      solved for the verdict and not kept
@@ -391,7 +418,9 @@ def board(
                          " this process\n" % (type(error).__name__, error))
         parallel.POOL.drop()
     finally:
-        watch.cancel_all()          # a no-op after a whole pass, which read every task
+        # a whole pass read or settled every task it sent, so this cancels only
+        # what an interrupted one left queued
+        watch.cancel_all()
     return _board_once(world, draft, catalog=catalog, brief=brief, workers=None, watch=watch)
 
 
@@ -432,15 +461,18 @@ def _board_once(
     blue = solve.optimal(blue_seat, blue_split, seat="blue")
     red = solve.optimal(red_seat, red_split, seat="red")
     countered_seat = dataclasses.replace(draft, red=tuple(red.result.blue))
-    against_split, answer_split = solve.sweep_countered(countered_seat)
+    # a full six that breaks a limit is not allowed, so its countered case is
+    # never sent out; half-drafted picks are known only once their fill merges
+    broken = len(blue_h) == TEAM_SIZE and bool(_broken(blue.solver, blue_h))
+    against_split, answer_split = solve.sweep_countered(countered_seat, allowed=not broken)
     for split in (fill_split, red_fill_split, against_split, answer_split):
         split.merge()
     try:
         fill = solve.filled(ours, fill_split, seat="blue", span=blue.span)
         stuck = False
     except Infeasible:
-        # no six that keeps blue's picks meets the limits: the fill is not
-        # solved, and blue's current comp says which limit the picks break
+        # no six in the fill's pools keeps blue's picks and meets the limits:
+        # the fill is not solved, and blue's current comp checks the roster
         fill, stuck = None, True
     # a full six is ranked against the field its seat's search just swept;
     # 100 is the seat's optimal, whatever it holds. The limits bind blue's picks
@@ -457,6 +489,11 @@ def _board_once(
         # a what-if: where no six answers red's six around blue's picks, it is not solved
         with contextlib.suppress(Infeasible):
             countered = solve.countered(countered_seat, against_split, answer_split)
+    else:
+        # picks the limits rule out have no countered case: its tails, sent
+        # before the fill said so, leave no worker busy once the board returns
+        against_split.settle()
+        answer_split.settle()
     seats = Seats(current=cur, red_current=red_cur, blue=blue.result, red=red.result,
                   fill=fill, red_fill=red_fill, countered=countered)
     # the six the comps tab shows for blue, which the plan describes: a comp
@@ -526,9 +563,10 @@ class _Pass:
             stuck: bool | None = None) -> Result:
         """`seat`'s picks as they stand, on its optimal's scale; a full six is
         ranked against the field `search` swept. With `stuck` - blue's seat,
-        True where no six that keeps the picks met the limits - the limits
-        bind the picks, and a comp they rule out is not allowed; None leaves
-        the picks as the other side's facts."""
+        True where the fill's pools held no six that keeps the picks and
+        meets the limits - the limits bind the picks, and a comp they rule
+        out is not allowed; None leaves the picks as the other side's
+        facts."""
         barred = None if stuck is None else _barred(self.world, draft, optimal, stuck)
         swept = search.swept() if len(draft.blue) == TEAM_SIZE and barred is None else None
         return _current(self.world, draft, optimal=optimal, catalog=self.catalog,
@@ -552,12 +590,13 @@ class _Pass:
         and the brief asks for it."""
         return bool(self.brief.countered and draft.blue and draft.red)
 
-    def sweep_countered(self, draft: Draft) -> tuple[Searching, Searching]:
+    def sweep_countered(self, draft: Draft, *, allowed: bool = True) -> tuple[Searching, Searching]:
         """The countered case's two searches, swept: blue's best counter to
         red's optimal six (`draft.red`), which is its 100, and blue's picks
         filled against that six on the same scale - the second only while
-        blue is half-drafted."""
-        wanted = self._wants_countered(draft)
+        blue is half-drafted. Picks the limits rule out (not `allowed`) send
+        neither."""
+        wanted = allowed and self._wants_countered(draft)
         against = self.split(dataclasses.replace(draft, blue=()), self.rest, wanted=wanted,
                              pool_size=self.countered_pool)
         against.sweep()

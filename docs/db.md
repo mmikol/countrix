@@ -135,32 +135,58 @@ history: postgres's own image, running a POSIX sh loop (`compose.yaml`)
 that writes `pg_dump -Fc` of the database into `backups/` at the repo
 root:
 
-- on start when today's dump is missing, then nightly at
-  `COUNTRIX_BACKUP_AT`, by default half an hour before the refresh;
+- on start when today's dump is missing, then nightly once the clock
+  passes `COUNTRIX_BACKUP_AT`, by default half an hour before the
+  refresh; the loop reads the wall clock every 15 seconds, so a host that
+  slept through the time dumps on waking;
 - into `.countrix-YYYY-MM-DD.dump.part`, renamed to
-  `countrix-YYYY-MM-DD.dump` once `pg_dump` succeeds; a failure logs a
-  line and leaves no file;
-- the newest 14 kept, each `0600` (umask 077), one log line a run;
-- a time that is not HH:MM stops the container at start; TERM ends it at
-  once, with exit 0;
+  `countrix-YYYY-MM-DD.dump` once `pg_dump` succeeds; a failure is tried
+  twice more, a minute and then two apart, and three leave no file and
+  wait for the next night;
+- the newest 14 `countrix-*.dump` kept, each `0600` (umask 077), one log
+  line a run;
+- before `data` rebuilds a stale schema, one more:
+  `prerebuild-YYYY-MM-DDTHHMMSS.dump`, which the rotation never prunes;
+- a time that is not HH:MM exits 1, and `restart: unless-stopped` starts
+  it again, the message in `docker compose logs backup` each time, until
+  the setting is fixed; TERM ends it at once, with exit 0;
 - unhealthy once the newest dump is older than 26 hours, so a missed
-  night shows in `docker compose ps`.
+  night shows in `docker compose ps` and in `orchestrator.py status`.
+
+The rebuild asks for its dump through the folder both containers mount:
+`data`'s entrypoint writes `backups/.predump` and waits up to five minutes
+for `backups/.predump.done`, where `backup` writes the new file's path or
+`failed`; with no answer the rebuild goes on, and the newest nightly dump
+holds the history. The rebuild never runs beside a dump it asked for. A
+rebuild through the door's `db_rebuild` asks for none: dump first by hand
+(below) when the history matters.
 
 `orchestrator.py up` makes `backups/` before the containers start, as
 the checkout's owner: left to Docker, a Linux host makes it root's and
 the dump cannot write it. A dump taken after a rebuild holds the short
-history since; restore one taken before it, within 14 nights. The restore
-replaces the database whole, so the snapshots taken since the dump go,
-and the next daily refresh appends today's.
+history since; restore the `prerebuild-*` one, or a nightly one taken
+before the rebuild within 14 nights. The restore replaces the database
+whole, so the snapshots taken since the dump go, and the next daily
+refresh appends today's. A `prerebuild-*` dump stays until it is deleted
+by hand.
 
-The restore, from the repo root with the stack up:
+The restore, from the repo root with the stack up; `backup` stops too, so
+no dump holds a session that makes `dropdb` fail or reads a half-restored
+database:
 
 ```bash
-docker compose stop data ui refresher
+docker compose stop data ui refresher backup
 docker compose exec -T db sh -c 'dropdb -U overwatch --if-exists overwatch && createdb -U overwatch overwatch'
 docker compose exec -T db pg_restore -U overwatch -d overwatch --no-owner < backups/<file>.dump
 docker compose run --rm data python -m door.mcp call db_migrate
-docker compose start data ui refresher
+docker compose start data ui refresher backup
+```
+
+A dump by hand, before a `db_rebuild` through the door, `0600` like the
+loop's:
+
+```bash
+(umask 077 && docker compose exec -T db pg_dump -U overwatch -d overwatch -Fc > "backups/prerebuild-$(date +%Y-%m-%dT%H%M%S).dump")
 ```
 
 `db_migrate` runs before `data` starts: the data container's entrypoint

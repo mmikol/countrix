@@ -14,6 +14,7 @@ from db import Refusal
 from facts import compute
 from inference import catalog, tune
 from inference.frontmatter import Parsed, parse_frontmatter
+from inference.shapes import legal_shapes
 from inference.strategy import KINDS, CatalogError, Strategy, settled_by_board
 from tests.inference import FIXTURE_PLAYBOOK, HEAL_RATE
 
@@ -94,7 +95,7 @@ def test_the_docs_word_every_form_the_reference_playbook_holds(tmp_path, monkeyp
         "`require team.tanks <= 2` - always holds\n" in text
     assert "weight 1; when `enemy.flyers >= 1 and not (team.hitscan >= 1)`; penalty `2.5`" in text
     assert "weight 1; penalty `max(0, team.squish_count - 4) * 1.0`" in text
-    assert "1 constraints (limits), 14 heuristics (8 on a metric, 6 scored)" in text
+    assert "1 constraint (a limit), 14 heuristics (8 on a metric, 6 scored)" in text
     assert "`maximize team.pool_total` - " in text and "\n# At most two tanks" not in text
 
 
@@ -209,10 +210,11 @@ def test_the_shipped_healing_floor_is_a_scored_heuristic_at_weight_two():
     assert [h.id for h in shipped if h.form == "scored"] == ["heal-rate"]
 
 
-def test_the_shipped_support_limit_is_a_hard_limit_at_three():
+def test_the_shipped_support_limit_is_a_shape_limit_at_three():
     """inference/strategies/at-most-three-supports.md, the owner's limit: a
     require on the Support role's count with three as its dial, never
-    weighted, and the shipped playbook's one limit."""
+    weighted, and the shipped playbook's one limit - a shape limit, so no
+    legal shape seats a fourth support and the roster refuses one."""
     shipped = catalog.load(catalog.SHIPPED_DIR)
     limit = next(s for s in shipped if s.id == "at-most-three-supports")
     assert (limit.kind, limit.form, limit.category, limit.weighs) == (
@@ -221,6 +223,7 @@ def test_the_shipped_support_limit_is_a_hard_limit_at_three():
     assert limit.require.source == "team.supports <= params.MAX_SUPPORTS"
     assert limit.params == {"MAX_SUPPORTS": 3}
     assert [s.id for s in shipped if s.form == "limit"] == ["at-most-three-supports"]
+    assert max(shape.supports for shape in legal_shapes(shipped)) == 3
 
 
 def test_catalog_rejects_a_goal_on_an_unknown_metric(tmp_path):
@@ -284,6 +287,10 @@ def test_a_constraint_is_a_limit_a_heuristic_weighs_and_an_assumption_is_prose(t
                 "---\nname: b\nkind: heuristic\nbonus: params.x\nparams:\n  x: 1\n---\nx\n"):
         with pytest.raises(CatalogError):
             load_one(bad)
+    # a confidence scales a metric's term, so a scored heuristic's is refused as such
+    with pytest.raises(CatalogError, match="only a heuristic on a metric scales by a confidence"):
+        load_one("---\nname: b\nkind: heuristic\nbonus: team.tanks\nconfidence: team.tanks\n"
+                 "---\nx\n")
 
 
 def test_a_key_that_is_not_a_field_is_refused_by_name(tmp_path):

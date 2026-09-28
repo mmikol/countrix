@@ -5,7 +5,7 @@ derived something.
 
     tune("coverage", "weight", 3.5, "the solver kept leaving Pharah unanswered")
     tune("under-healed", "params.HEAL_MARGIN", 0.8, "two-support lines felt thin")
-    tune("anti-air", "when", "enemy.flyers >= 1 and map.known == 1", "...")
+    tune("squish-limit", "penalty", "max(0, team.squish_count - 3) * 1.0", "...")
 
     add("shut-off-heals", "Shut off a heavy heal line", "heuristic", prose,
         {

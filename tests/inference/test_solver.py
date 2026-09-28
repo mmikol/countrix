@@ -136,6 +136,21 @@ def test_shape_limits_bound_the_search_and_a_stricter_one_narrows_it(synthetic_w
     assert roles == ["damage", "damage", "support", "support", "tank", "tank"]
 
 
+def test_a_shape_limit_on_a_dial_is_still_a_shape_limit(tmp_path):
+    """A cap written on a dial - `team.supports <= params.MAX_SUPPORTS` -
+    reads the six's shape and its own number: the shapes the roster enforces
+    and the search enumerates leave out every six past the dial, and moving
+    the dial moves the cap."""
+    shutil.copytree(FIXTURE_PLAYBOOK, tmp_path, dirs_exist_ok=True)
+    everything = legal_shapes(catalog.load(str(tmp_path)))
+    for cap in (3, 2):
+        (tmp_path / "support-cap.md").write_text(
+            "---\nname: support cap\nkind: constraint\nrequire: team.supports <="
+            " params.MAX_SUPPORTS\nparams:\n  MAX_SUPPORTS: %d\n---\nx\n" % cap, "utf-8")
+        shapes = legal_shapes(catalog.load(str(tmp_path)))
+        assert shapes == [s for s in everything if s.supports <= cap], cap
+
+
 def test_a_charge_for_a_rule_broken_is_a_heuristic_and_never_prunes(synthetic_world):
     """The reference playbook's anti-air charges rather than forbids, so it is
     a scored heuristic, `when: <a flier> and not (<a hitscan answer>)`: against

@@ -90,14 +90,16 @@ keeps it current.
   `facts/team.py` or `facts/compute.py` reads `hero.modifiers`. Knockbacks as their own
   count (Control's edges), damage beams apart from healing beams, area
   healing apart from area damage. Cost: a day each.
-- **Off-shapes never win.** 2-1-3 and 2-3-1 land within 2-8 percent of the
-  best 2-2-2 and the benchmark endorses three-support holds and
-  three-damage attacks (57-79 percent of the optimal today). The shape
-  rules are scored heuristics, which the fit does not touch. Cost: a day
-  to fit their dials to the benchmark's off-shape entries.
 - **One hero on most boards.** D.Mon is in most optimal sixes on the
   strength of the roster's highest win rate. A win rate on a low pick
   rate is a specialist's: weigh it by its sample.
+- **A share's zero is one six.** Each seat's floor is the lowest of its
+  1,200 reference sixes, so one pathological six sets every share on the
+  board and a roster or rates change moves them all through it; a floor
+  far below the field crowds every share toward 100. A low quantile (the
+  5th percentile) holds still: each slice ships its sorted scores and the
+  parent merges them, bit for bit as today. Cost: half a day, and every
+  share moves once.
 - **Shard the local search by seed.** The countered case's refine is the
   last serial block (~0.12 s). The result set holds; the reported
   `considered` count depends on seed order and would change.
@@ -191,11 +193,12 @@ few match-ups the wiki rates (the counters table is a list).
 - **The rates history is dumped nightly.** The `backup` service, on
   postgres's image and boxed like the app containers, writes a
   `pg_dump` into `backups/` every night and keeps fourteen: the dated
-  snapshots a rebuild drops and no source gives back. docs/db.md has
-  the restore.
+  snapshots a rebuild drops and no source gives back. A rebuild over a
+  stale schema asks it for one more first, which the rotation keeps.
+  docs/db.md has the restore.
 - **Nothing is written to `db/raw`.** The CSV mirror and `export_csv`
   and the door's audit log are deleted.
-- **The stack is four containers.** The sentry is gone: its quarantine
+- **The sentry is gone, and the engine runs in `ui`.** Its quarantine
   hid the failure the catalog makes loud, its patterns matched ordinary
   prose and missed real injections, and nothing read its flags; every
   write now runs under a door tool without exception. The inference

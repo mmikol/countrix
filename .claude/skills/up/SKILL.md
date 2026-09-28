@@ -28,8 +28,12 @@ answer, and prints a verdict. A first build scrapes the sources once
    reason and leave the file alone - a field is set through `/tune`, a
    draft finished through `/strategy`, and only the user removes a file
    (the data container refuses a rebuild over it and restarts until it
-   loads, as `docker compose logs data` shows); a board did not solve ->
-   `docker compose logs ui`.
+   loads, as `docker compose logs data` shows); a file the board refuses
+   that this checkout loads -> the image predates the checkout, and
+   `orchestrator.py up` rebuilds it; a board did not solve ->
+   `docker compose logs ui`. A `backup:` line is a warning, not a
+   failure: no nightly dump is being taken - report it with
+   `docker compose logs backup`.
 3. If the rates capture date is not today and the user is about to play,
    offer `.venv/bin/python orchestrator.py refresh` (or the `sync_all` tool
    with `refresh: true` on the `countrix-docker` MCP server). The

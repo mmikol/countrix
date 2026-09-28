@@ -1,7 +1,8 @@
 """One gate for every door: the same over-limit board sent through the page's
 facts endpoint, the service's three handlers, the four MCP board tools and
 the engine's three entry points is refused with the same message on each,
-and a six the playbook's limits rule out is refused by every evaluate.
+and a six the playbook's limits rule out is refused by every evaluate and
+every infer.
 The page's board is not listed: in-process it opens a connection and hands
 the query to serve.handle_board, which is a door here, and on the service
 it is that handler again. The synthetic World stands in for the database
@@ -99,17 +100,24 @@ def test_every_door_that_solves_refuses_a_third_red_tank(doors, door):
         doors[door]({"red": ("Anvil", "Kite", "Mortar"), "blue": ("Balm",)})
 
 
-def test_every_door_that_evaluates_refuses_a_six_its_limits_rule_out(
-        doors, monkeypatch, tmp_path):
+def test_every_door_that_evaluates_or_infers_refuses_a_six_its_limits_rule_out(
+        doors, synthetic_world, monkeypatch, tmp_path):
     """A full blue six that breaks one of the playbook's limits is not
-    allowed: the service's evaluate, the evaluate tool and the engine's
-    refuse it with the rule's name, before any search."""
+    allowed: the service's evaluate, the evaluate tool and the engine's,
+    under the playbook in force, refuse it with the rule's name before any
+    search, and every infer that is handed it as locked picks refuses them
+    in the same words."""
     (tmp_path / "three-supports.md").write_text(
         "---\nname: At most three supports\nkind: constraint\nrequire: team.supports <= 3\n"
         "---\n# At most three supports\n\nA six fields at most three supports.\n",
         encoding="utf-8")
     monkeypatch.setenv("COUNTRIX_STRATEGIES", str(tmp_path))
     board = {"red": ("Mortar",), "blue": ("Balm", "Myrrh", "Sorrel", "Tansy", "Anvil", "Rook")}
-    for door in ("service handle_evaluate", "mcp evaluate"):
+    # the engine's own doors under the playbook in force: the fixture's pass catalog=[]
+    in_force = {
+        "engine evaluate": lambda board: engine.evaluate(synthetic_world, Draft(**board)),
+        "engine infer": lambda board: engine.infer(synthetic_world, Draft(**board))}
+    for door in ("service handle_evaluate", "mcp evaluate", "engine evaluate",
+                 "service handle_infer", "mcp infer", "engine infer"):
         with pytest.raises(Refusal, match=r"^not allowed: breaks At most three supports$"):
-            doors[door](board)
+            in_force.get(door, doors[door])(board)

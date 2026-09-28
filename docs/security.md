@@ -101,7 +101,8 @@ capabilities its image needs to start as root and drop to `postgres`,
 takes no new privileges, and has a writable root and no limits.
 `backup` runs postgres's image under the same box as the app containers:
 the checkout's owner, 256 MB and 64 processes, a tmpfs over the image's
-data volume, and one bind mount it writes, `backups/`.
+data volume, and one bind mount it writes, `backups/`, which `data` also
+mounts to ask for a dump before it rebuilds.
 
 **The board holds its memory.** The ui container runs the solver's pool
 beside the page. A board waits for room while the boards in flight hold

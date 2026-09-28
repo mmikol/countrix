@@ -269,6 +269,39 @@ def test_a_half_drafted_seat_may_break_a_limit_its_picks_to_come_can_mend(
     assert b.fill is not None and b.momentum["blue"] is not None
 
 
+def test_picks_are_ruled_out_only_when_no_six_on_the_roster_completes_them(
+        synthetic_world, tmp_path, monkeypatch):
+    """The fill searches its pools, not the roster. Under a limit on the kit -
+    a light flier fielded, and Gale the only one - picks whose one
+    completion the fill's pools cut stay allowed, with no fill: the roster
+    holds a six that keeps them. Capped at two damage, the open slot is a
+    support's, no six completes them, and they are not allowed, the limit
+    they break named - by the board and by infer alike."""
+    from inference import engine, solver
+    real = solver.Solver.pools
+
+    def cut(self):
+        """The pools, with Gale cut from any search around locked picks."""
+        return {role: [h for h in heroes if not self.locked or h.name != "Gale"]
+                for role, heroes in real(self).items()}
+    monkeypatch.setattr(solver.Solver, "pools", cut)
+    (tmp_path / "air.md").write_text(
+        "---\nname: A light flier\nkind: constraint\nrequire: team.light_flyers >= 1\n---\nx\n",
+        "utf-8")
+    picks = Draft("Harbor Gate", ("Kite",), ("Anvil", "Mortar", "Rook", "Needle", "Balm"))
+    b = engine.board(synthetic_world, picks, catalog=catalog.load(str(tmp_path)))
+    assert b.fill is None and b.current.barred is None
+    assert b.current.violations == ["air"] and b.momentum["blue"] is not None
+    (tmp_path / "two-damage.md").write_text(
+        "---\nname: Two damage\nkind: constraint\nrequire: team.damage <= 2\n---\nx\n", "utf-8")
+    capped = catalog.load(str(tmp_path))
+    b = engine.board(synthetic_world, picks, catalog=capped)
+    assert b.fill is None and b.current.barred == "not allowed: breaks A light flier"
+    assert "Gale" in b.blue.blue
+    with pytest.raises(Refusal, match=r"^not allowed: breaks A light flier$"):
+        engine.infer(synthetic_world, picks, catalog=capped)
+
+
 BRAWL = ("Anvil", "Mortar", "Rook", "Needle", "Balm", "Myrrh")
 DIVE = ("Kite", "Quarry", "Gale", "Flint", "Sorrel", "Tansy")
 

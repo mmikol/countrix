@@ -13,7 +13,7 @@ from tests.inference import FIXTURE_PLAYBOOK
 
 
 def test_a_playbook_that_scores_nothing_reads_unscored(synthetic_world):
-    """With the default engine off, hard limits and prose alone tie every
+    """With the default engine off, limits and prose alone tie every
     legal six at zero: the results carry no share of a best, say so, and the
     verdict is the one line."""
     from inference import engine

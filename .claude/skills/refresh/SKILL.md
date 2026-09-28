@@ -38,9 +38,13 @@ is left half-done: a step that fails is reported, not hidden.
    read `metrics` for the vocabulary, decide the frontmatter exactly as
    the `/strategy` skill does (a constraint's require; a heuristic's
    metric, direction and weight, or when/bonus/penalty and weight; params
-   for either; or `kind: assumption`), and write it with `infer_strategy` - an
-   assumption with `tune`, field `kind` - the reason quoting the prose. A refused answer is fixed and sent again, once; a
-   draft you cannot complete is reported with why.
+   for either; or `kind: assumption`), and write it with `infer_strategy`,
+   the reason quoting the prose. A constraint is a limit only, so a
+   constraint draft whose prose charges or rewards rather than forbids
+   first takes `tune`, field `kind`, value `heuristic`, then its
+   when/bonus/penalty and weight through `infer_strategy`; an assumption
+   takes `tune`, field `kind`, alone. A refused answer is fixed and sent
+   again, once; a draft you cannot complete is reported with why.
 4. **Re-infer what the data changed.** Look at the catalog against the
    fresh data with restraint. Call `infer` with `compact: true` (the full
    breakdown is too large for a reply) on three boards, each with three

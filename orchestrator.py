@@ -22,13 +22,14 @@ run it with .venv/bin/python, since inference.derive loads psycopg. Exit
 code 0 means everything answered.
 """
 
+import json
 import os
 import subprocess  # nosec B404  # docker compose and the claude CLI, argv lists, never a shell
 import sys
 import time
 from collections.abc import Callable, Mapping
 from datetime import timedelta
-from typing import Any, NamedTuple, TypedDict
+from typing import Any, NamedTuple, NotRequired, TypedDict
 
 from db import ROOT, web
 from door.mcp import client
@@ -43,6 +44,7 @@ URLS = {"data": DATA + "/health", "inference": BOARD + "/health", "ui": BOARD + 
 MCP_URL = DATA + "/mcp"
 # the nightly dumps, bind-mounted into the backup service (compose.yaml)
 BACKUPS = "backups"
+BACKUP_SERVICE = "backup"
 # one board solved on the board before the stack is called ready: only the
 # container (its memory limit in compose.yaml, a read-only root) shows
 # whether this playbook fits its memory and time
@@ -109,22 +111,59 @@ class Verdict(NamedTuple):
     lines: list[str]
 
 
+class Service(TypedDict):
+    """One compose service's container as `docker compose ps` reports it: its
+    state (running, exited, restarting; empty with no container) and its
+    health (healthy, unhealthy, starting; empty with no healthcheck)."""
+    state: str
+    health: str
+
+
 class Health(TypedDict):
     """What each served layer answered, None where nothing did, and the probe:
     None when the board could not solve one or was never asked. The replies
-    stay JSON off the wire; verdict reads them with .get."""
+    stay JSON off the wire; verdict reads them with .get. `backup` is the
+    backup container, None where docker did not answer; `playbook` is why
+    the host's playbook does not load, None when it loads - each left out
+    where it was not asked."""
     data: dict[str, Any] | None
     inference: dict[str, Any] | None
     ui: dict[str, Any] | None
     board: Probe | None
+    backup: NotRequired[Service | None]
+    playbook: NotRequired[str | None]
 
 
 def health() -> Health:
-    """The three served layers' replies, and a board probed when the
-    inference layer answers."""
+    """The three served layers' replies, a board probed when the inference
+    layer answers, the backup container's state and the host's playbook
+    check."""
     replies = {layer: get_json(url) for layer, url in URLS.items()}
     return Health(data=replies["data"], inference=replies["inference"], ui=replies["ui"],
-                  board=probe() if replies["inference"] else None)
+                  board=probe() if replies["inference"] else None,
+                  backup=service(BACKUP_SERVICE), playbook=playbook_problem())
+
+
+def service(name: str) -> Service | None:
+    """One compose service's container as `docker compose ps` reports it,
+    None where docker does not answer. Compose prints a JSON object a line,
+    or one JSON array before 2.21."""
+    try:
+        done = subprocess.run(  # nosec B603 B607  # a literal argv, docker found on PATH as sh() finds it
+            ["docker", "compose", "ps", "--all", "--format", "json", name], cwd=ROOT,
+            capture_output=True, text=True, timeout=MINUTE)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if done.returncode:
+        return None
+    text = done.stdout.strip()
+    try:
+        rows = json.loads(text) if text.startswith("[") else [
+            json.loads(line) for line in text.splitlines() if line.strip()]
+    except ValueError:
+        return None
+    row = next((r for r in rows if isinstance(r, dict)), {})
+    return Service(state=str(row.get("State") or ""), health=str(row.get("Health") or ""))
 
 
 def probe() -> Probe | None:
@@ -171,13 +210,20 @@ def data_verdict(data: dict[str, Any] | None) -> Verdict:
     return Verdict(False, [problem, summary]) if problem else Verdict(True, [summary])
 
 
-def inference_verdict(inf: dict[str, Any] | None, board: Probe | None) -> Verdict:
+def inference_verdict(inf: dict[str, Any] | None, board: Probe | None,
+                      loads_here: bool = False) -> Verdict:
     """The inference layer answers on the board, sees the playbook, and solves
-    a board."""
+    a board. A playbook the board's container refuses while this checkout
+    loads it (`loads_here`) is read by older code: the image predates the
+    checkout."""
     if not inf:
         return Verdict(False, ["inference: not answering"])
     if inf.get("status") != "ok":
-        return Verdict(False, ["inference: %s" % inf.get("error", inf.get("status"))])
+        lines = ["inference: %s" % inf.get("error", inf.get("status"))]
+        if loads_here and "strategies" not in inf and not stale_mount(inf):
+            lines.append("inference: this checkout loads that playbook, so the image's code"
+                         " predates it - `orchestrator.py up` rebuilds the image")
+        return Verdict(False, lines)
     if not inf.get("strategies"):
         return Verdict(False, ["inference: no strategies visible (a stale bind mount -"
                                " run `docker compose up -d --force-recreate`)"])
@@ -202,15 +248,34 @@ def ui_verdict(ui: dict[str, Any] | None) -> Verdict:
                           % (len(ui["heroes"]), len(ui.get("maps", [])))])
 
 
+def backup_lines(backup: Service | None) -> list[str]:
+    """A warning when the nightly dump is not being taken: the backup
+    container not running, or unhealthy - its newest dump over 26 hours old.
+    Nothing where all is well or docker did not answer. The board works
+    without it, so it never makes the stack not ready."""
+    if backup is None:
+        return []
+    if backup["state"] != "running":
+        return ["backup: %s - no nightly dump is being taken (`docker compose logs backup`)"
+                % (backup["state"] or "no container")]
+    if backup["health"] == "unhealthy":
+        return ["backup: unhealthy - the newest dump in backups/ is over 26 hours old"
+                " (`docker compose logs backup`)"]
+    return []
+
+
 def verdict(h: Health) -> Verdict:
     """The stack's verdict from the health map: ok when every layer is, and the
-    data layer's lines, then the inference layer's, then the board's."""
+    data layer's lines, then the inference layer's, then the board's, then a
+    warning on the nightly dump."""
     layers = (
         data_verdict(h["data"]),
-        inference_verdict(h["inference"], h["board"]),
+        inference_verdict(h["inference"], h["board"],
+                          loads_here="playbook" in h and h["playbook"] is None),
         ui_verdict(h["ui"]))
     return Verdict(all(layer.ok for layer in layers),
-                   [line for layer in layers for line in layer.lines])
+                   [line for layer in layers for line in layer.lines]
+                   + backup_lines(h.get("backup")))
 
 
 def dotenv() -> dict[str, str]:
