@@ -184,11 +184,12 @@ wrote and read.
    `BlizzardError` or `WikiError` once it is cached, and fails the pull:
    the roster and every hero page, the rates table and its filters, the
    Maps article and the Hybrid lead, the Team Composition page, and a
-   synergies or counters pull that reads no claim at all. A reader of one article per entity takes what it finds: a map
-   whose Gameplay section it cannot read gets no stages, and an article
-   with too little kept terrain text is named in `without_text`. A page
-   that would not fetch falls back to its stale copy, else to a `missing`
-   line where the pull reads one page per entity, else the pull fails.
+   synergies or counters pull that reads no claim at all. A reader of one
+   article per entity takes what it finds: a map whose Gameplay section
+   it cannot read gets no stages, and an article with too little kept
+   terrain text is named in `without_text`. A page that would not fetch
+   falls back to its stale copy, else to a `missing` line where the pull
+   reads one page per entity, else the pull fails.
 
 ### The ways a run writes
 
@@ -258,8 +259,7 @@ pull_synergies and pull_counters read them from the cache; pull_maps
 fetches every map article and pull_terrain reads them.
 
 A page leaves the cache only when a refetch overwrites it or its file is
-deleted. The rates pages are keyed by their full query, so widening the
-rates' granularity resumes across runs from what is on disk.
+deleted. The rates pages are keyed by their full query.
 
 ### The stale fallback
 
@@ -829,7 +829,7 @@ pull reads one of the two.
 9. The data dictionary in docs/db.md regenerated with `db_docs`, and the
    migration applied with `db_migrate`, which keeps the data. In Docker,
    `orchestrator.py up` rebuilds the image, and the `data` container
-   rebuilds the database on a migration it lacks.
+   runs `db_migrate` on a migration it lacks.
 
    ```bash
    .venv/bin/python -m door.mcp call db_migrate

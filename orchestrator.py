@@ -3,7 +3,8 @@
     python orchestrator.py            up, when no verb is named
     python orchestrator.py up         build the image, start the containers, wait -
                                       the data container builds the database when
-                                      it is empty or stale - then the verdict
+                                      it is empty and migrates it when it is
+                                      stale - then the verdict
     python orchestrator.py status     what is running, how fresh the data is, the URLs
     python orchestrator.py down       stop everything (the database volume stays)
 

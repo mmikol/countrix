@@ -34,7 +34,7 @@ The search, which reads the playbook:
                   every heuristic is normalised against, and each hero's standing
     solver        searches compositions under the constraints and heuristics;
                   players are assumed to play optimally
-    engine        infer(), evaluate() and board(): the API over the solver
+    engine        infer() and board(): the API over the solver
     result        the Result and Board records and their citations into the
                   facts the facts layer generated
     plan          the game plan and the verdict in prose

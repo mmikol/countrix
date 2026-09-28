@@ -106,7 +106,8 @@ is a lesson the next run relearns.
   playbook of one limit: with most sixes tied, the local search swapped
   the announced hero in through a path the pools had filtered. Now: a
   test of a solver invariant runs under a minimal, limit-only catalog as
-  well as the shipped one - ties expose the paths a rich playbook hides.
+  well as the reference playbook (`tests/fixtures/playbook`) - ties
+  expose the paths a rich playbook hides.
 - **A test that cannot fail tests nothing.** An `assert ... or True` and
   a validation that skipped on every run (its source stopped publishing)
   sat in the suite as if they counted. Now: a run greps the tests for

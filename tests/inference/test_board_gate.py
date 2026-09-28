@@ -1,8 +1,7 @@
 """One gate for every door: the same over-limit board sent through the page's
 facts endpoint and its board handler, the three MCP board tools and the
-engine's three entry points is refused with the same message on each, and
-a six the playbook's limits rule out is refused by the engine's evaluate
-and every infer.
+engine's two entry points is refused with the same message on each, and
+locked picks the playbook's limits rule out are refused by every infer.
 The page's board route is not listed: it opens a connection and hands the
 query to serve.handle_board, which is a door here. The synthetic World
 stands in for the database and the reference playbook for the live one,
@@ -27,7 +26,7 @@ FACTS_DOORS = ("page api_facts", "mcp facts")
 SOLVING_DOORS = (
     "page handle_board",
     "mcp infer", "mcp board",
-    "engine infer", "engine evaluate", "engine board")
+    "engine infer", "engine board")
 DOORS = (*FACTS_DOORS, *SOLVING_DOORS)
 
 OVER_LIMIT = [
@@ -72,7 +71,6 @@ def doors(synthetic_world, monkeypatch):
         "mcp infer": tool("infer"),
         "mcp board": tool("board"),
         "engine infer": solved(engine.infer),
-        "engine evaluate": solved(engine.evaluate),
         "engine board": solved(engine.board),
     }
 
@@ -89,29 +87,27 @@ def test_every_door_refuses_a_board_no_lobby_holds(doors, door, board, message):
 @pytest.mark.parametrize("door", SOLVING_DOORS)
 def test_every_door_that_solves_refuses_a_third_red_tank(doors, door):
     """Three red tanks against one blue pick is refused as the queue's by
-    infer, evaluate and board alike, evaluate before it asks for a full six;
-    test_engine holds a third blue tank. The facts doors are left out: a
-    board's facts state what it holds and apply no tank rule."""
+    infer and board alike; test_engine holds a third blue tank. The facts
+    doors are left out: a board's facts state what it holds and apply no
+    tank rule."""
     with pytest.raises(Refusal, match="the queue allows at most 2 tanks, and red picks 3"):
         doors[door]({"red": ("Anvil", "Kite", "Mortar"), "blue": ("Balm",)})
 
 
-def test_every_door_that_evaluates_or_infers_refuses_a_six_its_limits_rule_out(
+def test_every_infer_refuses_locked_picks_its_limits_rule_out(
         doors, synthetic_world, monkeypatch, tmp_path):
     """A full blue six that breaks one of the playbook's limits is not
-    allowed: the engine's evaluate, under the playbook in force, refuses it
-    with the rule's name before any search, and every infer that is handed
-    it as locked picks refuses them in the same words."""
+    allowed: every infer that is handed it as locked picks, under the
+    playbook in force, refuses them with the rule's name, in the words the
+    board's current comp reads."""
     (tmp_path / "three-supports.md").write_text(
         "---\nname: At most three supports\nkind: constraint\nrequire: team.supports <= 3\n"
         "---\n# At most three supports\n\nA six fields at most three supports.\n",
         encoding="utf-8")
     monkeypatch.setenv("COUNTRIX_STRATEGIES", str(tmp_path))
     board = {"red": ("Mortar",), "blue": ("Balm", "Myrrh", "Sorrel", "Tansy", "Anvil", "Rook")}
-    # the engine's own doors under the playbook in force: the fixture's pass catalog=[]
-    in_force = {
-        "engine evaluate": lambda board: engine.evaluate(synthetic_world, Draft(**board)),
-        "engine infer": lambda board: engine.infer(synthetic_world, Draft(**board))}
-    for door in ("engine evaluate", "mcp infer", "engine infer"):
+    # the engine's own door under the playbook in force: the fixture's passes catalog=[]
+    in_force = {"engine infer": lambda board: engine.infer(synthetic_world, Draft(**board))}
+    for door in ("mcp infer", "engine infer"):
         with pytest.raises(Refusal, match=r"^not allowed: breaks At most three supports$"):
             in_force.get(door, doors[door])(board)

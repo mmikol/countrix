@@ -74,7 +74,7 @@ frontmatter, and the solver reads nothing else.
 
 ## Engineering
 
-- **797 tests.** CI runs ruff, mypy and the 680 that need no database on
+- **793 tests.** CI runs ruff, mypy and the 677 that need no database on
   every push to main and every pull request; they cover 93% of the lines,
   held to 78%. With the database built, all of them run against a 75% floor.
 - **The search is held to brute force.** A CI gate enumerates every legal six
@@ -134,9 +134,9 @@ which scores the sixes on their win rates, synergies and counters.
 
 The stack dumps its database into `backups/` every night, the newest 14 kept:
 the dated rates history, which a rebuild drops and no source gives back.
-Before the data container rebuilds a stale schema it takes one more, which
-the rotation keeps. [docs/db.md](docs/db.md#the-nightly-dump) has the
-restore.
+The data container migrates a stale schema in place; before it rebuilds
+one whose migration failed it takes one more, which the rotation keeps.
+[docs/db.md](docs/db.md#the-nightly-dump) has the restore.
 
 Without Docker, an embedded PostgreSQL (`pgserver`, macOS and Linux x86_64)
 holds the database:
@@ -152,7 +152,7 @@ holds the database:
 .venv/bin/ruff check db facts inference door ui tests orchestrator.py
 .venv/bin/python -m mypy db facts inference door ui orchestrator.py
 .venv/bin/python -m pytest -q --cov                                     # the full suite, 75% floor
-COUNTRIX_NO_DATABASE=1 .venv/bin/python -m pytest -q --cov --cov-fail-under=78   # what CI runs
+COUNTRIX_NO_DATABASE=1 .venv/bin/python -m pytest -q --cov --cov-fail-under=78   # what CI sees: no database
 ./docker-db .venv/bin/python -m pytest -q                               # against the stack's database
 ```
 

@@ -1,11 +1,12 @@
 #!/bin/sh
 # One image, one container per role. The first argument is the role:
 #
-#   data        the door: build the database when it is empty, unfilled or
-#               behind the migrations (the first build scrapes the sources;
-#               the mounted caches make later builds cheap; a rebuild over
-#               the rates history waits for backup's dump first), then serve
-#               every MCP tool on 8020
+#   data        the door: build the database when it is empty or unfilled
+#               (the first build scrapes the sources; the mounted caches
+#               make later builds cheap), migrate it in place when it is
+#               behind the migrations (a migration that fails is answered
+#               with a rebuild, after backup's dump of the rates history),
+#               then serve every MCP tool on 8020
 #   ui          the board and the INFERENCE ENGINE: wait for the database,
 #               serve it on 8017
 #   refresh     the door's clock: wait for the database, then refresh it
@@ -26,7 +27,7 @@ db_state() {
     python -m db.psql.schema
 }
 
-# a rebuild over a stale schema drops the dated rates history: the backup
+# a rebuild over a populated schema drops the dated rates history: the backup
 # service is asked for a dump its rotation never prunes (/backups/.predump),
 # and the rebuild waits PREDUMP_WAIT seconds at most for its answer, past which
 # the newest nightly dump in backups/ holds the history
@@ -72,9 +73,16 @@ case "$role" in
                 echo "data: $state database - running the first build (scrapes the sources once)"
                 rebuild ;;
             stale)
-                echo "data: schema behind the migrations - a dump, then a rebuild from the caches"
-                predump
-                rebuild ;;
+                # db_migrate keeps the rates history; a rebuild would drop it
+                echo "data: schema behind the migrations - migrating in place"
+                if ! python -m door.mcp call db_migrate; then
+                    echo "data: the migration failed (above) - a dump, then a rebuild from the caches" >&2
+                    predump
+                    rebuild
+                elif [ "$(db_state)" != current ]; then
+                    echo "data: migrated, no heroes yet - running the first build"
+                    rebuild
+                fi ;;
             *)
                 echo "data: database current" ;;
         esac

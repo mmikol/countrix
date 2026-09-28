@@ -39,18 +39,13 @@ def _fights(strategies: Iterable[Strategy]) -> list[str]:
     return fights
 
 
-@pytest.mark.parametrize("directory", [FIXTURE_PLAYBOOK, None], ids=["reference", "in-force"])
-def test_no_ungated_heuristic_opposes_a_gated_one_on_its_metric(directory):
+def test_no_ungated_heuristic_opposes_a_gated_one_on_its_metric():
     """A heuristic with no `when` reads on every board, so one that maximises a
     metric another minimises under a guard fights that guard wherever it holds:
     weight is spent on both sides and the board cannot say which it answered.
     Opposed pairs are fine - they must both be guarded, into different
     situations."""
-    strategies = catalog.load(directory)
-    if directory is None and not any(s.form == "heuristic" for s in strategies):
-        pytest.skip("the playbook in force (%s) holds no heuristic on a metric: the reference"
-                    " case carries the guard" % catalog.strategies_dir())
-    fights = _fights(strategies)
+    fights = _fights(catalog.load(FIXTURE_PLAYBOOK))
     assert not fights, fights
 
 

@@ -296,11 +296,11 @@ def test_the_migration_ledger_matches_the_files(rows):
 
 def test_the_migration_chain_builds_an_empty_database(db, dsn):
     """The chain from 001 builds the schema the built database has, and
-    docker-entrypoint.sh relies on it when it answers a stale schema with
-    db_rebuild. It runs into a scratch database on the same server: 011 and
-    012 create the cluster-wide reader role only if it is missing and set it
-    as it already is, and no migration inserts a hero, so the scratch
-    database is unfilled."""
+    docker-entrypoint.sh relies on it when it answers an empty database, or
+    a migration that failed, with db_rebuild. It runs into a scratch
+    database on the same server: 011 and 012 create the cluster-wide reader
+    role only if it is missing and set it as it already is, and no
+    migration inserts a hero, so the scratch database is unfilled."""
     scratch = "countrix_chain_%d" % os.getpid()
     with psycopg.connect(dsn, autocommit=True) as admin:
         admin.execute(SQL("CREATE DATABASE {}").format(Identifier(scratch)))

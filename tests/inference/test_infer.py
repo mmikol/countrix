@@ -1,8 +1,8 @@
-"""infer() and evaluate(): locked picks and the queue's shape, an answer to a
-flier, a full six ranked against its field, a board no six satisfies, bans,
-one scale per board, an announced hero, the fill that keeps a lock, a
-seat's search timed from where it began, and no rank in an unscored field.
-Every board is the synthetic World's: no database."""
+"""infer() and a full six scored alone: locked picks and the queue's shape,
+an answer to a flier, a full six ranked against its field, a board no six
+satisfies, bans, one scale per board, an announced hero, the fill that
+keeps a lock, a seat's search timed from where it began, and no rank in an
+unscored field. Every board is the synthetic World's: no database."""
 
 import os
 
@@ -13,7 +13,7 @@ from facts import board_facts
 from facts.draft import Draft
 from inference import catalog
 from inference.base import DEFAULT, OFF
-from tests.inference import ASSUMPTIONS_ONLY, FIXTURE_PLAYBOOK
+from tests.inference import ASSUMPTIONS_ONLY, FIXTURE_PLAYBOOK, evaluated
 
 
 def test_infer_keeps_locked_picks_and_the_open_queue_shape(synthetic_world):
@@ -47,24 +47,22 @@ def test_infer_honours_a_hitscan_answer_to_a_flier(synthetic_world):
     assert not anti["applies"] and anti["weighted"] == 0.0      # answered: nothing to charge
 
 
-def test_evaluate_ranks_a_full_six_against_the_field(synthetic_world):
+def test_a_full_six_is_ranked_against_the_field(synthetic_world):
     """A scored six is ranked against the field."""
-    from inference import engine
     world = synthetic_world
     fix = catalog.load(FIXTURE_PLAYBOOK)
     six = ("Anvil", "Mortar", "Rook", "Needle", "Balm", "Tansy")
-    r = engine.evaluate(world, Draft("Harbor Gate", ("Mortar", "Gale"), six), catalog=fix)
+    r = evaluated(world, Draft("Harbor Gate", ("Mortar", "Gale"), six), catalog=fix)
     assert r.rank >= 1 and r.kind == "evaluate" and len(r.picks) == 6
     with pytest.raises(Refusal, match="exactly 6"):
-        engine.evaluate(world, Draft(blue=("Balm",)), catalog=fix)
+        evaluated(world, Draft(blue=("Balm",)), catalog=fix)
 
 
-def test_a_board_no_six_satisfies_is_refused_by_infer_and_evaluate_alike(
+def test_a_board_no_six_satisfies_is_refused_by_infer_and_the_board_alike(
         synthetic_world, tmp_path):
     """A limit no six can meet leaves no legal shape, so the field is empty:
-    infer refuses the board, and evaluate refuses the six it is given, which
-    breaks the limit too, naming it - instead of ranking it first among
-    nothing."""
+    infer refuses the board, and the board refuses the full six it is
+    given - instead of ranking it first among nothing."""
     from inference import engine
     world = synthetic_world
     (tmp_path / "seven-tanks.md").write_text(
@@ -72,10 +70,10 @@ def test_a_board_no_six_satisfies_is_refused_by_infer_and_evaluate_alike(
     scratch = catalog.load(str(tmp_path))
     with pytest.raises(Refusal, match="relax a constraint"):
         engine.infer(world, Draft("Harbor Gate", ("Mortar",)), catalog=scratch)
-    with pytest.raises(Refusal, match=r"^not allowed: breaks seven tanks$"):
-        engine.evaluate(world, Draft("Harbor Gate", ("Mortar",),
-                                     ("Anvil", "Kite", "Rook", "Needle", "Balm", "Tansy")),
-                        catalog=scratch)
+    with pytest.raises(Refusal, match="relax a constraint"):
+        engine.board(world, Draft("Harbor Gate", ("Mortar",),
+                                  ("Anvil", "Kite", "Rook", "Needle", "Balm", "Tansy")),
+                     catalog=scratch)
 
 
 def test_infer_never_drafts_a_banned_hero(synthetic_world):
@@ -92,19 +90,19 @@ def test_infer_never_drafts_a_banned_hero(synthetic_world):
 
 
 def test_scores_share_one_scale_per_board(synthetic_world):
-    # infer, evaluate and the current comp normalise against the same
-    # seeded reference sample, so the same six scores the same everywhere
+    # infer, a full six scored alone and the current comp normalise against
+    # the same seeded reference sample, so the same six scores the same everywhere
     from inference import engine
     world = synthetic_world
     fix = catalog.load(FIXTURE_PLAYBOOK)       # a rich playbook: alternatives fall below the best
     red = ("Mortar", "Gale")
-    # no lock: evaluate ranks a six against the whole unlocked field, and the best six
+    # no lock: a full six is ranked against the whole unlocked field, and the best six
     # that keeps a locked pick need not be the best of that field
     r = engine.infer(world, Draft("Harbor Gate", red), catalog=fix)
-    e = engine.evaluate(world, Draft("Harbor Gate", red, tuple(r.blue)), catalog=fix)
+    e = evaluated(world, Draft("Harbor Gate", red, tuple(r.blue)), catalog=fix)
     assert abs(r.score - e.score) < 1e-9 and e.rank == 1
     held = engine.infer(world, Draft("Harbor Gate", red, ("Balm",)), catalog=fix)
-    again = engine.evaluate(world, Draft("Harbor Gate", red, tuple(held.blue)), catalog=fix)
+    again = evaluated(world, Draft("Harbor Gate", red, tuple(held.blue)), catalog=fix)
     assert "Balm" in held.blue and abs(held.score - again.score) < 1e-9
     assert r.to_dict()["normalized"] == 100 and e.to_dict()["normalized"] == 100
     assert all(0 <= a["normalized"] <= 100 for a in r.alternatives)
@@ -118,7 +116,7 @@ def test_scores_share_one_scale_per_board(synthetic_world):
     b = engine.board(world, Draft("Harbor Gate", red, tuple(r.blue)), catalog=fix)
     assert b.blue.blue == best.blue and b.current.to_dict()["normalized"] <= 100
     again = engine.infer(world, Draft("Harbor Gate", red, ("Balm",)), pool_size=4, catalog=fix)
-    rescored = engine.evaluate(world, Draft("Harbor Gate", red, tuple(again.blue)), catalog=fix)
+    rescored = evaluated(world, Draft("Harbor Gate", red, tuple(again.blue)), catalog=fix)
     assert abs(again.score - rescored.score) < 1e-9
 
 
@@ -189,25 +187,24 @@ def test_a_seat_solved_across_the_pool_is_timed_from_when_its_search_began(
 
 def test_a_six_in_a_field_that_scores_nothing_has_no_rank(
         synthetic_world, scratch_playbook, tmp_path):
-    """evaluate counts the sixes that score strictly higher, and where nothing
-    scores - the default engine off, a playbook of limits alone - every six
-    ties at zero, so every six ranked first. An unscored six now carries no
-    rank; a scored one keeps its place, and the default engine alone scores
-    the limits' field."""
+    """A full six's rank counts the sixes that score strictly higher, and
+    where nothing scores - the default engine off, a playbook of limits
+    alone - every six ties at zero, so every six ranked first. An unscored
+    six now carries no rank; a scored one keeps its place, and the default
+    engine alone scores the limits' field."""
     import shutil
 
-    from inference import engine
     six = ("Anvil", "Kite", "Rook", "Needle", "Balm", "Tansy")
     limit_only = tmp_path / "limit-only"            # the scratch playbook is tmp_path's own
     limit_only.mkdir()
     shutil.copy(os.path.join(FIXTURE_PLAYBOOK, "open-queue-tanks.md"), limit_only)
     board = Draft("Harbor Gate", (), six, side="attack")
-    unscored = engine.evaluate(synthetic_world, board, catalog=catalog.load(str(limit_only)),
-                               base=OFF)
+    unscored = evaluated(synthetic_world, board, catalog=catalog.load(str(limit_only)),
+                         base=OFF)
     assert unscored.unscored() is not None
     assert unscored.rank is None and unscored.to_dict()["rank"] is None
     assert "(rank " not in unscored.rendered() and "UNSCORED" in unscored.rendered()
-    for scored in (engine.evaluate(synthetic_world, board, catalog=scratch_playbook, base=OFF),
-                   engine.evaluate(synthetic_world, board, catalog=catalog.load(str(limit_only)))):
+    for scored in (evaluated(synthetic_world, board, catalog=scratch_playbook, base=OFF),
+                   evaluated(synthetic_world, board, catalog=catalog.load(str(limit_only)))):
         assert scored.unscored() is None and scored.rank >= 1
         assert "(rank %d among the feasible field)" % scored.rank in scored.rendered()

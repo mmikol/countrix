@@ -21,7 +21,7 @@ python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m mypy db facts inference door ui orchestrator.py             # the types CI checks
 
 .venv/bin/python -m pytest -q -p no:cacheprovider --cov                         # full suite, 75% bar, needs the built database
-COUNTRIX_NO_DATABASE=1 .venv/bin/python -m pytest -q -rs -p no:cacheprovider --cov --cov-fail-under=78   # as CI runs it
+COUNTRIX_NO_DATABASE=1 .venv/bin/python -m pytest -q -rs -p no:cacheprovider --cov --cov-fail-under=78   # what CI sees: no database
 .venv/bin/python -m pytest -q tests/test_docs.py                                # one file
 .venv/bin/python -m pytest -q 'tests/test_docs.py::test_the_overview_names_everything_at_the_root'   # one test
 .venv/bin/python -m pytest -q -m 'not invariant'                                # everything that needs no database
@@ -125,8 +125,8 @@ db <- facts <- inference <- door <- ui.
   the team.* counter metrics never read) - and the playbook's terms
   sit on top, so the shipped playbook's boards are scored, never
   *unscored*. A `BaseWeights` rides the `Brief` (`base=` on `infer`,
-  `evaluate`, `Objective`, `Solver` and the pool's `Spec`); the board and
-  the tools run `base.DEFAULT`. `base.OFF` is the playbook alone, byte for
+  `Objective`, `Solver` and the pool's `Spec`); the board and the tools
+  run `base.DEFAULT`. `base.OFF` is the playbook alone, byte for
   byte the engine before it had a base: a test that pins the reference
   playbook's sixes or scores passes it.
 - **The kit is read in 6v6.** `facts.draft.KIT_FORMAT` names the format;
@@ -141,7 +141,7 @@ db <- facts <- inference <- door <- ui.
   string seed, the map and the side, bounded against the enemy; the lowest
   of their scores is the seat's floor, a share's 0, as its optimal is the
   100. current shares blue's optimal's scale, red_current red's, so within
-  a seat infer, evaluate and current are comparable. Blue's picks the
+  a seat infer, the fill and current are comparable. Blue's picks the
   limits rule out - a full six that breaks one, or picks no six on the
   roster completes (`Solver.completes`) - are not allowed: no score, no
   share, no odds; red's picks are never ruled out. Only
@@ -161,9 +161,10 @@ db <- facts <- inference <- door <- ui.
   nightly `pg_dump` into `backups/` on postgres's image (`compose.yaml`,
   `docker-entrypoint.sh`). Migrations ship in the image, not a mount: once
   `orchestrator.py up` rebuilds it, any new migration file makes the `data`
-  container `db_rebuild` on start, which drops the dated rates history;
-  it first asks `backup` for a `prerebuild-*` dump the rotation keeps,
-  which gives the history back (docs/db.md, The nightly dump).
+  container `db_migrate` on start, which keeps the data. A migration that
+  fails is answered with `db_rebuild`, which drops the dated rates
+  history; it first asks `backup` for a `prerebuild-*` dump the rotation
+  keeps, which gives the history back (docs/db.md, The nightly dump).
 
 ## What the tests hold you to
 
@@ -254,7 +255,8 @@ db <- facts <- inference <- door <- ui.
   file either way). The ledger records filenames only: never edit a
   statement in an applied migration, add the next number. The `--` prose
   is documentation the data dictionary reads, and is kept current.
-  Locally, `db_migrate` keeps the data; `db_rebuild` drops it.
+  `db_migrate` keeps the data, locally and in the `data` container;
+  `db_rebuild` drops it.
 - Over stdio, stdout is the JSON-RPC wire. Code reachable from a tool logs
   through `ctx.log` or stderr, never `print`. A refusal raises `db.Refusal`;
   anything else is the server's fault.

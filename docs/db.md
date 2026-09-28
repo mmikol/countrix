@@ -62,7 +62,8 @@ repo root) make every build after the first cost almost no requests.
 ```mermaid
 stateDiagram-v2
     [*] --> empty: docker compose up<br/>(on a host, db_rebuild<br/>creates the cluster)
-    empty --> unfilled: db_rebuild<br/>every migration, no data yet
+    empty --> current: db_rebuild<br/>every migration, then sync_all
+    empty --> unfilled: a db_rebuild whose<br/>sync_all failed
     unfilled --> current: sync_all<br/>every pull + load_authored
     current --> stale: a migration file<br/>the ledger lacks
     stale --> current: db_migrate<br/>keeps the data
@@ -75,7 +76,8 @@ stateDiagram-v2
 `sync_all`, whatever the state - unless the playbook does not load, which
 refuses it before anything is dropped. Docker's `data` container asks
 `python -m db.psql.schema` for the state (`schema.state`), runs
-`db_rebuild` on anything but current, then serves the door; a refused
+`db_rebuild` on empty or unfilled and `db_migrate` on stale - a rebuild
+there only when the migration fails - then serves the door; a refused
 rebuild ends the container, which restarts until the playbook loads.
 `db_status` and the door's `/health` report the same state, which the ui
 and refresher containers wait on.
@@ -117,7 +119,7 @@ root:
   wait for the next night;
 - the newest 14 `countrix-*.dump` kept, each `0600` (umask 077), one log
   line a run;
-- before `data` rebuilds a stale schema, one more:
+- before `data` rebuilds a schema whose migration failed, one more:
   `prerebuild-YYYY-MM-DDTHHMMSS.dump`, which the rotation never prunes;
 - a time that is not HH:MM exits 1, and `restart: unless-stopped` starts
   it again, the message in `docker compose logs backup` each time, until
@@ -161,10 +163,10 @@ loop's:
 (umask 077 && docker compose exec -T db pg_dump -U overwatch -d overwatch -Fc > "backups/prerebuild-$(date +%Y-%m-%dT%H%M%S).dump")
 ```
 
-`db_migrate` runs before `data` starts: the data container's entrypoint
-rebuilds a stale schema, which would drop what was just restored.
 `db_migrate` brings a dump taken under older migrations up to the
-image's and keeps its rows.
+image's and keeps its rows. It runs before `data` starts, so a
+migration that fails says so here: the data container's entrypoint
+answers one with a rebuild, which would drop what was just restored.
 
 ## The schema
 

@@ -3,7 +3,7 @@ functions of an Objective.
 
     sample              the REFERENCE: a seeded set of random legal sixes for this
                         map and side. Heuristics are normalised against it, so infer,
-                        evaluate and the current comp share one scale and a score
+                        the fill and the current comp share one scale and a score
                         means the same thing across calls. The seed is a string, so
                         every process draws the same list and any of them can prepare
                         a slice of it.
@@ -177,7 +177,7 @@ def _board_field(objective: Objective) -> Iterator[list[Hero]]:
 
     It must not read the locked picks, and it takes SCALE_POOL rather than
     the pool this search happens to use. The bounds it feeds are the
-    board's one scale: `infer`, `evaluate`, `current` and the countered
+    board's one scale: `infer`, the fill, `current` and the countered
     what-if run with different locks and different pool sizes on the same
     board, and a scale that moved with either would make a current comp and
     the optimal it is a share of two different numbers."""

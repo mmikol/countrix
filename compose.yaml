@@ -2,8 +2,9 @@
 #
 #   db          PostgreSQL
 #   data        the door: builds the database from the bind-mounted page
-#               caches when it is empty or stale, then serves every MCP tool
-#               at http://localhost:8020/mcp (.mcp.json, server
+#               caches when it is empty, migrates it in place when it is
+#               stale, then serves every MCP tool at
+#               http://localhost:8020/mcp (.mcp.json, server
 #               "countrix-docker")
 #   ui          the board at http://localhost:8017, with the INFERENCE ENGINE
 #               in the board's process, reading the strategy files live
@@ -13,8 +14,8 @@
 #   backup      the nightly pg_dump into ./backups at COUNTRIX_BACKUP_AT
 #               (04:30 container time), the newest 14 kept: the dated rates
 #               history a rebuild drops and no source gives back; before
-#               data rebuilds a stale schema it asks for one more, which
-#               the rotation keeps
+#               data rebuilds a schema whose migration failed it asks for
+#               one more, which the rotation keeps
 #
 # Every container but db runs as an unprivileged user on a read-only root
 # filesystem, with every capability dropped, no new privileges and process

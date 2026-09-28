@@ -40,7 +40,7 @@ def test_the_board_writes_nothing(served):
     address = urlparse(served)
     for headers, status in (({}, 501), ({"Origin": "http://evil.example"}, 403)):
         connection = http.client.HTTPConnection(address.hostname, address.port, timeout=60)
-        connection.request("POST", "/api/weight", body=b"{}", headers={
+        connection.request("POST", "/api/board", body=b"{}", headers={
             "Content-Type": "application/json", **headers})
         assert connection.getresponse().status == status, headers
         connection.close()

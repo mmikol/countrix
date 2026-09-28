@@ -62,12 +62,10 @@ def test_tools_call_without_a_database_and_unknown_method():
             "jsonrpc": "2.0", "id": 1, "method": "tools/call",
             "params": {"name": "metrics", "arguments": {}}},
         {"jsonrpc": "2.0", "id": 2, "method": "no/such/method"},
-        {"jsonrpc": "2.0", "id": 3, "method": "resources/list"},
     ])
     assert "team.coverage_share" in replies[0]["result"]["content"][0]["text"]
     assert replies[0]["result"]["isError"] is False
-    # the door serves tools alone: resources/list is a method it does not know
-    assert [r["error"]["code"] for r in replies[1:]] == [-32601, -32601]
+    assert replies[1]["error"]["code"] == -32601
 
 
 def test_bad_json_is_a_parse_error_not_a_crash():

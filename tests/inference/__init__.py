@@ -3,8 +3,9 @@ assumptions alone (ASSUMPTIONS_ONLY) for a test that needs a playbook that score
 the shipped healing floor's fields (HEAL_RATE) and heal_rate(), a playbook of that rule
 alone written where a test says, so no solver test reads inference/strategies/, the
 recorded fixture, read with the objective it was recorded under and compared with the
-one in force, and timeless(), a board's payload less the seconds each result took, for
-comparing two solves."""
+one in force, evaluated(), a full six scored as the board scores its current comp, and
+timeless(), a board's payload less the seconds each result took, for comparing two
+solves."""
 
 import json
 import os
@@ -14,7 +15,10 @@ from typing import Any, TypedDict
 import pytest
 
 from db import ROOT
-from inference import base, catalog
+from facts.draft import Draft
+from facts.model import World
+from inference import base, catalog, engine
+from inference.result import Result
 from inference.strategy import Strategy
 
 FIXTURES = os.path.join(ROOT, "tests", "fixtures")
@@ -72,6 +76,17 @@ def in_force() -> tuple[str, base.BaseStamp | None]:
     """The objective a board is solved under by default: the playbook in
     force's digest and the default engine's stamp, as a fixture records them."""
     return catalog.playbook_digest(), base.stamp(base.DEFAULT)
+
+
+def evaluated(
+        world: World, draft: Draft, *, catalog: list[Strategy],
+        base: base.BaseWeights = base.DEFAULT) -> Result:
+    """Blue's full six (`draft.blue`) scored and ranked against the field its
+    seat would search, as the board scores its current comp, without the
+    board's other seats."""
+    return engine._evaluated(world, draft, catalog=catalog, base=base,
+                             pool_size=engine.POOL_DEFAULT, seat="blue", kind="evaluate",
+                             swept=None)
 
 
 def timeless(payload: dict[str, Any]) -> dict[str, Any]:

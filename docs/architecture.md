@@ -48,7 +48,7 @@ subscription, and the board never calls a model.
 | `pm/` | `backlog.md`: what is worth doing next, why and at what cost, in payoff order; the maintainer skill keeps it current | |
 | `.github/workflows/` | `ci.yml`: lint, the types (mypy) and the tests that need no built database, held to 78% coverage, on pushes to `main` and on pull requests | |
 | `.cache-blizzard/` `.cache-wiki/` | the page caches (gitignored): every build after the first costs almost no requests | |
-| `backups/` | the `backup` service's nightly dumps of the stack's database (gitignored, each `0600`), the newest 14 `countrix-YYYY-MM-DD.dump`: the dated rates history a rebuild drops and no source gives back; a `prerebuild-*.dump` taken before `data` rebuilds a stale schema, which the rotation keeps. `orchestrator.py up` makes the folder | [db.md](db.md#the-nightly-dump) |
+| `backups/` | the `backup` service's nightly dumps of the stack's database (gitignored, each `0600`), the newest 14 `countrix-YYYY-MM-DD.dump`: the dated rates history a rebuild drops and no source gives back; a `prerebuild-*.dump` taken before `data` rebuilds a schema whose migration failed, which the rotation keeps. `orchestrator.py up` makes the folder | [db.md](db.md#the-nightly-dump) |
 
 How they fit:
 
@@ -142,10 +142,11 @@ flowchart LR
 The containers share one network; only `data` and `refresher` ever open a
 connection out. `docker-entrypoint.sh` takes the role as its argument
 (`data`, `ui`, `refresh`); `backup` runs its own sh loop on postgres's
-image, and only a rebuild over a stale schema waits on it, up to five
-minutes for the dump it asks for through `backups/`. Readiness has one
-definition, `db.psql.schema.state`: empty, stale (a migration the ledger
-lacks), unfilled (no heroes) or current. The entrypoint asks it through
+image. `data` migrates a stale schema in place, and only a rebuild after
+a failed migration waits on `backup`, up to five minutes for the dump it
+asks for through `backups/`. Readiness has one definition,
+`db.psql.schema.state`: empty, stale (a migration the ledger lacks),
+unfilled (no heroes) or current. The entrypoint asks it through
 `python -m db.psql.schema`; `ui` and `refresh` wait for current, up to the
 data healthcheck's 900 s, then exit. The data container's `/health`
 carries the state: compose's healthcheck holds `data` unhealthy until it

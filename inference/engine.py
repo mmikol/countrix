@@ -1,4 +1,4 @@
-"""infer(), evaluate() and board(): the API over the solver.
+"""infer() and board(): the API over the solver.
 
     infer(world, Draft(map_name="King's Row", red=("Zarya", "Pharah"), blue=("Ana",),
                        side="attack"))
@@ -8,12 +8,12 @@ that justify it (the facts the board would show for map + red + the
 six), the score broken down into the default engine's terms and each
 strategy's, and the alternatives. board() does it for both seats - blue's
 absolute optimal, red around its revealed ones, on opposite sides of a
-sided map - and scores the current blue picks as they stand. All three
-refuse a team past the queue's tanks, on either seat, and score under the
+sided map - and scores the current blue picks as they stand. Both refuse
+a team past the queue's tanks, on either seat, and score under the
 default engine unless the caller passes base.OFF. The limits bind blue's
-own picks: evaluate refuses a six that breaks one, and the board reads such
-picks as not allowed. The records are result.py's, the prose plan.py's and
-the process pool parallel.py's.
+own picks: the board reads a six that breaks one as not allowed, and infer
+refuses locked picks no six completes. The records are result.py's, the
+prose plan.py's and the process pool parallel.py's.
 """
 
 import contextlib
@@ -150,7 +150,7 @@ def infer(
     playbook in force; a catalog given, [] included, is the caller's. The
     default engine scores under `base`; OFF leaves the playbook alone.
     Locked picks no six can complete within the limits are refused as not
-    allowed, in the words evaluate and the board use."""
+    allowed, in the words the board uses."""
     catalog = catalog_module.load() if catalog is None else catalog
     try:
         return _optimal(world, draft, catalog=catalog, base=base, pool_size=pool_size,
@@ -160,20 +160,6 @@ def infer(
         if ruled is None:
             raise                   # no picks, or a six past the pools the search cut
         raise Infeasible(not_allowed(ruled)) from error
-
-
-def evaluate(
-        world: World, draft: Draft, *, catalog: list[Strategy] | None = None,
-        pool_size: int = POOL_DEFAULT, base: BaseWeights = DEFAULT) -> Result:
-    """Blue's full six (`draft.blue`), scored and ranked against the field the
-    solver would have searched. A six that breaks one of the playbook's
-    limits is refused, the rules named: it is not allowed, so it has no
-    score. No catalog is the playbook in force; the default engine scores
-    under `base`."""
-    return _evaluated(world, draft,
-                      catalog=catalog_module.load() if catalog is None else catalog,
-                      base=base, pool_size=pool_size, seat="blue", kind="evaluate",
-                      swept=None, limited=True)
 
 
 class _Optimal(NamedTuple):
@@ -236,12 +222,12 @@ def _optimal(
 
 def _evaluated(
         world: World, draft: Draft, *, catalog: list[Strategy], base: BaseWeights,
-        pool_size: int, seat: Seat, kind: ResultKind, swept: Swept | None,
-        limited: bool = False) -> Result:
+        pool_size: int, seat: Seat, kind: ResultKind, swept: Swept | None) -> Result:
     """`seat`'s full six (`draft.blue`), scored and ranked against the field
     the solver would have searched, labelled `kind`. `swept` takes that field
-    from a search the caller already ran on this board. `limited`: a six that
-    breaks a limit is refused, the rules named, before any search."""
+    from a search the caller already ran on this board; None sweeps it here.
+    A six that breaks a limit is scored with its breaches listed: the board
+    bars blue's before it gets here, and ranks red's."""
     started = time.time()
     m, red_h, blue_h, bans_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
     side = board_side(m, draft.side)
@@ -249,12 +235,6 @@ def _evaluated(
     if len(blue_h) != TEAM_SIZE:
         raise Refusal("evaluate needs exactly %d %s picks (got %d)"
                          % (TEAM_SIZE, seat, len(blue_h)))
-    if limited:
-        # the limits read no scale and no engine term, so no search is drawn to check them
-        broken = _broken(Objective(world, m, red=red_h, banned=bans_h, side=side,
-                                   catalog=catalog, base=OFF), blue_h)
-        if broken:
-            raise Refusal(not_allowed(broken))
     result = Result(kind=kind, map_name=m.name if m else None, red=[h.name for h in red_h],
                     blue=[h.name for h in blue_h], locked=[], catalog=catalog, base=base,
                     bans=[h.name for h in bans_h], side=side, seat=seat)

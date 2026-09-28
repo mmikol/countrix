@@ -42,12 +42,12 @@ shows). Prefer whichever is connected; they expose the same tools.
    and the matchup, numbered F1.. and citable: every domain's independent
    facts (a selection's own row) and dependent ones (its joins: hero ⋈
    map, hero ⋈ enemy, hero ⋈ ally, the team, the matchup). The game is
-   6v6 Open Queue: six picks, at most two tanks. The playbook itself - STRATEGIES
-   = CONSTRAINTS ∪ HEURISTICS ∪ ASSUMPTIONS - is three kinds of markdown
-   file (read them with the `strategies` tool):
-   constraints (a limit that always holds), heuristics (a weighted metric
-   or a scored adjustment) and assumptions (prose, taken as given - the
-   ground rules).
+   6v6 Open Queue: six picks, at most two tanks. The playbook itself -
+   STRATEGIES = CONSTRAINTS ∪ HEURISTICS ∪ ASSUMPTIONS - is three kinds of
+   markdown file (read them with the `strategies` tool): constraints (a
+   limit that always holds), heuristics (a weighted metric or a scored
+   adjustment) and assumptions (prose, taken as given - the ground
+   rules).
 4. Decide - you are the agent in COMP = ARGMAX[ STRATEGIES( FACTS ) ]:
    the solver's optimum is the straw man, and your job is to reconcile
    the facts with the strategies where arithmetic cannot. Adopt the

@@ -20,7 +20,7 @@ answer, and prints a verdict. A first build scrapes the sources once
 2. `NOT READY` names the problem. The usual fixes, in order: a stale bind
    mount after moving directories -> `docker compose up -d --force-recreate`,
    as the verdict prints; a schema behind the migrations -> the `data`
-   container rebuilds on its own, wait and run
+   container migrates it on its own, wait and run
    `.venv/bin/python orchestrator.py status` again; the database never
    became reachable -> `docker compose logs db`; a strategy file does not
    load -> the run stops before the containers start, or the verdict's
@@ -37,7 +37,8 @@ answer, and prints a verdict. A first build scrapes the sources once
 3. If the rates capture date is not today and the user is about to play,
    offer the `sync_all` tool with `refresh: true` on the `countrix-docker`
    MCP server. The refresher container refreshes daily on its own and on
-   start when the caches are a day old, so this is rarely needed.
+   start when the cached pages are 20 hours old, so this is rarely
+   needed.
 4. A line "N draft(s) awaiting /strategy" is not a failure: the solver
    ignores a draft, and `/strategy` completes it with the user.
 5. Never run `docker compose down -v`: that deletes the database volume

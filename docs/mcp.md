@@ -36,8 +36,10 @@ HTTP (`http.py`), with no batches and no sessions. HTTP adds `405` on a
 bare `GET /mcp`, and `GET /health` for the healthchecks: the database's
 state (`db.psql.schema.state`) and counts, read directly and not through
 a tool. The methods: `initialize`, `ping`, `tools/list` and
-`tools/call`, at protocol version `2025-06-18`. The server logs to
-stderr, since stdout is the wire.
+`tools/call`, at protocol version `2025-06-18` alone, whatever an
+`initialize` asks for: Claude Code speaks it, and a client pinned to an
+older revision is not served. The server logs to stderr, since stdout is
+the wire.
 
 Every call, in-process too, is checked against the tool's schema before
 the tool runs. What goes wrong is answered by its cause:
@@ -47,6 +49,7 @@ the tool runs. What goes wrong is answered by its cause:
 | a refusal (`db.Refusal`): a call the caller can fix - an unknown hero, a bad weight, SQL that Postgres rejects, arguments the schema does not admit | `isError` with the reason |
 | params that are not an object; a tool name that is not a string or names no tool | `INVALID_PARAMS` (-32602) |
 | a message that is not an object (a batch included), or a method that is not a string | `INVALID_REQUEST` (-32600) |
+| a method the server does not serve - any but the four above | `METHOD_NOT_FOUND` (-32601) |
 | a message with no method | dropped, no reply |
 | anything else, a playbook that does not load included | `INTERNAL` (-32603) with the error's type and message; the traceback goes to stderr |
 

@@ -117,9 +117,10 @@ keeps it current.
   it ran alone.
 - **One writer at a time.** Nothing serialises the writers across
   processes: the refresher's start-up refresh and a session's `sync_all`
-  can run together when the caches are a day old, so Blizzard is asked
-  at twice its pace and two DELETE-then-INSERT reloads can interleave. A `pg_try_advisory_lock` taken by `refresh_once` and
-  the door's pulls, `sync_all`, `db_rebuild`, `db_migrate` and
+  can run together when the cached pages are 20 hours old, so Blizzard
+  is asked at twice its pace and two DELETE-then-INSERT reloads can
+  interleave. A `pg_try_advisory_lock` taken by `refresh_once` and the
+  door's pulls, `sync_all`, `db_rebuild`, `db_migrate` and
   `load_authored`, with the callers told to wait on it, serialises every
   writer whichever process it runs in. Cost: half a day.
 
@@ -184,12 +185,32 @@ few match-ups the wiki rates (the counters table is a list).
 
 ## Done
 
+- **The engine keeps only what a board reads** - `3c78ae8`. The
+  unscored-by-strategy paths, the heuristic confidence field and dead
+  branches in the catalog, the solver and the frontmatter reader go.
+- **Every fact on a board has a reader** - `317edd0`. Facts that
+  restated others, the playbook's S record and the 5v5 reading of the
+  kit go; a two-pick King's Row board drops from 826 facts to 816.
+- **Patches daily** - `ade29e3`. The refresher pulls the patches before
+  the rates each day, so a snapshot is stamped against a current patch
+  list. `seasons`, `ability_modifiers` and `perk_ability_effects`, which
+  nothing read, go in migration 028.
+- **The door serves its tools alone** - `3ccb73d`. Resources, prompts,
+  batches, sessions, `evaluate`, `db_init` and `list_sources` go; the
+  door speaks protocol 2025-06-18.
+- **The board writes nothing** - `6059487`. The weight's store button,
+  `POST /api/weight` and the remote inference service go; the session
+  sliders stay, and `tune` alone changes a file.
+- **No model runs unattended** - `825fb41`. A bare `orchestrator.py` is
+  `up`; the headless `/refresh` agents, `derive_strategies` and the run,
+  agents, refresh and test verbs go.
 - **The rates history is dumped nightly.** The `backup` service, on
   postgres's image and boxed like the app containers, writes a
   `pg_dump` into `backups/` every night and keeps fourteen: the dated
-  snapshots a rebuild drops and no source gives back. A rebuild over a
-  stale schema asks it for one more first, which the rotation keeps.
-  docs/db.md has the restore.
+  snapshots a rebuild drops and no source gives back. The data container
+  migrates a stale schema in place; a rebuild after a failed migration
+  asks it for one more first, which the rotation keeps. docs/db.md has
+  the restore.
 - **Nothing is written to `db/raw`.** The CSV mirror and `export_csv`
   and the door's audit log are deleted.
 - **The sentry is gone, and the engine runs in `ui`.** Its quarantine

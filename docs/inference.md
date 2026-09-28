@@ -81,10 +81,10 @@ the calibration. A heuristic still moves a six by its weight at most; the
 math page says how that compares with the base's spread. Each term is a bar of the breakdown,
 with the fact it read: the counter bar's fact names the six it read.
 
-A `BaseWeights` rides the `Brief`, and `infer` and `evaluate`'s `base`,
-into every `Objective` and every worker's `Spec`; `base.OFF` turns the
-engine off, and a board is the playbook's alone, as it was before the
-engine had a base. The board and the MCP tools run `DEFAULT`. The tests
+A `BaseWeights` rides the `Brief`, and `infer`'s `base`, into every
+`Objective` and every worker's `Spec`; `base.OFF` turns the engine off,
+and a board is the playbook's alone, as it was before the engine had a
+base. The board and the MCP tools run `DEFAULT`. The tests
 that pin the reference playbook's sixes turn it off. With the engine off
 and a playbook that scores nothing, every six ties at zero and a board
 reads *unscored*.
@@ -120,8 +120,7 @@ still render. The badge and the strip read `not allowed: breaks <the
 limit's name>`, or, where the picks break no limit as they stand, `not
 allowed: no six that keeps these picks meets the playbook's limits`. Red's
 revealed picks are the other side's facts and are never ruled out.
-`evaluate` refuses such a six, the limit named, and `infer` refuses such
-picks in the same words.
+The `infer` tool refuses such picks in the same words.
 
 ## How a strategy file works
 

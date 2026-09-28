@@ -6,7 +6,7 @@ from facts import board_facts
 from facts.draft import Draft
 from inference import catalog
 from inference.base import OFF
-from tests.inference import FIXTURE_PLAYBOOK
+from tests.inference import FIXTURE_PLAYBOOK, evaluated
 
 
 def test_a_playbook_that_scores_nothing_reads_unscored(synthetic_world):
@@ -90,8 +90,7 @@ def test_a_mirror_pick_cites_its_own_facts_not_the_enemy_copy(synthetic_world):
     """Gale on both teams: our Gale's reasons come from our side of the
     board - never "answers Anvil" (our Anvil, whom red's Gale answers) and
     never "partner of Kite" (red's Kite)."""
-    from inference import engine
-    r = engine.evaluate(synthetic_world, Draft(
+    r = evaluated(synthetic_world, Draft(
         "Harbor Gate", ("Kite", "Gale"), ("Anvil", "Mortar", "Gale", "Rook", "Balm", "Sorrel")),
         catalog=catalog.load(FIXTURE_PLAYBOOK))
     ours = next(p for p in r.picks if p["hero"] == "Gale")

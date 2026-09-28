@@ -174,14 +174,11 @@ def test_the_queue_caps_tanks_at_two_whatever_the_playbook_holds(synthetic_world
         for six in sixes:
             assert sum(world.hero(n).role == "tank" for n in six) <= MAX_TANKS, (map_name, six)
         assert max(t for t, _, _ in d["shapes"]) == MAX_TANKS
-    for blue in (["Anvil", "Kite", "Mortar"], ["Anvil", "Kite", "Mortar", "Balm"]):
+    for blue in (["Anvil", "Kite", "Mortar"], ["Anvil", "Kite", "Mortar", "Balm"],
+                 ["Anvil", "Kite", "Mortar", "Balm", "Tansy", "Needle"]):
         with pytest.raises(Refusal, match="the queue allows at most 2 tanks"):
             engine.board(world, Draft("Harbor Gate", (), tuple(blue)),
                          catalog=ASSUMPTIONS_ONLY)
-    with pytest.raises(Refusal, match="the queue allows at most 2 tanks"):
-        engine.evaluate(world, Draft("Harbor Gate", (),
-                                     ("Anvil", "Kite", "Mortar", "Balm", "Tansy", "Needle")),
-                        catalog=ASSUMPTIONS_ONLY)
 
 
 SUPPORTS = ("Balm", "Myrrh", "Sorrel", "Tansy")
@@ -237,8 +234,8 @@ def test_blue_picks_that_break_a_limit_are_not_allowed_and_the_board_still_rende
     allowed - no score, no share, no odds, the limit named in its reason and
     its badge, its breakdown the limit alone. Blue's optimal still renders.
     A full six that breaks it reads the same, ranked against nothing, and
-    the plan describes the optimal; evaluate refuses it by the rule's name.
-    Three supports keep the limit and score."""
+    the plan describes the optimal. Three supports keep the limit and
+    score."""
     from inference import engine
     world, cat = synthetic_world, _support_limit(tmp_path)
     b = engine.board(world, Draft("Harbor Gate", (), SUPPORTS), catalog=cat)
@@ -263,8 +260,6 @@ def test_blue_picks_that_break_a_limit_are_not_allowed_and_the_board_still_rende
     assert full["momentum"]["blue"] is None and full["momentum"]["odds"] is None
     assert b.fill is None and b.countered is None
     assert "The six is the one you picked." not in b.plan
-    with pytest.raises(Refusal, match="^%s$" % NOT_ALLOWED):
-        engine.evaluate(world, Draft("Harbor Gate", ("Mortar",), six), catalog=cat)
     kept = engine.board(world, Draft("Harbor Gate", ("Mortar",), SUPPORTS[:3]), catalog=cat)
     assert kept.current.barred is None and kept.fill is not None
     assert kept.momentum["blue"] is not None and kept.momentum["odds"] is not None

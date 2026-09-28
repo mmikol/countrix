@@ -20,7 +20,7 @@ from facts.team import team_metrics
 from inference import catalog
 from inference.base import DEFAULT, OFF
 from inference.shapes import legal_shapes
-from tests.inference import FIXTURE_PLAYBOOK
+from tests.inference import FIXTURE_PLAYBOOK, evaluated
 
 # the reference playbook's shape limit tightened to Role Queue's two-two-two
 ROLE_QUEUE = (
@@ -173,7 +173,7 @@ def test_a_rule_guarded_on_the_six_itself_is_a_need_and_a_state_has_a_budget(
     support: met in full it costs nothing, unmet it costs the weight, and the
     needs written on one guard cost NEED_BUDGET together at most. A guard on
     the board (red, the map) stays a reward."""
-    from inference import engine, scoring
+    from inference import scoring
     world = synthetic_world
     shutil.copy(os.path.join(FIXTURE_PLAYBOOK, "open-queue-tanks.md"), tmp_path)
     rule = ("---\nname: %s\nkind: heuristic\ndirection: maximize\nmetric: %s\nweight: 2\n"
@@ -185,17 +185,17 @@ def test_a_rule_guarded_on_the_six_itself_is_a_need_and_a_state_has_a_budget(
         rule % ("Their fliers", "team.hitscan", "enemy.light_flyers >= 1"), "utf-8")
     scratch = catalog.load(str(tmp_path))
     # Gale flies for red; blue fields Balm as its one support
-    solo = engine.evaluate(world, Draft("Harbor Gate", ("Gale",),
-                                        ("Anvil", "Mortar", "Rook", "Needle", "Flint", "Balm")),
-                           catalog=scratch).to_dict()
+    solo = evaluated(world, Draft("Harbor Gate", ("Gale",),
+                                  ("Anvil", "Mortar", "Rook", "Needle", "Flint", "Balm")),
+                     catalog=scratch).to_dict()
     terms = {c["id"]: c for c in solo["contributions"]}
     needs = [terms["solo-%d" % i] for i in range(3)]
     assert all(c["applies"] and c["need"] and c["weighted"] <= 0 for c in needs)
     assert sum(c["weighted"] for c in needs) >= -scoring.NEED_BUDGET - 1e-9
     assert terms["their-fliers"]["need"] is False and terms["their-fliers"]["weighted"] >= 0
     paired = ("Anvil", "Mortar", "Rook", "Needle", "Balm", "Tansy")
-    pair = engine.evaluate(world, Draft("Harbor Gate", ("Gale",), paired),
-                           catalog=scratch).to_dict()
+    pair = evaluated(world, Draft("Harbor Gate", ("Gale",), paired),
+                     catalog=scratch).to_dict()
     assert all(
         not c["applies"] and c["weighted"] == 0
         for c in pair["contributions"] if c["id"].startswith("solo-"))
@@ -368,6 +368,29 @@ def test_a_roster_with_fewer_legal_sixes_than_the_reference_is_sampled_whole(syn
     assert len(legal) < scale.REFERENCE_SIZE
     assert [c.key for c in drawn] == [c.key for c in scale.sample(objective)]
     assert sorted(sorted(c.key) for c in drawn) == sorted(sorted(six) for six in legal)
+
+
+def test_merged_slices_bound_a_heuristic_as_one_process_does(synthetic_world, tmp_path):
+    """A slice in which no six values a heuristic leaves it out of its bounds,
+    so merging that slice adds nothing: the pool's merge of its slices'
+    bounds equals the bounds one process draws over all of them."""
+    from inference import parallel, scale, scoring
+    shutil.copy(os.path.join(FIXTURE_PLAYBOOK, "meta-strength.md"), tmp_path)
+    objective = scoring.Objective(synthetic_world, None, red=[],
+                                  catalog=catalog.load(str(tmp_path)), base=DEFAULT)
+    assert [h.id for h in objective.heuristics] == ["meta-strength"]
+    valued = []
+    for raw in (0.4, 0.7):
+        cand = scoring.Candidate([])
+        cand.raw = [raw]
+        valued.append(cand)
+    unvalued = scoring.Candidate([])
+    unvalued.raw = [None]
+    assert scale._bounds_over(objective, [unvalued]) == {}
+    merged = parallel._widen(parallel._widen({}, scale._bounds_over(objective, valued)),
+                             scale._bounds_over(objective, [unvalued]))
+    assert merged == scale._bounds_over(objective, [*valued, unvalued])
+    assert merged == {"meta-strength": scoring.Interval(0.4, 0.7)}
 
 
 def test_the_floor_is_the_lowest_reference_six_and_slices_fold_to_it(synthetic_world):
