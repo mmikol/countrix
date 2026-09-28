@@ -17,8 +17,8 @@ no doc. This file is what a session needs before it changes code.
 ```bash
 python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
-.venv/bin/ruff check db facts inference door ui tests scripts orchestrator.py   # the paths CI lints
-.venv/bin/python -m mypy db facts inference door ui orchestrator.py scripts     # the types CI checks
+.venv/bin/ruff check db facts inference door ui tests orchestrator.py           # the paths CI lints
+.venv/bin/python -m mypy db facts inference door ui orchestrator.py             # the types CI checks
 
 .venv/bin/python -m pytest -q -p no:cacheprovider --cov                         # full suite, 75% bar, needs the built database
 COUNTRIX_NO_DATABASE=1 .venv/bin/python -m pytest -q -rs -p no:cacheprovider --cov --cov-fail-under=78   # as CI runs it
@@ -95,7 +95,7 @@ db <- facts <- inference <- door <- ui.
   validates a strategy's `metric` against the registry, so the number on the
   board and the number the solver maximises cannot drift. `facts/` is a
   shared library: `inference/`, the door's `facts`, `solver`, `boards` and
-  `playbook` modules, the board and `scripts/reach.py` import it.
+  `playbook` modules, the board and the tests' reach recorder import it.
 - **Facts are numbered.** `FactSet` numbers facts F1.. and the playbook's
   record S1.. in emission order; a solver contribution cites a fact by metric
   key (`also=` on `FactSet.add`). Adding a fact renumbers every later id.
@@ -183,7 +183,7 @@ db <- facts <- inference <- door <- ui.
   tool.
 - Each layer imports only the layers below it: `db/` imports nothing above
   it, `facts/` only `db/`, `inference/` `db/` and `facts/`, `door/` all
-  three; `ui/`, `scripts/` and `orchestrator.py` import any of them. An
+  three; `ui/`, `tests/` and `orchestrator.py` import any of them. An
   upward import, deferred or not, fails
   `test_each_layer_imports_only_the_layers_below_it`.
 - A line indented 1 to 16 columns sits on a multiple of 4, docstring maps
@@ -231,8 +231,8 @@ db <- facts <- inference <- door <- ui.
   seats it, beside the objective it was recorded under - the playbook's
   digest (`catalog.playbook_digest`) and the default engine's stamp
   (`base.stamp`). After a deliberate change to the objective,
-  `.venv/bin/python -m scripts.reach` re-records it, and the commit says
-  what moved.
+  `.venv/bin/python -m tests.inference.record_reach` re-records it, and
+  the commit says what moved.
 
 ## House rules
 

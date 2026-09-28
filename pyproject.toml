@@ -34,11 +34,11 @@ known-first-party = ["db", "facts", "inference", "door", "ui"]
 [tool.ruff.lint.pep8-naming]
 extend-ignore-names = ["do_*"]
 
-# The types: `python -m mypy db facts inference door ui orchestrator.py
-# scripts`, as CI runs it; the tests are not checked. Every function and
-# method is annotated. psycopg, requests and beautifulsoup4 ship their own
-# types (py.typed), so no stub package is installed; a missing import is
-# ignored by name, never wholesale.
+# The types: `python -m mypy db facts inference door ui orchestrator.py`,
+# as CI runs it; the tests, the reach recorder among them, are not checked.
+# Every function and method is annotated. psycopg, requests and
+# beautifulsoup4 ship their own types (py.typed), so no stub package is
+# installed; a missing import is ignored by name, never wholesale.
 [tool.mypy]
 python_version = "3.12"
 disallow_untyped_defs = true

@@ -4,9 +4,10 @@ Runs inference.reach.search for every released hero, in name order, on the
 built database, the playbook in force and the default engine, and writes the
 boards it finds to tests/fixtures/reach.json beside that playbook's digest and
 the engine's stamp (inference.base.stamp). Minutes of solving in one process.
-Run from the repo root:
+Run from the repo root, as a module of the tests' package; pytest does not
+collect it, and test_reach.py runs it on the synthetic World:
 
-    .venv/bin/python -m scripts.reach
+    .venv/bin/python -m tests.inference.record_reach
 
 It prints the heroes no board seats, each with the gap it fell short by, so
 UNSEATED in tests/inference/test_reach.py can be checked against them.

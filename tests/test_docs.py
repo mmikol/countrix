@@ -108,7 +108,7 @@ def test_only_the_door_calls_the_playbook_writers():
     assert WRITER_RE.search("        catalog.mirror(cx, cat)")
     assert not WRITER_RE.search('tool_context().call("tune", **arguments)')
     outside = []
-    for path in _python_files("db", "facts", "inference", "door", "ui", "scripts"):
+    for path in _python_files("db", "facts", "inference", "door", "ui"):
         relative = os.path.relpath(path, ROOT)
         with open(path, encoding="utf-8") as handle:
             calls = WRITER_RE.search(handle.read())
@@ -119,7 +119,7 @@ def test_only_the_door_calls_the_playbook_writers():
 
 # the layers, bottom up: each imports only the ones before it
 LAYERS = ("db", "facts", "inference", "door")
-FIRST_PARTY = {*LAYERS, "ui", "scripts", "tests", "orchestrator"}
+FIRST_PARTY = {*LAYERS, "ui", "tests", "orchestrator"}
 
 
 def _first_party_imports(tree):
@@ -137,7 +137,7 @@ def _first_party_imports(tree):
 def test_each_layer_imports_only_the_layers_below_it():
     """docs/architecture.md's layering: db <- facts <- inference <- door, each
     importing only the layers below it, a deferred import as much as one at
-    the top. ui/, scripts/ and orchestrator.py stand over them and may import
+    the top. ui/, tests/ and orchestrator.py stand over them and may import
     any layer."""
     snippet = "import db.psql\nfrom ui.board import x\ndef f():\n    from door import refresh\n"
     assert _first_party_imports(ast.parse(snippet)) == {"db", "ui", "door"}
@@ -160,7 +160,7 @@ def test_every_shallow_indent_sits_on_a_four_column_stop():
     16 columns and counts nesting in that unit: one line off a multiple of 4
     makes the unit 1 and every column a level. Docstrings and strings count."""
     off = []
-    for path in _python_files("db", "facts", "inference", "door", "ui", "tests", "scripts"):
+    for path in _python_files("db", "facts", "inference", "door", "ui", "tests"):
         with open(path, encoding="utf-8") as handle:
             for number, line in enumerate(handle, 1):
                 text = line.lstrip()
@@ -214,7 +214,7 @@ def test_no_module_reads_the_environment_at_import():
                                         "    return os.environ['C']\n"
                                         "Y = os.path.expanduser('~')\n")) == [2, 3, 5]
     frozen = []
-    for path in _python_files("db", "facts", "inference", "door", "ui", "scripts"):
+    for path in _python_files("db", "facts", "inference", "door", "ui"):
         with open(path, encoding="utf-8") as handle:
             tree = ast.parse(handle.read(), path)
         frozen += ["%s:%d" % (os.path.relpath(path, ROOT), line)
@@ -242,7 +242,7 @@ def test_every_type_alias_is_a_type_statement():
                                    "SIDES = ('a', 'b')\nMAX_BANS = 5\n"
                                    "type Query = int\n")) == [1, 2]
     bare = []
-    for path in _python_files("db", "facts", "inference", "door", "ui", "scripts"):
+    for path in _python_files("db", "facts", "inference", "door", "ui"):
         with open(path, encoding="utf-8") as handle:
             tree = ast.parse(handle.read(), path)
         bare += ["%s:%d" % (os.path.relpath(path, ROOT), line) for line in _bare_aliases(tree)]

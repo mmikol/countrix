@@ -13,8 +13,8 @@ change only what a check or the user points at, and leave a report.
 
 1. **Lint, types and tests, three ways.** From the repo root:
 
-       .venv/bin/ruff check db facts inference door ui tests scripts orchestrator.py
-       .venv/bin/python -m mypy db facts inference door ui orchestrator.py scripts
+       .venv/bin/ruff check db facts inference door ui tests orchestrator.py
+       .venv/bin/python -m mypy db facts inference door ui orchestrator.py
        .venv/bin/python -m pytest -q -p no:cacheprovider --cov
        COUNTRIX_NO_DATABASE=1 .venv/bin/python -m pytest -q -p no:cacheprovider \
            --cov --cov-fail-under=78

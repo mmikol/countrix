@@ -2,8 +2,9 @@
 impossible, and the heroes the search seats nowhere are named. tests/fixtures/reach.json
 records, per released hero, the board inference.reach.search seated it on (a tool:
 `reach`), within the five bans a match has, beside the objective that seated it - the
-playbook's digest and the default engine's stamp; `.venv/bin/python -m scripts.reach`
-re-records it, and every released hero is on file or named unseated.
+playbook's digest and the default engine's stamp;
+`.venv/bin/python -m tests.inference.record_reach` re-records it, and every released hero
+is on file or named unseated.
 Rates move daily and the two databases differ, so a few boards may tip; a hero that falls
 off its board, or is on neither list, is searched for again, and none may be lost. The
 search itself, and the recorder, run on the synthetic World."""
@@ -17,8 +18,8 @@ from facts.model import World
 from inference import base, catalog, reach
 from inference.result import scores
 from inference.solver import Infeasible
-from scripts import reach as recorder
 from tests.inference import FIXTURE_PLAYBOOK, in_force, recorded
+from tests.inference import record_reach as recorder
 
 # named, not waived - see the test
 UNSEATED = {"Cassidy", "Domina", "Emre", "Freja", "Hazard", "Ramattra", "Shion", "Sierra",
@@ -53,7 +54,7 @@ def test_every_hero_reach_finds_a_board_for_is_still_seated_and_none_is_newly_lo
     # search tries they value none of the eleven above its rivals for the seat, even
     # with five of them banned; the playbook's rules are what can answer it. They are
     # not searched again on every run - eleven searches are a quarter hour, more under
-    # coverage - so one that comes to seat leaves UNSEATED when scripts.reach
+    # coverage - so one that comes to seat leaves UNSEATED when the recorder
     # re-records. The healing floor seated Illari and Lifeweaver and unseated Cassidy;
     # summed healing seated Kiriko and unseated Zarya.
     assert not UNSEATED - released, "not a released hero: %s" % ", ".join(UNSEATED - released)
@@ -150,7 +151,7 @@ class _Connected:
 
 def test_the_recorder_writes_every_seated_hero_beside_the_objective_it_ran_under(
         synthetic_world, monkeypatch, tmp_path, capsys):
-    """scripts.reach searches each released hero in name order, records the
+    """The recorder searches each released hero in name order, records the
     boards that seat one beside the playbook's digest and the default
     engine's stamp, and names the heroes no board seats with the gap each
     fell short by. The search is stubbed: its own tests are above."""

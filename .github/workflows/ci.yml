@@ -32,10 +32,10 @@ jobs:
         run: grep -v '^pgserver' requirements.txt | pip install -r /dev/stdin
 
       - name: Lint (ruff)
-        run: python -m ruff check db facts inference door ui tests scripts orchestrator.py
+        run: python -m ruff check db facts inference door ui tests orchestrator.py
 
       - name: Types (mypy)
-        run: python -m mypy db facts inference door ui orchestrator.py scripts
+        run: python -m mypy db facts inference door ui orchestrator.py
 
       - name: Tests (db-bound tests skip without a built cluster)
         run: >-

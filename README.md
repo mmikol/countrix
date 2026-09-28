@@ -144,8 +144,8 @@ holds the database:
 ## Development
 
 ```bash
-.venv/bin/ruff check db facts inference door ui tests scripts orchestrator.py
-.venv/bin/python -m mypy db facts inference door ui orchestrator.py scripts
+.venv/bin/ruff check db facts inference door ui tests orchestrator.py
+.venv/bin/python -m mypy db facts inference door ui orchestrator.py
 .venv/bin/python -m pytest -q --cov                                     # the full suite, 75% floor
 COUNTRIX_NO_DATABASE=1 .venv/bin/python -m pytest -q --cov --cov-fail-under=78   # what CI runs
 ```
