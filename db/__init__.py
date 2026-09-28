@@ -27,7 +27,7 @@ where a progress line goes (Log) and the stderr writer a pull, a Context
 and the MCP server default to (to_stderr), the hour every age is read in
 (SECONDS_PER_HOUR), and embed, which rewrites one generated section of a
 markdown file for every layer that generates docs.
-docs/db.md walks the tree.
+docs/db.md names the tables each pull writes, and the schema.
 
 Every row carries a source_id, and that is the only distinction drawn
 between what was measured, what was judged and what was written by hand.

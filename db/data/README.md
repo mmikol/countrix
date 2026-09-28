@@ -259,8 +259,7 @@ fetches every map article and pull_terrain reads them.
 
 A page leaves the cache only when a refetch overwrites it or its file is
 deleted. The rates pages are keyed by their full query, so widening the
-rates' granularity resumes across runs from what is on disk
-([docs/db.md](../../docs/db.md#widening-the-metas-granularity)).
+rates' granularity resumes across runs from what is on disk.
 
 ### The stale fallback
 

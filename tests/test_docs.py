@@ -80,9 +80,7 @@ def test_every_setting_the_code_reads_is_documented():
         with open(path, encoding="utf-8") as handle:
             names |= set(ENV_RE.findall(handle.read()))
     documented = "".join(_read("docs", doc) for doc in ENV_DOCS)
-    # the two that only the tests set are the suite's own, not a setting to document
-    missing = sorted(n for n in names - {"COUNTRIX_NO_DATABASE", "COUNTRIX_LOCAL_SERVER"}
-                     if n not in documented)
+    missing = sorted(n for n in names if n not in documented)
     assert not missing, missing
 
 

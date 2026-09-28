@@ -1,5 +1,4 @@
-# Lint, type and coverage settings. pytest.ini holds the test paths and markers,
-# requirements.txt the packages.
+# Lint, type, test and coverage settings; requirements.txt holds the packages.
 
 [tool.ruff]
 line-length = 100
@@ -50,6 +49,14 @@ warn_unused_ignores = true
 [[tool.mypy.overrides]]
 module = ["pgserver", "pgserver.*"]
 ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# bare `pytest` must find the repo root like `python -m pytest` does
+pythonpath = ["."]
+markers = [
+    "invariant: needs the built database (db/psql/cluster by default)",
+]
 
 [tool.coverage.run]
 source = ["db", "facts", "inference", "door", "ui", "orchestrator"]

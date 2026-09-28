@@ -31,8 +31,8 @@ other table is pulled from Blizzard or the wiki.
 
 No accounts, no keys, no API billing. The board is a local page and the
 solver is deterministic; the model work (comps in chat, strategies
-inferred from prose, the refresh that tunes with a reason) runs in Claude
-Code on your subscription, and the board never calls a model.
+inferred from prose, a tune and its reason) runs in Claude Code on your
+subscription, and the board never calls a model.
 
 ## The folders
 
@@ -108,8 +108,7 @@ read Postgres directly ([mcp.md](mcp.md)).
 | `docker-db` | run any host command against the compose database: `./docker-db .venv/bin/python -m door.mcp call infer '{"map": "Ilios"}'`, or the suite: `./docker-db .venv/bin/python -m pytest -q` |
 | `.mcp.json` | registers the two MCP servers a Claude Code session sees: `countrix` (stdio, the local cluster) and `countrix-docker` (HTTP, the stack's database) - [mcp.md](mcp.md) |
 | `requirements.txt` | psycopg, requests, beautifulsoup4 and pgserver pinned (pgserver is the embedded PostgreSQL a host build uses; the image and CI filter it out, since neither starts a cluster), then pytest and pytest-cov, and ruff and mypy pinned, since a new release of either finds new errors in unchanged code. CI and a local check run all four; the image leaves them out |
-| `pyproject.toml` | ruff's rules (line length 100; outside the tests, an import sits in the module's import block); mypy's, which hold every function in `db`, `facts`, `inference`, `door`, `ui` and `orchestrator.py` to full annotations; the coverage bar, 75% where a database exists |
-| `pytest.ini` | the `invariant` marker for tests that need a built database |
+| `pyproject.toml` | ruff's rules (line length 100; outside the tests, an import sits in the module's import block); mypy's, which hold every function in `db`, `facts`, `inference`, `door`, `ui` and `orchestrator.py` to full annotations; pytest's test paths and the `invariant` marker for tests that need a built database; the coverage bar, 75% where a database exists |
 | `CLAUDE.md` | what a Claude Code session reads before it changes code: the commands, the layers in brief, what the tests hold a change to, the house rules and style |
 | `SECURITY.md` | the terms - you run it at your own risk, no security commitment from the author - and how to report a vulnerability privately; the measures themselves are in [security.md](security.md) |
 | `LICENSE` | PolyForm Strict 1.0.0: noncommercial use only, no redistribution, no changes or new works; anything else needs a separate license from the author |

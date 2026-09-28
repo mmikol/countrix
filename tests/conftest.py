@@ -8,9 +8,9 @@ Two kinds of test:
 A unit test that needs a World takes synthetic_world, built by hand in
 tests/synthetic.py. The second kind defaults to the repo's own build at
 db/psql/cluster, the database `.venv/bin/python -m door.mcp call db_rebuild` produces,
-and skips itself when it is absent. COUNTRIX_LOCAL_SERVER or DATABASE_URL
-override the target; COUNTRIX_NO_DATABASE=1 runs the suite with no database,
-as CI does. A run that starts with no cluster ends with none.
+and skips itself when it is absent. DATABASE_URL overrides the target;
+COUNTRIX_NO_DATABASE=1 runs the suite with no database. A run that starts
+with no cluster ends with none.
 """
 
 import os
@@ -23,12 +23,7 @@ from tests import synthetic
 
 def _dsn():
     if os.environ.get("COUNTRIX_NO_DATABASE"):
-        return None            # what CI sees: no cluster, the db-bound tests skip
-    local = os.environ.get("COUNTRIX_LOCAL_SERVER")
-    if local:
-        import pgserver
-
-        return pgserver.get_server(os.path.abspath(local)).get_uri()
+        return None            # no database: the db-bound tests skip
     try:
         return psql.default_dsn()   # the code's own answer, which creates no cluster
     except psql.NoDatabaseError:

@@ -166,64 +166,6 @@ rebuilds a stale schema, which would drop what was just restored.
 `db_migrate` brings a dump taken under older migrations up to the
 image's and keeps its rows.
 
-## Widening the meta's granularity
-
-This concerns the rates tables, `hero_meta` and `map_meta`. Hero kits,
-weapons, maps and modes have no such dimensions: a cooldown is a cooldown
-in every region, on every platform, at every rank. The playbook tables
-(`counters`, `synergies`, `playstyle`) carry no tier or region column by
-design: a judgement is a current read of the game, not a measurement of a
-population.
-
-Every dimension below has its column, so widening one is an edit to
-`pull_rates` and a refetch; a new dimension is a new migration, never an
-edit to `psql/migrations/004_meta.sql`. The rows already stored are data:
-`pull_rates` appends a dated snapshot and deletes nothing, so `db_migrate`
-keeps the series and `db_rebuild` drops it; the nightly dump gives it back.
-
-| dimension | column exists? | populated today | to widen it |
-| --- | --- | --- | --- |
-| tier - `hero_meta` | yes | 9 ranks | already there |
-| tier - `map_meta` | yes | all-ranks only | restore the inner loop; ×9 requests |
-| region - `hero_meta` | yes | Americas | drop the region pin; ×3 requests |
-| region - `map_meta` | yes | Americas | drop the region pin; ×3 requests |
-| platform | as `meta_snapshots.platform` | Console | fetch `input=PC` too; ×2 requests |
-| input device | as `meta_snapshots.input` | controller | the same filter as platform (see below) |
-| map stage | `map_stages` | stage list loaded | a source with per-stage rates (see below) |
-
-**Platform and input device are one filter.** Blizzard's rates page sends
-`input=PC` or `input=Console` and labels the two Mouse & Keyboard and
-Controller. A snapshot records both readings of the one pin, `platform`
-console and `input` controller (`db.PLATFORM`, `db.INPUT_DEVICE`). No
-source splits a platform by device.
-
-**Map stages exist; per-stage rates do not.** `map_stages` holds the
-wiki's stages - a Control map's three, a Flashpoint map's five points, a
-Hybrid map's two phases, an Escort map's named stretches - but Blizzard's
-map filter stops at whole maps, so every `map_meta` row keeps `stage_id`
-NULL, the whole map. `map_meta` is `UNIQUE NULLS NOT DISTINCT`: Postgres
-treats NULLs as distinct by default, which would let the same hero, map
-and rank be inserted over and over.
-
-**The request count is the real ceiling.** The dimensions compose
-multiplicatively, and the source refuses long sweeps. `map_meta` at full
-granularity:
-
-```
-30 maps × 9 ranks × 3 regions × 2 platforms = 1,620 requests
-```
-
-The rates endpoint began answering `504 Gateway Time-out` partway through
-a **280**-request sweep, and then closed connections outright. 1,620 is
-not reachable in one pass at any polite rate. The page cache makes it
-tractable: it is permanent and keyed by the full query, so granularity
-widens one dimension at a time across many runs, each resuming from what
-is on disk. Widen first along the dimension that separates the numbers
-most: `hero_meta` carries every tier, so a query over it says how far one
-hero's rates move up the ladder - the spread each map's all-ranks figure
-averages away. The rates are Blizzard's, for personal use, so this
-document quotes none of them.
-
 ## The schema
 
 Generated from the live database by

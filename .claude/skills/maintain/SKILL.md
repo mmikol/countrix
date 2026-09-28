@@ -26,14 +26,13 @@ change only what a check or the user points at, and leave a report.
    which builds none, holds 78%. The second run is what CI sees - but not
    exactly: GitHub runs from a fresh clone with no `.env`, no caches and
    no cluster, so after every push read the run itself with
-   `gh run list --limit 3` (the repository is private, so the anonymous
-   API cannot see it; `gh` is installed at `~/.local/bin/gh` and signed
-   in as the user) and, when it disagrees with the local run, reproduce
-   it in a fresh clone with a fresh venv before touching anything. A
-   failure is the first thing to fix or report; never mark a failing test
-   skipped to get green, and never weaken an assertion to pass - a test
-   that cannot fail (`or True`, a comparison that always skips) is
-   deleted, not kept.
+   `gh run list --limit 3` (`gh` is installed at `~/.local/bin/gh` and
+   signed in as the user) and, when it disagrees with the local run,
+   reproduce it in a fresh clone with a fresh venv before touching
+   anything. A failure is the first thing to fix or report; never mark a
+   failing test skipped to get green, and never weaken an assertion to
+   pass - a test that cannot fail (`or True`, a comparison that always
+   skips) is deleted, not kept.
 
 2. **The documentation is current.** `tests/test_docs.py` fails when the
    generated sections of `docs/` are behind the code; the fix is the
@@ -83,9 +82,9 @@ change only what a check or the user points at, and leave a report.
    API.
 
 6. **Security posture.** `docs/security.md` lists the measures; check
-   that what it describes is still what the code does (the allowlist in
-   `orchestrator.py`, the guards in `db/web.py` and `door/mcp/http.py`,
-   the `query` tool, the compose hardening).
+   that what it describes is still what the code does (the guards in
+   `db/web.py` and `door/mcp/http.py`, the `query` tool, the compose
+   hardening).
 
 7. **The backlog is current.** `pm/backlog.md` is the list of what is
    worth doing next, ordered by payoff over blast radius. A run moves an
@@ -108,15 +107,6 @@ is a lesson the next run relearns.
   the announced hero in through a path the pools had filtered. Now: a
   test of a solver invariant runs under a minimal, limit-only catalog as
   well as the shipped one - ties expose the paths a rich playbook hides.
-- **Green here, red on GitHub.** Four pushes failed CI while the local
-  CI-mode run passed: on a fresh clone, a served endpoint's
-  `default_dsn()` let pgserver initdb an empty cluster, the `dsn` fixture
-  then found a directory and handed out its URI, and two tests ran
-  against a database with no tables. Now: check 1 reads GitHub's run
-  after every push and reproduces a disagreement in a fresh clone; the
-  `dsn` fixture rides on `db`, which skips unless the database is built;
-  and `default_dsn()` no longer creates a cluster - only `db_rebuild`
-  does, through `psql.boot`.
 - **A test that cannot fail tests nothing.** An `assert ... or True` and
   a validation that skipped on every run (its source stopped publishing)
   sat in the suite as if they counted. Now: a run greps the tests for
@@ -154,63 +144,25 @@ is a lesson the next run relearns.
   TABLE`, or, where the text is a `COMMENT ON` statement an applied
   migration ran, adds the next migration with the new comment (as `022`
   does); `db_docs` carries it into `docs/db.md`.
-- **A test bound to the playbook in force.** Solver tests read
-  `catalog.load()` and so proved whatever rules the user had that day;
-  one picked "any heuristic" and would have raised on a playbook with
-  none. Now: a test of the solver or the tune path runs on
-  `FIXTURE_PLAYBOOK` (or a scratch copy it writes); only the tests that
-  are about the live playbook (it loads, it mirrors, three sentences)
-  read `inference/strategies/`.
 - **A negative assertion about a name that is gone.** `not hasattr(board,
   "api_recs")` and a dozen `"old-id" not in page` pins guarded against
   code deleted many commits earlier; they pass forever and say nothing.
   Now: a pin on an absence lasts one commit past the deletion; check 4
   greps the tests for `not hasattr` and `not in` against names no file
   defines.
-- **Styling nothing renders.** Nine stylesheet rules styled classes no
-  script or template named, left by the board's stripping of helper text.
-  Now: `test_every_stylesheet_class_is_used_by_the_page` fails on a
-  class in `board.css` that the scripts, the page shell and the math page
-  never name.
 - **A shim for the tests' stand-ins.** `getattr(h, "form", None)` and
   `isinstance` tolerance crept into the engine so tests could pass
   `SimpleNamespace` stand-ins for a `Result`; the production path carried
   the tests' convenience. Now: a test builds the real object (`Result`,
   `Strategy`) and the code reads attributes plainly.
-- **Green locally, dead in the container.** A playbook of 300 rules
-  solved fine on the host and returned 502 from the stack: the solver
-  kept a namespace, 244 raw values and a 300-line breakdown for each of
-  13,000 candidates, 1.8 GB at peak, over the inference container's
-  1 GiB (since merged into the ui container). Now: the solver scores
-  candidates slim and hydrates only the winners (150 MB),
-  `orchestrator.py up` solves one board on the stack's board before it
-  says READY, and a change that scales with the playbook's size is tried
-  in the stack, not only on the host.
-- **A metric under two names is scored twice.** The mechanical
-  consistency pass compared rules on the same key and missed that
-  every `matchup.*_diff` normalises exactly like its blue half (red is
-  constant across a board's sample), that `safe_count`, `exposed_count`
-  and `exposure_share` are one count, and that `heal_ratio` is
-  `heal_peak_supports` over a constant - so 61 of 300 community rules
-  were duplicates or cancelling pairs that five reviewers had to find by
-  reading. Now: a check of the playbook groups rules by what a metric
-  reduces to, not by its name (the alias table is a backlog item under
-  the fact engine), and a review reads the guards' hold counts on the
-  reference samples before it calls two rules distinct.
-- **A fact worded by set order.** The style profile fact listed tied
-  styles in whatever order the tag set iterated, which differs by
-  process hash seed, so the parallel board and the sequential one
-  disagreed on a fact's text - unseen until three hundred rules cited
-  it. Now: every fact that lists names sorts ties by name, and the
-  parity test (`test_the_board_splits_its_solves...`) is the check that
-  the two paths agree byte for byte.
-- **Single pulls append.** A rates pull against the Docker database
-  appends a dated snapshot every time. Now: tests run the pulls inside a
-  rolled-back transaction.
-- **Hash order reached the answer.** Style ties broke by the iteration
-  order of a set of names, so PYTHONHASHSEED changed the solver's six.
-  Now: every tie in the scoring path breaks by name, and a test flips
-  the iteration order to prove it.
+- **Set order reached the answer.** Tied styles were listed, and broke
+  the solver's ties, in the order a set of names iterated, which the
+  process hash seed sets: the parallel board and the sequential one
+  disagreed on a fact's text, and PYTHONHASHSEED changed the six. Now:
+  every tie, in a fact's wording and in the scoring path, breaks by name;
+  a solver test flips the iteration order, and the parity test
+  (`test_the_board_splits_its_solves...`) holds the two paths byte for
+  byte.
 - **The look and the rules described as they were.** The UI document
   named a look the last commit had replaced and two former rules by name, and
   a skill's worked example tuned a strategy the playbook no longer holds.

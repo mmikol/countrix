@@ -74,9 +74,9 @@ frontmatter, and the solver reads nothing else.
 
 ## Engineering
 
-- **879 tests, 97% line coverage** with the database built, against a 75%
-  floor. CI runs ruff, mypy and the database-free suite, held to 78%, on every
-  push to main and every pull request.
+- **797 tests.** CI runs ruff, mypy and the 680 that need no database on
+  every push to main and every pull request; they cover 93% of the lines,
+  held to 78%. With the database built, all of them run against a 75% floor.
 - **The search is held to brute force.** A CI gate enumerates every legal six
   on six small synthetic boards and fails unless the search returns the true
   maximum.
@@ -84,16 +84,17 @@ frontmatter, and the solver reads nothing else.
   pooled and single-process answers are pinned to agree exactly.
 - **Typed throughout.** mypy checks every source module in CI; records that
   cross a module boundary are dataclasses, NamedTuples or TypedDicts.
-- **One door for writes.** 28 MCP tools over stdio, HTTP or in-process, each
+- **One door for writes.** 27 MCP tools over stdio, HTTP or in-process, each
   schema-checked; the query tool runs as a read-only database login.
-- **Hardened containers.** Three services share one image and, with the
-  nightly `pg_dump`, run unprivileged on a read-only root with every capability
-  dropped; PostgreSQL keeps the five it needs to start. Every port binds to
-  loopback, and every HTTP server refuses a foreign Host or Origin.
+- **Five hardened containers.** Three services share one image and, with
+  the nightly `pg_dump`, run unprivileged on a read-only root with every
+  capability dropped; PostgreSQL keeps the five capabilities it needs to
+  start. Every port binds to loopback, and every HTTP server refuses a
+  foreign Host or Origin.
 - **Tested documentation.** Relative links resolve, every setting is documented,
   and the generated schema, tool and catalog references match a fresh render.
 
-About 20,000 lines of Python and 15,000 of tests. Python 3.12, PostgreSQL 16,
+About 19,000 lines of Python and 14,000 of tests. Python 3.12, PostgreSQL 16,
 psycopg, requests and beautifulsoup4 for the scrapers, the standard library's
 HTTP server with no web framework, plain JavaScript with no build step, Docker
 Compose.
