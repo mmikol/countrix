@@ -611,7 +611,14 @@ Each ends in `run()`, and each docstring opens "Pull + clean + store".
 - **`matchups.py` - pull_counters.** The Match-Up column of every released
   hero's article, each written cell a verdict from the article hero's
   seat: +1 it answers the enemy, -1 the enemy answers it, 0 neither. The
-  wiki's MATCHUP or VS. rating decides where the cell gives one.
+  wiki's MATCHUP or VS. rating decides where the cell gives one. A
+  PRIORITY TARGET rating does not: a tank's article rates every damage and
+  support hero on that scale and a RISK one, whom to kill first and how
+  dangerous it is to try, never who wins. Doomfist's rating of Sierra,
+  HIGH PRIORITY TARGET | LOW RISK, is therefore no answer by its label -
+  Mercy carries the same label over prose that calls her a very difficult
+  target - and its prose, vulnerable only once he closes the gap, gives
+  none either.
   Otherwise the prose is scored: the article's hero becomes "you" and the
   enemy "foe", a pronoun goes to the one whose article uses it, and
   weighted cue patterns add advantage or threat - whole in the first
@@ -682,7 +689,13 @@ one module that imports the pipeline.
   and named in `rejected_6v6`, never stored. Both kits stay stored:
   `facts.tables.load` lays `kit_6v6` and the `heroes.*_6v6` pools over the
   5v5 rows in the format `facts.draft.KIT_FORMAT` names
-  (`facts/kit_format.py`).
+  (`facts/kit_format.py`). A pool the article does not write stands at
+  its 5v5 figure. Twelve of the fifteen released tanks' articles write
+  one; Hazard's and D.Mon's infoboxes have no 6v6 field and Sigma's leaves
+  `shield6v6` blank (the live articles checked 2026-09-28). The wiki is
+  what is missing, not the parser: Hazard's 6v6 patch notes move Spike
+  Guard and Jagged Wall, never his pool, so his 5v5 275 health and 225
+  armor stand, 500, and likewise D.Mon's 600 and Sigma's 450.
 - **`measurements.py`.** A stat value split into rows, each a
   `Measurement(value, numerator, denominator, window, condition, text)`.
   A wiki value is rarely one number: it carries conditions in parentheses,

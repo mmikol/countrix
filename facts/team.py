@@ -82,6 +82,8 @@ TEAM_METRICS = OrderedDict([
     ("beam", "picks with a damaging beam"), ("melee", "picks with a melee weapon"),
     ("aoe_count", "kit pieces tagged area of effect or shockwave"),
     ("aoe_damage_count", "kit pieces that damage an area"),
+    ("range_known", "picks whose weapons publish a range: the three below read these alone,"
+                    " and read 0 where none does"),
     ("range_median", "median of each pick's longest published range"),
     ("range_max", "the longest range on the team"), ("range_min", "the shortest longest-range"),
     ("dmg_amp", "picks that amplify someone's damage"),
@@ -301,7 +303,7 @@ def _durability(heroes: list[Hero]) -> MetricBag:
 def _damage(heroes: list[Hero]) -> MetricBag:
     """Sustained and burst damage, the ultimates, the weapon kinds and the reach."""
     burst = max(heroes, key=lambda h: h.burst) if heroes else None
-    ranges = [h.max_range for h in heroes if h.max_range]
+    ranges = [h.max_range for h in heroes if h.max_range is not None]
     return {"dps_floor": sum(h.dps for h in heroes),
             "dps_count": sum(1 for h in heroes if h.dps),
             "burst_max": burst.burst if burst else 0.0,
@@ -318,6 +320,7 @@ def _damage(heroes: list[Hero]) -> MetricBag:
             "melee": sum(1 for h in heroes if h.melee),
             "aoe_count": sum(h.aoe_count for h in heroes),
             "aoe_damage_count": sum(h.aoe_damage_count for h in heroes),
+            "range_known": len(ranges),
             "range_median": _median(ranges),
             "range_max": max(ranges) if ranges else 0.0,
             "range_min": min(ranges) if ranges else 0.0,

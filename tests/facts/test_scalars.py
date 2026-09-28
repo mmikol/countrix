@@ -130,6 +130,8 @@ def test_the_reach_is_the_published_limit_and_a_blind_projectile_leaves_hitscan(
     lobbed = _gun("Rockets", "Projectile", _per_second("dps", 120), _stat("range", 60, "meters"))
     assert _hero(weapons=[lobbed, pistol]).max_range == 60.0
     assert _hero(weapons=[lobbed]).hitscan_range == 0.0
+    # a projectile alone that publishes no limit: the range is unknown, not 0 m
+    assert _hero(weapons=[rockets]).max_range is None
 
 
 def test_the_weapon_kinds_read_the_damaging_weapons():
@@ -189,9 +191,17 @@ def test_control_movement_and_flight_read_the_keywords_and_the_rows():
     slow = _kit("Frost", KIND_ABILITY, _stat("mspeed_slow", -30, "percent"))
     jet = _kit("Jet Pack", KIND_ABILITY, keywords="flight")
     roll = _kit("Roll", KIND_ABILITY, _stat("shot_type", None, text="Movement"))
-    hero = _hero(abilities=[stun, shove, nudge, slow, jet, roll])
+    # a tool that moves a teammate is the teammate's; a partial one moves its hero
+    grip = _kit("Grip", KIND_ABILITY, keywords="evasive;;target ally")
+    lunge = _kit("Lunge", KIND_ABILITY, keywords="partial movement")
+    # a movement tool's knockback is its own flight, typed Movement or tagged
+    slam = _kit("Slam", KIND_ABILITY, _stat("damage", 50, "hp"), _stat("kbspeed", 15, "meters"),
+                _stat("shot_type", None, text="Movement"))
+    hero = _hero(abilities=[stun, shove, nudge, slow, jet, roll, grip, lunge, slam])
     assert hero.cc_tools == ["Concussive Blast", "Flashbang", "Frost"]
-    assert hero.mobility_tools == ["Jet Pack", "Roll"] and hero.flyer
+    assert hero.mobility_tools == ["Jet Pack", "Lunge", "Roll", "Slam"] and hero.flyer
+    assert [p.name for p in scalars.mobility_tools(hero.abilities)] == [
+        "Jet Pack", "Roll", "Lunge", "Slam"]
 
 
 def test_saves_split_what_lands_on_a_teammate_from_what_saves_its_owner():

@@ -13,6 +13,7 @@ from facts.draft import Draft
 from facts.kit import KitPiece, Stat
 from facts.model import Hero, World
 from facts.records import DerivedEdge, Fired, Pairing
+from facts.scalars import derive_scalars
 from tests import synthetic
 
 # the units a row of each stat is written in: (numerator, denominator)
@@ -116,6 +117,27 @@ def test_control_answers_a_channel_and_mobility():
     stunner = _hero("Rook", abilities=[_piece("Stun", keywords="stun", cooldown=8.0)])
     channel = _hero("Myrrh", abilities=[_piece("Beam Ult", KIND_ULTIMATE, keywords="channel")])
     assert _fired(stunner, channel)["cc"] == 0.5
+
+
+def test_the_matrix_reads_mobility_off_the_facts_movement_tools():
+    """One definition of a movement tool (scalars.moves): a piece typed
+    Movement with no tag (Roll) moves its hero, and a movement channel is
+    no channel control interrupts; a tool that moves a teammate (Grip) is
+    the teammate's. The matrix's mobility pieces are the facts' movement
+    tools, where Roll used to read as no mobility and a channel."""
+    roll = _piece("Roll", keywords="channel", shot_type=(None, "Movement"))
+    grip = _piece("Grip", keywords="evasive;;target ally")
+    boost = _piece("Boost", keywords="strong movement", cooldown=5.0)
+    ball = _hero("Ball", role="tank", pool=600, abilities=[roll, grip, boost])
+    derive_scalars(ball)
+    features = counters.features(ball, 100.0)
+    assert ball.mobility_tools == ["Boost", "Roll"]
+    assert sorted(features.mobility_pieces) == ball.mobility_tools
+    assert features.mobility == 1.0 and features.channel == 0.0      # (1 + 0.5) / 1.5
+    stunner = _hero("Rook", abilities=[_piece("Stun", keywords="stun", cooldown=8.0)])
+    fired = counters.pairing(counters.features(stunner, 100.0), features).fired
+    (cc,) = [f for f in fired if f.mechanism == "cc"]
+    assert (cc.strength, cc.phrase) == (1.0, "control against its mobility")
 
 
 def test_a_projectile_eater_takes_what_its_family_or_its_description_names():

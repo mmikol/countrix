@@ -97,6 +97,20 @@ def test_the_matchup_reads_both_sides(synthetic_world):
     assert compute.heal_read(w, red_t) == compute.HealRead(healing=130.0, pool=2125.0, filled=4)
 
 
+def test_a_side_whose_picks_publish_no_range_is_unknown_not_zero_metres(synthetic_world):
+    """Gale and Balm publish no range: their side has no median, and the gap
+    to Needle's 70 m is unknown either way, read as none - it read 70 m
+    against 0 m while an unknown range stood as 0."""
+    w = synthetic_world
+    blue, red = [w.hero("Needle")], [w.hero("Gale"), w.hero("Balm")]
+    assert w.hero("Gale").max_range is None and w.hero("Balm").max_range is None
+    blue_t, red_t = team_metrics(w, blue, None, red), team_metrics(w, red, None, blue)
+    assert (blue_t["range_known"], blue_t["range_median"]) == (1, 70.0)
+    assert (red_t["range_known"], red_t["range_median"]) == (0, 0.0)
+    assert compute.matchup_metrics(w, blue_t, red_t)["range_diff"] == 0.0
+    assert compute.matchup_metrics(w, red_t, blue_t)["range_diff"] == 0.0
+
+
 def test_no_matchup_metric_restates_a_team_metric(synthetic_world):
     """A matchup key must read both sides. One that copies blue's own number
     gives a second name to one signal: two strategies reading it through the

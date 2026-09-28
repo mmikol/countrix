@@ -253,6 +253,11 @@ def test_the_matchup_names_each_side_of_every_trade(synthetic_world):
     assert _said(fs, "blue")["team.net_edges"].endswith("3 red answer-edges back (-1)")
     assert behind["matchup.range_diff"] == (
         "poke war: blue median reach 30m vs red 20m - blue outranges; open fights at distance")
+    # a side none of whose picks publishes a range is not 0 m away
+    blind = _facts(w, None, ("Gale", "Balm"), ("Needle",))
+    assert _said(blind)["matchup.range_diff"] == (
+        "poke war: red's picks publish no reach - unknown, not compared")
+    assert "team.range_median" not in _said(blind, "red")
     even = _said(_facts(w, None, ("Tansy", "Sorrel"), ("Tansy", "Sorrel")))
     assert even["matchup.burst_vs_heal"].endswith(
         "90 vs red's best save 90 - their saves absorb the burst; stack or poke instead")

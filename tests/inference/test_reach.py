@@ -15,6 +15,7 @@ import pytest
 
 from db import Refusal
 from facts.model import World
+from facts.records import DerivedEdge
 from inference import base, catalog, reach
 from inference.solver import Infeasible
 from tests.inference import FIXTURE_PLAYBOOK, in_force, recorded
@@ -135,6 +136,22 @@ def test_a_hero_its_best_map_favours_is_seated_there_with_no_ban(synthetic_world
     assert "Anvil" in board["six"] and reach.seated(synthetic_world, board)
 
 
+def test_the_reds_read_the_counter_graph_the_engine_scores(synthetic_world):
+    """A red is built on counters.weight, the graph the default engine
+    scores, not the wiki's edges alone: Anvil's derived answers to Quarry
+    and Flint rank after its wiki answer to Mortar and before the most
+    picked heroes it does not answer, and Balm, with a derived answer to
+    Anvil, drops behind them. On the wiki's edges alone the red was
+    Mortar, Kite, Needle, Rook, Balm and Tansy."""
+    w = synthetic_world
+    ids = {h.name: h.id for h in w.heroes.values()}
+    for winner, loser in (("Anvil", "Quarry"), ("Anvil", "Flint"), ("Balm", "Anvil")):
+        w.derived[(ids[loser], ids[winner])] = DerivedEdge(
+            winner=ids[winner], loser=ids[loser], score=0.8, net=0.5, fired=())
+    assert reach.reds(w, w.hero("Anvil")) == [
+        [], ["Mortar", "Quarry", "Flint", "Needle", "Tansy", "Myrrh"]]
+
+
 # four of a six, none of them a tank
 REST = ("Rook", "Needle", "Balm", "Tansy")
 
@@ -171,6 +188,22 @@ def test_a_rival_banned_out_of_the_heros_seat_seats_it(synthetic_world, monkeypa
     assert board == {"hero": "Anvil", "seated": True, "map": "Harbor Gate", "side": "attack",
                      "red": [], "banned": ["Mortar"], "six": top_of(("Mortar",)), "gap": 0.0}
     assert ("Mortar",) in seen
+
+
+def test_a_rival_of_another_role_is_banned_out_of_the_heros_seat(synthetic_world, monkeypatch):
+    """In Open Queue a seat is no role's: Harbor Gate's optimal six fields
+    Gale and Kite where the six holding Anvil fields Anvil and Sorrel. The
+    ban search bans Kite first, Anvil's own role, then Gale, a damage hero
+    the search used to pass over, stopping with no tank left to ban, and
+    the board solved again seats Anvil."""
+    def top_of(bans):
+        if "Gale" in bans:
+            return ["Anvil", "Sorrel", *REST]
+        return ["Gale", "Sorrel" if "Kite" in bans else "Kite", *REST]
+    seen = _boards(monkeypatch, ["Harbor Gate"], top_of, lambda map_name: 1.0)
+    board = reach.search(synthetic_world, "Anvil")
+    assert (board["seated"], board["banned"]) == (True, ["Kite", "Gale"])
+    assert seen[-3:] == [(), ("Kite",), ("Kite", "Gale")]
 
 
 def test_a_ban_search_that_runs_out_returns_the_closest_board(synthetic_world, monkeypatch):
@@ -233,4 +266,46 @@ def test_the_recorder_writes_every_seated_hero_beside_the_objective_it_ran_under
     assert [b["hero"] for b in written["boards"]] == [n for n in released if n != "Quarry"]
     assert capsys.readouterr().out == (
         "recorded 11 seated heroes under playbook abababababab and the default engine, 1 of"
-        " them after bans; unseated: Quarry 1.235\n")
+        " them after bans, 0 on a six recorded for another; unseated: Quarry 1.235\n")
+
+
+def test_the_recorder_checks_every_six_already_recorded_before_a_hero_is_unseated(
+        synthetic_world, monkeypatch, tmp_path, capsys):
+    """Quarry's and Myrrh's own searches find no board. Rook's board, found
+    in this run, fields Quarry in its optimal six, and the fixture held a
+    board for Flint that, solved afresh, fields Myrrh: each is recorded on
+    that board. Wisp is announced, never searched. Only a hero no recorded
+    six holds is named unseated - the recorder used to name all three."""
+    missed = {"Quarry": 1.2, "Myrrh": 0.5, "Sorrel": 0.9}
+
+    def search(world, name):
+        if name in missed:
+            return {"hero": name, "seated": False, "map": "Salt Flats", "side": "",
+                    "red": [], "banned": [], "six": [], "gap": missed[name]}
+        six = [name, "Quarry"] if name == "Rook" else [name]
+        return {"hero": name, "seated": True, "map": "Harbor Gate", "side": name,
+                "red": [], "banned": [], "six": six, "gap": 0.0}
+    prior = {"hero": "Flint", "seated": True, "map": "Ember Ruins", "side": "",
+        "red": ["Anvil"], "banned": [], "six": ["Flint"], "gap": 0.0}
+    out = tmp_path / "reach.json"
+    out.write_text(json.dumps({"playbook": "cd" * 32, "base": None, "boards": [prior]}))
+    solved = []
+
+    def six(world, board):
+        solved.append(board["map"])
+        return ["Flint", "Myrrh"]
+    monkeypatch.setattr(recorder.psql, "default_dsn", lambda: "postgresql://nowhere")
+    monkeypatch.setattr(recorder.psycopg, "connect", lambda dsn: _Connected())
+    monkeypatch.setattr(recorder.tables, "load", lambda cx: synthetic_world)
+    monkeypatch.setattr(recorder.reach, "search", search)
+    monkeypatch.setattr(recorder.reach, "six", six)
+    monkeypatch.setattr(recorder.catalog, "playbook_digest", lambda: "ab" * 32)
+    monkeypatch.setattr(recorder, "OUT", str(out))
+    assert recorder.main() == 0
+    written = {b["hero"]: b for b in json.loads(out.read_text())["boards"]}
+    assert (written["Quarry"]["map"], written["Quarry"]["side"]) == ("Harbor Gate", "Rook")
+    assert written["Quarry"]["six"] == ["Rook", "Quarry"] and written["Quarry"]["seated"]
+    assert (written["Myrrh"]["map"], written["Myrrh"]["six"]) == ("Ember Ruins", ["Flint", "Myrrh"])
+    assert "Sorrel" not in written and solved == ["Ember Ruins"]
+    assert capsys.readouterr().out.endswith(
+        "0 of them after bans, 2 on a six recorded for another; unseated: Sorrel 0.900\n")

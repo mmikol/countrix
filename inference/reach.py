@@ -3,7 +3,9 @@
 The intent is that the playbook makes a hero rare but never impossible. This is the
 check, not the guarantee: for a hero it looks for a board that suits it - one of its
 maps, a red it answers, a side - on which it is in the optimal six, banning the rivals
-that hold its seat where it must, up to the five bans a match has.
+that hold its seat where it must, up to the five bans a match has. A rival is any hero
+of the optimal six the best six holding the hero leaves out, of any role: in Open Queue
+a seat is no role's, and a damage hero may take a tank's.
 
 The two answers it gives are not symmetric. A board found is a proof: the hero seats
 there, and re-solving that board shows it. A board not found is not a proof of the
@@ -18,12 +20,14 @@ tests/fixtures/reach.json beside the objective it ran under, and the suite check
 is lost.
 
     maps    the four its map rates lift it most on (its three best maps are among them)
-    reds    none (blue counters the likely six); the heroes it answers, two a role, the
-            most exposed to it first; the same without the heroes that answer it back
+    reds    none (blue counters the likely six); the heroes it answers, two a role, on
+            the counter graph the default engine scores (counters.weight: a wiki edge,
+            then a derived one); the same without the heroes that answer it back
 """
 
 from typing import NamedTuple, TypedDict
 
+from facts import counters
 from facts.draft import MAX_BANS, SIDES, Draft, is_sided
 from facts.model import ROLES, Hero, Map, World
 from inference import engine
@@ -68,15 +72,19 @@ def maps(world: World, hero: Hero) -> list[Map]:
 
 
 def reds(world: World, hero: Hero) -> list[list[str]]:
+    """The reds to try: none, then two a role of the heroes the hero answers
+    on the graph the engine scores - a wiki edge before a derived one, one
+    that answers it back last, then the most picked - then the same without
+    those that answer it back."""
     others = [h for h in world.heroes.values() if h.released and h.id != hero.id]
     out: list[list[str]] = [[]]
     for strict in (False, True):
         red: list[str] = []
         for role in ROLES:
             pool = [h for h in others if h.role == role
-                    and not (strict and world.is_countered_by(hero.id, h.id))]
-            pool.sort(key=lambda h: (-bool(world.is_countered_by(h.id, hero.id)),
-                                     bool(world.is_countered_by(hero.id, h.id)),
+                    and not (strict and counters.weight(world, hero.id, h.id))]
+            pool.sort(key=lambda h: (-counters.weight(world, h.id, hero.id),
+                                     counters.weight(world, hero.id, h.id),
                                      -(h.pick or 0), h.name))
             red += [h.name for h in pool[:2]]
         if red not in out:
@@ -84,10 +92,10 @@ def reds(world: World, hero: Hero) -> list[list[str]]:
     return out
 
 
-def _role(world: World, name: str) -> str | None:
-    """The role of a hero the engine named, which the World always holds."""
+def _rank(world: World, hero: Hero, name: str) -> bool:
+    """A rival's place in the ban order: one of the hero's own role first."""
     found = world.hero(name)
-    return found.role if found else None
+    return found is None or found.role != hero.role
 
 
 def search(world: World, name: str) -> Reach:
@@ -137,9 +145,10 @@ def search(world: World, name: str) -> Reach:
 
 def _banning(world: World, hero: Hero, map_name: str, red: list[str], side: str) -> Reach | None:
     """One board's ban search: each round bans the first rival that holds the
-    hero's seat, up to MAX_BANS -> the board once the hero seats, or None when
-    it never does, no rival is left to ban or a ban leaves no six within the
-    playbook's limits."""
+    hero's seat - a hero of the optimal six the best six holding the hero
+    leaves out, of any role, its own role's first - up to MAX_BANS -> the
+    board once the hero seats, or None when it never does, no rival is left
+    to ban or a ban leaves no six within the playbook's limits."""
     banned: list[str] = []
     # one solve of this board per ban, not two: the board a ban produces is
     # the board the next round starts from, so the round reads it
@@ -157,20 +166,26 @@ def _banning(world: World, hero: Hero, map_name: str, red: list[str], side: str)
                                 top=1)
         except Infeasible:
             return None
-        rivals = [h for h in top.blue if _role(world, h) == hero.role
-                  and h not in held.blue and h not in red]
+        rivals = sorted((h for h in top.blue if h not in held.blue and h not in red),
+                        key=lambda h: _rank(world, hero, h))
         if not rivals:
             break
         banned = [*banned, rivals[0]]
     return None
 
 
-def seated(world: World, board: Reach) -> bool:
-    """Is the hero still in the optimal six of the board a search recorded for
-    it? A board the playbook's limits no longer fit has fallen: it seats no one."""
+def six(world: World, board: Reach) -> list[str]:
+    """The optimal six of a board a search recorded, solved afresh; none on a
+    board the playbook's limits no longer fit."""
     try:
         top = engine.infer(world, Draft(map_name=board["map"], red=tuple(board["red"]),
                                         bans=tuple(board["banned"]), side=board["side"]), top=1)
     except Infeasible:
-        return False
-    return board["hero"] in top.blue
+        return []
+    return top.blue
+
+
+def seated(world: World, board: Reach) -> bool:
+    """Is the hero still in the optimal six of the board a search recorded for
+    it? A board the playbook's limits no longer fit has fallen: it seats no one."""
+    return board["hero"] in six(world, board)

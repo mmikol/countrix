@@ -15,6 +15,7 @@ knows the roster's dps.
 import math
 import re
 import statistics
+from collections.abc import Iterable
 from typing import NamedTuple
 
 from db import KIND_ABILITY, KIND_PASSIVE, KIND_ULTIMATE, KIND_WEAPON
@@ -30,7 +31,8 @@ from facts.model import Hero
 # `atoms`.
 CC_KEYWORDS = ("stun", "sleep", "immobilize", "hinder", "knockback", "knockdown", "hacked")
 MOBILITY_KEYWORDS = (
-    "movement", "strong movement", "active movement", "evasive", "flight", "strong flight")
+    "movement", "strong movement", "active movement", "partial movement", "evasive", "flight",
+    "strong flight")
 FLIGHT_KEYWORDS = ("flight", "strong flight")
 CLEANSE_KEYWORDS = ("lesser cleanse", "greater cleanse", "perfect cleanse")
 AREA_KEYWORDS = ("area of effect", "shockwave")     # a ground or cone wave is tagged shockwave
@@ -119,6 +121,22 @@ LINGERING_RE = re.compile(r"over time|\bhot\b", re.I)
 BOUNCE_RE = re.compile(r"(\d+)\w*\s+bounce", re.I)
 # the total a per-second heal stops at: "75 per second , up to 300"
 CAP_RE = re.compile(r"up to\s*(\d+(?:\.\d+)?)", re.I)
+
+
+def moves(piece: KitPiece) -> bool:
+    """A piece that moves the one who uses it: tagged with a mobility
+    keyword, or typed Movement with no tag (Siphon Blaster, Roll). The one
+    definition: the facts' movement tools and the counter matrix's mobility
+    both read it."""
+    return bool(piece.keywords & set(MOBILITY_KEYWORDS)) or piece.typed("movement")
+
+
+def mobility_tools(pieces: Iterable[KitPiece]) -> list[KitPiece]:
+    """The hero's own movement tools: its abilities and passives that move
+    it. One that moves a teammate (Life Grip) is the teammate's, and an
+    ultimate is no tool the hero moves with every fight."""
+    return [p for p in pieces
+            if p.kind in (KIND_ABILITY, KIND_PASSIVE) and not p.for_allies and moves(p)]
 
 
 def derive_scalars(hero: Hero) -> None:
@@ -574,15 +592,18 @@ def ally_lifesteal(hero: Hero, ally_dps: float) -> None:
 
 def _reach(hero: Hero, guns: list[KitPiece]) -> None:
     """max_range and hitscan_range: the weapons' published limits. A weapon
-    that publishes none says nothing, and the hero stays out of the range
-    metrics: unknown is not a number. A held projectile that publishes no
-    limit leaves only hitscan figures standing."""
+    that publishes none says nothing, and a hero none of whose weapons
+    publishes one has no max_range, None: unknown is not a number, and not
+    0 m, so the hero stays out of the range metrics. A held projectile that
+    publishes no limit leaves only hitscan figures standing - the wiki
+    publishes none for a projectile, which flies until it hits (Ramattra's
+    Void Accelerator, Orisa's Augmented Fusion Driver)."""
     blind = any(
         w.extra.get("slot") in PRIMARY_SLOTS and not w.reach
         and not any(t in w.weapon_kind for t in ("hitscan", "beam", "melee"))
         for w in guns)
     known = [r for r in (w.reach for w in guns if not blind or "hitscan" in w.weapon_kind) if r]
-    hero.max_range = max(known, default=0.0)
+    hero.max_range = max(known, default=None)
     hitscan = (w.reach for w in guns if "hitscan" in w.weapon_kind)
     hero.hitscan_range = max((r for r in hitscan if r), default=0.0)
 
@@ -665,15 +686,12 @@ def _control(hero: Hero, base: list[KitPiece], fights: list[KitPiece]) -> None:
     hero.cc_tools = sorted({
         k.name for k in fights
         if k.keywords & set(CC_KEYWORDS)
-        or (k.kind in (KIND_ABILITY, KIND_ULTIMATE) and k.damages and k.shoves
-            and not k.keywords & set(MOBILITY_KEYWORDS))
+        or (k.kind in (KIND_ABILITY, KIND_ULTIMATE) and k.damages and k.shoves and not moves(k))
         or (k.kind in (KIND_ABILITY, KIND_ULTIMATE)
             and any((s.value or 0) < 0 for s in k.stats.get("mspeed_slow", ())))})
-    moves = [a for a in base if a.kind in (KIND_ABILITY, KIND_PASSIVE)]
-    # tagged as movement, or typed Movement with no tag (Siphon Blaster, Roll)
-    hero.mobility_tools = sorted({
-        k.name for k in moves if k.keywords & set(MOBILITY_KEYWORDS) or k.typed("movement")})
-    hero.flyer = any(k.keywords & set(FLIGHT_KEYWORDS) for k in moves)
+    hero.mobility_tools = sorted({k.name for k in mobility_tools(base)})
+    hero.flyer = any(k.keywords & set(FLIGHT_KEYWORDS)
+                     for k in base if k.kind in (KIND_ABILITY, KIND_PASSIVE))
 
 
 def _saves(hero: Hero, base: list[KitPiece], ults: list[KitPiece]) -> None:

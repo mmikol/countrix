@@ -119,7 +119,7 @@ def _output_traits(h: Hero) -> list[TraitRow]:
             if n)), {"cast": h.self_heal, "per_second": h.self_hps}, None)
         if (h.self_heal or h.self_hps) else None,
         ("hero.range", "%s's weapon reaches %gm" % (name, h.max_range),
-            h.max_range, "m") if h.max_range else None,
+            h.max_range, "m") if h.max_range is not None else None,
         ("hero.cooldown_median", "%s's median cooldown: %gs across %d abilities"
             % (name, h.median_cooldown, len(h.cooldowns)), h.median_cooldown, "s")
         if h.median_cooldown is not None else None,

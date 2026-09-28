@@ -597,6 +597,7 @@ the `team.*` metrics computed for the red side.
 | `team.melee` | picks with a melee weapon |
 | `team.aoe_count` | kit pieces tagged area of effect or shockwave |
 | `team.aoe_damage_count` | kit pieces that damage an area |
+| `team.range_known` | picks whose weapons publish a range: the three below read these alone, and read 0 where none does |
 | `team.range_median` | median of each pick's longest published range |
 | `team.range_max` | the longest range on the team |
 | `team.range_min` | the shortest longest-range |
@@ -666,7 +667,7 @@ the `team.*` metrics computed for the red side.
 | `matchup.chew_time_ours` | seconds of blue's floor damage to chew red's pool (999 if unknown) |
 | `matchup.chew_time_theirs` | seconds of red's floor damage to chew blue's pool |
 | `matchup.tempo_diff` | red median cooldown minus blue's (positive: blue cycles faster) |
-| `matchup.range_diff` | blue median reach minus red's |
+| `matchup.range_diff` | blue median reach minus red's; 0 where a side's picks publish none: unknown, no gap |
 | `matchup.exposure_share` | share of blue answered by red |
 | `matchup.ult_answers` | blue invulnerabilities plus cleanses |
 | `matchup.heal_need` | hp/s blue must heal: red's healing per pool times blue's pool, at least red's healing; red's open slots read as the 2-2-2's missing roles |

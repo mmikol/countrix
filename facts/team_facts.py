@@ -187,13 +187,13 @@ def _damage_facts(w: _TeamWriter, figures: dict[str, float], heroes: Sequence[He
         w.fact("aoe_count", "%s area volume: %d kit pieces tagged area of effect, %d of them"
             " damaging" % (label, figures["aoe_count"], figures["aoe_damage_count"]),
             also=("team.aoe_damage_count",))
-    if metrics["range_median"]:
+    if metrics["range_known"]:
         w.fact("range_median", "%s reach: median %gm across the %d of %d picks whose weapons"
             " publish one (%gm to %gm) - reads as %s"
-            % (label, figures["range_median"], sum(1 for h in heroes if h.max_range),
+            % (label, figures["range_median"], figures["range_known"],
                 figures["size"], figures["range_min"], figures["range_max"],
                 "poke" if figures["range_median"] >= 20 else "brawl"), "m",
-            also=("team.range_max", "team.range_min"))
+            also=("team.range_max", "team.range_min", "team.range_known"))
     if metrics["dmg_amp"]:
         w.fact("dmg_amp", "%s damage amplification: %s boost someone's damage"
             % (label, counted(figures["dmg_amp"])))
@@ -392,11 +392,14 @@ def _matchup_trades(fs: FactSet, matchup: MetricBag, blue_t: MetricBag, red_t: M
         "blue re-engages first; force fight frequency" if matchup_n["tempo_diff"] > 0 else
         "red re-engages first; make each fight decisive" if matchup_n["tempo_diff"] < 0 else
         "even tempo"), "s")
-    add("range_diff", "poke war: blue median reach %gm vs red %gm - %s" % (
-        blue_n["range_median"], red_n["range_median"],
-        "blue outranges; open fights at distance" if matchup_n["range_diff"] > 0 else
-        "red outranges; close fast or trade cover" if matchup_n["range_diff"] < 0 else
-        "even reach"), "m")
+    unknown = [side for side, n in (("blue", blue_n), ("red", red_n)) if not n["range_known"]]
+    add("range_diff", "poke war: %s" % (
+        "%s's picks publish no reach - unknown, not compared" % " and ".join(unknown)
+        if unknown else "blue median reach %gm vs red %gm - %s" % (
+            blue_n["range_median"], red_n["range_median"],
+            "blue outranges; open fights at distance" if matchup_n["range_diff"] > 0 else
+            "red outranges; close fast or trade cover" if matchup_n["range_diff"] < 0 else
+            "even reach")), "m")
 
 
 def _heal_floor(fs: FactSet, world: World, blue_t: MetricBag, red_t: MetricBag) -> None:

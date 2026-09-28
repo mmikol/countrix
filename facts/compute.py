@@ -36,7 +36,8 @@ MATCHUP_METRICS = OrderedDict([
     ("chew_time_ours", "seconds of blue's floor damage to chew red's pool (999 if unknown)"),
     ("chew_time_theirs", "seconds of red's floor damage to chew blue's pool"),
     ("tempo_diff", "red median cooldown minus blue's (positive: blue cycles faster)"),
-    ("range_diff", "blue median reach minus red's"),
+    ("range_diff", "blue median reach minus red's; 0 where a side's picks publish none:"
+                   " unknown, no gap"),
     ("exposure_share", "share of blue answered by red"),
     ("ult_answers", "blue invulnerabilities plus cleanses"),
     ("heal_need", "hp/s blue must heal: red's healing per pool times blue's pool, at least"
@@ -227,7 +228,11 @@ def matchup_metrics(world: World, blue_t: MetricBag, red_t: MetricBag) -> Metric
     matchup["chew_time_ours"] = red_pool / blue_dps if blue_dps and red_pool else 999.0
     matchup["chew_time_theirs"] = blue_pool / red_dps if red_dps and blue_pool else 999.0
     matchup["tempo_diff"] = number(red_t["cooldown_median"]) - number(blue_t["cooldown_median"])
-    matchup["range_diff"] = number(blue_t["range_median"]) - number(red_t["range_median"])
+    # a side none of whose picks publishes a range has no median: unknown, not
+    # 0 m, so there is no gap to read
+    known = number(blue_t["range_known"]) and number(red_t["range_known"])
+    matchup["range_diff"] = (
+        number(blue_t["range_median"]) - number(red_t["range_median"]) if known else 0.0)
     matchup["exposure_share"] = number(blue_t["exposed_count"]) / size if size else 0.0
     matchup["ult_answers"] = number(blue_t["invuln"]) + number(blue_t["cleanse"])
     need = heal_need(heal_read(world, red_t), blue_pool)

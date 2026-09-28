@@ -68,7 +68,15 @@ from db import KIND_ABILITY, KIND_PASSIVE, KIND_ULTIMATE
 from facts.kit import KitPiece
 from facts.model import Hero, World
 from facts.records import DerivedEdge, Fired, Pairing
-from facts.scalars import CLEANSE_KEYWORDS, FLIGHT_KEYWORDS, FORM_GATED, PILOT_GUNS, PRIMARY_SLOTS
+from facts.scalars import (
+    CLEANSE_KEYWORDS,
+    FLIGHT_KEYWORDS,
+    FORM_GATED,
+    PILOT_GUNS,
+    PRIMARY_SLOTS,
+    mobility_tools,
+    moves,
+)
 from facts.team import FLIER_REACH
 
 # --- the matrix's rules --------------------------------------------------------
@@ -135,8 +143,9 @@ MELEE_BURST = 0.5       # a melee-only hero's hit must be walked to
 MOBILE_DODGE = 0.5      # a mobile target dodges this share of it
 ONESHOT_FROM, ONESHOT_SPAN = 150.0, 150.0   # a hit over 150 starts to threaten a one-shot
 # --- mobility and dive -------------------------------------------------------------
+# a movement tool is scalars.moves's; one tagged strong is worth STRONG_MOVE,
+# any other - tagged movement or evasive, or typed Movement alone - WEAK_MOVE
 MOVE_STRONG = frozenset({"strong movement", "flight", "strong flight"})
-MOVE_WEAK = frozenset({"movement", "evasive", "active movement", "partial movement"})
 STRONG_MOVE, WEAK_MOVE = 1.0, 0.5   # a movement tool's worth
 MOBILITY_FULL = 1.5     # one strong tool and one weak one make a hero fully mobile
 MOBILE_FROM = 0.34      # mobility under this (one weak tool) is nothing a lock takes away
@@ -315,10 +324,6 @@ class Features:
     oneshot_risk: float
 
 
-def _movement(piece: KitPiece) -> bool:
-    return bool(piece.keywords & (MOVE_STRONG | MOVE_WEAK))
-
-
 def _main(steady: Sequence[KitPiece]) -> KitPiece | None:
     """The weapon the hero fights with: the highest sustained rate, then
     name; a scoped config of it that hits harder in its place."""
@@ -339,7 +344,7 @@ def _burst(h: Hero) -> tuple[float, str]:
     headshot where one counts, and the piece."""
     best, where = 0.0, ""
     for piece in (*h.weapons, *(a for a in h.abilities if a.kind != KIND_ULTIMATE)):
-        if piece.name in PILOT_GUNS or (piece.kind == KIND_ABILITY and _movement(piece)):
+        if piece.name in PILOT_GUNS or (piece.kind == KIND_ABILITY and moves(piece)):
             continue
         hits = [*piece.hits(), *([c] if (c := piece.cast_hit()) else [])]
         if hits and max(hits) > best:
@@ -392,7 +397,7 @@ def _control(h: Hero) -> tuple[float, float, tuple[str, ...], tuple[str, ...]]:
         elif a.keywords & ROOT:
             deny += ROOT_WEIGHT * w
             by_deny.append("%s (%s)" % (a.name, "/".join(sorted(a.keywords & ROOT))))
-        elif a.shoves and a.damages and not _movement(a):
+        elif a.shoves and a.damages and not moves(a):
             deny += KNOCK * w
             by_deny.append("%s (knockback)" % a.name)
     return _clamp(interrupt), _clamp(deny), tuple(by_interrupt), tuple(by_interrupt + by_deny)
@@ -432,15 +437,14 @@ def features(h: Hero, support_hps: float) -> Features:
     reach, range_weapon = max(((m, w.name) for w, m in fights), default=(0.0, ""))
     aa, aa_weapon, aa_kind, aa_reach = _anti_air(h, fights, burst)
     flight, flight_piece = _flight(h)
-    moves = [a for a in h.abilities
-                if a.kind in (KIND_ABILITY, KIND_PASSIVE) and not a.for_allies and _movement(a)]
-    mobility = _clamp(sum(STRONG_MOVE if a.keywords & MOVE_STRONG else WEAK_MOVE for a in moves)
+    tools = mobility_tools(h.abilities)
+    mobility = _clamp(sum(STRONG_MOVE if a.keywords & MOVE_STRONG else WEAK_MOVE for a in tools)
                       / MOBILITY_FULL)
     cc_int, cc_deny, int_pieces, deny_pieces = _control(h)
     ult_channels = [a.name for a in h.abilities
                     if a.kind == KIND_ULTIMATE and "channel" in a.keywords]
     channels = [a.name for a in h.abilities if a.kind == KIND_ABILITY and "channel" in a.keywords
-                and not a.for_allies and not _movement(a)]
+                and not a.for_allies and not moves(a)]
     saves = [a for a in h.abilities if a.kind in (KIND_ABILITY, KIND_ULTIMATE)
                 and a.keywords & (SAVE | CLEANSE)]
     save = _clamp(sum((CLEANSE_SAVE if a.keywords & CLEANSE else INVULN_SAVE)
@@ -475,7 +479,7 @@ def features(h: Hero, support_hps: float) -> Features:
         range=reach, range_weapon=range_weapon, aa=aa, aa_weapon=aa_weapon, aa_kind=aa_kind,
         aa_reach=aa_reach, flight=flight, flight_piece=flight_piece, mobility=mobility,
         mobile=_clamp((mobility - MOBILE_FROM) / (1.0 - MOBILE_FROM)),
-        mobility_pieces=tuple(a.name for a in moves),
+        mobility_pieces=tuple(a.name for a in tools),
         diver=1.0 if h.subrole in DIVERS else 0.0,
         escape=tuple(sorted(a.name for a in h.abilities if a.kind == KIND_ABILITY
                             and a.keywords & SAVE and not a.for_allies)),

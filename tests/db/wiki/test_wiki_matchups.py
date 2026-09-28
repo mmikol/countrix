@@ -193,6 +193,29 @@ def test_the_wikis_rating_is_read_before_the_prose(cell, verdict, basis):
     assert (reading.verdict, reading.basis) == (verdict, basis)
 
 
+# Doomfist's article on Sierra as the row parser hands it over: the ratings
+# leading the cell, then its first paragraph
+DOOMFIST_ON_SIERRA = (
+    "'''HIGH PRIORITY TARGET | LOW RISK''' Sierra operates heavily at mid-range, making her"
+    " vulnerable when Doomfist closes the gap. Her {{al|Anchor Drone}} allows her to make sudden,"
+    " erratic aerial repositionings, but Doomfist can easily predict her grapple trajectory and"
+    " intercept her with a well-timed Seismic Slam.")
+
+
+def test_a_high_priority_low_risk_target_is_no_answer_until_the_prose_says_so():
+    """A tank's article rates each damage and support hero on the PRIORITY
+    TARGET and RISK scales, never MATCHUP: whom to kill first and how
+    dangerous it is to try, not who wins. Doomfist's HIGH PRIORITY TARGET |
+    LOW RISK on Sierra is half a cue, under MARGIN, and its prose weighs
+    none - she is vulnerable only once he closes the gap - so it is no
+    edge. The same label over prose that says he wins is one."""
+    assert matchups.read_label(["HIGH PRIORITY TARGET", "LOW RISK"]) == (None, 0.5)
+    pronouns = ("he", "she")
+    assert read_cell(DOOMFIST_ON_SIERRA, "Doomfist", "Sierra", pronouns) == (0, "prose")
+    easy = "'''HIGH PRIORITY TARGET | LOW RISK''' Sierra is an easy target for Doomfist."
+    assert read_cell(easy, "Doomfist", "Sierra", pronouns) == (1, "prose")
+
+
 @pytest.mark.parametrize("cell", [
     "<small>(To be added)</small>", "(to be added)", "", "'''TBA RISK'''\n<small></small>",
     "'''TBA PRIORITY TARGET''' <small>TBA</small>",

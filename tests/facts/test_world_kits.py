@@ -114,10 +114,12 @@ def test_the_weapon_a_hero_fights_with_sets_its_kind_and_reach(world):
     winston, torb, ramattra = (world.hero(n) for n in ("Winston", "Torbjörn", "Ramattra"))
     assert not winston.hitscan and winston.beam and winston.max_range == 8
     assert winston.burst == 60 and winston.pierces_barrier
-    assert not torb.melee and not torb.pierces_barrier and torb.max_range == 0
+    assert not torb.melee and not torb.pierces_barrier and torb.max_range is None
     assert torb.self_heal == 0 and torb.self_hps == 0
     assert ramattra.melee and ramattra.pierces_barrier and ramattra.dps == 100
-    assert ramattra.max_range == 0 and world.hero("Anran").max_range == 0
+    # a projectile that publishes no limit leaves the range unknown, not 0 m
+    assert ramattra.max_range is None and world.hero("Anran").max_range is None
+    assert world.hero("Orisa").max_range is None
     # Nemesis Form's armor for 8 s of every 16: the form's, not the base row's - 225
     # in 6v6, the kit's format, where 5v5 gives 275. An ultimate's armor (Rally)
     # stays out. 6v6's health is 350, 5v5's 275
@@ -151,6 +153,8 @@ def test_tools_are_counted_once_and_for_what_they_do(world):
     # typed Movement with no movement tag; a speed buff alone is not one
     assert world.hero("Emre").mobility_tools == ["Siphon Blaster"]
     assert "Roll" in world.hero("Wrecking Ball").mobility_tools
+    # Life Grip moves the teammate, not Lifeweaver
+    assert world.hero("Lifeweaver").mobility_tools == ["Rejuvenating Dash"]
     assert "Commanding Shout" not in world.hero("Junker Queen").mobility_tools
     assert "Nemesis Form" not in world.hero("Ramattra").mobility_tools
     assert sum(1 for h in world.heroes.values() if h.released and h.mobility_tools) == 39

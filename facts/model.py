@@ -78,7 +78,7 @@ class Hero:
     self_hps: float = 0.0
     self_heal: float = 0.0
     lifesteal: float = 0.0
-    max_range: float = 0.0
+    max_range: float | None = None     # m; None: no weapon publishes a limit, unknown
     hitscan_range: float = 0.0
     cooldowns: list[float] = field(default_factory=list)
     median_cooldown: float | None = None

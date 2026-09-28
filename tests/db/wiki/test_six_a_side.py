@@ -68,6 +68,28 @@ def test_an_article_without_6v6_fields_states_no_6v6_kit():
     assert (six.pools, six.lines, six.rejected) == ({}, [], [])
 
 
+def test_a_pool_is_read_off_the_infobox_alone_never_the_patch_notes():
+    """Hazard's article: an infobox with 275 health, 225 armor and no 6v6
+    field, and 6v6 patch notes that raise Jagged Wall's health from 400 to
+    500. No pool is read - that health is the wall's, and a patch note is
+    history, not the kit - so his 5v5 pool stands in 6v6."""
+    six = parse_six_a_side("""{{Infobox character
+| health = 275
+| armor = 225
+}}
+{{Ability_details
+| ability_name = Jagged Wall
+| 6v6_details = * Cooldown increased from 12 to 15 seconds
+}}
+|ow6v6={{PatchTableElement|2024-12-17|
+{{al|Jagged Wall}}
+* Health increased from 400 to 500.
+}}""")
+    assert six.pools == {} and six.rejected == []
+    assert six.lines == [SixLine("Jagged Wall", "cooldown", 12.0, 15.0,
+                                 "Cooldown increased from 12 to 15 seconds")]
+
+
 def test_a_lines_stat_is_the_one_its_piece_holds_with_the_from_figure():
     """"Health reduced from 225 to 200" names a barrier's health: the stat
     is barrier_health on a piece that stores that row, health on one that
