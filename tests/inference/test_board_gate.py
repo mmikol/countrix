@@ -1,13 +1,12 @@
 """One gate for every door: the same over-limit board sent through the page's
-facts endpoint, the service's three handlers, the four MCP board tools and
-the engine's three entry points is refused with the same message on each,
-and a six the playbook's limits rule out is refused by every evaluate and
+facts endpoint and its board handler, the four MCP board tools and the
+engine's three entry points is refused with the same message on each, and
+a six the playbook's limits rule out is refused by every evaluate and
 every infer.
-The page's board is not listed: in-process it opens a connection and hands
-the query to serve.handle_board, which is a door here, and on the service
-it is that handler again. The synthetic World stands in for the database
-and the reference playbook for the live one, and every board solves in
-this process."""
+The page's board route is not listed: it opens a connection and hands the
+query to serve.handle_board, which is a door here. The synthetic World
+stands in for the database and the reference playbook for the live one,
+and every board solves in this process."""
 
 import contextlib
 
@@ -26,7 +25,7 @@ SEVEN = ("Balm", "Myrrh", "Sorrel", "Tansy", "Rook", "Needle", "Flint")
 # every door that reads a board; the ones that solve apply the queue's tank rule too
 FACTS_DOORS = ("page api_facts", "mcp facts")
 SOLVING_DOORS = (
-    "service handle_infer", "service handle_evaluate", "service handle_board",
+    "page handle_board",
     "mcp infer", "mcp evaluate", "mcp board",
     "engine infer", "engine evaluate", "engine board")
 DOORS = (*FACTS_DOORS, *SOLVING_DOORS)
@@ -49,8 +48,8 @@ class Offline(tools.Context):
 @pytest.fixture()
 def doors(synthetic_world, monkeypatch):
     """Each door by name, as a call that takes a board: red, blue and bans as
-    tuples, one dict for Draft(**board), ctx.call(name, **board) and the HTTP
-    doors' parsed query."""
+    tuples, one dict for Draft(**board), ctx.call(name, **board) and the
+    page's parsed query."""
     monkeypatch.setattr(tables, "load", lambda cx: synthetic_world)
     # board() asks the pool for its workers before _board_once refuses
     monkeypatch.setenv("COUNTRIX_PARALLEL", "0")
@@ -68,9 +67,7 @@ def doors(synthetic_world, monkeypatch):
 
     return {
         "page api_facts": lambda board: page.api_facts(None, query(board)),
-        "service handle_infer": lambda board: serve.handle_infer(None, query(board)),
-        "service handle_evaluate": lambda board: serve.handle_evaluate(None, query(board)),
-        "service handle_board": lambda board: serve.handle_board(None, query(board)),
+        "page handle_board": lambda board: serve.handle_board(None, query(board)),
         "mcp facts": tool("facts"),
         "mcp infer": tool("infer"),
         "mcp evaluate": tool("evaluate"),
@@ -103,10 +100,9 @@ def test_every_door_that_solves_refuses_a_third_red_tank(doors, door):
 def test_every_door_that_evaluates_or_infers_refuses_a_six_its_limits_rule_out(
         doors, synthetic_world, monkeypatch, tmp_path):
     """A full blue six that breaks one of the playbook's limits is not
-    allowed: the service's evaluate, the evaluate tool and the engine's,
-    under the playbook in force, refuse it with the rule's name before any
-    search, and every infer that is handed it as locked picks refuses them
-    in the same words."""
+    allowed: the evaluate tool and the engine's, under the playbook in
+    force, refuse it with the rule's name before any search, and every infer
+    that is handed it as locked picks refuses them in the same words."""
     (tmp_path / "three-supports.md").write_text(
         "---\nname: At most three supports\nkind: constraint\nrequire: team.supports <= 3\n"
         "---\n# At most three supports\n\nA six fields at most three supports.\n",
@@ -117,7 +113,6 @@ def test_every_door_that_evaluates_or_infers_refuses_a_six_its_limits_rule_out(
     in_force = {
         "engine evaluate": lambda board: engine.evaluate(synthetic_world, Draft(**board)),
         "engine infer": lambda board: engine.infer(synthetic_world, Draft(**board))}
-    for door in ("service handle_evaluate", "mcp evaluate", "engine evaluate",
-                 "service handle_infer", "mcp infer", "engine infer"):
+    for door in ("mcp evaluate", "engine evaluate", "mcp infer", "engine infer"):
         with pytest.raises(Refusal, match=r"^not allowed: breaks At most three supports$"):
             in_force.get(door, doors[door])(board)

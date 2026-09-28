@@ -1,7 +1,5 @@
-/* the playbook tab: the groups, the cards, the weight sliders and their store;
-   loaded before board.js, which calls into it. READ_ONLY comes from the inline
-   script in the page shell (ui/pages.py) and is true unless the board was told
-   it may write; everything below about *store* is the READ_ONLY=0 case. */
+/* the playbook tab: the groups, the cards and the weight sliders; loaded
+   before board.js, which calls into it. */
 /* a heuristic's weight is the user's to set: a slider under its card, 0 to 10
    to the hundredth (0.25, 9.99), with a number box for the exact figure,
    starting at the weight the file infers; a setting rides with every board
@@ -13,28 +11,7 @@ function weightRow(h) {
     "<span class='wlbl'>weight</span><input type='range' min='0' max='10' step='0.01' value='" + v + "' aria-label='weight of " + esc(h.name) + "'>" +
     "<input type='number' class='wval' min='0' max='10' step='0.01' value='" + v + "' aria-label='exact weight of " + esc(h.name) + "'>" +
     "<span class='wbreak'></span>" +
-    "<button class='wreset' " + (set ? '' : 'disabled') + ">reset</button>" +
-    (READ_ONLY ? '' : "<button class='wstore' " + (set ? '' : 'disabled') + " title='write this weight into the heuristic&#39;s file'>store</button>") + "</div>";
-}
-/* store: only reachable when READ_ONLY is false - the button is not rendered
-   otherwise and the server answers 403. The weight goes into the heuristic's
-   file through the door's tune tool (validated, logged, mirrored); the
-   file's weight is then the inferred default, so the browser's setting is
-   dropped and the cards re-read */
-function storeWeight(id, value, button) {
-  if (value === null) return;
-  button.disabled = true; button.textContent = 'storing…';
-  fetch('/api/weight', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id, weight: value }) })
-    .then(function (r) { return r.json(); })
-    .then(function (d) {
-      if (d.error) { flash('not stored: ' + d.error); button.disabled = false; button.textContent = 'store'; return; }
-      flash(d.line || ('stored ' + id + ' at ' + value));
-      delete st.weights[id];
-      save();
-      loadPlaybook();
-      refresh();
-    })
-    .catch(function (e) { flash('not stored: ' + e); button.disabled = false; button.textContent = 'store'; });
+    "<button class='wreset' " + (set ? '' : 'disabled') + ">reset</button></div>";
 }
 function clampWeight(x) { x = Math.round(+x * 100) / 100; return isNaN(x) ? null : Math.min(10, Math.max(0, x)); }
 function setWeight(id, value, inferred) {
@@ -90,13 +67,12 @@ function renderPlaybook(d) {
   });
   el('playbook').querySelectorAll('.wrow').forEach(function (row) {
     var id = row.getAttribute('data-id'), inferred = +row.getAttribute('data-inferred');
-    var range = row.querySelector('input[type=range]'), val = row.querySelector('.wval'), reset = row.querySelector('.wreset'), store = row.querySelector('.wstore');
-    var commit = function (x) { x = clampWeight(x); if (x === null) return; range.value = x; val.value = x; reset.disabled = x === inferred; if (store) store.disabled = x === inferred; setWeight(id, x, inferred); };
+    var range = row.querySelector('input[type=range]'), val = row.querySelector('.wval'), reset = row.querySelector('.wreset');
+    var commit = function (x) { x = clampWeight(x); if (x === null) return; range.value = x; val.value = x; reset.disabled = x === inferred; setWeight(id, x, inferred); };
     range.oninput = function () { val.value = range.value; };
     range.onchange = function () { commit(range.value); };
     val.onchange = function () { commit(val.value); };
-    reset.onclick = function () { range.value = inferred; val.value = inferred; reset.disabled = true; if (store) store.disabled = true; setWeight(id, null, inferred); };
-    if (store) store.onclick = function () { storeWeight(id, clampWeight(val.value), store); };
+    reset.onclick = function () { range.value = inferred; val.value = inferred; reset.disabled = true; setWeight(id, null, inferred); };
   });
   function card(h) {
     var meta = h.form === 'heuristic' ? h.direction + ' ' + h.metric + ' · weight ' + h.weight + (h.need ? ' · need' : '') + (h.when ? ' · when ' + h.when : '')

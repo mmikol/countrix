@@ -13,7 +13,7 @@ and the board is reachable from this machine only.
 | threat | how it would arrive |
 | --- | --- |
 | **prompt injection** | text that reads like an instruction, in a source page or a strategy file, shown by a tool to a session, which has tools |
-| **the door and the other servers** | any process on this machine calling every tool on the MCP door, the writes, refreshes and rebuilds included; a browser page trying the same through DNS rebinding, or reading the board, the playbook and the solver's answers from any of the three HTTP servers |
+| **the door and the board** | any process on this machine calling every tool on the MCP door, the writes, refreshes and rebuilds included; a browser page trying the same through DNS rebinding, or reading the board, the playbook and the solver's answers from either HTTP server |
 | **SQL** | the `query` tool: the project's database users are superusers, and a superuser's `SELECT` can read files off the disk it runs on |
 | **files** | tools that write into the playbook: a path that escapes the folder, a file the catalog would refuse, an oversized body |
 | **the containers** | a compromised process inside one reaching the internet, escalating, filling the host, or calling every tool on the door, which answers the whole stack network as `data:8020` |
@@ -30,20 +30,16 @@ whitelisted expression language in `inference/expr.py`. Nothing runs a
 model unattended: a strategy's frontmatter is written in a session, by a
 person or through `/strategy`.
 
-**The board's write is off by default, and knocks at the door when it is
-on.** `COUNTRIX_READ_ONLY` defaults to `1`: `POST /api/weight` answers
-403, or 415 first for a body not labelled `application/json`, so a
-slider's weight stays in the session. At `0` the POST becomes a call to
-the door's `tune` tool, which ignores the setting. The board's code writes
-no playbook file and no row, and its container mounts the playbook
-read-only.
+**The board writes nothing.** It answers `GET` alone, so a slider's
+weight stays in the session. Its code writes no playbook file and no row,
+and its container mounts the playbook read-only.
 
-**Every server answers only to its own names.** The door, the inference
-service and the board stand on `db/web.py`, which checks each request's
-`Host` and `Origin` before any route runs, on every method. Each must be a
-local name (`db.web.LOCAL_HOSTS`) or one the server was started with: its
-compose service name (`data`) or a published board's public
-name. Anything else is 403, a missing `Host` and `Origin: null` included.
+**Every server answers only to its own names.** The door and the board
+stand on `db/web.py`, which checks each request's `Host` and `Origin`
+before any route runs, on every method. Each must be a local name
+(`db.web.LOCAL_HOSTS`) or one the server was started with: its compose
+service name (`data`) or a published board's public name. Anything else
+is 403, a missing `Host` and `Origin: null` included.
 A page rebound by DNS sends its own host name, so the Host check stops it.
 
 **The door checks who is knocking.** It listens on 0.0.0.0:8020 inside
@@ -52,17 +48,13 @@ its container, so every container on the stack network reaches it as
 twenty messages, refuses a body not labelled `application/json` with
 415, allows 120 tool calls per client address a minute and answers 429
 past that, and asks for `Authorization: Bearer <token>` when
-`COUNTRIX_MCP_TOKEN` is set in `.env`; `.mcp.json` sends it, and `ui`
-holds it too. `/health` stays open for the healthchecks.
+`COUNTRIX_MCP_TOKEN` is set in `.env`; `.mcp.json` sends it. `/health`
+stays open for the healthchecks.
 
 **A failure keeps its traceback.** A request that raises is 400 with the
 refusal's reason or 500 with the error's type and message
 (`db.web.failure`), and the traceback goes to stderr; the door's JSON-RPC
-says the same with `isError` and `INTERNAL`. The board's relays,
-`door.mcp.client.call_tool` to the door and `ui.board.remote` to the
-inference service, answer 400 for the caller's error, pass a 429 through,
-and answer 502 for any other failure upstream, the door's 401 included,
-since the token it refused is the board's. Each server logs one line to
+says the same with `isError` and `INTERNAL`. Each server logs one line to
 stderr for every request that fails and every board it solves.
 
 **SQL runs as the reader.** The `query` tool in `door/mcp/lifecycle.py`
@@ -119,16 +111,15 @@ the browser loads hero portraits and role icons from Blizzard's CDNs.
   containers. A compromised page can put text into the database; the
   skills treat it as data, and a rebuild from the page cache reproduces
   it until the cache is refreshed.
-- The board and the inference service have no authentication of their
-  own. The database's password is `overwatch`, public in `compose.yaml`,
-  unless `POSTGRES_PASSWORD` is set in `.env`, and `matrix_reader`'s is
-  its own name (migration 012). The door carries the tools that write,
-  refresh and rebuild, and its token is optional and unset by default.
-  Never publish the door (8020), the database (5433) or an inference
-  service run on its own (8019).
+- The board has no authentication of its own. The database's password is
+  `overwatch`, public in `compose.yaml`, unless `POSTGRES_PASSWORD` is set
+  in `.env`, and `matrix_reader`'s is its own name (migration 012). The
+  door carries the tools that write, refresh and rebuild, and its token is
+  optional and unset by default. Never publish the door (8020) or the
+  database (5433).
 - A board published anyway goes out alone: its line in
   `docker-entrypoint.sh` gains `--allow-host <public name>`, or every
-  request answers 403, and `COUNTRIX_READ_ONLY` stays at `1`.
+  request answers 403.
 - `backups/` holds the nightly dumps: the whole database, Blizzard's
   rates among it, which are licensed for personal use only. Each is
   `0600` under the loop's umask 077, ignored by git and left out of the

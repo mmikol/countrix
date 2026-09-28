@@ -131,12 +131,6 @@ services:
       - "127.0.0.1:8017:8017"
     environment:
       <<: *env
-      COUNTRIX_UI_HOST: 0.0.0.0
-      # the board writes nothing unless COUNTRIX_READ_ONLY=0; the two below
-      # are the channel its write would use (a tune, through the door)
-      COUNTRIX_READ_ONLY: ${COUNTRIX_READ_ONLY:-}
-      COUNTRIX_MCP_URL: http://data:8020/mcp
-      COUNTRIX_MCP_TOKEN: ${COUNTRIX_MCP_TOKEN:-}
       # the solver's workers; empty is one per core, six to twelve (inference/parallel.py)
       COUNTRIX_WORKERS: ${COUNTRIX_WORKERS:-}
     depends_on:

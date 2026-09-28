@@ -93,10 +93,10 @@ WRITER_RE = re.compile(r"\b(?:catalog|catalog_module)\.mirror\(|\btune\.(?:tune|
 def test_only_the_door_calls_the_playbook_writers():
     """docs/architecture.md's rule: the door gates every write. The code that
     writes the playbook and its table lives in inference/ (catalog.mirror,
-    tune.tune, tune.add, tune.complete), and only a door tool calls it. The
-    board stores a weight through ctx.call, not tune."""
+    tune.tune, tune.add, tune.complete), and only a door tool calls it. A
+    call through the door, ctx.call("tune", ...), is not one."""
     assert WRITER_RE.search("        catalog.mirror(cx, cat)")
-    assert not WRITER_RE.search('tool_context().call("tune", **arguments)')
+    assert not WRITER_RE.search('ctx.call("tune", **arguments)')
     outside = []
     for path in _python_files("db", "facts", "inference", "door", "ui"):
         relative = os.path.relpath(path, ROOT)

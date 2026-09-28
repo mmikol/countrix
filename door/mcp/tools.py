@@ -1,6 +1,6 @@
 """The door's tools, assembled: importing every family fills REGISTRY, in the
-order the server lists them. The servers, the refresher, the shell and the
-board import this module for that and for what it re-exports - REGISTRY,
+order the server lists them. The servers, the refresher and the shell
+import this module for that and for what it re-exports - REGISTRY,
 Context, Log, NoSuchToolError and StrategyResources. An in-process call is
 ctx.call(name, **arguments).
 """

@@ -25,10 +25,10 @@ def test_the_entry_point_lists_tools_and_refuses_nonsense(capsys):
     assert "python -m door.mcp call" in capsys.readouterr().err
 
 
-def test_the_http_mode_takes_the_flags_the_other_servers_take(monkeypatch, capsys):
-    """--host, --port and a repeated --allow-host, as the board and the
-    inference service spell them; the old HOST:PORT positional is a usage
-    error like a port that is not a number."""
+def test_the_http_mode_takes_the_flags_the_board_takes(monkeypatch, capsys):
+    """--host, --port and a repeated --allow-host, as the board spells
+    them; the old HOST:PORT positional is a usage error like a port that is
+    not a number."""
     served = []
     monkeypatch.setattr(http, "serve", lambda server, host, port, status, allowed_hosts=(): (
         served.append((host, port, list(allowed_hosts)))))

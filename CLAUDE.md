@@ -46,13 +46,13 @@ variable: it has no cluster and no pgserver.
 
 The solver's pool (`inference/parallel.py`) spawns `max(6, min(cores, 12))`
 worker processes (12 here) in any process that calls `engine.board()`
-without a catalog of its own: `ui.board`
-and `inference.serve` at launch, the stdio MCP server and `door.mcp call board`
-on the first board, pytest on the first board test. `COUNTRIX_WORKERS=6` is
-the lowest cap that keeps that test green; `COUNTRIX_PARALLEL=0` solves
-in-process. `COUNTRIX_PARALLEL` is read on every board, `COUNTRIX_WORKERS`
-when the pool starts. The pool is spawn-context, and a worker exits within
-a second of its parent, a kill included.
+without a catalog of its own: `ui.board` at launch, the stdio MCP server
+and `door.mcp call board` on the first board, pytest on the first board
+test. `COUNTRIX_WORKERS=6` is the lowest cap that keeps that test green;
+`COUNTRIX_PARALLEL=0` solves in-process. `COUNTRIX_PARALLEL` is read on
+every board, `COUNTRIX_WORKERS` when the pool starts. The pool is
+spawn-context, and a worker exits within a second of its parent, a kill
+included.
 
 Without the database, two generated sections regenerate on their own:
 `.venv/bin/python -c "from door.mcp import tools; tools.REGISTRY.write_docs()"`
@@ -125,10 +125,10 @@ db <- facts <- inference <- door <- ui.
   the team.* counter metrics never read) - and the playbook's terms
   sit on top, so the shipped playbook's boards are scored, never
   *unscored*. A `BaseWeights` rides the `Brief` (`base=` on `infer`,
-  `evaluate`, `Objective`, `Solver` and the pool's `Spec`); the board, the
-  tools and the service run `base.DEFAULT`. `base.OFF` is the playbook
-  alone, byte for byte the engine before it had a base: a test that pins
-  the reference playbook's sixes or scores passes it.
+  `evaluate`, `Objective`, `Solver` and the pool's `Spec`); the board and
+  the tools run `base.DEFAULT`. `base.OFF` is the playbook alone, byte for
+  byte the engine before it had a base: a test that pins the reference
+  playbook's sixes or scores passes it.
 - **The kit is read in 6v6.** `facts.draft.KIT_FORMAT` names the format;
   `tables.load` lays the wiki's 6v6 pools and lines (`heroes.*_6v6`,
   `kit_6v6`) over the 5v5 rows before `derive_scalars` (`facts/kit_format.py`).
@@ -149,15 +149,14 @@ db <- facts <- inference <- door <- ui.
   must agree bit for bit: string-seeded RNGs, integer tallies, a least
   floor, ties broken by `map_win_mean` and then sorted names.
 - **The board** (`ui/board.py`, its pages in `ui/pages.py`) serves
-  `/api/facts` in-process and answers `/api/board`, `/api/strategies` and
-  `/health` with `inference/serve.py`'s handlers, in-process - the compose
-  stack's `ui` container runs the engine and its pool - or on the service
-  `COUNTRIX_INFERENCE_URL` names. `serve.Admission` holds the boards in
-  flight to one `engine.FIELD_BUDGET` of sixes. It is read-only unless
-  `COUNTRIX_READ_ONLY=0`; its one write, a weight's `tune`, goes through
-  the door.
-  All three HTTP servers stand on `db/web.py`: a request whose Host or Origin
-  is not a local name or one given with `--allow-host` is refused with 403.
+  `/api/facts` and answers `/api/board`, `/api/strategies` and `/health`
+  with `inference/serve.py`'s handlers, all in its own process - the
+  compose stack's `ui` container runs the engine and its pool.
+  `serve.Admission` holds the boards in flight to one `engine.FIELD_BUDGET`
+  of sixes. It answers GET alone and writes nothing: a slider's weight
+  rides with the session's requests. Both HTTP servers, the board and the
+  MCP door, stand on `db/web.py`: a request whose Host or Origin is not a
+  local name or one given with `--allow-host` is refused with 403.
 - **Docker** runs one image as three roles, plus postgres and `backup`, the
   nightly `pg_dump` into `backups/` on postgres's image (`compose.yaml`,
   `docker-entrypoint.sh`). Migrations ship in the image, not a mount: once

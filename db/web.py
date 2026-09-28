@@ -1,5 +1,5 @@
-"""What the three HTTP servers share - the MCP door, the inference service and
-the board - and the one JSON reader their clients read answers with.
+"""What the two HTTP servers share - the MCP door and the board - and the
+one JSON reader orchestrator.py reads their answers with.
 
 A server here answers only requests that name it: LocalServer holds the host
 names it answers to, and Handler checks each request's Host and Origin
@@ -11,25 +11,11 @@ error, 400 with its message; anything else is the server's fault, 500 with
 the error's type and message, and the traceback goes to stderr, never to the
 caller.
 
-A route that relays a call to another server - the board's to the MCP door
-and to the inference service - answers by one map. The caller's error is
-400: a Refusal, a tool's isError, or the inference service's 400, since the
-query goes to it as received. The door's 429 passes through. Every other
-outcome upstream is 502: the door's 401, 400 or 413, a JSON-RPC error
-object, a body that is not a JSON object, nothing answering, the service's
-403, 404 or 500. The relaying process's own crash is failure()'s 500. The
-door's 401 is not passed on: the browser sent no credentials, and the token
-the door refused is the board's.
-
 read_json() is the one HTTP reader - the status and the decoded body of any
-answer - under door.mcp.client.call_tool(), a tools/call over the MCP
-door's HTTP transport read into a CallReply that carries the status the map
-gives it, and under the board's and the orchestrator's calls to the other
-servers.
+answer - under orchestrator.py's calls to the stack's servers.
 
 Stdlib only, besides db.Refusal, so what stands on it - the MCP door's HTTP
-transport (door/mcp/http.py) and its client (door/mcp/client.py) - stays
-dependency-free.
+transport (door/mcp/http.py) - stays dependency-free.
 """
 
 import json
@@ -53,7 +39,7 @@ LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "0.0.0.0"})  # nosec B
 
 class Reply(NamedTuple):
     """A JSON reply: its body, a JSON object, and its HTTP status - what every
-    route of the board and the inference service answers, and failure()."""
+    JSON route of the board answers, and failure()."""
     body: dict[str, object]
     status: int
 
@@ -176,7 +162,7 @@ def read_json(request: urllib.request.Request | str, timeout: float) -> JsonAnsw
     Nothing answering - a refused connection, a timeout - is an OSError and
     propagates, so each caller keeps the reason in its own words."""
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:  # nosec B310  # every caller checks the scheme: door.mcp.client.call_tool, board.inference_url(), orchestrator's http literals
+        with urllib.request.urlopen(request, timeout=timeout) as response:  # nosec B310  # the one caller, orchestrator.py, passes its own http literals
             status, raw = response.status, response.read()
     except urllib.error.HTTPError as error:          # a URLError, so caught first
         status, raw = error.code, error.read()

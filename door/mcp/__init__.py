@@ -17,13 +17,11 @@ one of them.
                  caps and the rate limit a client is held to
     schema       a tool as the protocol serves it: its arguments as JSON
                  Schema, its reply, and the Tool that checks every call
-    client       the one client that calls the door over HTTP: call_tool, a
-                 tools/call read into a CallReply, for the board
     registry     the one Registry every family declares its tools into, the
                  order it lists the families in, and the Context a call
                  lands in
     tools        every family imported, so the registry is whole, and the
-                 Context the servers, the refresher and the board use
+                 Context the servers and the refresher use
     pulls        pull, clean, store: the pull_* tools, load_authored, sync_all
     lifecycle    the database's life: status, init, migrate, rebuild, the
                  generated docs, read-only query
@@ -35,8 +33,8 @@ one of them.
                  write them, the tuning log, the strategy:// resources
     __main__     the command line above
 
-The protocol, its transports and its client are dependency-free (server,
-stdio, http, schema, client): the door is its own few hundred lines, and
-the surface is the standard one - initialize, tools/list, tools/call,
-resources - so any MCP client can drive it.
+The protocol and its transports are dependency-free (server, stdio, http,
+schema): the door is its own few hundred lines, and the surface is the
+standard one - initialize, tools/list, tools/call, resources - so any MCP
+client can drive it.
 """

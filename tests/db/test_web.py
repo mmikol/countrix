@@ -1,4 +1,4 @@
-"""What the three HTTP servers share: the reply to a request that raised, the
+"""What the two HTTP servers share: the reply to a request that raised, the
 Host-and-Origin guard, the handler base that logs what failed and the one
 JSON reader."""
 
@@ -38,8 +38,8 @@ def _headers(**fields):
 
 
 def test_a_request_must_name_the_server_by_its_host_and_its_origin():
-    allowed = web.LOCAL_HOSTS | {"inference"}
-    for host in ("localhost:8017", "127.0.0.1", "[::1]:8020", "LOCALHOST", "inference:8019"):
+    allowed = web.LOCAL_HOSTS | {"data"}
+    for host in ("localhost:8017", "127.0.0.1", "[::1]:8020", "LOCALHOST", "data:8020"):
         assert web.request_allowed(_headers(Host=host), allowed), host
     # a rebound page sends no Origin on a same-origin GET, but its own host name
     for host in ("evil.example", "evil.example:8017", "localhost.evil.example", "[::1", ""):

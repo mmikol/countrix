@@ -47,7 +47,7 @@ class Latest:
         return superseded
 
 
-# the page's boards, one lane per client, in whichever server solves them
+# the page's boards, one lane per client
 LATEST = Latest()
 
 

@@ -1,9 +1,9 @@
 """The board's vocabulary: a lobby's limits and the refusal of a team past
 them, the sides of a sided map, and the Draft - the board at one stage of
 the pick-and-ban draft, which refuses a board no lobby holds - with
-parse_board, the one reader of a board off the wire, shared by the page and
-the service because the page's board runs through serve.handle_board, and
-the format the kit is read in, KIT_FORMAT. A playbook draft - a strategy
+parse_board, the one reader of a board off the wire, which the board's
+facts and its solves (serve.handle_board) share, and the format the kit is
+read in, KIT_FORMAT. A playbook draft - a strategy
 awaiting its frontmatter - is another thing. A leaf: it imports only the
 model and db's Refusal, so every other module in the package can take
 these names from it.
@@ -71,13 +71,13 @@ class Draft:
 
 # --- the board off the wire -----------------------------------------------------
 #
-# Both HTTP doors - ui/board.py and inference/serve.py - read a board off a
-# query string with parse_board. The limits belong to Draft, so these doors
-# and the MCP board tools (door/mcp/boards.py) refuse the same boards. A
-# Draft holds tuples: a list in a field makes an equal-looking Draft compare
-# unequal.
+# The board's two routes that read one - /api/facts in ui/board.py and
+# /api/board through inference/serve.py - read it off a query string with
+# parse_board. The limits belong to Draft, so these routes and the MCP board
+# tools (door/mcp/boards.py) refuse the same boards. A Draft holds tuples: a
+# list in a field makes an equal-looking Draft compare unequal.
 
-# A parsed query string, as both doors hand it to parse_board
+# A parsed query string, as both routes hand it to parse_board
 type Query = Mapping[str, Sequence[str]]
 
 

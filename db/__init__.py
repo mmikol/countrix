@@ -12,7 +12,7 @@ the tables over db.psql.default_dsn().
                   needs (psql), the schema, the ledger, rebuild and the
                   generated docs (psql.schema), the migrations, and the
                   embedded cluster a local build creates (gitignored)
-    web           what the three HTTP servers share: the Host-and-Origin
+    web           what the two HTTP servers share: the Host-and-Origin
                   guard, the handler that sends and logs, the reply to a
                   request that raised (a Refusal 400, anything else 500 with
                   its traceback on stderr) and the one JSON reader

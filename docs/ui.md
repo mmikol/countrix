@@ -9,21 +9,19 @@ the board or its pages.
 
 ```bash
 .venv/bin/python -m ui.board              # http://localhost:8017, the local cluster
-COUNTRIX_INFERENCE_URL=http://localhost:8019 .venv/bin/python -m ui.board   # comps from a service
 ```
 
-An `http.server` handler over psycopg, no web framework, no build step. In
-the compose stack the `ui` container computes the facts and the comps
-itself, the solver's worker pool warmed at launch; `COUNTRIX_INFERENCE_URL`
-hands the comps to an inference service run on its own.
+An `http.server` handler over psycopg, no web framework, no build step.
+The board computes the facts and the comps in its own process, the
+solver's worker pool warmed at launch, as the compose stack's `ui`
+container does. It writes nothing.
 
 ## `board.py` and `pages.py` - the page and its endpoints
 
 `pages.py` renders the page, a shell over the static files that injects
-only `TEAM` (six), `BANS` (five) and whether the board writes. `board.py`
-serves it and the JSON endpoints behind the host guard `db/web.py` puts on
-all three servers, and a call it relays answers by that module's status
-map ([security.md](security.md)).
+only `TEAM` (six) and `BANS` (five). `board.py` serves it and the JSON
+endpoints behind the host guard `db/web.py` puts on both servers
+([security.md](security.md)).
 
 | route | serves |
 | --- | --- |
@@ -31,25 +29,17 @@ map ([security.md](security.md)).
 | `/static/<file>` | `board.css`, `board.js`, `comps.js`, `playbook.js` and `bebas-neue.woff2`, nothing else |
 | `/api/roster` | the roster `facts/roster.py` builds, which the door's `roster` tool lists too: every hero (role, subrole, health pool, portrait, status, release day) and every map (mode, top style, sided or not), with the role icons and the patches newer than the rates |
 | `/api/facts?map=&side=&red=&blue=&bans=` | the FactSet for the board as JSON: the facts, their count and the playbook's record |
-| `/api/board?map=&side=&red=&blue=&bans=[&weights=&client=&pool=]` | the board solved at any stage under the playbook tab's weights: the `board` tool's answer ([mcp.md](mcp.md#the-tools)) without the countered case, which the page never reads. `serve.handle_board` in-process, or the service's `/board` when `COUNTRIX_INFERENCE_URL` is set, the query forwarded as received before any connection opens. A board waits while the boards in flight hold one `FIELD_BUDGET`'s worth of sixes, and answers 429 after a minute (`serve.Admission`) |
-| `/api/strategies` | the catalog: every constraint, heuristic and assumption with its kind, form, frontmatter and body - `serve.handle_strategies` in-process, or the service's `/strategies` |
-| `/health` | the engine's health, `serve.handle_health` in-process or the service's `/health`: ok or degraded, the strategies, the drafts pending and the heroes, and the error naming what is out of reach. The ui container's healthcheck and `orchestrator.py` read it |
+| `/api/board?map=&side=&red=&blue=&bans=[&weights=&client=&pool=]` | the board solved at any stage under the playbook tab's weights: the `board` tool's answer ([mcp.md](mcp.md#the-tools)) without the countered case, which the page never reads, from `serve.handle_board`. A board waits while the boards in flight hold one `FIELD_BUDGET`'s worth of sixes, and answers 429 after a minute (`serve.Admission`) |
+| `/api/strategies` | the catalog: every constraint, heuristic and assumption with its kind, form, frontmatter and body, from `serve.handle_strategies` |
+| `/health` | the engine's health, from `serve.handle_health`: ok or degraded, the strategies, the drafts pending and the heroes, and the error naming what is out of reach. The ui container's healthcheck and `orchestrator.py` read it |
 | `/math` | `static/math.html` in the page shell, the constants it quotes (the default engine's three weights and `RATE_PICK_HALF`, `SYNERGY_PULL`, `REFERENCE_SIZE`, `NEED_BUDGET` and the search's four) filled in by `pages.py`: the equation, the scoring function with the default engine under the playbook, the board and how the layers fit |
-| `/tests` | `static/tests.html` in the page shell: the designed proof, the adversarial hunt, the random sample, the regression gate, the suite, and what none of it proves |
-| `POST /api/weight` `{id, weight}` | the board's one write, a `tune` call through the door: over HTTP to `COUNTRIX_MCP_URL` with the bearer token when that is set (the compose stack), in-process otherwise. Off by default; `COUNTRIX_READ_ONLY=0` turns it and the *store* button on |
 
-The POST answers in the order `board.py` checks: 404 for any other path;
-415 for a body that does not claim `application/json`, with writes off
-too; 403 while the board is read-only - a weight applies to the session
-only; 400 for a body past 4 KB or not JSON, for an id that is not one or a
-weight that is not a number, and for the tool's refusal - a weight outside
-0..10, no such strategy; the door's 429 as it came; 502 for a door that
-fails or does not answer, and 500 for a crash in-process.
+The board answers GET alone: any other method is a 501, after the host
+guard.
 
-`/api/roster`, `/api/facts` and an in-process `/api/board` each open their
-own connection and load a fresh World, so a `pull_rates` or a tune shows
-on the next click without a restart. A board forwarded to the service
-opens none, so it answers while the database is out of reach.
+`/api/roster`, `/api/facts` and `/api/board` each open their own
+connection and load a fresh World, so a `pull_rates` or a tune shows on
+the next click without a restart.
 
 ## `static/` - the board's look and behaviour
 
@@ -62,7 +52,6 @@ static/
   comps.js       the comps tab: a seat's result and the two seats
   playbook.js    the playbook tab: the groups, the cards, the weight sliders
   math.html      the math page's article
-  tests.html     the tests page's article
 ```
 
 `board.js` loads last, since it calls the other two. It keeps the map, the
@@ -155,17 +144,14 @@ as the default. A setting stays in the browser and rides with every board
 request as `weights=<id>:<value>`; the solver applies it to that board
 only (each result names its `weights`), and the file is untouched. A
 setting whose heuristic the catalog no longer holds is dropped when the
-playbook loads. With writes on, *store* sends the weight to
-`POST /api/weight`; the file's weight becomes the default, and the
-browser's setting is dropped.
+playbook loads. Only `tune` changes the file's weight.
 
-**The header** pins three pills top-right: *the math*, *the tests* and the
-repository on GitHub (`COUNTRIX_REPO_URL` overrides the address). Its
-*clear all* empties the map, the side, the bans and both teams and leaves
-the weights; each team's box has its own *clear*. Its only messages are
-short-lived flashes - a banned pick, a full team, a refused pick. A patch
-newer than the rates raises the warning box; the rates' capture date is a
-fact.
+**The header** pins two pills top-right: *the math* and the repository on
+GitHub. Its *clear all* empties the map, the side, the bans and both teams
+and leaves the weights; each team's box has its own *clear*. Its only
+messages are short-lived flashes - a banned pick, a full team, a refused
+pick. A patch newer than the rates raises the warning box; the rates'
+capture date is a fact.
 
 `board.css` puts the game's look on a faint diagonal stripe and colours
 the kinds: blue for constraints, green for heuristics, sand for

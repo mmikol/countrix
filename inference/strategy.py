@@ -273,7 +273,7 @@ def _check_keys(meta: Frontmatter) -> None:
 # --- the strategy -----------------------------------------------------------------
 
 class StrategyRecord(TypedDict):
-    """A strategy as the tools, the service and the board serve it."""
+    """A strategy as the tools and the board serve it."""
     id: str
     name: str
     kind: Kind
@@ -442,7 +442,7 @@ class Strategy:
                 and not settled_by_board(self.when.names))
 
     def to_dict(self) -> StrategyRecord:
-        """The record the tools, the service and the board serve."""
+        """The record the tools and the board serve."""
         return {"id": self.id, "name": self.name, "kind": self.kind, "form": self.form,
                 "pending": self.pending, "need": self.need,
                 "category": self.category, "direction": self.direction,

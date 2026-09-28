@@ -80,8 +80,8 @@ STRATEGY_FIELDS: Properties = {
 # who asked, for the log line: the three writers take it alike, so a
 # caller names itself whichever it calls
 BY: Properties = {
-    "by": {"type": "string", "description": "who asked, for the log line (default %s;"
-                                           " the board says so)" % tune.BY_SESSION}}
+    "by": {"type": "string", "description": "who asked, for the log line (default %s)"
+                                           % tune.BY_SESSION}}
 
 
 def _remirror(ctx: Context) -> None:

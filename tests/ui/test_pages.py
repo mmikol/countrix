@@ -1,5 +1,5 @@
-"""The board's pages: the shell, the math and tests pages, and the static
-files they load. No server and no database - these read ui/pages.py's output
+"""The board's pages: the shell, the math page, and the static files they
+load. No server and no database - these read ui/pages.py's output
 and the scripts' source. The scripts are pinned at their seams - the routes
 and query keys they send, the ids they write, the globals and payload keys
 they read - against what the shell and the server write. The two decisions
@@ -37,7 +37,7 @@ def function(script, name):
 
 
 def test_board_page_has_two_rosters_and_the_three_panels():
-    body = pages.view_board(True)
+    body = pages.view_board()
     assert "class='team red'" in body and "class='team blue'" in body
     nav = body[body.index("<nav class='tabs'>"):body.index("</nav>")]
     assert nav.count("<button") == 3
@@ -64,7 +64,7 @@ def test_board_page_has_two_rosters_and_the_three_panels():
 
 
 def test_the_ban_picker_is_a_roster():
-    body = pages.view_board(True)
+    body = pages.view_board()
     assert "id='banhead'" in body and "id='banslots'" in body and "id='banroster'" in body
     assert "id='banmini'" in body and "id='bancount'" in body
     css = pages.static_file("board.css")[0].decode()
@@ -90,13 +90,13 @@ def test_every_stylesheet_class_is_used_by_the_page():
         if selector.lstrip().startswith("@"):        # an at-rule, not a selector
             continue
         classes.update(re.findall(r"\.([A-Za-z_][\w-]*)", re.sub(r"/\*.*?\*/", "", selector)))
-    sources = scripts() + pages.view_board(True) + pages.view_math()
+    sources = scripts() + pages.view_board() + pages.view_math()
     assert len(classes) > 50
     assert [c for c in classes if not re.search(r"\b%s\b" % re.escape(c), sources)] == []
 
 
 def test_the_page_is_a_shell_over_static_files():
-    body = pages.view_board(True)
+    body = pages.view_board()
     assert "/static/board.css" in body and "/static/board.js" in body
     order = [body.index("/static/%s.js" % n) for n in ("comps", "playbook", "board")]
     assert order == sorted(order)      # board.js loads last: it calls the others
@@ -126,15 +126,13 @@ def test_the_page_is_a_shell_over_static_files():
         assert rule in css, rule
     assert "id='clearall'" in body
     header = body.split("</header>")[0]
-    # the three pills, pinned top-right
+    # the two pills, pinned top-right
     links = header[header.index("<span class='links'>"):]
-    assert "href='/math'" in links
-    assert pages.repo_url() in links
-    assert "href='/tests'" in links            # the checks, beside the math
+    assert "href='/math'" in links and pages.REPO_URL in links
+    assert links.count("<a ") == 2
     assert links.rstrip().endswith("GitHub</a></span>")
-    # the page hands the scripts the board's flag, and the counts they need
-    assert "var TEAM = 6, BANS = 5, READ_ONLY = true;" in body
-    assert "READ_ONLY = false" in pages.view_board(False)
+    # the page hands the scripts the counts they need
+    assert "var TEAM = 6, BANS = 5;" in body
     data, ctype = pages.static_file("board.js")
     assert ctype.startswith("application/javascript") and b"function paint" in data
     data, ctype = pages.static_file("comps.js")
@@ -162,14 +160,14 @@ def test_the_display_font_ships_with_the_board_and_its_licence():
 
 
 def test_the_scripts_send_the_routes_and_query_keys_the_board_reads():
-    """Each route the scripts ask for is the board's own - /api/infer is the
-    inference service's, not the page's - and each key of a board's query
-    is sent in the spelling parse_board reads, with the sliders' weights and
-    the page's client, which serve.handle_board reads beside them."""
+    """Each route the scripts ask for is the board's own, each a GET - the
+    board writes nothing - and each key of a board's query is sent in the
+    spelling parse_board reads, with the sliders' weights and the page's
+    client, which serve.handle_board reads beside them."""
     script = scripts()
-    for route in ("/api/roster", "/api/facts?", "/api/board?", "/api/strategies", "/api/weight"):
+    for route in ("/api/roster", "/api/facts?", "/api/board?", "/api/strategies"):
         assert route in script, route
-    assert "/api/infer" not in script
+    assert "POST" not in script
     for key in ("map", "side", "red", "blue", "bans", "weights", "client"):
         assert "'%s='" % key in script, key
 
@@ -179,7 +177,7 @@ def test_the_scripts_write_the_ids_and_read_the_globals_the_shell_holds():
     renders, the data attributes the clicks read are the shell's, each
     global the shell sets is read, and the weight slider and its number box
     carry the bounds the strategy rule checks a weight against."""
-    script, body = scripts(), pages.view_board(True)
+    script, body = scripts(), pages.view_board()
     ids = set(re.findall(r"\bel\('([^']+)'\)", script))
     assert len(ids) >= 20
     assert [i for i in sorted(ids) if "id='%s'" % i not in body] == []
@@ -187,7 +185,7 @@ def test_the_scripts_write_the_ids_and_read_the_globals_the_shell_holds():
         assert attribute in script and attribute in body, attribute
     shell = re.search(r"<script>var (.*?);</script>", body).group(1)
     names = [part.split(" = ")[0] for part in shell.split(", ")]
-    assert names == ["TEAM", "BANS", "READ_ONLY"]
+    assert names == ["TEAM", "BANS"]
     for name in names:
         assert re.search(r"\b%s\b" % name, script), name
     assert script.count("min='%g' max='%g' step='0.01'" % WEIGHT_RANGE) == 2
@@ -311,4 +309,4 @@ def test_the_math_page_states_the_equation_and_the_layers():
     counter = page[page.index("<p id='counter'>"):]
     assert "shows blue's six above the optimal" in counter[:counter.index("</p>")]
     # the page solves no countered case: the hedge is the board tool's
-    assert "row is the hedge" not in page and "row is the hedge" not in pages.view_tests()
+    assert "row is the hedge" not in page

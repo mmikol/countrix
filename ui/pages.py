@@ -1,5 +1,5 @@
-"""The board's HTML: the page shell, the math and tests pages, and the static
-files they load - the stylesheet, the scripts and the display font.
+"""The board's HTML: the page shell, the math page, and the static files
+they load - the stylesheet, the scripts and the display font.
 
 The page is a shell over the static files: board.js loads last because it
 calls into comps.js and playbook.js, and TEAM and BANS come from the page
@@ -27,14 +27,7 @@ GITHUB_MARK = (
     ".29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z'/></svg>")  # noqa: E501
 
 
-REPO_URL = "https://github.com/mmikol/countrix"
-
-
-# The repository the header links to; COUNTRIX_REPO_URL overrides it when the
-# repo moves. Read on every page, so a change in the environment holds from
-# the next one.
-def repo_url() -> str:
-    return os.environ.get("COUNTRIX_REPO_URL", REPO_URL)
+REPO_URL = "https://github.com/mmikol/countrix"      # the repository the header links to
 
 
 def esc(x: object) -> str:
@@ -77,10 +70,9 @@ HEAD = ("<!doctype html><meta charset='utf-8'>"
         "<link rel='stylesheet' href='/static/board.css'>")
 
 
-def view_board(read_only: bool) -> str:
+def view_board() -> str:
     """The board: the header, the bans bar, the two rosters and the three
-    panels, empty until the scripts fill them. `read_only` tells the scripts
-    whether to offer the write."""
+    panels, empty until the scripts fill them."""
     shell = (HEAD + "<title>Countrix</title><main>"
             "<header class='top'><h1>Countrix"
             "<span class='expand'> the counter utility matrix</span></h1>"
@@ -93,7 +85,6 @@ def view_board(read_only: bool) -> str:
             "clear all</button>"
             "<span class='flash' id='flash'></span></div>"
             "<span class='links'><a class='mathlink' href='/math'>the math</a>"
-            "<a class='mathlink' href='/tests'>the tests</a>"
             "<a class='gh' href='%s' target='_blank' rel='noopener'>%s GitHub</a>"
             "</span>"
             "</header>"
@@ -134,16 +125,15 @@ def view_board(read_only: bool) -> str:
             "<span id='chips'></span><span id='factsn' class='count'></span></div>"
             "<table class='facts'><tbody id='factbody'></tbody></table></section>"
             "<section class='panel' id='tab-playbook'><div id='playbook'></div></section>"
-            "</main><script>var TEAM = %d, BANS = %d, READ_ONLY = %s;</script>"
+            "</main><script>var TEAM = %d, BANS = %d;</script>"
             "<script src='/static/comps.js'></script>"
             "<script src='/static/playbook.js'></script>"
             "<script src='/static/board.js'></script>")
-    return shell % (
-        repo_url(), GITHUB_MARK, TEAM_SIZE, MAX_BANS, "true" if read_only else "false")
+    return shell % (REPO_URL, GITHUB_MARK, TEAM_SIZE, MAX_BANS)
 
 
 def page(title: str, body: str) -> str:
-    """A page in the shell the math, tests and error pages share: the
+    """A page in the shell the math and error pages share: the
     stylesheet, the title, and a header that links back to the board."""
     return (HEAD + "<title>%s</title>"
             "<main><header class='top'><h1><a href='/'>Counter <span>Utility Matrix</span></a></h1>"
@@ -180,7 +170,3 @@ def view_math() -> str:
         "TEAMMATES": scalars.TEAMMATES,
         "TEAMMATES_BUT_ONE": scalars.TEAMMATES - 1})
 
-
-def view_tests() -> str:
-    """The tests page: what is checked, how, and what none of it proves."""
-    return page("the tests", _article("tests.html"))

@@ -110,8 +110,8 @@ def parse_weights(items: Mapping[str, object] | Iterable[object] | None) -> dict
     -> {id: weight}, each clamped to the file's WEIGHT_RANGE. What a board's
     sliders send. An entry that is not id:value, or a value that is not a
     finite number (strategy.finite_number: nan and inf are not), is a
-    Refusal, which the board, the service and the board tool answer as the
-    caller's error."""
+    Refusal, which the board and the board tool answer as the caller's
+    error."""
     if isinstance(items, Mapping):
         pairs = [(str(sid), value) for sid, value in items.items()]
     else:

@@ -23,7 +23,7 @@ read opens its own connection through `db.psql.default_dsn()`.
 ```
 db/
   __init__.py        where things live, and the scope; the package's map
-  web.py             what the three HTTP servers share and the one JSON reader
+  web.py             what the two HTTP servers share and the one JSON reader
   data/              the sources, page to table
     blizzard/        overwatch.blizzard.com
     wiki/            overwatch.fandom.com
@@ -43,7 +43,7 @@ db/
 | `data/__init__.py` | `PullSummary`, what every pull's `run()` returns, and `ArticlePullSummary`, which adds the pages that would not fetch |
 | `data/cache.py` | the page cache, its freshness and the one request loop: `cached_get`, `cached`, `request` under a `RequestPolicy`, and `PullContext`, what a pull's `run()` takes beside its connection |
 | `data/normalizer.py` | one hero, map or ability across sources: `name_key`, `hero_key` through `RENAMED`, `slug`, `ability_key` and `index` |
-| `web.py` | what the three HTTP servers share: the Host and Origin guard, the reply to a request that raised, and `read_json`, the one HTTP reader; its docstring holds the relay's status map |
+| `web.py` | what the two HTTP servers share: the Host and Origin guard, the reply to a request that raised, and `read_json`, the one HTTP reader, which `orchestrator.py` reads the stack's health with |
 
 ### `data/` - one package per source
 

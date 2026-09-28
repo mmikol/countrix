@@ -84,10 +84,10 @@ with the fact it read: the counter bar's fact names the six it read.
 A `BaseWeights` rides the `Brief`, and `infer` and `evaluate`'s `base`,
 into every `Objective` and every worker's `Spec`; `base.OFF` turns the
 engine off, and a board is the playbook's alone, as it was before the
-engine had a base. The board, the MCP tools and the inference service run
-`DEFAULT`. The tests that pin the reference playbook's sixes turn it off.
-With the engine off and a playbook that scores nothing, every six ties at
-zero and a board reads *unscored*.
+engine had a base. The board and the MCP tools run `DEFAULT`. The tests
+that pin the reference playbook's sixes turn it off. With the engine off
+and a playbook that scores nothing, every six ties at zero and a board
+reads *unscored*.
 
 ## The share
 
@@ -199,12 +199,11 @@ completes it through `infer_strategy`. No API key anywhere.
 
 The default engine's weights are constants in `inference/base.py`, and no
 slider moves them. The board's sliders override a weight for one board -
-`weights=<id>:<0..10>` on `/board`, `weights` on the `board` tool - and
-every result names the weights it was scored under. Three tools write a strategy file - `tune`,
-`add_strategy` and `infer_strategy` - each validated
-through the catalog before it writes and logged with its reason in
-`strategies/tuning-log.md`; a slider's *store* is a `tune` call, which
-the board offers only with `COUNTRIX_READ_ONLY=0`.
+`weights=<id>:<0..10>` on `/api/board`, `weights` on the `board` tool -
+and every result names the weights it was scored under; the board writes
+none of them. Three tools write a strategy file - `tune`, `add_strategy`
+and `infer_strategy` - each validated through the catalog before it
+writes and logged with its reason in `strategies/tuning-log.md`.
 
 ## Sustained healing
 

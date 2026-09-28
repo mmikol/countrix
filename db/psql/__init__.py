@@ -67,15 +67,15 @@ UNREACHABLE = (psycopg.Error, NoDatabaseError, OSError, json.JSONDecodeError)
 
 # pgserver's own lock (fasteners, over fcntl) excludes other processes but
 # not this process's threads, and get_server reads its instance cache before
-# taking it, so two first touches from the threaded servers
-# (inference/serve.py, ui/board.py) could interleave the read-truncate-write
-# of the pid file. The first touch is serialised here. What remains: a
-# .handle_pids.json left empty by a process killed mid-write makes the first
-# touch in each later process raise JSONDecodeError, reported as degraded,
-# and later touches in that process get pgserver's cached handle, with the
-# process unregistered. The file is pgserver's and is not repaired here;
-# removing it while no process uses the cluster clears the fault (pgserver
-# 0.1.4's DiskList reads a missing file as []).
+# taking it, so two first touches from a threaded server (ui/board.py) could
+# interleave the read-truncate-write of the pid file. The first touch is
+# serialised here. What remains: a .handle_pids.json left empty by a process
+# killed mid-write makes the first touch in each later process raise
+# JSONDecodeError, reported as degraded, and later touches in that process
+# get pgserver's cached handle, with the process unregistered. The file is
+# pgserver's and is not repaired here; removing it while no process uses the
+# cluster clears the fault (pgserver 0.1.4's DiskList reads a missing file
+# as []).
 _FIRST_TOUCH = threading.Lock()
 
 

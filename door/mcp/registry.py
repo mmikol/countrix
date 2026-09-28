@@ -146,8 +146,8 @@ class Registry:
         return [_bind(ctx, spec) for spec in self]
 
     def run(self, ctx: "Context", name: str, /, **arguments: object) -> ToolReply:
-        """Call a tool by name, in-process - the refresher's, the shell's, the
-        board's and one tool's call of another. The call is validated against
+        """Call a tool by name, in-process - the refresher's, the shell's and
+        one tool's call of another. The call is validated against
         the tool's schema, like a call through either door: a call the schema
         refuses is a Refusal, and a name no tool has is a NoSuchToolError,
         which reaches no tool. The name is positional only, so a tool
@@ -249,6 +249,6 @@ class Context:
         return path
 
     def call(self, name: str, /, **arguments: object) -> ToolReply:
-        """A tool by name, in-process - the refresher's, the shell's, the
-        board's and one tool's call of another (Registry.run)."""
+        """A tool by name, in-process - the refresher's, the shell's and one
+        tool's call of another (Registry.run)."""
         return self.tools.run(self, name, **arguments)

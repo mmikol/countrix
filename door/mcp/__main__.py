@@ -55,9 +55,9 @@ def _call(ctx: tools.Context, name: str, text: str) -> int:
 
 
 def _http_command_line(argv: list[str]) -> argparse.Namespace:
-    """`--http`'s flags, spelled as the board and the inference service spell
-    them: where the door listens, and, repeated, a host name it answers to
-    beside the local ones. A bad flag or port prints the usage and exits 2."""
+    """`--http`'s flags, spelled as the board spells them: where the door
+    listens, and, repeated, a host name it answers to beside the local
+    ones. A bad flag or port prints the usage and exits 2."""
     parser = argparse.ArgumentParser(
         prog="python -m door.mcp --http",
         description="Serve the tools over Streamable HTTP (/mcp, /health).")

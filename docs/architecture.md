@@ -38,7 +38,7 @@ Code on your subscription, and the board never calls a model.
 
 | folder | what it is | read |
 | --- | --- | --- |
-| `db/` | **DATA LAYER** - `data/` and `psql/` pull every source, clean it and store it, with the schema, its migrations and the embedded cluster; `web.py` is what the three HTTP servers share, from the Host-and-Origin guard to the one JSON reader. The bottom of the import graph: it imports nothing above it, and the layers over it read Postgres directly, over `db.psql.default_dsn()` | [db.md](db.md) |
+| `db/` | **DATA LAYER** - `data/` and `psql/` pull every source, clean it and store it, with the schema, its migrations and the embedded cluster; `web.py` is what the two HTTP servers share, from the Host-and-Origin guard to the one JSON reader. The bottom of the import graph: it imports nothing above it, and the layers over it read Postgres directly, over `db.psql.default_dsn()` | [db.md](db.md) |
 | `facts/` | **FACTS LAYER** - everything the database knows about a board: the World (the database in memory), the metrics registry, the FactSet. It imports only `db`; the solver, the door and the board read the same numbers through it | [`facts/__init__.py`](../facts/__init__.py) |
 | `inference/` | **INFERENCE LAYER** - the playbook of constraints, heuristics and assumptions in markdown, the solver, the tuning loop | [inference.md](inference.md) |
 | `door/` | **THE DOOR** over all three layers - `mcp/`, the MCP server and its tools, under which every write runs; `refresh.py`, the clock that runs the tools daily and weekly | [mcp.md](mcp.md) |
@@ -133,7 +133,6 @@ flowchart LR
     end
     SESSION -->|".mcp.json: countrix-docker"| DATA
     BROWSER --> UI
-    UI -->|"COUNTRIX_MCP_URL:<br/>its write, a tune"| DATA
     UI --> DBC
     DATA --> DBC
     SHELL --> DBC
@@ -162,22 +161,15 @@ the rest of the measures.
 
 Settings, from the environment or `.env` (the refresh and backup times are in [db.md](db.md)).
 Each is read where it is used, so a change takes effect on the next call -
-except where a server listens (the UI and inference host and port), the MCP
-server's token, `COUNTRIX_WORKERS` (read when the pool starts) and the
-refresh clock, which are read once at start:
+except the MCP server's token, `COUNTRIX_WORKERS` (read when the pool
+starts) and the refresh clock, which are read once at start:
 
 | setting | default | meaning |
 | --- | --- | --- |
 | `COUNTRIX_STRATEGIES` | empty | a playbook folder other than `inference/strategies/`, relative to the repo root or absolute |
 | `COUNTRIX_WORKERS` | `max(6, min(cores, 12))` | the solver's worker processes |
 | `COUNTRIX_PARALLEL` | `1` | `0`: every board in one process |
-| `COUNTRIX_UI_HOST`, `COUNTRIX_UI_PORT` | `127.0.0.1`, `8017` | where the board listens |
-| `COUNTRIX_READ_ONLY` | `1` | the board writes nothing: a slider's weight is the session's own; `0` brings back *store* |
-| `COUNTRIX_INFERENCE_HOST`, `COUNTRIX_INFERENCE_PORT` | `127.0.0.1`, `8019` | where the inference service listens, run on its own (`python -m inference.serve`); the stack runs none |
-| `COUNTRIX_INFERENCE_URL` | unset | the inference service the board delegates to; its handlers run in the board's process when unset, as in the stack. http or https: any other scheme stops the board at launch |
 | `COUNTRIX_MCP_TOKEN` | unset | bearer token the MCP server requires over HTTP |
-| `COUNTRIX_MCP_URL` | unset | the MCP server the board's write goes to, a `tune`; in-process through the same registry when unset. http or https, like the inference URL |
-| `COUNTRIX_REPO_URL` | `https://github.com/mmikol/countrix` | the repository the board's header links to |
 | `DATABASE_URL` | unset | the PostgreSQL to use. Unset, the embedded pgserver cluster at `db/psql/cluster`, which `db_init` or `db_rebuild` builds: the local run, on the same tools, facts and strategies as the stack. With neither, `NoDatabaseError` |
 
 ## The skills
