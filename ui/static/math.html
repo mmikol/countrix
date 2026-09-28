@@ -1,6 +1,7 @@
 <article class='math'>
 <nav class='toc'>
 <a href='#equation'>the counter utility matrix</a>
+<a href='#chosen'>how a six is chosen</a>
 <a href='#function'>the function</a>
 <a class='sub' href='#default-engine'>the default engine</a>
 <a class='sub' href='#sustained-healing'>sustained healing</a>
@@ -54,6 +55,28 @@ weighted. A <b>heuristic</b> is a metric, a direction and a weight, or a bonus o
 a condition, times its weight. An <b>assumption</b> is prose: shown, never scored.</p>
 <p><b>COMP</b>: of every legal six, the one the function scores highest on this board. The
 same board gives the same six.</p>
+<h2 id='chosen'>How a six is chosen</h2>
+<p>Inference on maxims and facts. The maxims are the playbook's rules, the facts the database's
+numbers about this board, and together they make one objective, weighted and constrained, which
+the search solves exactly. Five steps, in order:</p>
+<pre class='eq'>1  the space       every six of released, unbanned heroes that keeps the locked picks,
+                   each set once, grouped tank, damage, support; at most two tanks
+2  the limits      each constraint removes the sixes that break it, and weighs nothing
+3  the meta        the default engine scores every six left, times the meta weight:
+                   win-rate edge trusted by pick rate, synergies, counters
+4  the heuristics  each adds or subtracts, times its weight, from the same facts
+5  the argmax      the best legal six, proved, then the next best in order;
+                   every reason cites a fact</pre>
+<p>An open board holds about 17.2 million legal sixes under the shipped playbook
+(<a href='#searched'>what is searched</a>), and a ban or a locked pick leaves fewer. A synergy
+pair neither hero's article writes is unknown, not zero: it reads at the mean of the written
+pairs. The weights are not learned: a rule's starting weight comes from its prose on the house
+scale, 0.25 a whisper, 1 the default, 2.5 strong and 4 dominant, and every weight is yours to
+turn - the tune tool for the file, a slider for a session, the Meta slider for the whole
+engine. A score is not a probability: a badge reads it as a share of the seat's optimal, and
+the fight odds split the two seats' shares. The rates are Competitive Role Queue, 5v5, a proxy
+for Open Queue 6v6, so a value a hero has only beside a second tank, such as Zarya's in a
+two-tank front line, is missing from them.</p>
 <h2 id='function'>The function: STRATEGIES( FACTS )</h2>
 <p>One six in, one number out. The facts are its namespace: <code>team</code>,
 <code>enemy</code>, <code>matchup</code>, <code>map</code> and <code>world</code>, the facts

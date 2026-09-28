@@ -27,16 +27,22 @@ hide the rate figures: Blizzard licenses those for personal use only.*
 - **Turns a draft into facts.** Map, side, bans and both teams' picks become
   numbered facts (F1, F2, ...): a hero on this map, against each enemy, beside
   each ally, the six against the six.
-- **Solves the comp.** An exact search - branch and bound over every legal
-  six of the released roster - proves the best six and the next best in
-  order, scoring a few dozen of seventeen million in full. A default engine scores every candidate on its win rates on the map, the
-  wiki's synergies, a pair no article writes at the written pairs' mean,
-  and its counters to the other side - the wiki's, and where the wiki says
-  nothing, answers derived from the two kits and named
-  on the board with the mechanism that fired - under weights the playbook
-  sets, one meta weight scaling the three; the playbook's
-  constraints cut the space and its heuristics adjust that score. The best six comes back with
-  the alternatives and why.
+- **Solves the comp.** Maxims (the playbook) and facts (the data) make
+  one weighted, constrained objective, solved exactly
+  ([how a six is chosen](docs/inference.md#how-a-six-is-chosen)). The
+  space is every six of the released roster, each set of heroes once, at
+  most two tanks, and the playbook's constraints prune it, weighing
+  nothing: about 17.2 million legal sixes today, fewer with bans or
+  locks. A default engine, the meta, scores every six left on its win
+  rates on the map trusted by pick rate, the wiki's synergies (a pair no
+  article writes read at the written pairs' mean, not zero) and its
+  counters to the other side - the wiki's, and answers derived from the
+  kits where the wiki says nothing - and one meta weight scales it. The
+  heuristics add or subtract from the same facts, each times its weight.
+  A branch-and-bound search proves the best six, scoring a few dozen in
+  full, and returns the next best in order; every reason cites a fact.
+  No weight is learned: a rule's starts from its prose, the engine's
+  from a calibration, and every one is yours to turn.
 - **Serves it two ways.** A web board and an MCP (Model Context Protocol)
   server, the tool interface a Claude Code session uses to draft comps and
   tune the playbook. The solver is arithmetic; the board
@@ -48,9 +54,9 @@ hide the rate figures: Blizzard licenses those for personal use only.*
 
 ![The score breakdown, one bar per strategy](docs/img/breakdown.jpg)
 
-*How they scored: 5,692 candidates in 1.3 s, one bar per strategy, each with
-the fact it read. A limit that holds adds nothing; what a six gives up shows
-under costing.*
+*How they scored: one bar per strategy, each with the fact it read. A limit
+that holds adds nothing; what a six gives up shows under costing. The picture
+predates the exact search; the count over the bars is now the space it covers.*
 
 ## How it works
 

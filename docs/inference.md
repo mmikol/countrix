@@ -32,6 +32,108 @@ file of every form but the draft. The package's map is the
 [inference/__init__.py](../inference/__init__.py) docstring, and each
 module's docstring holds its detail.
 
+## How a six is chosen
+
+A six is chosen by inference on maxims and facts. The maxims are the
+playbook, rules in markdown a person reads and turns; the facts are the
+data, what the database holds about the board. Together they make one
+objective, weighted and constrained, and the solver solves it exactly:
+the six it returns is the best of every legal six under that objective,
+proved, and not the best a search happened to meet. Five steps, in order:
+
+```
+space  = every six of released, unbanned heroes that keeps the locked picks,
+         each set once, grouped tank, damage, support; at most two tanks
+legal  = the space, less every six a limit rules out           a limit weighs nothing
+score  = meta x (rate x rates + synergy x synergy + counter x counters)
+       + each heuristic's term, times its weight               from the same facts
+COMP   = the legal six of highest score, exactly; the next best after it, in order
+```
+
+1. **The space.** A six is a set: the same heroes in another order are
+   one six, held grouped as tanks, damage and supports. It keeps the
+   locked picks, leaves out the banned and the unreleased, and fields at
+   most two tanks, the queue's own limit. Today's 53 released heroes -
+   15 tanks, 24 damage, 14 supports - make 22,957,480 sixes, and
+   18,040,386 of them field two tanks or fewer.
+2. **The limits prune.** A constraint is a limit: it removes every six
+   that breaks it and adds nothing to one that keeps it. The shipped
+   playbook's one, `at-most-three-supports`, removes 822,822 sixes and
+   leaves 17,217,564 legal on an open board, about 17.2 million. A ban
+   or a locked pick leaves fewer: four bans on Ilios leave 10,572,870,
+   two locked picks on King's Row 163,242. Blue's own comp that breaks
+   a limit is not allowed; red's revealed picks are facts, and never
+   ruled out ([The share](#the-share)).
+3. **The meta scores.** The default engine reads three things off the
+   facts and scores every legal six: each pick's win-rate edge over 50
+   on the map, trusted by its pick rate, so a rarely picked hero's edge
+   counts for less; the wiki's synergy scores among the six, a pair
+   neither article writes read at the written pairs' mean, as unknown
+   and not as zero; and the counter graph against the other side's
+   locked picks, else its likely six - the wiki's edges and, where the
+   wiki has none, answers derived from the kits. `meta.md`'s `meta`
+   weight scales the three together: 1 is the engine as calibrated, and
+   0 leaves the playbook alone ([The objective](#the-objective)).
+4. **The heuristics adjust.** Each heuristic reads the same facts,
+   through the metric functions the board words as facts, and adds or
+   subtracts, times its weight: a metric normalised to 0..1 on the
+   board's scale, or a bonus less a penalty where its `when` holds
+   ([How a strategy file works](#how-a-strategy-file-works)). The
+   shipped playbook's one, `heal-rate`, charges a six that heals less
+   than the other side's rate up to its weight, 2 ([The healing
+   floor](#the-healing-floor)).
+5. **The argmax.** The search returns the legal six of highest score,
+   proved by branch and bound, and the next best in rank order as the
+   alternatives, five unless a caller asks for up to twenty. Ties break
+   by the six's mean map win rate, then by the names, so a board has one
+   answer. On an open board the search scores a few dozen sixes in full
+   and proves that none of the rest can beat them ([The
+   search](#the-search)). Every reason it gives cites a numbered fact
+   (F1, F2, ...): each pick's reasons, and each bar of the breakdown,
+   the engine's three terms among them.
+
+**The weights are not learned.** No weight is fit to outcomes. A
+heuristic's starting weight is derived from its prose on the house
+scale, 0.25 a whisper, 1 the default, 2.5 strong and 4 dominant, when
+`/strategy` stores it. The engine's rate weight is 1, so its term reads
+in win-rate points, and its synergy and counter weights were set so that
+each term spreads a typical board's sixes about half as far as the rate
+term does ([The objective](#the-objective)). Every weight can be
+changed: `/tune` changes a file's for good and logs why, a heuristic's
+slider on the playbook tab changes it for a session, and the Meta slider
+scales the whole engine ([How the weights move](#how-the-weights-move)).
+
+**A score is not a probability.** A score is a sum of weighted terms in
+the objective's own units, and signed, since the rate term counts each
+pick's edge over 50. The board reads it as a share - a seat's six placed
+between the seat's floor, 0, and its optimal, 100 - and the fight odds
+split the two seats' shares. Neither is a fitted win probability ([The
+share](#the-share)).
+
+**The rates are a proxy.** Blizzard publishes rates for Competitive Role
+Queue, 5v5, one tank a side; no source publishes Open Queue 6v6, the
+mode the playbook assumes (`open-queue-ranked`). The rates stand in for
+it, for direction and not for decimals, and a value a hero has only
+beside a second tank is missing from them: Zarya's, in a two-tank front
+line, is the plain case. The kit is read in 6v6
+([architecture.md](architecture.md#the-scope)); the rates cannot be.
+
+**Why it is built this way.** Each step is one of the owner's rules, and
+each rule's reasons are below. Constraints prune and never weigh, so a
+rule either forbids a six or prices it, and a price is always a
+heuristic's ([How a strategy file works](#how-a-strategy-file-works)).
+Every weight is the playbook's and one meta scales the engine, so no
+weight hides in code ([Why the weights are the
+playbook's](#why-the-weights-are-the-playbooks)). An unwritten synergy
+pair is unknown, not zero, so a new hero is not charged for being new
+([Why an unwritten synergy pair is not
+zero](#why-an-unwritten-synergy-pair-is-not-zero)). The search is exact
+over every legal six, with no per-role shortlist deciding who can
+appear ([Why the search is exact](#why-the-search-is-exact)). Written as
+one pipeline, a board can be checked step by step: the space is
+counted, the limits are named, every term is a bar with the fact it
+read, and the argmax is proved.
+
 ## The objective
 
 The solver maximises one number per six, the default engine's terms
@@ -558,8 +660,9 @@ any red that heals, so the engine answers with a second support and keeps
 a third only where the pair heals little. Within a board the shortfall
 mostly follows the support count; the rest is how much the pair heals,
 which a count would miss. The weight, 2, sets a six at full shortfall
-beside the synergy and counter terms, which each spread a typical board's
-sixes about 2.1 points (`inference/base.py`).
+beside the synergy and counter terms, each of which spreads a typical
+board's sixes a point or two ([The objective](#the-objective) has the
+figures).
 
 **What it inherits.** The bar is only as good as `hps`, and a
 World-wide error cancels, since the bench moves with it; an error on one

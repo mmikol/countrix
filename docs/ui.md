@@ -31,7 +31,7 @@ endpoints behind the host guard `db/web.py` puts on both servers
 | `/api/board?map=&side=&red=&blue=&bans=[&weights=&client=]` | the board solved at any stage under the playbook tab's weights: the `board` tool's answer ([mcp.md](mcp.md#the-tools)) without the countered case, which the page never reads, from `serve.handle_board`. One board solves at a time; another waits, and answers 429 after a minute (`serve.Admission`) |
 | `/api/strategies` | the catalog: every constraint, heuristic and assumption with its kind, form, frontmatter and body, from `serve.handle_strategies` |
 | `/health` | the engine's health, from `serve.handle_health`: ok or degraded, the strategies, the drafts pending and the heroes, and the error naming what is out of reach. The ui container's healthcheck and `orchestrator.py` read it |
-| `/math` | `static/math.html` in the page shell, the constants it quotes (the default engine's three weights and `RATE_PICK_HALF`, `SYNERGY_PULL`, `REFERENCE_SIZE`, `NEED_BUDGET` and the search's four) filled in by `pages.py`: the equation, the scoring function with the default engine under the playbook, the board and how the layers fit |
+| `/math` | `static/math.html` in the page shell, the numbers it quotes filled in by `pages.py` - the default engine's four weights from the playbook's `meta.md`, and from the code the counter graph's four constants, `RATE_PICK_HALF`, `SYNERGY_PULL`, `REFERENCE_SIZE`, `NEED_BUDGET`, the search's `SCORE_PLACES` and `RANK_CAP`, and the healing formation's radius and teammates: the equation, how a six is chosen, the scoring function with the default engine under the playbook, the board and how the layers fit |
 
 The board answers GET alone: any other method is a 501, after the host
 guard.
@@ -95,7 +95,8 @@ blue's own picks never constrain. Red's (right) is their most likely
 starting comp, a two-two-two filled slot by slot from the map's pick rates
 and the wiki's synergies, past the bans; it reads no strategy, and only a
 new map, side or ban sends it back to *searching*. Under a six's cards sit
-the search's numbers (candidates, seconds, the lean), the default engine's
+the search's numbers (the candidates, every six of the legal shapes its
+answer covers; the seconds; the lean), the default engine's
 three terms - `base.rates`, `base.synergy`, `base.counters`, a bar each
 with the fact it read, always shown - then the strategies in three tabs -
 *satisfied*, *costing* with the summed cost, *did not read* - under a
@@ -135,15 +136,19 @@ fill or the six, red's from their current comp.
 holds beside the filter ("12 of 464 facts" under a filter); the tab
 carries no number.
 
-**The playbook panel** lists the catalog in three groups in the equation's
-order, under a row of anchors, each card edged in its kind's colour and
-its meta line its form. Under each heuristic sits a slider for its weight,
-0 to 10 to the hundredth, with a number box, a reset and the file's weight
-as the default. A setting stays in the browser and rides with every board
-request as `weights=<id>:<value>`; the solver applies it to that board
-only (each result names its `weights`), and the file is untouched. A
-setting whose heuristic the catalog no longer holds is dropped when the
-playbook loads. Only `tune` changes the file's weight.
+**The playbook panel** opens with the meta, the card of `meta.md`: its
+four weights, its prose and the Meta slider, which scales the whole
+default engine. Under it the catalog follows in three groups in the
+equation's order, under a row of anchors, each card edged in its kind's
+colour and its meta line its form. Under each heuristic sits a slider for
+its weight, 0 to 10 to the hundredth, with a number box, a reset and the
+file's weight as the default; the Meta slider is one more of the kind. A
+setting stays in the browser and rides with every board request as
+`weights=<id>:<value>`, the meta's as `weights=meta:<value>`; the solver
+applies it to that board only (each result names its `weights`), and the
+file is untouched. A setting whose heuristic the catalog no longer holds
+is dropped when the playbook loads; the meta's is always kept. Only
+`tune` changes a file's weight, the meta's included.
 
 **The header** pins two pills top-right: *the math* and the repository on
 GitHub. Its *clear all* empties the map, the side, the bans and both teams

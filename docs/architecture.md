@@ -19,15 +19,19 @@ STRATEGIES     = CONSTRAINTS ∪ HEURISTICS ∪ ASSUMPTIONS   the playbook: mark
 COMP           = ARGMAX[ STRATEGIES( FACTS ) ]            the solver searches, the agent argues
 ```
 
-The function the argmax takes is two layers. The default engine
+The argmax runs over every legal six - each set of heroes once, at most
+two tanks - less the sixes the playbook's limits rule out, which weigh
+nothing. The function it takes is two layers. The default engine
 (`inference/base.py`) scores a six on its win rates on the map, the
 wiki's synergy pairs among its picks - a pair neither article writes at
-the mean of the written ones - and the wiki's counter edges against the
-other side, so a playbook of assumptions alone still gets scored sixes.
+the mean of the written ones - and the counter graph against the other
+side, the wiki's edges and answers derived from the kits where the wiki
+has none, so a playbook of assumptions alone still gets scored sixes.
 Its weights are the playbook's - `meta.md` beside the strategy files,
 one meta weight over the three terms' - and at meta 0 it is off.
-The playbook's terms sit on top and adjust that answer
-([inference.md](inference.md#the-objective)).
+The playbook's heuristics sit on top and adjust that answer, and the
+search proves the best six
+([inference.md](inference.md#how-a-six-is-chosen)).
 
 One input is the user's, the strategies, which the solver reads; every
 other table is pulled from Blizzard or the wiki.

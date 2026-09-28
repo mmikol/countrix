@@ -59,7 +59,7 @@ keeps it current.
   on the math page where they cannot: the same board gives the same six;
   scaling every weight by one factor leaves the argmax unchanged; a
   normalised term stays within 0..1 and the reference sample bounds it;
-  fight odds split 100 exactly; the local search never lowers the score.
+  fight odds split 100 exactly.
   Cost: (a) three to four days, the kit model most of it; (b) a day for
   the tests, a day for the page.
 - **Recorded matches, playbook validation and learned weights.** The
@@ -84,10 +84,12 @@ keeps it current.
   migration for the two tables and the changes since; a day more for the
   learned weights once the maps exist.
 - **Memoize the per-hero parts of the metrics.** `team.team_metrics`
-  rebuilds each hero's pool, kit sums and keyword sets for every
-  candidate and is ~41% of a sequential board. A per-world term table
-  measured 3x on the function, ~5% on a board. Cost: a day; risk: none to
-  the answer if the memo is keyed on the hero and the map.
+  rebuilds each hero's pool, kit sums and keyword sets for every six it
+  prepares, and is ~59% of a board under the exact search, nearly all of
+  it the scale's 1,200 reference sixes; the search itself scores a few
+  dozen. A per-world term table measured 3x on the function. Cost: a
+  day; risk: none to the answer if the memo is keyed on the hero and the
+  map.
 - **What the scrub left in the data layer.** Domina's weapon publishes no
   rate (dps 0); conditional cooldowns are mis-split for some abilities;
   the match-up reader gives no verdict on about two in three written

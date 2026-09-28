@@ -116,7 +116,7 @@ def test_the_page_is_a_shell_over_static_files():
     toc = page[page.index("<nav class='toc'>"):page.index("</nav>")]
     targets = re.findall(r"href='#([^']+)'", toc)
     assert targets and all(("id='%s'" % t) in page for t in targets), targets
-    for name in ("likely-comp", "counter", "weights", "what-100-means", "argmax"):
+    for name in ("chosen", "likely-comp", "counter", "weights", "what-100-means", "argmax"):
         assert name in targets
     assert "<h2 id='equation'>The Counter Utility Matrix</h2>" in page  # the name is the equation
     # and the page says what the short name stands for
@@ -339,6 +339,13 @@ def test_the_math_page_states_the_equation_and_the_layers():
     assert "A heuristic moves a six by its weight at most" in flat
     assert "What 100 means" in page and "not a win probability" in page
     assert "When nothing scores" in page
+    # how a six is chosen: the five steps in order, then what a reader must not assume
+    chosen = flat[flat.index("<h2 id='chosen'>"):flat.index("<h2 id='function'>")]
+    steps = ["1 the space", "2 the limits", "3 the meta", "4 the heuristics", "5 the argmax"]
+    assert [chosen.index(s) for s in steps] == sorted(chosen.index(s) for s in steps)
+    for claim in ("weighs nothing", "The weights are not learned", "A score is not a probability",
+                  "a proxy for Open Queue 6v6", "unknown, not zero"):
+        assert claim in chosen, claim
     assert "The data layer" in page and "The inference layer" in page and "The board" in page
     assert "never calls a language model" in page
     # the counter: blue's own six above the optimal that ignores its picks
