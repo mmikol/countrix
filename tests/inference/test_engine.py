@@ -5,8 +5,8 @@ share read from the seat's floor and a mirror's even odds, the likely six, a
 full six on control, every seat of a board on the synthetic World, the
 page's boards superseding one another, and the healing floor on top of the
 default engine.
-Every board is the synthetic World's but the last, King's Row on the built
-database. test_board_gate holds the lobby's limits on every door."""
+Every board is the synthetic World's but the last two, King's Row and
+Samoa on the built database. test_board_gate holds the lobby's limits on every door."""
 
 import os
 
@@ -221,7 +221,7 @@ def test_red_may_reveal_what_a_limit_forbids(synthetic_world, tmp_path):
                      catalog=catalog.load(str(tmp_path)), brief=BRIEF)
     red = b.red_current.to_dict()
     assert red["kind"] == "evaluate" and red["violations"] == ["three-supports"]
-    assert red["rank"] is not None and red["normalized"] is not None
+    assert (red["rank"] is not None or red["outranked"]) and red["normalized"] is not None
     assert red["pending"] == ["a-draft"]
     text = b.rendered()
     assert "  VIOLATES: three-supports" in text
@@ -283,28 +283,22 @@ def test_a_half_drafted_seat_may_break_a_limit_its_picks_to_come_can_mend(
     assert b.fill is not None and b.momentum["blue"] is not None
 
 
-def test_picks_are_ruled_out_only_when_no_six_on_the_roster_completes_them(
-        synthetic_world, tmp_path, monkeypatch):
-    """The fill searches its pools, not the roster. Under a limit on the kit -
-    a light flier fielded, and Gale the only one - picks whose one
-    completion the fill's pools cut stay allowed, with no fill: the roster
-    holds a six that keeps them. Capped at two damage, the open slot is a
-    support's, no six completes them, and they are not allowed, the limit
-    they break named - by the board and by infer alike."""
-    from inference import engine, solver
-    real = solver.Solver.pools
-
-    def cut(self):
-        """The pools, with Gale cut from any search around locked picks."""
-        return {role: [h for h in heroes if not self.locked or h.name != "Gale"]
-                for role, heroes in real(self).items()}
-    monkeypatch.setattr(solver.Solver, "pools", cut)
+def test_picks_are_ruled_out_exactly_when_no_six_on_the_roster_completes_them(
+        synthetic_world, tmp_path):
+    """The fill searches every six on the roster that keeps the picks, so an
+    empty answer is a proof. Under a limit on the kit - a light flier
+    fielded, and Gale the only one - picks whose one completion seats Gale
+    are allowed and filled with her, their breach listed as one to mend.
+    Capped at two damage, the open slot is a support's, no six completes
+    them, and they are not allowed, the limit they break named - by the
+    board and by infer alike."""
+    from inference import engine
     (tmp_path / "air.md").write_text(
         "---\nname: A light flier\nkind: constraint\nrequire: team.light_flyers >= 1\n---\nx\n",
         "utf-8")
     picks = Draft("Harbor Gate", ("Kite",), ("Anvil", "Mortar", "Rook", "Needle", "Balm"))
     b = engine.board(synthetic_world, picks, catalog=catalog.load(str(tmp_path)), brief=BRIEF)
-    assert b.fill is None and b.current.barred is None
+    assert b.fill is not None and "Gale" in b.fill.blue and b.current.barred is None
     assert b.current.violations == ["air"] and b.momentum["blue"] is not None
     (tmp_path / "two-damage.md").write_text(
         "---\nname: Two damage\nkind: constraint\nrequire: team.damage <= 2\n---\nx\n", "utf-8")
@@ -358,7 +352,7 @@ def test_a_mirror_reads_even(synthetic_world):
 
 def test_an_empty_catalog_is_the_callers_and_loads_no_playbook(synthetic_world, monkeypatch):
     """Only a catalog left out is the playbook in force: [] is the caller's
-    own, as parallel.available already reads it, and scores nothing."""
+    own, and scores nothing."""
     from inference import engine
 
     def load(directory=None):
@@ -391,15 +385,25 @@ def test_blue_counters_the_likely_six_until_red_reveals_a_pick(synthetic_world):
 
 
 def test_board_ranks_a_full_six_and_ignores_sides_on_control(synthetic_world):
+    """A full six on a control map is ranked among every legal six - the
+    optimal's third alternative is fourth - and the side a caller names
+    is dropped: control has none. A weak six ranks outside RANK_CAP."""
     from inference import engine
     world = synthetic_world
     fix = catalog.load(FIXTURE_PLAYBOOK)
-    six = ["Anvil", "Mortar", "Rook", "Needle", "Balm", "Tansy"]
+    first = engine.board(world, Draft("Ember Ruins", ("Gale",)), catalog=fix, brief=BRIEF)
+    six = first.blue.alternatives[2]["blue"]
     b = engine.board(world, Draft("Ember Ruins", ("Gale",), tuple(six), side="attack"),
                      catalog=fix, brief=BRIEF)
     assert b.side == "" and b.blue.side == "" and b.red.side == ""
-    assert b.current.kind == "evaluate" and b.current.rank >= 1
+    assert b.current.kind == "evaluate" and b.current.rank == 4 and not b.current.outranked
+    assert "(rank 4 among the legal sixes)" in b.current.rendered()
     assert set(b.current.blue) == set(six)
+    weak = ("Anvil", "Mortar", "Rook", "Needle", "Balm", "Tansy")
+    outside = engine.board(world, Draft("Ember Ruins", ("Gale",), weak), catalog=fix,
+                           brief=BRIEF).current
+    assert outside.rank is None and outside.outranked and outside.to_dict()["outranked"]
+    assert "(outside the top 100 of the legal sixes)" in outside.rendered()
     assert b.blue.locked == [] and b.blue.to_dict()["normalized"] == 100
     assert 0 <= b.current.to_dict()["normalized"] <= 100      # against the absolute optimal
     b = engine.board(world, Draft(), catalog=fix, brief=BRIEF)
@@ -515,3 +519,27 @@ def test_the_healing_floor_takes_kings_row_off_one_support(world, tmp_path):
 
     assert supports(plain) == 1 and _shortfall(world, plain) > 0.5
     assert supports(floored) >= 2 and _shortfall(world, floored) < 0.15
+
+
+@pytest.mark.invariant
+def test_the_search_proves_real_boards_scoring_few_sixes_in_full(world):
+    """On the built database the bound is tight enough that the exact search
+    proves a seat's best sixes out of 17 million legal ones while scoring
+    a few dozen in full - Samoa against five revealed picks, and King's
+    Row with nothing revealed - and the whole space is what it covered. The
+    ceilings are two orders of magnitude over what the boards take, so a
+    data refresh moves the counts and not the verdict; a bound gone slack
+    fails it."""
+    from inference import catalog as catalog_module
+    from inference.solver import Solver
+    for map_name, red, side in (
+            ("Samoa", ("D.Va", "Roadhog", "Sombra", "Lúcio", "Brigitte"), ""),
+            ("King's Row", (), "attack")):
+        m, red_h, _, _ = world.resolve(map_name, red, (), ())
+        solver = Solver(world, m, red=red_h, locked=[], side=side,
+                        catalog=catalog_module.load(), base=catalog_module.engine_weights())
+        solved = solver.solve(top=6)
+        released = sum(1 for h in world.heroes.values() if h.released)
+        assert len(solved.ranked) == 6 and solver.considered > released ** 3
+        assert solver.leaves < 2_000 and solver.nodes < 100_000, (map_name, solver.leaves)
+

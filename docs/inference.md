@@ -11,10 +11,10 @@ COMP       = ARGMAX[ STRATEGIES( FACTS ) ]  the solver searches; the agent argue
 Two things infer:
 
 - **The solver**: deterministic arithmetic. It reads the strategy files'
-  frontmatter, scores every candidate six with the facts layer's metrics,
-  and returns the best. No model, no API, and no randomness but seeded
-  draws: the reference sample and the refine's restarts. It cannot read
-  prose.
+  frontmatter, scores six after six with the facts layer's metrics, and
+  returns the best of every legal six, exactly ([The search](#the-search)).
+  No model, no API, and no randomness but the reference sample's seeded
+  draw. It cannot read prose.
 - **The agent**: a Claude Code session on the `/comp` skill. It reads the
   same facts and the prose of the same strategies and reconciles them
   where arithmetic cannot. It runs when you ask it to, never on its own,
@@ -95,7 +95,7 @@ fact it read and its weight with the meta applied: the counter bar's fact
 names the six it read.
 
 A `BaseWeights` rides the `Brief`, and `infer`'s `base`, into every
-`Objective` and every worker's `Spec`. Left unset it is the playbook in
+`Objective`. Left unset it is the playbook in
 force's `meta.md` (`catalog.engine_weights`), with a board's own meta
 over it where the playbook tab's Meta slider sets one
 (`weights=meta:<0..10>`). Every result records the weights it was scored
@@ -163,9 +163,8 @@ from the wiki's, with the mean they read at, so a reason never passes an
 unwritten pair off as a documented one. The graph metrics -
 `team.synergy_edges`, `synergy_density`, `core_size`, `isolated` and
 `pairs` - count the pairs the wiki claims, and describe what is
-documented; so do the other side's likely six, which adds `SYNERGY_PULL`
-for each documented partner, and the solver's pool ranking by locked
-partners. A fixture's stamp (`base.stamp`) names the reading, so one
+documented; so does the other side's likely six, which adds
+`SYNERGY_PULL` for each documented partner. A fixture's stamp (`base.stamp`) names the reading, so one
 recorded while an unwritten pair read 0 reads as another objective.
 
 What it moved, on the shipped playbook at the shipped weights, blue's
@@ -186,8 +185,7 @@ compared.
 
 Each seat's optimal six is its 100, and its 0 is the seat's floor: the
 lowest score among the reference sixes its scale drew (`Solver.floor`,
-the least of the tally `inference/scale.py` keeps over the sample, which
-the pool's slices fold in any order to the same number). A comp's share
+from `inference/scale.py`), and a fill takes its seat's. A comp's share
 is its place on that span:
 
 ```
@@ -204,9 +202,8 @@ floor leaves nothing to divide, and every comp but the optimal reads
 
 A comp the limits rule out is not allowed: blue's full six that breaks
 one, or picks that no six keeping them completes within the limits (their
-fill is then not solved). The fill searches its pools; when they hold no
-such six, `Solver.completes` tries the open slots over the whole roster,
-up to `COMPLETION_BUDGET` sixes, and only a search that ends with none
+fill is then not solved). The fill searches every six on the roster that
+keeps the picks, so a fill that ends with none is a proof, and only that
 rules the picks out. Such a comp carries no score, no share and no odds,
 and its breakdown keeps the limits alone; blue's optimal and red's seat
 still render. The badge and the strip read `not allowed: breaks <the
@@ -214,6 +211,105 @@ limit's name>`, or, where the picks break no limit as they stand, `not
 allowed: no six that keeps these picks meets the playbook's limits`. Red's
 revealed picks are the other side's facts and are never ruled out.
 The `infer` tool refuses such picks in the same words.
+
+## The search
+
+`inference/solver.py` returns the best sixes of the whole legal space:
+every six of released, unbanned heroes that holds the locked picks, each
+once, at most two tanks and every limit kept - 17,217,564 on an open board
+under the shipped playbook. It walks that space by branch and bound. Each
+legal shape is filled role by role, a role's picks at rising places of its
+walk order, and a branch - the picks so far and the candidates each open
+role has left - is dropped only where its bound proves that no six in it
+can enter the best K. The answer is the enumeration's own, in the full
+rank order, whatever order the walk takes; no hero is left out of any
+role, and the alternatives are the next best sixes in that order.
+
+The bound (`inference/bounds.py`) adds up, in the score's own order:
+
+- the default engine's terms together: the picks' own parts and their
+  pairs, then each open role's best few candidates by their own part,
+  their synergy with the picks, and half their best synergies among the
+  rest of the roster. Each pair among the open picks is counted from both
+  of its ends, so the two halves are never less than the pair;
+- each heuristic on a metric at the better end of the metric's range over
+  the branch, and a need at 0 where its guard may not hold;
+- each scored heuristic at its weight times the bonus's high end less the
+  penalty's low end, and 0 where its `when` may not hold.
+
+A metric's range comes from the aggregate it is - a sum over the picks, a
+mean or a median of the known values, a max or a min, a product, a sum
+over pairs, the enemies answered, the distinct subroles, or fixed by the
+shape - and every team and matchup key has its rule. An expression's
+range comes from its tree: an operator takes its operands' ends, a
+comparison is true, false or either, and `and`, `or` and `if` join the
+values they can take. A limit false on every six of a branch drops it. A
+metric the bound sums in another order than the metric itself carries a
+slack, `SLACK` (1e-12) per unit of its addends, outward on both ends; one
+of whole numbers carries none, so a threshold on a count reads exactly.
+
+Sixes rank by `scoring.rank_key`: the score rounded to `SCORE_PLACES` (9)
+decimal places, then the six's mean map win rate, then the names. The
+rounding makes a plateau finite: with the engine off, the healing floor
+scores every six that heals enough exactly 0, and the tie-break's own
+bound, the best mean map win rate a branch can reach, settles which of
+them lead. Each six is scored in one seat order - tanks, then damage, then
+supports, each by hero id - so its score is a function of its heroes to
+the last bit, and a board is the same payload under any hash seed.
+
+A full six's rank counts the legal sixes whose rounded score beats its
+own: read off the seat's search where the six reaches its best K, counted
+by a search of its own where it does not, exact up to `RANK_CAP` (100);
+past it the six reads outside the top 100. A search past `NODE_BUDGET`
+branches or `SCORE_BUDGET` sixes scored in full raises `Unbounded`, a
+refusal: the answer is exact or refused, never a guess. A search that ends
+with no six proves that none exists, so blue's picks a fill finds nothing
+for are not allowed. Every search runs in the calling process, one after
+another; a board asks its client's lane (`inference/supersede.py`) every
+`CHECK_EVERY` branches whether a newer board replaced it.
+
+The suite holds the search to enumeration:
+`test_the_search_reaches_the_enumerated_maximum` and its neighbours in
+`tests/inference/test_solver.py` compare the best sixes, the score floats
+and the ranks with a full enumeration's on synthetic boards - both seats,
+the fill, the countered case, bans, locks and plateaus - and
+`tests/inference/test_bounds.py` holds every rule and the whole bound to
+every completion of random branches. On the built database,
+`python -m tests.inference.prove_exact` brute-forces every legal six of a
+real board, in slices, against the search.
+
+### Why the search is exact
+
+The owner's rule: the solver optimises exactly over the whole legal
+space - every six, duplicates removed, at most two tanks, the playbook's
+limits - and no per-role shortlist may restrict which heroes can appear.
+The search it replaces kept each role's six highest-standing heroes,
+swept the 13,101 sixes they allow, then climbed from the best of them by
+local search over the whole roster. It scored about 14,500 of 17 million
+sixes, and its answer was the best it met, not the best there is. On Samoa
+against D.Va, Roadhog, Sombra, Lúcio and Brigitte the investigation that
+led here found it returning a two-one-three at 3.8673 where a two-two-two
+scored 3.8885: the shape it needed was never searched from a good start,
+and no pool size could promise it would be.
+
+Replayed on that data, the old search still answers the two-one-three
+and the exact one the two-two-two at 3.8885, the same float a brute force
+of all 17,217,564 legal sixes found. On today's data, where an unwritten
+synergy pair reads the written pairs' mean, the old search happened to
+find the best six on each of 126 boards tried - every map against red's
+likely six, 90 seeded boards of random reds and bans, and six boards
+brute-forced in full - so its misses were rare, and nothing said when one
+happened. The exact search proves its answer, and costs less: 0.08 s a
+search against the old 2.3 s in one process, and a whole board
+0.19-0.33 s in one process against 1.1-3.7 s on twelve workers and
+3.8-11.2 s without them.
+
+Exactness retires what served the approximation: the process pool, its
+rounds and the two settings that sized it; the per-role pool and the
+`pool` knob of `infer`, `board` and `/api/board`; the field budget that
+held the swept fields in memory; and the check that tried the roster when
+the pools found no fill. `top` is the one knob left, and it buys the next
+best sixes in order.
 
 ## How a strategy file works
 

@@ -1,46 +1,45 @@
 """The search: the optimal six under the catalog, players playing optimally.
 A Solver is the board's Objective (inference.scoring) on the board's scale
-(inference.scale), searched around the locked picks.
+(inference.scale), searched exactly around the locked picks.
 
-    legal_sixes     every shape the queue and the shape limits allow, filled around
-                    the locked picks from a per-role pool of released heroes (an
-                    announced hero waits) ranked by standing, PARTNER_POINTS for
-                    each locked partner (six per role by default)
-    sweep           a slice of the enumeration prepared, scored and slimmed. The
-                    slices partition the field, so the search splits across
-                    processes.
-    rank            sorted by score, then tie-break, then names - a total order, so
-                    the answer does not depend on how the sweep was split
-    refine          local search from the best six sixes and the best of every
-                    shape within SHAPE_REACH of the best: swap any slot for any
-                    same-role hero on the roster, keep improvements; bring each
-                    of the wiki's synergy pairs into the best sixes two slots at
-                    once; then climb from random sixes of the leader's shape and
-                    change two seats at once
+    shapes      the (tanks, damage, supports) triples the queue and the shape
+                limits allow that can still seat the locked picks
+    solve       the best sixes of the whole legal space - every six of
+                released, unbanned heroes around the locked picks, each once,
+                at most two tanks, every limit kept - in the full rank order
+                (scoring.rank_key), by branch and bound: each shape is filled
+                role by role, a role's picks at rising places of its walk
+                order, and a branch is dropped only where its bound
+                (inference.bounds) proves that no six in it can enter the
+                top K. The answer is the enumeration's own, whatever order
+                the walk takes; no hero is left out of any role
+    outranking  how many legal sixes a six's quantized score is beaten by:
+                the same walk, dropping every branch whose bound cannot beat
+                it, exact up to RANK_CAP
+
+A search refuses rather than guesses: past NODE_BUDGET branches or
+SCORE_BUDGET sixes scored in full it raises Unbounded, and a search that
+ends with no six is Infeasible - a proof that no legal six exists.
 """
 
-import heapq
-import itertools
-import random
-from collections.abc import Iterator, Mapping, Sequence
+import bisect
+import math
+from collections.abc import Callable, Sequence
 from typing import NamedTuple
 
 from db import Refusal
 from facts.model import ROLES, Hero, Map, World
 from inference import scale
 from inference.base import BaseWeights
-from inference.scoring import Candidate, Interval, Objective, SixKey
+from inference.bounds import Bound, Frame, Space, roster
+from inference.scoring import Candidate, Objective, quantized, rank_key
 from inference.shapes import Shape, legal_shapes
 from inference.strategy import Strategy
 
-PARTNER_POINTS = 0.5              # a locked partner's worth when ranking a pool
-SEEDS = 6                         # the local search's starts, whatever `top` asks for
-RESTARTS = 24                     # in-shape random starts: the SEEDS are near-duplicates
-SHAPE_REACH = 4.0                 # a shape starts too when its best six is this close
-PAIR_TRIES = 800                  # the most new sixes one refine scores bringing pairs in
-# the most sixes completes() tries over the whole roster before it gives up on an
-# answer: about two seconds at 40 microseconds a six prepared
-COMPLETION_BUDGET = 50_000
+RANK_CAP = 100                    # the ranks outranking() counts exactly; past it, "outside"
+NODE_BUDGET = 2_000_000           # branches one search walks before it refuses
+SCORE_BUDGET = 200_000            # sixes one search scores in full before it refuses
+CHECK_EVERY = 4096                # branches between two asks whether the board is superseded
 
 
 class Infeasible(Refusal):
@@ -48,72 +47,135 @@ class Infeasible(Refusal):
     playbook answer it, so it is a Refusal: the server is not at fault."""
 
 
+class Unbounded(Refusal):
+    """A search that passed its budget before it proved its answer: a
+    playbook whose terms the bound cannot narrow. The answer is exact or
+    refused, never guessed."""
+
+
 class Solved(NamedTuple):
-    """A board's search: the solver that ran it and its ranked winners, hydrated."""
+    """A board's search: the solver that ran it, its ranked winners
+    hydrated, and how many it was asked for - fewer ranked than that is
+    every feasible six."""
     solver: "Solver"
     ranked: list[Candidate]
-
-
-class Swept(NamedTuple):
-    """A board's field: the whole enumeration's size and one slice's feasible sixes."""
-    solver: "Solver"
     size: int
-    feasible: list[Candidate]
 
 
 class Evaluated(NamedTuple):
-    """A full six scored and ranked against the refined field's best five, hydrated."""
+    """A full six scored and ranked against every legal six - its rank, None
+    where RANK_CAP sixes outrank it (outranked) or the count ran out of
+    budget - and the seat's best sixes, hydrated."""
     target: Candidate
     field: list[Candidate]
-    rank: int
+    rank: int | None
+    outranked: bool
     solver: "Solver"
+
+
+# the roles still open at a node: (role, first candidate, picks left)
+type Open = tuple[tuple[int, int, int], ...]
+
+
+def _open(slots: Sequence[int], j: int, start: int) -> Open:
+    """The roles slots[j:] still fill, the first from `start`, the rest from
+    their first candidate."""
+    out = []
+    i = j
+    while i < len(slots):
+        k = i
+        while k < len(slots) and slots[k] == slots[i]:
+            k += 1
+        out.append((slots[i], start if i == j else 0, k - i))
+        i = k
+    return tuple(out)
+
+
+class _Best:
+    """The K best sixes met so far, in rank order, and the prune the K-th
+    sets: a branch whose bound rounds below its score, or ties it with a
+    tie-break that cannot reach its own."""
+
+    done = False
+
+    def __init__(self, k: int) -> None:
+        self.k = k
+        self.items: list[tuple[tuple[float, float, list[str]], Candidate]] = []
+
+    def prunes(self, bound: float, walk: Bound, frame: Frame, open_roles: Open) -> bool:
+        if len(self.items) < self.k:
+            return False
+        worst = self.items[-1][0]
+        score = quantized(bound)
+        if score != -worst[0]:
+            return score < -worst[0]
+        return walk.tiebreak(frame, open_roles) < -worst[1]
+
+    def offer(self, cand: Candidate) -> None:
+        key = rank_key(cand)
+        if len(self.items) >= self.k and key >= self.items[-1][0]:
+            return
+        bisect.insort(self.items, (key, cand), key=lambda item: item[0])
+        del self.items[self.k:]
+
+
+class _Count:
+    """The legal sixes whose quantized score beats a target's, counted up
+    to a cap; a branch whose bound cannot beat it is dropped."""
+
+    def __init__(self, target: float, cap: int) -> None:
+        self.target, self.cap, self.count, self.done = target, cap, 0, False
+
+    def prunes(self, bound: float, walk: Bound, frame: Frame, open_roles: Open) -> bool:
+        return quantized(bound) <= self.target
+
+    def offer(self, cand: Candidate) -> None:
+        if quantized(cand.score) > self.target:
+            self.count += 1
+            self.done = self.count >= self.cap
+
+
+type Goal = _Best | _Count
 
 
 class Solver(Objective):
     """One board's search: the playbook's objective on this board, the scale
-    it is normalised on, and the local search around the locked picks."""
+    it is normalised on, and the exact search around the locked picks."""
 
     def __init__(self, world: World, m: Map | None, *, red: Sequence[Hero],
                  locked: Sequence[Hero], banned: Sequence[Hero] = (), side: str = "",
-                 catalog: list[Strategy], base: BaseWeights, pool_size: int = 6) -> None:
+                 catalog: list[Strategy], base: BaseWeights,
+                 check: Callable[[], None] | None = None) -> None:
         super().__init__(world, m, red=red, banned=banned, side=side, catalog=catalog,
                          base=base)
         self.locked = list(locked)
         self._locked_by_role = {r: [h for h in self.locked if h.role == r] for r in ROLES}
-        self.pool_size = pool_size
-        self.considered = 0
-        self._standing: dict[int, float] = {}   # hero id -> mean reference score, once read
+        self.check = check            # raises where a newer board superseded this one
+        self.considered = 0           # the legal sixes the last search's answer covers
+        self.nodes = 0                # branches the last search walked
+        self.leaves = 0               # sixes the last search scored in full
         # the lowest score among the reference sixes, once read: the zero of a
         # share on this board, as the optimal is its 100
         self.floor: float | None = None
+        self._frozen = False
+        self._bound: Bound | None = None
 
-    # --- the scale and the standing ---------------------------------------------
+    # --- the scale ----------------------------------------------------------------
 
     def freeze_bounds(self) -> None:
-        """Bounds per heuristic from the reference sample and the field, then
-        each hero's standing in the sample and the sample's floor."""
-        self.adopt_standing(scale.freeze(self))
+        """Bounds per heuristic from the reference sample and the field, and
+        the sample's floor."""
+        self.floor = scale.freeze(self)
+        self._frozen, self._bound = True, None
 
-    def adopt_bounds(self, bounds: Mapping[str, Interval],
-                     standing: scale.Tally | None = None) -> None:
-        """Bounds (and standing) frozen elsewhere for this same board: another
-        process's slice of the search, or an earlier solver on the same map,
-        side, enemies and bans. The sample is seeded, so it draws the same
-        numbers wherever it runs; taking them saves drawing it again."""
-        super().adopt_bounds(bounds)
-        if standing is not None:
-            self.adopt_standing(standing)
+    def adopt_scale(self, other: "Solver") -> None:
+        """The scale another solver on the same board froze - its bounds and
+        its floor: a fill takes its seat's, and draws no sample."""
+        self.adopt_bounds(other.bounds)
+        self.floor = other.floor
+        self._frozen, self._bound = True, None
 
-    def adopt_standing(self, tally: scale.Tally) -> None:
-        """A hero's standing: the mean score of the reference sixes it is in -
-        how the default engine and the playbook in force rate it on this
-        board, red and the map included. It ranks each role's pool, so the
-        heroes searched in full are the ones the objective favours, not the
-        ones a side formula does. The tally's floor is the board's floor."""
-        self._standing = {hid: s.total / s.sixes for hid, s in tally.heroes.items() if s.sixes}
-        self.floor = tally.floor
-
-    # --- enumeration ---------------------------------------------------------------
+    # --- the space ----------------------------------------------------------------
 
     def shapes(self) -> list[Shape]:
         """(tanks, damage, supports) triples the queue and the shape-only
@@ -123,340 +185,130 @@ class Solver(Objective):
             tanks=len(locked["tank"]), damage=len(locked["damage"]),
             supports=len(locked["support"])))
 
-    def prior(self, h: Hero) -> float:
-        """The ranking that cut the pools before the playbook ranked them
-        itself: still the tie-break, and the whole ranking when nothing scores.
-        The board's prior, with a hero's partners among the locked picks."""
-        partners = sum(1 for a in self.locked if self.world.synergy(a.id, h.id))
-        return scale.board_prior(self, h, partners)
+    def _walker(self) -> Bound:
+        """The bound over this board's space, built once the scale is frozen."""
+        if not self._frozen:
+            self.freeze_bounds()
+        if self._bound is None:
+            space = Space(self, self.locked, roster(self.world, self.locked, self.banned))
+            self._bound = Bound(self, space)
+        return self._bound
 
-    def pools(self) -> dict[str, list[Hero]]:
-        locked_ids = {h.id for h in self.locked} | self.banned
-        pools: dict[str, list[Hero]] = {}
-        for role in ROLES:
-            heroes = [h for h in self.world.heroes.values()      # announced heroes wait
-                      if h.role == role and h.released and h.id not in locked_ids]
-            heroes.sort(key=self._pool_key)
-            pools[role] = heroes[:self.pool_size]
-        return pools
-
-    def _pool_key(self, h: Hero) -> tuple[float, float, str]:
-        """Standing first, PARTNER_POINTS for each locked partner; then the old
-        prior, then the name."""
-        standing = self._standing.get(h.id)
-        if standing is not None:
-            standing += PARTNER_POINTS * 1e6 * sum(
-                1 for a in self.locked if self.world.synergy(a.id, h.id))
-        return (-(standing if standing is not None else float("-inf")), -self.prior(h), h.name)
-
-    def legal_sixes(self) -> Iterator[list[Hero]]:
-        """Every legal six around the locked picks, as a list of heroes. A six's
-        roles fix its shape and the pools hold neither the locked picks nor the
-        bans, so no two of these are the same set. Lazy: a slice of the search
-        builds candidates for its own positions and walks past the rest."""
-        pools = self.pools()
-        locked_by_role = self._locked_by_role
-        for t, d, s in self.shapes():
-            need = {"tank": t - len(locked_by_role["tank"]),
-                    "damage": d - len(locked_by_role["damage"]),
-                    "support": s - len(locked_by_role["support"])}
-            choices = [list(itertools.combinations(pools[r], need[r])) for r in ROLES]
-            for combo in itertools.product(*choices):
-                yield self.locked + [h for part in combo for h in part]
-
-    def completes(self, budget: int = COMPLETION_BUDGET) -> bool | None:
-        """Whether any six around the locked picks meets every limit, its open
-        slots drawn from the whole roster - released and unbanned - not the
-        pools the search cuts: True at the first that does, False once every
-        legal shape's sixes are tried and none does, None when `budget`
-        sixes pass without an answer. No shape seats the picks: False at
-        once, the answer a shape limit gives."""
-        taken = {h.id for h in self.locked} | self.banned
-        roster = {r: [h for h in sorted(self.world.heroes.values(), key=lambda h: h.id)
-                      if h.role == r and h.released and h.id not in taken] for r in ROLES}
-        locked_by_role = self._locked_by_role
-        tried = 0
+    def _slots(self, space: Space) -> list[tuple[int, ...]]:
+        """Each legal shape's open slots, role by role in ROLES order; a
+        shape a role has too few candidates for holds no six."""
+        out = []
         for shape in self.shapes():
-            need = dict(zip(ROLES, shape, strict=True))
-            choices = [itertools.combinations(roster[r], need[r] - len(locked_by_role[r]))
-                       for r in ROLES]
-            for combo in itertools.product(*choices):
-                if tried >= budget:
-                    return None
-                tried += 1
-                six = self.locked + [h for part in combo for h in part]
-                if not self.prepare(Candidate(six)).violations:
-                    return True
-        return False
+            need = [shape[i] - len(self._locked_by_role[r]) for i, r in enumerate(ROLES)]
+            if all(n <= len(space.roles[i]) for i, n in enumerate(need)):
+                out.append(tuple(i for i, n in enumerate(need) for _ in range(n)))
+        return out
 
     # --- the search -------------------------------------------------------------------
 
-    def sweep(self, index: int = 0, count: int = 1) -> Swept:
-        """Every `count`-th candidate of the enumeration, from `index`:
-        prepared, scored and slimmed, so a search of thousands holds only
-        verdicts. -> Swept: this solver, the whole field's size and the
-        feasible ones of this slice. The slices of one field partition it, so
-        any split of the work reaches the same set."""
-        feasible: list[Candidate] = []
-        size = 0
-        for heroes in self.legal_sixes():
-            if size % count == index:
-                cand = self.prepare(Candidate(heroes))
-                if not cand.violations:
-                    feasible.append(self.slim(self.score(cand, detail=False)))
-            size += 1
-        return Swept(self, size, feasible)
-
-    def rank(self, feasible: list[Candidate], top: int = 5) -> list[Candidate]:
-        """The best sixes of a swept field, refined and hydrated. The order is
-        the _rank_key's alone, so it does not depend on how the sweep was
-        split."""
-        if not feasible:
-            return []
-        feasible.sort(key=self._rank_key)
-        return [self.hydrate(c) for c in self.refine(feasible)[:top]]
-
     def solve(self, top: int = 5) -> Solved:
-        """The best sixes, in this process."""
-        self.freeze_bounds()
-        swept = self.sweep()
-        self.considered = swept.size
-        return Solved(self, self.rank(swept.feasible, top))
+        """The `top` best legal sixes, exactly, in rank order, hydrated."""
+        goal = _Best(max(1, top))
+        self._search(goal)
+        return Solved(self, [self.hydrate(c) for _, c in goal.items], goal.k)
 
-    @staticmethod
-    def _rank_key(c: Candidate) -> tuple[float, float, list[str]]:
-        # sorted: a six's names in seat order are a construction artifact, so the
-        # same hero set could key 720 ways and the order would not be a function
-        # of the composition
-        return (-c.score, -c.tiebreak, sorted(c.names))
+    def outranking(self, target: Candidate, cap: int | None = None) -> int | None:
+        """How many legal sixes score above `target` once scores are
+        quantized: exactly, or None once `cap` do - RANK_CAP where none is
+        named."""
+        goal = _Count(quantized(target.score), RANK_CAP if cap is None else cap)
+        self._search(goal)
+        return None if goal.done else goal.count
 
-    def refine(self, ranked: list[Candidate]) -> list[Candidate]:
-        """Local search: swap any open slot for any same-role hero. A swap keeps
-        the shape, so the starts are the best SEEDS of the field and the best
-        six of every shape in it: an off-shape six can win only if its own
-        shape was searched. Then the best SEEDS sixes try each of the wiki's synergy pairs
-        brought in two slots at once, and the swaps run on from any that gained:
-        partners that pay only together are never met one swap at a time.
-        The field is never empty: rank() returns before calling it, and
-        evaluate_comp refuses a board with no feasible six the way infer
-        does."""
-        known = {c.key: c for c in ranked}
-        starts = list(ranked[:SEEDS])
-        shapes: set[tuple[str, ...]] = set()
-        floor = ranked[0].score - SHAPE_REACH
-        for cand in ranked:                   # sorted: the first of a shape is its best
-            if cand.score < floor:
-                break                         # a swap or two will not make this up
-            shape = tuple(sorted(h.role for h in cand.heroes))
-            if shape not in shapes:
-                shapes.add(shape)
-                if cand not in starts:
-                    starts.append(cand)
-        roster = [h for h in sorted(self.world.heroes.values(), key=lambda h: h.id)
-                  if h.released and h.id not in self.banned]    # announced heroes wait here too
-        for seed in starts:
-            self._climb(seed, roster, known)
-        pairs = self._pairs()
-        if pairs:
-            for seed in heapq.nsmallest(SEEDS, known.values(), key=self._rank_key):
-                spent = self.considered + PAIR_TRIES      # each seed gets its own budget
-                paired = self._bring_pair(seed, pairs, known, spent)
-                if paired is not seed:
-                    self._climb(paired, roster, known)
-        # the SEEDS are the top of one pool-restricted sweep and sit within a swap
-        # or two of each other, so the climbs above share a basin; and a climb moves
-        # one seat at a time, so a six two swaps away is unreachable however many
-        # times it is started. These two stages answer those in that order.
-        leader = min(known.values(), key=self._rank_key)
-        leader = self._restarts(leader, roster, known)
-        self._two_swap(leader, roster, known)
-        out = list(known.values())
-        out.sort(key=self._rank_key)
-        return out
-
-    def _try(self, heroes: Sequence[Hero],
-                known: dict[SixKey, Candidate]) -> Candidate | None:
-        """The six prepared, scored and slimmed once; None where a limit
-        refuses it."""
-        cand = Candidate(heroes)
-        if cand.key in known:
-            return known[cand.key]
-        self.prepare(cand)
-        self.considered += 1
-        if cand.violations:
-            return None
-        known[cand.key] = self.slim(self.score(cand, detail=False))
-        return cand
-
-    def _climb(self, seed: Candidate, roster: Sequence[Hero],
-                known: dict[SixKey, Candidate]) -> Candidate:
-        """Single-slot swaps from one six until none ranks above it."""
-        locked_ids = {h.id for h in self.locked}
-        current = seed
-        while True:
-            best = current
-            for index, hero in enumerate(current.heroes):
-                if hero.id in locked_ids:
-                    continue
-                for other in roster:
-                    if other.role != hero.role or other.id in current.key:
-                        continue
-                    heroes = list(current.heroes)
-                    heroes[index] = other
-                    cand = self._try(heroes, known)
-                    if cand is not None and _beats(cand, best):
-                        best = cand
-            if best is current:
-                return current
-            current = best
-
-    def _restarts(self, leader: Candidate, roster: Sequence[Hero],
-                  known: dict[SixKey, Candidate], n: int = RESTARTS) -> Candidate:
-        """Climbs from random sixes of the leader's own shape. A climb preserves
-        the shape, so a start off it can only report on a shape already searched;
-        confining the draw is what makes a couple of dozen starts enough."""
-        locked_ids = {h.id for h in self.locked}
-        by_role = {r: [h for h in roster if h.role == r and h.id not in locked_ids]
-                   for r in ROLES}
-        locked_by_role = self._locked_by_role
-        shape = {r: sum(1 for h in leader.heroes if h.role == r) for r in ROLES}
-        seed = "restart|%s|%s" % (self.m.id if self.m else 0, self.side)
-        rng = random.Random(seed)  # nosec B311  # a str seed, stable across processes
-        best = leader
-        for _ in range(n):
-            heroes: list[Hero] = []
-            short = False                     # a role with too few heroes for the shape
-            for role in ROLES:
-                need = shape[role] - len(locked_by_role[role])
-                if not 0 <= need <= len(by_role[role]):
-                    short = True
-                    break
-                heroes += locked_by_role[role] + rng.sample(by_role[role], need)
-            if short:
-                continue
-            cand = self._try(heroes, known)
-            if cand is None:
-                continue
-            cand = self._climb(cand, roster, known)
-            if _beats(cand, best):
-                best = cand
-        return best
-
-    def _two_swap(self, leader: Candidate, roster: Sequence[Hero],
-                  known: dict[SixKey, Candidate]) -> Candidate:
-        """Two open seats changed at once, to convergence. Two picks that pay
-        only together are a saddle a one-slot climb cannot cross."""
-        locked_ids = {h.id for h in self.locked}
-        current = leader
-        while True:
-            best = current
-            for heroes in _two_swaps(current, roster, locked_ids):
-                cand = self._try(heroes, known)
-                if cand is not None and _beats(cand, best):
-                    best = cand
-            if best is current:
-                return current
-            current = self._climb(best, roster, known)
-
-    def _pairs(self) -> list[tuple[Hero, Hero]]:
-        """The wiki's synergy pairs this board can field, in id order."""
-        heroes = self.world.heroes
-        out = []
-        ids = sorted(tuple(sorted(pair)) for pair in self.world.synergies if len(pair) == 2)
-        for a_id, b_id in ids:
-            a, b = heroes.get(a_id), heroes.get(b_id)
-            if (a is not None and b is not None and a.released and b.released
-                    and a.id not in self.banned and b.id not in self.banned):
-                out.append((a, b))
-        return out
-
-    def _bring_pair(self, seed: Candidate, pairs: Sequence[tuple[Hero, Hero]],
-                    known: dict[SixKey, Candidate], spent: int) -> Candidate:
-        """Each pair with neither partner in the six, seated in two open slots of
-        their own roles, until `considered` reaches `spent`. -> the best six met,
-        the seed itself where none beat it."""
-        locked_ids = {h.id for h in self.locked}
-        open_slots: dict[str, list[int]] = {}
-        for index, hero in enumerate(seed.heroes):
-            if hero.id not in locked_ids:
-                open_slots.setdefault(hero.role, []).append(index)
-        best = seed
-        for a, b in pairs:
-            if a.id in seed.key or b.id in seed.key:
-                continue                      # one swap reaches these
-            if self.considered >= spent:
+    def _search(self, goal: Goal) -> None:
+        """Walk every legal shape, strongest root bound first, into `goal`."""
+        walk = self._walker()
+        space = walk.space
+        self.nodes = self.leaves = 0
+        roots = self._slots(space)
+        self.considered = sum(
+            math.prod(math.comb(len(space.roles[r]), slots.count(r)) for r in range(len(ROLES)))
+            for slots in roots)
+        start = walk.start()
+        ranked = []
+        for slots in roots:
+            bound = walk.of(start, _open(slots, 0, 0))
+            if bound is not None:
+                ranked.append((-bound, slots))
+        ranked.sort()
+        for _, slots in ranked:
+            if goal.done:
                 break
-            for i, j in _seatings(open_slots, a, b):
-                heroes = list(seed.heroes)
-                heroes[i], heroes[j] = a, b
-                cand = self._try(heroes, known)
-                if cand is not None and _beats(cand, best):
-                    best = cand
-        return best
+            self._branch(walk, goal, slots, 0, 0, start)
+
+    def _branch(self, walk: Bound, goal: Goal, slots: tuple[int, ...], j: int, start: int,
+                frame: Frame) -> None:
+        """One node: its bound, then its leaf or its children - the next
+        slot's role filled at each place from `start` that leaves the role's
+        later slots room."""
+        self.nodes += 1
+        if not self.nodes % CHECK_EVERY:
+            self._checkpoint()
+        open_roles = _open(slots, j, start)
+        bound = walk.of(frame, open_roles)
+        if bound is None or goal.prunes(bound, walk, frame, open_roles):
+            return
+        if j == len(slots):
+            self._leaf(walk, goal, frame)
+            return
+        role = slots[j]
+        candidates = walk.space.roles[role]
+        later = 0
+        while j + 1 + later < len(slots) and slots[j + 1 + later] == role:
+            later += 1
+        for i in range(start, len(candidates) - later):
+            if goal.done:
+                return
+            self._branch(walk, goal, slots, j + 1, i + 1 if later else 0,
+                         walk.push(frame, candidates[i]))
+
+    def _leaf(self, walk: Bound, goal: Goal, frame: Frame) -> None:
+        """A six its branch's bound let through: scored in full, by the one
+        objective, and offered to the goal where no limit breaks it."""
+        self.leaves += 1
+        if self.leaves > SCORE_BUDGET:
+            raise Unbounded("the search scored %d sixes without proving its answer - a"
+                            " playbook term the bound cannot narrow; tighten it in"
+                            " inference/strategies/" % SCORE_BUDGET)
+        cand = self.prepare(Candidate(walk.space.heroes[i] for i in frame.picks))
+        if cand.violations:
+            return
+        goal.offer(self.slim(self.score(cand, detail=False)))
+
+    def _checkpoint(self) -> None:
+        """Every CHECK_EVERY branches: stop a superseded board, and a search
+        past its budget."""
+        if self.check is not None:
+            self.check()
+        if self.nodes > NODE_BUDGET:
+            raise Unbounded("the search walked %d branches without proving its answer - a"
+                            " playbook term the bound cannot narrow; tighten it in"
+                            " inference/strategies/" % NODE_BUDGET)
 
 
-def _beats(cand: Candidate, best: Candidate) -> bool:
-    """Whether a six ranks above another in the order rank() sorts by: score,
-    then tie-break, then names. Every move of the local search asks this, so
-    where sixes tie - all of them, with the default engine off under a
-    playbook that scores nothing - it still climbs toward the six rank()
-    puts first."""
-    if cand.score != best.score:
-        return cand.score > best.score
-    return Solver._rank_key(cand) < Solver._rank_key(best)
-
-
-def _two_swaps(current: Candidate, roster: Sequence[Hero],
-                locked_ids: set[int]) -> Iterator[list[Hero]]:
-    """Every six two open seats from `current`: each pair of open seats, in
-    seat order, refilled with two other heroes of their roles."""
-    open_seats = [i for i, h in enumerate(current.heroes) if h.id not in locked_ids]
-    for i, j in itertools.combinations(open_seats, 2):
-        role_i, role_j = current.heroes[i].role, current.heroes[j].role
-        for x in roster:
-            if x.role != role_i or x.id in current.key:
-                continue
-            for y in roster:
-                if y.role != role_j or y.id in current.key or y.id == x.id:
-                    continue
-                heroes = list(current.heroes)
-                heroes[i], heroes[j] = x, y
-                yield heroes
-
-
-def _seatings(open_slots: Mapping[str, Sequence[int]], a: Hero,
-                b: Hero) -> Iterator[tuple[int, int]]:
-    """The seats a pair can take: a in an open slot of its role, b in another
-    of its own."""
-    for i in open_slots.get(a.role, ()):
-        for j in open_slots.get(b.role, ()):
-            # the same six, seated the other way round, is met once
-            if i != j and not (a.role == b.role and i > j):
-                yield i, j
-
-
-def evaluate_comp(world: World, m: Map | None, heroes: Sequence[Hero], *,
-                  red: Sequence[Hero], banned: Sequence[Hero] = (), side: str = "",
-                  catalog: list[Strategy], base: BaseWeights, pool_size: int = 6,
-                  swept: Swept | None = None) -> Evaluated:
-    """Score one full six against the field the solver would search. `swept`
-    takes a Swept from elsewhere - the same board's optimal search, which
-    sweeps the same field under the same base. A board with no feasible six
-    is Infeasible, as infer refuses it."""
-    if swept is None:
-        solver = Solver(world, m, red=red, locked=[], banned=banned, side=side,
-                        catalog=catalog, base=base, pool_size=pool_size)
-        solver.freeze_bounds()                # the same reference scale as infer
-        swept = solver.sweep()
-    solver = swept.solver
-    solver.considered = swept.size
-    if not swept.feasible:
+def evaluate_comp(solved: Solved, heroes: Sequence[Hero]) -> Evaluated:
+    """Score one full six on a seat's search and rank it against every legal
+    six: from the search's own top K where the six's score reaches it,
+    else by outranking(); a count past its budget leaves it unranked. A
+    board with no feasible six is Infeasible, as infer refuses it."""
+    solver = solved.solver
+    if not solved.ranked:
         raise Infeasible("no composition satisfies the limits on this board - relax a"
                          " constraint in inference/strategies/")
     target = solver.score(solver.prepare(Candidate(heroes)))
-    # rank against the field the search actually ends on. Ranking against the raw
-    # sweep alone called a six first that the refinement had already beaten, so a
-    # comp and a strictly better one both read rank 1.
-    feasible = solver.refine(sorted(swept.feasible, key=Solver._rank_key))
-    rank = 1 + sum(1 for c in feasible if c.score > target.score + 1e-9)
-    return Evaluated(target, [solver.hydrate(c) for c in feasible[:5]], rank, solver)
+    score = quantized(target.score)
+    ranked = solved.ranked
+    if len(ranked) < solved.size or score >= quantized(ranked[-1].score):
+        above: int | None = sum(1 for c in ranked if quantized(c.score) > score)
+    else:
+        try:
+            above = solver.outranking(target)
+        except Unbounded:
+            return Evaluated(target, ranked[:5], None, False, solver)
+    return Evaluated(target, ranked[:5], None if above is None else 1 + above, above is None,
+                     solver)

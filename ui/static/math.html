@@ -177,24 +177,24 @@ rest. A seat still drafting is read through its fill, the best six its picks can
 both sides alike: a sum over fewer picks reads low, so the seat with more picks would lead. With
 one seat unscored or not allowed the bars show the shares alone. This is not a fitted
 probability.</p>
-<p id='argmax'><b>The argmax.</b> Each role's pool is the six heroes of highest standing: a
-hero's mean score across the reference sixes it appears in, plus %(PARTNER_POINTS)g for each
-locked partner. Every legal shape is filled around the locked picks and scored. A local search
-then swaps same-role heroes while the score rises, starting from the best %(SEEDS)d sixes and
-from the best six of every shape within %(SHAPE_REACH)g points of the top, and finally brings
-the wiki's synergy pairs into the leading sixes two slots at a time. Ties break by mean map win
-rate, then by name.</p>
-<p id='searched'><b>What is searched, and what is not.</b> There are
-<b>18,040,386</b> legal sixes. The search scores about <b>14,500</b> of them, near enough
-0.08%%, so the answer is not a proof that nothing better exists. Two things cut the space.
-The <b>pool</b> keeps each role's six highest-standing heroes, a truncation that can drop a
-hero who is weak alone and decisive beside one partner. The <b>local search</b> reaches back
-out of the pool: it swaps against the whole released roster, restarts %(RESTARTS)d times inside
-the leading shape, and changes two seats at once, which is how a pair that only pays together
-is found. The suite checks the reaching back on every run: on small boards of a twelve-hero
-test roster under a two-two-two role queue, each role's pool cut to half, the search returns
-the maximum a full enumeration finds, with the default engine on and off, and on at least one
-of them the winning six holds a hero the pool cut.</p>
+<p id='argmax'><b>The argmax.</b> The search is exact. Every legal shape is filled role by role
+from every released, unbanned hero of each role, each six built once. A branch of the search
+is dropped only where a bound proves that no six in it can reach the board's best: the
+default engine's terms are bounded together - each open pick's own rate and counter part, its
+synergy with the picks already made, and half its best synergies among the rest - and each of
+the playbook's terms apart, from the range each metric it reads can take over the branch. A
+limit that fails on every six of a branch drops the branch too. Sixes rank by their score to
+%(SCORE_PLACES)d decimal places, then by mean map win rate, then by name. A full six's rank
+counts the legal sixes that score above it, exactly up to %(RANK_CAP)d.</p>
+<p id='searched'><b>What is searched.</b> Every legal six: <b>17,217,564</b> on an open
+board under the shipped playbook, of 53 released heroes, at most two tanks and three
+supports. The search scores a few dozen of them in full and proves the rest cannot beat
+them, so the answer is the best of all of them, and the alternatives are the next best in
+order. The suite checks it on every run: on small boards of a twelve-hero test roster, with
+bans, locked picks and red revealed, under the reference playbook and a two-two-two role
+queue, the default engine on and off, the search returns exactly the sixes a full
+enumeration ranks first. On the built database, a brute force of every legal six on real
+boards agreed with it six for six, score for score.</p>
 <p id='against-red'><b>What it is optimal against.</b> A comp is optimal <i>against the red
 you can see</i>, not against every red they might pick. Before red reveals anything the board
 answers their most likely starting comp, drawn from the map's pick rates; each pick they show
@@ -204,10 +204,9 @@ that information does. The hedge is the <i>if countered optimally</i> case the
 that wins only while red plays badly shows up there. The board page does not solve it.</p>
 <p id='reach'><b>Reach.</b> The weights are meant to make a hero common or rare, never
 impossible. What is established is narrower: under the shipped playbook, the default engine
-and the healing floor, 42 of the 53 released heroes have a board on which they are in the
-optimal six, within a match's five bans, and each such board is a proof. The search found none
-for eleven: Cassidy, Domina, Emre, Freja, Hazard, Kiriko, Ramattra, Shion, Sierra, Sojourn and
-Venture. That is not
+and the healing floor, 48 of the 53 released heroes have a board on which they are in the
+optimal six, within a match's five bans, and each such board is a proof: the six is the exact
+optimum. The search found none for five: Emre, Freja, Kiriko, Sojourn and Zarya. That is not
 evidence that no such board exists, only that a search over a few maps and a few reds did not
 find one. No rule forbids any of them; the engine does not value what they do on the boards it
 tried, and the playbook's rules are what can answer that.</p>

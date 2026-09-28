@@ -297,10 +297,8 @@ def test_the_math_page_quotes_each_weight_from_the_playbooks_meta_file(
     (scale, "REFERENCE_SIZE", "against %s random legal sixes"),
     (scoring, "NEED_BUDGET", "min( 1, %s / &Sigma; w over the needs"),
     (scoring, "NEED_BUDGET", "one state costs %s at most"),
-    (solver, "PARTNER_POINTS", "plus %s for each locked partner"),
-    (solver, "SEEDS", "from the best %s sixes"),
-    (solver, "SHAPE_REACH", "within %s points of the top"),
-    (solver, "RESTARTS", "restarts %s times"),
+    (scoring, "SCORE_PLACES", "by their score to %s decimal places"),
+    (solver, "RANK_CAP", "exactly up to %s"),
 ])
 def test_the_math_page_quotes_each_constant_from_the_code(monkeypatch, module, name, phrase):
     """math.html quotes the code's numbers as placeholders ui/pages.py fills in,

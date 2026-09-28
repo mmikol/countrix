@@ -37,7 +37,7 @@ from db import psql, web
 from facts import board_facts, tables
 from facts.draft import Query, parse_board
 from facts.roster import roster_of
-from inference import parallel, serve
+from inference import serve
 from ui import pages
 
 # --- JSON endpoints ---------------------------------------------------------
@@ -132,12 +132,10 @@ def command_line(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Serve the board, the solver's pool warmed first."""
+    """Serve the board."""
     args = command_line(argv)
     server = web.LocalServer((args.host, args.port), Handler, args.allow_host)
-    workers = parallel.warm()                    # the board's solves split across these
-    print("Countrix: http://%s:%d%s" % (
-        args.host, args.port, " (%d solver workers)" % workers if workers else ""))
+    print("Countrix: http://%s:%d" % (args.host, args.port))
     server.serve_forever()
 
 

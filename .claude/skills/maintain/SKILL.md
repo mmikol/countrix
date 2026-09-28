@@ -161,9 +161,9 @@ is a lesson the next run relearns.
   process hash seed sets: the parallel board and the sequential one
   disagreed on a fact's text, and PYTHONHASHSEED changed the six. Now:
   every tie, in a fact's wording and in the scoring path, breaks by name;
-  a solver test flips the iteration order, and the parity test
-  (`test_the_board_splits_its_solves...`) holds the two paths byte for
-  byte.
+  a solver test flips the iteration order, and
+  `test_a_board_is_the_same_under_any_hash_seed` solves boards under two
+  hash seeds and holds the payloads byte for byte.
 - **The look and the rules described as they were.** The UI document
   named a look the last commit had replaced and two former rules by name, and
   a skill's worked example tuned a strategy the playbook no longer holds.

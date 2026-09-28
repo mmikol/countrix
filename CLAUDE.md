@@ -44,15 +44,11 @@ cluster is built and `DATABASE_URL` is unset; `DATABASE_URL` or
 `./docker-db <command>` points it at another Postgres. CI sets no
 variable: it has no cluster and no pgserver.
 
-The solver's pool (`inference/parallel.py`) spawns `max(6, min(cores, 12))`
-worker processes (12 here) in any process that calls `engine.board()`
-without a catalog of its own: `ui.board` at launch, the stdio MCP server
-and `door.mcp call board` on the first board, pytest on the first board
-test. `COUNTRIX_WORKERS=6` is the lowest cap that keeps that test green;
-`COUNTRIX_PARALLEL=0` solves in-process. `COUNTRIX_PARALLEL` is read on
-every board, `COUNTRIX_WORKERS` when the pool starts. The pool is
-spawn-context, and a worker exits within a second of its parent, a kill
-included.
+The solver searches exactly, in the process that calls it: a board is a
+few searches of tens of milliseconds each, one after another, and spawns
+no worker. `python -m tests.inference.prove_exact` checks it by hand
+against a brute force of every legal six on a board of the built
+database, in slices under five minutes each (its docstring says how).
 
 Without the database, two generated sections regenerate on their own:
 `.venv/bin/python -c "from door.mcp import tools; tools.REGISTRY.write_docs()"`
@@ -132,7 +128,7 @@ db <- facts <- inference <- door <- ui.
   (1, 1, 0.1, 0.05 shipped); `tune` with id `meta` changes them, and the
   playbook tab's Meta slider (`weights=meta:<v>`) sets the meta for a
   session. No weight lives in code. A `BaseWeights` rides the `Brief`
-  (`base=` on `infer`, `Objective`, `Solver` and the pool's `Spec`); left
+  (`base=` on `infer`, `Objective` and `Solver`); left
   unset it is the playbook in force's `meta.md` (`engine.weights_in_force`),
   and every result and `base.stamp` record it. A test that runs the engine
   names the reference playbook's weights, never the live file's.
@@ -151,19 +147,22 @@ db <- facts <- inference <- door <- ui.
   string seed, the map and the side, bounded against the enemy; the lowest
   of their scores is the seat's floor, a share's 0, as its optimal is the
   100. current shares blue's optimal's scale, red_current red's, so within
-  a seat infer, the fill and current are comparable. Blue's picks the
-  limits rule out - a full six that breaks one, or picks no six on the
-  roster completes (`Solver.completes`) - are not allowed: no score, no
-  share, no odds; red's picks are never ruled out. Only
-  `board()` uses the process pool, and the pooled and sequential answers
-  must agree bit for bit: string-seeded RNGs, integer tallies, a least
-  floor, ties broken by `map_win_mean` and then sorted names.
+  a seat infer, the fill and current are comparable. The search is exact
+  (`inference/solver.py`, its bounds in `inference/bounds.py`): every
+  legal six of the released, unbanned roster, each once, by branch and
+  bound, in one total order - the score to `SCORE_PLACES` decimals, then
+  `map_win_mean`, then sorted names - each six scored in one seat order.
+  A new metric or expression construct needs a bound rule, and
+  `tests/inference/test_bounds.py` fails without one. Blue's picks the
+  limits rule out - a full six that breaks one, or picks the fill's search
+  proves no six completes - are not allowed: no score, no share, no odds;
+  red's picks are never ruled out. A search past its budget refuses
+  (`solver.Unbounded`), never guesses.
 - **The board** (`ui/board.py`, its pages in `ui/pages.py`) serves
   `/api/facts` and answers `/api/board`, `/api/strategies` and `/health`
   with `inference/serve.py`'s handlers, all in its own process - the
-  compose stack's `ui` container runs the engine and its pool.
-  `serve.Admission` holds the boards in flight to one `engine.FIELD_BUDGET`
-  of sixes. It answers GET alone and writes nothing: a slider's weight
+  compose stack's `ui` container runs the engine.
+  `serve.Admission` solves `BOARDS_AT_ONCE` board at a time. It answers GET alone and writes nothing: a slider's weight
   rides with the session's requests. Both HTTP servers, the board and the
   MCP door, stand on `db/web.py`: a request whose Host or Origin is not a
   local name or one given with `--allow-host` is refused with 403.
@@ -239,10 +238,12 @@ db <- facts <- inference <- door <- ui.
   them in), so a literal percent in `ui/static/math.html` is written `%%`.
 - `test_the_search_reaches_the_enumerated_maximum` in
   `tests/inference/test_solver.py` is the regression gate on the search:
-  six synthetic boards under the reference playbook and a role queue, with
-  the default engine on and off, each role's pool cut to two, the search
-  against a full enumeration, with no database, so CI runs it. A board it
-  misses is a solver defect: fix the search, never swap the board out.
+  synthetic boards - red revealed, locks, bans, a pair that pays only
+  together, a widened roster - under the reference playbook with a role
+  queue and with the open queue's shapes, the default engine on and off,
+  the search's best six sixes against a full enumeration's, element for
+  element, with no database, so CI runs it. A board it misses is a solver
+  defect: fix the search, never swap the board out.
 - `tests/fixtures/reach.json` records a board per released hero that
   seats it, beside the objective it was recorded under - the playbook's
   digest (`catalog.playbook_digest`) and the default engine's stamp

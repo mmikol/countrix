@@ -88,11 +88,12 @@ the checkout's owner, 256 MB and 64 processes, a tmpfs over the image's
 data volume, and one bind mount it writes, `backups/`, which `data` also
 mounts to ask for a dump before it rebuilds.
 
-**The board holds its memory.** The ui container runs the solver's pool
-beside the page. A board waits for room while the boards in flight hold
-one `FIELD_BUDGET`'s worth of sixes, and answers 429 after a minute
-(`serve.Admission` in `inference/serve.py`), so a burst of boards queues
-instead of running the container out of memory and the page with it.
+**The board holds its time.** The ui container solves in the page's own
+process, one board at a time. A board waits for the one in flight, and
+answers 429 after a minute (`serve.Admission` in `inference/serve.py`), so
+a burst of boards queues instead of starving the page; a search that
+cannot prove its answer within its budget refuses (`solver.Unbounded`)
+instead of holding the solver.
 
 **Two containers reach out.** All five share one network: Docker
 publishes a port only for a container on a routable network. What keeps

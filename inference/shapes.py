@@ -42,14 +42,20 @@ def legal_shapes(catalog: Iterable[Strategy], locked: Shape = NO_PICKS) -> list[
     return out
 
 
-def _shape_limits(catalog: Iterable[Strategy]) -> list[tuple[Strategy, Expr]]:
-    """The catalog's limits that read only a six's shape, each with its
-    require. A dial the limit reads (`params.MAX_SUPPORTS`) is its own
-    number, not the six's, so it leaves the limit a shape limit."""
-    return [(strategy, strategy.require) for strategy in catalog
-            if strategy.form == "limit" and strategy.require
+def is_shape_limit(strategy: Strategy) -> bool:
+    """Whether a strategy is a limit that reads only a six's shape. A dial
+    the limit reads (`params.MAX_SUPPORTS`) is its own number, not the
+    six's, so it leaves the limit a shape limit. legal_shapes applies these
+    whole, so the search never meets a six that breaks one."""
+    return (strategy.form == "limit" and strategy.require is not None
             and {n for n in strategy.require.names if not n.startswith("params.")}
-            <= SHAPE_KEYS]
+            <= SHAPE_KEYS)
+
+
+def _shape_limits(catalog: Iterable[Strategy]) -> list[tuple[Strategy, Expr]]:
+    """The catalog's shape limits, each with its require."""
+    return [(strategy, strategy.require) for strategy in catalog
+            if is_shape_limit(strategy) and strategy.require is not None]
 
 
 def _shape_allowed(t: int, d: int, s: int, limits: Sequence[tuple[Strategy, Expr]]) -> bool:

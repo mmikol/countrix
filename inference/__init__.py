@@ -33,16 +33,18 @@ The search, which reads the playbook:
     shapes        the legal shapes: the role counts a six may take around the
                   locked picks
     scale         the board's one scale: the seeded reference sample and field
-                  every heuristic is normalised against, and each hero's standing
-    solver        searches compositions under the constraints and heuristics;
-                  players are assumed to play optimally
+                  every heuristic is normalised against, and the board's floor
+    bounds        the search's bounds: the most any six a branch can reach
+                  scores, each metric's and expression's range over it
+    solver        the exact search over every legal six under the constraints
+                  and heuristics, by branch and bound; players are assumed to
+                  play optimally
     engine        infer() and board(): the API over the solver
     result        the Result and Board records and their citations into the
                   facts the facts layer generated
     plan          the game plan and the verdict in prose
-    parallel      the process pool the board splits its searches across
     supersede     latest wins: a board a newer request replaced stops at its
-                  next round
+                  next check
     reach         the board each released hero is optimal on, within a match's bans
     serve         the engine's handlers, which the board runs in-process
 """

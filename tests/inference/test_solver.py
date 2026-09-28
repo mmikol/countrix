@@ -1,8 +1,11 @@
-"""The search on a board: the enumerated maximum it must reach, shape
-limits, a charge for a rule broken that never prunes, a need and its budget,
-partners that only pay together, the scale a ban leaves alone, the ranking
-order and its tie-breaks, and the reference sample of a small roster.
-Every board is the synthetic World's: no database."""
+"""The search on a board, held to a full enumeration: the best sixes of
+every legal six, element for element, on both seats, around locked picks,
+past bans, in the countered case and on a plateau where every six ties;
+a full six's rank; shape limits, a charge for a rule broken that never
+prunes, a need and its budget, partners that only pay together, the scale
+a ban leaves alone, the ranking order and its tie-breaks, the reference
+sample of a small roster, and the budget a search refuses past. Every
+board is the synthetic World's: no database."""
 
 import copy
 import dataclasses
@@ -14,18 +17,20 @@ import pytest
 
 from db import Refusal
 from db.data.normalizer import name_key
-from facts.draft import Draft
+from facts.draft import Draft, opposite
 from facts.records import Synergy
 from facts.team import team_metrics
 from inference import catalog
 from inference.base import OFF
+from inference.scoring import Candidate, quantized, rank_key
 from inference.shapes import legal_shapes
-from tests.inference import DEFAULT, FIXTURE_PLAYBOOK, evaluated
+from tests.inference import ASSUMPTIONS_ONLY, DEFAULT, FIXTURE_PLAYBOOK, evaluated, heal_rate
 
 # the reference playbook's shape limit tightened to Role Queue's two-two-two
 ROLE_QUEUE = (
     "---\nname: role queue\nkind: constraint\nrequire: team.tanks == 2 and team.damage == 2"
     " and team.supports == 2\n---\nx\n")
+K = 6                   # the sixes a board's seat keeps: its best and BOARD_TOP alternatives
 
 
 def shape(six):
@@ -43,73 +48,224 @@ def legal_sixes(world, playbook, locked=(), banned=()):
     return [six for six in sixes if shape(six) in shapes]
 
 
+def enumerated(solver):
+    """Every legal six of a solver's board that keeps the limits, scored by
+    the solver's own objective and ranked: the answer the search must give,
+    found without it."""
+    banned = [solver.world.heroes[i] for i in solver.banned]
+    sixes = legal_sixes(solver.world, solver.catalog, solver.locked, banned)
+    scored = [solver.score(solver.prepare(Candidate(six)), detail=False) for six in sixes]
+    return sorted((c for c in scored if not c.violations), key=rank_key)
+
+
+def verdicts(sixes):
+    """Sixes as the comparison reads them: the score's float, the tie-break
+    and the names."""
+    return [(c.score, c.tiebreak, sorted(c.names)) for c in sixes]
+
+
+def seated(world, draft, playbook, base, scale_of=None):
+    """The Solver of a board's seat, on `scale_of`'s scale where given."""
+    from inference.solver import Solver
+    m, red, locked, banned = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
+    solver = Solver(world, m, red=red, locked=locked, banned=banned, side=draft.side,
+                    catalog=playbook, base=base)
+    if scale_of is not None:
+        solver.adopt_scale(scale_of)
+    return solver
+
+
+def widened(world):
+    """The world with three stronger twins of each role's best hero: seven a
+    role, 38,038 legal sixes under the open queue, room for the bound to
+    prune."""
+    world = copy.copy(world)
+    world.heroes, world.by_key = dict(world.heroes), dict(world.by_key)
+    next_id = max(world.heroes) + 1
+    for role in ("tank", "damage", "support"):
+        best = max((h for h in world.heroes.values() if h.role == role and h.released),
+                   key=lambda h: h.win)
+        for i in range(3):
+            twin = dataclasses.replace(best, id=next_id, name="%s %d" % (best.name, i + 2),
+                                       win=best.win + 1 + i)
+            world.heroes[twin.id] = twin
+            world.by_key[name_key(twin.name)] = twin.id
+            next_id += 1
+    return world
+
+
+def paired(world, a, b):
+    """A copy of the world whose one synergy pair is `a` and `b`."""
+    out = copy.copy(world)
+    pair = Synergy(1, "scratch")
+    out.synergies = {frozenset((a.id, b.id)): pair}
+    out.partners = {a.id: {b.id: pair}, b.id: {a.id: pair}}
+    return out
+
+
 @pytest.mark.parametrize(("base", "pair"), [(OFF, ("Anvil", "Tansy")),
                                             (DEFAULT, ("Anvil", "Balm"))],
                          ids=["base-off", "base-on"])
 def test_the_search_reaches_the_enumerated_maximum(synthetic_world, catalog_copy, base, pair):
-    """The regression gate on the search. On six small boards - no red, red
-    revealed, one lock, two locks, two bans, and a pair that pays only
-    together - every legal six is enumerated and scored, and infer returns
-    the best of them, tie-break included. Each role's pool holds two of its
-    four heroes, so the reach-back steps have to find the rest. The playbook
-    is the reference plus a role queue: a shape the pools cannot seat is
-    never searched, and pools of two cannot seat three of a role. It holds
-    with the default engine under the playbook and without it; the pair is
-    two heroes the pools cut, and what ranks the pools differs between the
-    two, so each names its own. A board this misses is a solver defect: fix
-    the search, never swap the board out."""
-    from inference import engine, scoring
-    from inference import solver as solver_module
+    """The regression gate on the search. On every board here - no red, red
+    revealed, one lock, two locks, two bans, a pair that pays only together,
+    each under a two-two-two role queue and under the open queue's shapes,
+    and two on a widened roster of seven a role under the role queue - every
+    legal six is enumerated and
+    scored, and the search's best sixes are the enumeration's first, element
+    for element: the score's float, the tie-break and the names. It holds
+    with the default engine under the reference playbook and without it,
+    and on some board the search scores fewer sixes than it enumerates, so
+    the bound prunes. The pair is two heroes worth nothing apart, made the
+    one synergy pair of a copy of the world, and the best six fields both.
+    A board this misses is a solver defect: fix the search, never swap the
+    board out."""
+    from inference import engine
+    open_queue = catalog.load(catalog_copy)
     with open(os.path.join(catalog_copy, "role-queue.md"), "w", encoding="utf-8") as handle:
         handle.write(ROLE_QUEUE)
-    fix = catalog.load(catalog_copy)
-    assert any(s.weighs for s in fix)
-
-    def searched(world, draft):
-        m, red, locked, banned = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
-        solver = solver_module.Solver(world, m, red=red, locked=locked, banned=banned,
-                                      side=draft.side, catalog=fix, base=base, pool_size=2)
-        solver.freeze_bounds()
-        return solver, legal_sixes(world, fix, locked, banned)
-
-    # the pair: two heroes the pools cut on a world with no synergies, made the
-    # one synergy pair of a copy of the world
-    pair_board = Draft("Salt Flats", ("Anvil",))
-    alone = copy.copy(synthetic_world)
-    alone.synergies, alone.partners = {}, {}
-    solver, _ = searched(alone, pair_board)
+    role_queue = catalog.load(catalog_copy)
+    assert any(s.weighs for s in role_queue)
     a, b = (synthetic_world.hero(name) for name in pair)
-    assert not {a.id, b.id} & {h.id for pool in solver.pools().values() for h in pool}
-    paired = copy.copy(synthetic_world)
-    synergy = Synergy(1, "scratch")
-    paired.synergies = {frozenset((a.id, b.id)): synergy}
-    paired.partners = {a.id: {b.id: synergy}, b.id: {a.id: synergy}}
+    together = paired(synthetic_world, a, b)
     boards = [
         (synthetic_world, Draft("Harbor Gate", side="attack")),
         (synthetic_world, Draft("Ember Ruins", ("Mortar", "Gale"))),
         (synthetic_world, Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm",), side="defense")),
         (synthetic_world, Draft("Salt Flats", ("Anvil",), ("Kite", "Needle"))),
         (synthetic_world, Draft("Ember Ruins", ("Rook",), (), ("Myrrh", "Flint"))),
-        (paired, pair_board)]
-    missed, reached_back = [], []
-    for world, draft in boards:
-        solver, sixes = searched(world, draft)
-        scored = [solver.score(solver.prepare(scoring.Candidate(six)), detail=False)
-                  for six in sixes]
-        feasible = sorted((c for c in scored if not c.violations), key=solver._rank_key)
-        best = feasible[0]
-        assert best.score > feasible[-1].score, draft          # the playbook tells sixes apart
-        got = engine.infer(world, draft, catalog=fix, pool_size=2, top=1, base=base)
-        if sorted(got.blue) != sorted(best.names) or abs(got.score - best.score) > 1e-9:
-            missed.append("%s: %.6f %s, enumerated %.6f %s"
-                          % (draft, got.score, sorted(got.blue), best.score, sorted(best.names)))
-        seated = {h.id for pool in solver.pools().values() for h in pool}
-        seated |= {h.id for h in solver.locked}
-        reached_back += [h.name for h in best.heroes if h.id not in seated]
-        if world is paired:
-            assert {a.name, b.name} <= set(best.names)     # the pair pays, and is fielded
+        (together, Draft("Salt Flats", ("Anvil",))),
+        (widened(synthetic_world), Draft("Harbor Gate", ("Mortar", "Gale"), ("Kite",),
+                                         side="attack")),
+        (widened(synthetic_world), Draft("Ember Ruins", ("Rook",), ("Balm",), ("Needle",)))]
+    missed, pruned = [], False
+    for playbook in (role_queue, open_queue):
+        for world, draft in boards:
+            if len(world.heroes) > len(synthetic_world.heroes) and playbook is open_queue:
+                continue                   # the widened roster's open field is slow to enumerate
+            solver = seated(world, draft, playbook, base)
+            got = solver.solve(top=K)
+            full = enumerated(solver)
+            assert full[0].score > full[-1].score, draft      # the playbook tells sixes apart
+            if verdicts(got.ranked) != verdicts(full[:K]):
+                missed.append("%s: %s, enumerated %s" % (draft, verdicts(got.ranked)[:2],
+                                                         verdicts(full[:2])))
+            pruned = pruned or solver.leaves < len(full)
+            assert solver.considered == len(legal_sixes(
+                world, playbook, solver.locked, [world.heroes[i] for i in solver.banned]))
+            if world is together:
+                assert {a.name, b.name} <= set(full[0].names)   # the pair pays, and is fielded
+            top = engine.infer(world, draft, catalog=playbook, top=K - 1, base=base)
+            assert [sorted(top.blue), *(sorted(alt["blue"]) for alt in top.alternatives)] == [
+                sorted(c.names) for c in full[:K]], draft
     assert not missed, "the search misses the enumerated maximum:\n  " + "\n  ".join(missed)
-    assert reached_back                    # some board's best six holds a hero the pools cut
+    assert pruned
+
+
+@pytest.mark.parametrize("base", [OFF, DEFAULT], ids=["base-off", "base-on"])
+def test_every_seat_of_a_board_is_the_enumerated_maximum(synthetic_world, base):
+    """A board's seats are each an exact search: blue's optimal against red's
+    picks, red's against blue's on the other side, the fill around blue's
+    picks on blue's scale, red's fill on red's, and the countered case -
+    blue's best counter to red's optimal six, and blue's picks filled against
+    it on that scale. Each is the enumeration's best six, and the board shows
+    each seat's six and alternatives in the enumeration's order."""
+    from inference import engine
+    playbook = catalog.load(FIXTURE_PLAYBOOK)
+    for draft in (Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm", "Rook"), side="attack"),
+                  Draft("Ember Ruins", ("Anvil",), ("Needle",), ("Myrrh",))):
+        board = engine.board(synthetic_world, draft, catalog=playbook,
+                             brief=engine.Brief(base=base))
+        blue_seat = dataclasses.replace(draft, blue=())
+        red_seat = Draft(draft.map_name, draft.blue, (), draft.bans, opposite(draft.side))
+        blue = seated(synthetic_world, blue_seat, playbook, base)
+        red = seated(synthetic_world, red_seat, playbook, base)
+        blue.freeze_bounds()
+        red.freeze_bounds()
+        theirs = Draft(draft.map_name, draft.blue, draft.red, draft.bans, opposite(draft.side))
+        against = dataclasses.replace(draft, red=tuple(board.red.blue), blue=())
+        countered = seated(synthetic_world, against, playbook, base)
+        countered.freeze_bounds()
+        seats = [(board.blue, blue), (board.red, red),
+                 (board.fill, seated(synthetic_world, draft, playbook, base, blue)),
+                 (board.countered, seated(synthetic_world, dataclasses.replace(
+                     against, blue=draft.blue), playbook, base, countered))]
+        for result, solver in seats:
+            full = enumerated(solver)
+            assert verdicts(solver.solve(top=K).ranked) == verdicts(full[:K]), draft
+            shown = [sorted(result.blue), *(sorted(a["blue"]) for a in result.alternatives)]
+            assert shown == [sorted(c.names) for c in full[:len(shown)]], draft
+            assert abs(result.score - full[0].score) < 1e-12
+        red_fill = seated(synthetic_world, theirs, playbook, base, red)
+        assert verdicts(red_fill.solve(top=K).ranked) == verdicts(enumerated(red_fill)[:K])
+
+
+@pytest.mark.parametrize("playbook", ["assumptions", "healing floor"])
+def test_a_plateau_is_ranked_by_its_tie_break_and_then_its_names(
+        synthetic_world, tmp_path, playbook):
+    """With the default engine off, a playbook of assumptions scores every
+    six 0, and the healing floor alone scores 0 every six that heals
+    enough: the best sixes are the tie-break's and then the names', exactly
+    as the enumeration ranks them, and the search proves it without scoring
+    every six."""
+    rules = ASSUMPTIONS_ONLY if playbook == "assumptions" else heal_rate(str(tmp_path))
+    wide = widened(synthetic_world)
+    for world, draft in ((synthetic_world, Draft("Harbor Gate", side="attack")),
+                         (synthetic_world, Draft("Salt Flats", ("Kite",))),
+                         (wide, Draft("Ember Ruins", ("Rook",), ("Balm",), ("Myrrh",)))):
+        solver = seated(world, draft, rules, OFF)
+        got = solver.solve(top=K)
+        full = enumerated(solver)
+        assert full[0].score == full[K].score == 0.0
+        assert verdicts(got.ranked) == verdicts(full[:K]), draft
+        assert solver.leaves < len(full)
+
+
+def test_a_full_six_is_ranked_against_every_legal_six(synthetic_world, monkeypatch):
+    """A full six's rank is one more than the legal sixes whose quantized
+    score beats its own: read off the seat's search where the six reaches
+    its top K, counted by a search of its own where it does not, and none
+    past RANK_CAP, where the six reads as outranked."""
+    from inference import solver as solver_module
+    playbook = catalog.load(FIXTURE_PLAYBOOK)
+    draft = Draft("Harbor Gate", ("Mortar", "Gale"), side="attack")
+    blue = seated(synthetic_world, draft, playbook, DEFAULT)
+    solved = blue.solve(top=K)
+    full = enumerated(blue)
+    for place in (0, 3, K + 4, 60):
+        six = full[place]
+        evaluation = solver_module.evaluate_comp(solved, six.heroes)
+        above = sum(1 for c in full if quantized(c.score) > quantized(six.score))
+        assert evaluation.rank == 1 + above and not evaluation.outranked, place
+        result = evaluated(synthetic_world, dataclasses.replace(
+            draft, blue=tuple(six.names)), catalog=playbook)
+        assert result.rank == 1 + above
+    monkeypatch.setattr(solver_module, "RANK_CAP", 5)
+    weak = full[len(full) // 2]
+    evaluation = solver_module.evaluate_comp(solved, weak.heroes)
+    assert evaluation.rank is None and evaluation.outranked
+    result = evaluated(synthetic_world, dataclasses.replace(draft, blue=tuple(weak.names)),
+                       catalog=playbook)
+    assert result.rank is None and result.outranked
+    assert "(outside the top " in result.rendered()
+
+
+def test_a_search_past_its_budget_refuses_rather_than_guesses(synthetic_world, monkeypatch):
+    """A search that has not proved its answer within its budget raises
+    Unbounded, a refusal: the answer is exact or refused, never a guess."""
+    from inference import solver as solver_module
+    playbook = catalog.load(FIXTURE_PLAYBOOK)
+    monkeypatch.setattr(solver_module, "SCORE_BUDGET", 3)
+    solver = seated(synthetic_world, Draft("Harbor Gate", side="attack"), playbook, DEFAULT)
+    with pytest.raises(solver_module.Unbounded):
+        solver.solve(top=K)
+    assert issubclass(solver_module.Unbounded, Refusal)
+    monkeypatch.setattr(solver_module, "SCORE_BUDGET", 10_000)
+    monkeypatch.setattr(solver_module, "NODE_BUDGET", 10)
+    monkeypatch.setattr(solver_module, "CHECK_EVERY", 4)
+    busy = seated(synthetic_world, Draft("Harbor Gate", side="attack"), playbook, DEFAULT)
+    with pytest.raises(solver_module.Unbounded):
+        busy.solve(top=K)
 
 
 def test_shape_limits_bound_the_search_and_a_stricter_one_narrows_it(synthetic_world, tmp_path):
@@ -117,20 +273,20 @@ def test_shape_limits_bound_the_search_and_a_stricter_one_narrows_it(synthetic_w
     world = synthetic_world
     fix = catalog.load(FIXTURE_PLAYBOOK)
     # two tanks is allowed under the two-tank limit; a third is not, and is the queue's
-    r = engine.infer(world, Draft("Harbor Gate", ("Needle",), ("Anvil", "Kite")), pool_size=4,
-                     catalog=fix, base=DEFAULT)
+    r = engine.infer(world, Draft("Harbor Gate", ("Needle",), ("Anvil", "Kite")), catalog=fix,
+                     base=DEFAULT)
     assert {"Anvil", "Kite"} <= set(r.blue)
     with pytest.raises(Refusal, match="the queue allows at most 2 tanks"):
         engine.infer(world, Draft("Harbor Gate", (), ("Anvil", "Kite", "Mortar")),
-                     pool_size=4, catalog=fix, base=DEFAULT)
+                     catalog=fix, base=DEFAULT)
     # a stricter authored limit narrows the search the same way
     for name in os.listdir(FIXTURE_PLAYBOOK):
         if name != "open-queue-tanks.md":
             shutil.copy(os.path.join(FIXTURE_PLAYBOOK, name), tmp_path / name)
     (tmp_path / "shape.md").write_text(ROLE_QUEUE, "utf-8")
     cat = catalog.load(str(tmp_path))
-    r = engine.infer(world, Draft("Harbor Gate", ("Needle",), ("Balm",)), pool_size=4,
-                     catalog=cat, base=DEFAULT)
+    r = engine.infer(world, Draft("Harbor Gate", ("Needle",), ("Balm",)), catalog=cat,
+                     base=DEFAULT)
     roles = sorted(world.hero(n).role for n in r.blue)
     assert roles == ["damage", "damage", "support", "support", "tank", "tank"]
 
@@ -202,78 +358,35 @@ def test_a_rule_guarded_on_the_six_itself_is_a_need_and_a_state_has_a_budget(
 
 
 def test_partners_that_only_pay_together_are_brought_in_together(synthetic_world, tmp_path):
-    """One slot at a time, a pair worth nothing apart is never met: each partner
-    alone only costs. The playbook here pays one synergy pair, the two
-    lowest-standing heroes of their roles, outside the pools. The best six holds
-    both, with the locked pick, the ban and the shape kept. The pair step off,
-    the restarts reach it, and the two-seat swap alone does too; with all
-    three off, the search stops short of it."""
-    from inference import solver as solver_module
-    world = synthetic_world
-    # four a role are too few for a pool to leave anyone out once a pair's synergy
-    # lifts its standing: three stronger twins of each role's best widen the roster
-    next_id = max(world.heroes) + 1
-    for role in ("tank", "damage", "support"):
-        best = max((h for h in world.heroes.values() if h.role == role and h.released),
-                   key=lambda h: h.win)
-        for i in range(3):
-            twin = dataclasses.replace(best, id=next_id, name="%s %d" % (best.name, i + 2),
-                                       win=best.win + 1 + i)
-            world.heroes[twin.id] = twin
-            world.by_key[name_key(twin.name)] = twin.id
-            next_id += 1
+    """One slot at a time, a pair worth nothing apart is never met: each
+    partner alone only costs. The playbook here pays one synergy pair, the
+    two weakest heroes of their roles on a roster of seven a role, and the
+    best six holds both, with the locked pick, the ban and the shape kept -
+    the enumeration's own best six, which the bound reaches because a
+    candidate's pairs count toward its branch before it is picked."""
+    world = widened(synthetic_world)
     (tmp_path / "shape.md").write_text(ROLE_QUEUE, "utf-8")
     rule = "---\nname: %s\nkind: heuristic\ndirection: maximize\nmetric: %s\nweight: %s\n---\nx\n"
     (tmp_path / "winning.md").write_text(rule % ("Winning", "team.win_mean", 1), "utf-8")
     (tmp_path / "together.md").write_text(rule % ("Together", "team.synergy_edges", 0.5), "utf-8")
     scratch = catalog.load(str(tmp_path))
-    locked, banned = [world.hero("Anvil")], [world.hero("Needle")]
-
-    def solver_on(w):              # the playbook alone: the pair is its to pay
-        return solver_module.Solver(w, None, red=[], locked=locked, banned=banned,
-                                    catalog=scratch, base=OFF, pool_size=2)
-
-    alone = copy.copy(world)                   # the same roster, no synergy pair yet
-    alone.synergies, alone.partners = {}, {}
-    before = solver_on(alone)
-    before.solve(top=1)
-    last = {r: sorted((h for h in world.heroes.values() if h.role == r and h.released
-                       and h not in locked and h not in banned), key=before._pool_key)[::-1]
-            for r in ("tank", "damage", "support")}
-    for a, b in ((last["support"][0], last["support"][1]), (last["tank"][0], last["damage"][0])):
-        paired = copy.copy(world)
-        pair = Synergy(1, "scratch")
-        paired.synergies = {frozenset((a.id, b.id)): pair}
-        paired.partners = {a.id: {b.id: pair}, b.id: {a.id: pair}}
-        solver = solver_on(paired)
-        top = solver.solve(top=1).ranked[0]
-        pooled = {h.id for pool in solver.pools().values() for h in pool}
-        assert a.id not in pooled and b.id not in pooled      # the sweep never saw either
+    draft = Draft(None, (), ("Anvil",), ("Needle",))
+    weakest = {}
+    for r in ("tank", "damage", "support"):
+        rest = [h for h in world.heroes.values()
+                if h.role == r and h.released and h.name not in ("Anvil", "Needle")]
+        weakest[r] = sorted(rest, key=lambda h: (h.win, h.name))
+    for a, b in ((weakest["support"][0], weakest["support"][1]),
+                 (weakest["tank"][0], weakest["damage"][0])):
+        lonely = seated(paired(world, a, a), draft, scratch, OFF)
+        alone = lonely.solve(top=1).ranked[0]
+        assert not {a.name, b.name} & set(alone.names)       # apart, neither is picked
+        solver = seated(paired(world, a, b), draft, scratch, OFF)
+        top = solver.hydrate(solver.solve(top=1).ranked[0])
         assert {a.name, b.name, "Anvil"} <= set(top.names) and "Needle" not in top.names
         assert sorted(h.role for h in top.heroes) == ["damage"] * 2 + ["support"] * 2 + ["tank"] * 2
         assert any(c["id"] == "together" and c["raw"] == 1 for c in top.contributions)
-        # with the pair step off, the restarts reach them first
-        single = solver_on(paired)
-        single._pairs = list                   # the pair step off
-        pair_off = single.solve(top=1).ranked[0]
-        assert {a.name, b.name} <= set(pair_off.names)
-
-        # and with the restarts off too, the two-at-once swap reaches them alone:
-        # that is what it is for
-        swap_only = solver_on(paired)
-        swap_only._pairs = list                # the pair step off
-        swap_only._restarts = lambda leader, roster, known, n=0: leader
-        swapped = swap_only.solve(top=1).ranked[0]
-        assert {a.name, b.name} <= set(swapped.names)
-
-        # a pair outside the pool is unreachable only when all three are off: the
-        # restarts can land on both partners at once, as can the two-at-once swap.
-        neither = solver_on(paired)
-        neither._pairs = list                  # the pair step off
-        neither._two_swap = lambda leader, roster, known: leader
-        neither._restarts = lambda leader, roster, known, n=0: leader
-        short = neither.solve(top=1).ranked[0]
-        assert not {a.name, b.name} & set(short.names) and short.score < top.score
+        assert verdicts([top]) == verdicts(enumerated(solver)[:1])
 
 
 def test_a_ban_does_not_rescale_the_board(synthetic_world):
@@ -309,18 +422,29 @@ def test_a_ban_does_not_rescale_the_board(synthetic_world):
     assert abs(first - second) < 1e-9, (first, second)
 
 
-def test_the_order_of_a_six_does_not_decide_the_ranking(synthetic_world):
-    """_rank_key's third element breaks ties, so it has to be a property of the
-    hero set - in seat order one set keys 720 ways."""
+def test_the_order_of_a_six_does_not_decide_its_score_or_its_rank(synthetic_world):
+    """A six is scored in one seat order, whatever order it arrives in, so
+    its score is a function of its heroes down to the last bit; rank_key's
+    third element breaks ties, so it too is a property of the hero set - in
+    arrival order one set would key 720 ways."""
     from inference import scoring
-    from inference import solver as solver_module
     world = synthetic_world
     heroes = [world.hero(n) for n in ("Anvil", "Kite", "Rook", "Needle", "Balm", "Tansy")]
+    objective = scoring.Objective(world, world.map("Harbor Gate"), red=[world.hero("Gale")],
+                                  catalog=catalog.load(FIXTURE_PLAYBOOK), base=DEFAULT)
+    scores = set()
+    for order in itertools.permutations(heroes):
+        scores.add(objective.score(objective.prepare(scoring.Candidate(order)), detail=False).score)
+    assert len(scores) == 1
     one = scoring.Candidate(heroes)
     other = scoring.Candidate(list(reversed(heroes)))
+    assert one.heroes == other.heroes
     one.score = other.score = 1.0
     one.tiebreak = other.tiebreak = 0.5
-    assert solver_module.Solver._rank_key(one) == solver_module.Solver._rank_key(other)
+    assert rank_key(one) == rank_key(other)
+    close = scoring.Candidate(list(reversed(heroes)))
+    close.score, close.tiebreak = 1.0 + 1e-12, 0.4          # a tie at SCORE_PLACES
+    assert rank_key(one) < rank_key(close)
 
 
 def test_style_ties_break_by_name_so_hash_order_cannot_reach_the_answer(synthetic_world):
@@ -371,48 +495,21 @@ def test_a_roster_with_fewer_legal_sixes_than_the_reference_is_sampled_whole(syn
     assert sorted(sorted(c.key) for c in drawn) == sorted(sorted(six) for six in legal)
 
 
-def test_merged_slices_bound_a_heuristic_as_one_process_does(synthetic_world, tmp_path):
-    """A slice in which no six values a heuristic leaves it out of its bounds,
-    so merging that slice adds nothing: the pool's merge of its slices'
-    bounds equals the bounds one process draws over all of them."""
-    from inference import parallel, scale, scoring
-    shutil.copy(os.path.join(FIXTURE_PLAYBOOK, "meta-strength.md"), tmp_path)
-    objective = scoring.Objective(synthetic_world, None, red=[],
-                                  catalog=catalog.load(str(tmp_path)), base=DEFAULT)
-    assert [h.id for h in objective.heuristics] == ["meta-strength"]
-    valued = []
-    for raw in (0.4, 0.7):
-        cand = scoring.Candidate([])
-        cand.raw = [raw]
-        valued.append(cand)
-    unvalued = scoring.Candidate([])
-    unvalued.raw = [None]
-    assert scale._bounds_over(objective, [unvalued]) == {}
-    merged = parallel._widen(parallel._widen({}, scale._bounds_over(objective, valued)),
-                             scale._bounds_over(objective, [unvalued]))
-    assert merged == scale._bounds_over(objective, [*valued, unvalued])
-    assert merged == {"meta-strength": scoring.Interval(0.4, 0.7)}
-
-
-def test_the_floor_is_the_lowest_reference_six_and_slices_fold_to_it(synthetic_world):
+def test_the_floor_is_the_lowest_reference_six(synthetic_world):
     """A seat's floor, a share's 0, is the lowest score among the reference
-    sixes its scale draws. The pool scores the sample in slices, and the
-    slices fold - in any order - into the tally and the floor one process
-    draws, bit for bit."""
+    sixes its scale draws, and a fill that takes the seat's scale takes its
+    floor too."""
     from inference import scale
     from inference import solver as solver_module
     world = synthetic_world
-    m, red, _, _ = world.resolve("Harbor Gate", ["Mortar", "Gale"], [], [])
+    m, red, locked, _ = world.resolve("Harbor Gate", ["Mortar", "Gale"], ["Balm"], [])
+    playbook = catalog.load(FIXTURE_PLAYBOOK)
     solver = solver_module.Solver(world, m, red=red, locked=[], side="attack",
-                                  catalog=catalog.load(FIXTURE_PLAYBOOK), base=DEFAULT)
+                                  catalog=playbook, base=DEFAULT)
     solver.freeze_bounds()
     scores = [solver.score(c, detail=False).score for c in scale._prepared(solver)]
     assert solver.floor == min(scores) < max(scores)
-    whole = scale.freeze(solver)
-    parts = [scale.reference_standing(solver, i, 3) for i in range(3)]
-    for order in (parts, parts[::-1]):
-        folded = scale.Tally()
-        for part in order:
-            folded.fold(part)
-        assert folded == whole and folded.floor == solver.floor
-    assert scale.Tally().fold(scale.Tally()).floor is None      # nothing scored, no floor
+    fill = solver_module.Solver(world, m, red=red, locked=locked, side="attack",
+                                catalog=playbook, base=DEFAULT)
+    fill.adopt_scale(solver)
+    assert fill.floor == solver.floor and fill.bounds == solver.bounds

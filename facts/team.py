@@ -257,7 +257,7 @@ def _shape(heroes: list[Hero], m: Map | None) -> MetricBag:
     return {"size": n, "open_slots": max(0, TEAM_SIZE - n),
             "tanks": tanks, "damage": damage, "supports": supports,
             "subroles": subroles, "subrole_diversity": len(subroles) / n if n else 0.0,
-            "shape_flags": _shape_flags(tanks, damage, supports) if n else [],
+            "shape_flags": shape_flags(tanks, damage, supports) if n else [],
             "style_counts": dict(counts),
             "style_top": sorted(counts, key=lambda s: (-counts[s], s))[0] if counts else "",
             "style_lean": (sorted(majority, key=lambda s: (-counts[s], s != map_style, s))[0]
@@ -267,8 +267,10 @@ def _shape(heroes: list[Hero], m: Map | None) -> MetricBag:
             "shape_excess": sum(max(0, roles[r] - slots) for r, slots in EXPECTED_SHAPE.items())}
 
 
-def _shape_flags(tanks: int, damage: int, supports: int) -> list[str]:
-    """The warnings a shape carries, in the order the facts word them."""
+def shape_flags(tanks: int, damage: int, supports: int) -> list[str]:
+    """The warnings a shape carries, in the order the facts word them: a
+    function of the shape alone, so the search reads it exactly wherever a
+    branch has fixed its shape."""
     flags = []
     if tanks == 0:
         flags.append("TANKLESS")
@@ -366,6 +368,17 @@ def _tools(heroes: list[Hero]) -> MetricBag:
             # past a barrier and a beam that burns through one are one pick each by count
             "pierce_dps": sum(h.dps for h in heroes if h.pierces_barrier),
             "deployables": sum(1 for h in heroes if h.deployables)}
+
+
+def pair_score(world: World, a: int, b: int) -> float:
+    """One pair's part of team.synergy_score: the wiki's score where an
+    article claims the pair, the written pairs' mean where neither article
+    writes a cell for it, else 0. _cohesion sums the same parts, counted
+    apart; the search's bound (inference.bounds) reads each pair here."""
+    edge = world.synergy(a, b)
+    if edge:
+        return edge.score or 0
+    return world.synergy_prior if world.synergy_unwritten(a, b) else 0.0
 
 
 def _cohesion(world: World, heroes: list[Hero]) -> MetricBag:

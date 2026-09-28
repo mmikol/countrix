@@ -52,8 +52,6 @@ def doors(synthetic_world, monkeypatch):
     tuples, one dict for Draft(**board), ctx.call(name, **board) and the
     page's parsed query."""
     monkeypatch.setattr(tables, "load", lambda cx: synthetic_world)
-    # board() asks the pool for its workers before _board_once refuses
-    monkeypatch.setenv("COUNTRIX_PARALLEL", "0")
     monkeypatch.setenv("COUNTRIX_STRATEGIES", FIXTURE_PLAYBOOK)
     ctx = Offline(dsn="postgresql://nowhere")
 

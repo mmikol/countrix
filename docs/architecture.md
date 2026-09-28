@@ -46,7 +46,7 @@ subscription, and the board never calls a model.
 | `inference/` | **INFERENCE LAYER** - the playbook of constraints, heuristics and assumptions in markdown, the solver, the tuning loop | [inference.md](inference.md) |
 | `door/` | **THE DOOR** over all three layers - `mcp/`, the MCP server and its tools, under which every write runs; `refresh.py`, the clock that runs the tools daily and weekly | [mcp.md](mcp.md) |
 | `ui/` | **THE BOARD** - the page (map, sides, bans, red and blue rosters) over the facts layer's facts and the inference layer's answer: `board.py`, `pages.py` and `static/` - the only presentation code | [ui.md](ui.md) |
-| `tests/` | one folder per layer beside the root files' tests, with `synthetic.py`, a World of twelve released heroes, one announced hero and three maps built by hand, so a test works out its expected values with no database; `tests/fixtures/playbook/`, the reference playbook of every kind and form of strategy that the solver tests run on in place of `inference/strategies/`; and `tests/inference/record_reach.py`, the recorder that writes `tests/fixtures/reach.json`, a board per released hero, run from the repo root as `.venv/bin/python -m tests.inference.record_reach` | |
+| `tests/` | one folder per layer beside the root files' tests, with `synthetic.py`, a World of twelve released heroes, one announced hero and three maps built by hand, so a test works out its expected values with no database; `tests/fixtures/playbook/`, the reference playbook of every kind and form of strategy that the solver tests run on in place of `inference/strategies/`; `tests/inference/record_reach.py`, the recorder that writes `tests/fixtures/reach.json`, a board per released hero, run from the repo root as `.venv/bin/python -m tests.inference.record_reach`; and `tests/inference/prove_exact.py`, a brute force of every legal six on a board of the built database against the exact search, in slices run by hand | |
 | `.claude/skills/` | the skills a Claude Code session runs here, one `SKILL.md` each | [The skills](#the-skills) |
 | `pm/` | `backlog.md`: what is worth doing next, why and at what cost, in payoff order; the maintainer skill keeps it current | |
 | `.github/workflows/` | `ci.yml`: lint, the types (mypy) and the tests that need no built database, held to 78% coverage, on pushes to `main` and on pull requests | |
@@ -84,7 +84,7 @@ flowchart LR
 
     subgraph INFER["INFERENCE LAYER - inference/"]
         HEUR["strategies/*.md<br/>STRATEGIES = CONSTRAINTS ∪ HEURISTICS ∪ ASSUMPTIONS<br/>constraint: limit · heuristic: metric · scored"]
-        SOLVER["solver<br/>enumerate · prune ·<br/>normalise · refine"]
+        SOLVER["solver<br/>normalise · bound ·<br/>prune · exact argmax"]
     end
 
     BLZ & WIKI --> PULL
@@ -106,7 +106,7 @@ read Postgres directly ([mcp.md](mcp.md)).
 | file | purpose |
 | --- | --- |
 | `orchestrator.py` | the stack from a shell. `.venv/bin/python orchestrator.py` brings it up (the data container pulls and ingests when the database is empty or stale), waits, solves one board and prints the verdict. Verbs: `up` (default) · `status` · `down` |
-| `compose.yaml` | one container per role: `db` (PostgreSQL 16), `data` (the door: builds the database, then serves every MCP tool over HTTP), `ui` (the board, with the inference engine in the board's process and the solver's worker pool beside it), `refresher` (the door's clock) and `backup` (the nightly `pg_dump` into `backups/`). The three app containers share one image; `db` and `backup` run postgres's. Every container but `db` runs unprivileged on a read-only root with every capability dropped and memory and process limits; `db` keeps the five capabilities the postgres image needs to start as root, with no read-only root and no limits. Every port is published on 127.0.0.1 only. Bind mounts keep the caches, `inference/strategies`, `docs` and `backups` on the host, so tuning, authoring and regenerating need no rebuild |
+| `compose.yaml` | one container per role: `db` (PostgreSQL 16), `data` (the door: builds the database, then serves every MCP tool over HTTP), `ui` (the board, with the inference engine in the board's process), `refresher` (the door's clock) and `backup` (the nightly `pg_dump` into `backups/`). The three app containers share one image; `db` and `backup` run postgres's. Every container but `db` runs unprivileged on a read-only root with every capability dropped and memory and process limits; `db` keeps the five capabilities the postgres image needs to start as root, with no read-only root and no limits. Every port is published on 127.0.0.1 only. Bind mounts keep the caches, `inference/strategies`, `docs` and `backups` on the host, so tuning, authoring and regenerating need no rebuild |
 | `Dockerfile` | the one image, run as an unprivileged user (uid 1000, or `COUNTRIX_UID`/`GID` from `.env` on a Linux host whose checkout is owned by someone else); `docker-entrypoint.sh` takes the role as its argument and, for `data`, builds the database when it is empty, unfilled or behind the migrations |
 | `docker-db` | run any host command against the compose database: `./docker-db .venv/bin/python -m door.mcp call infer '{"map": "Ilios"}'`, or the suite: `./docker-db .venv/bin/python -m pytest -q` |
 | `.mcp.json` | registers the two MCP servers a Claude Code session sees: `countrix` (stdio, the local cluster) and `countrix-docker` (HTTP, the stack's database) - [mcp.md](mcp.md) |
@@ -128,7 +128,7 @@ flowchart LR
     end
     subgraph DOCKER["docker compose (one image, three containers, plus postgres and its nightly dump)"]
         DATA["data - the door<br/>builds when empty or stale,<br/>then MCP over HTTP :8020/mcp"]
-        UI["ui - the board and the<br/>INFERENCE ENGINE :8017<br/>facts and comps in-process,<br/>the solver's worker pool"]
+        UI["ui - the board and the<br/>INFERENCE ENGINE :8017<br/>facts and comps in-process"]
         DBC["db - postgres:16<br/>volume pgdata"]
         REF["refresher - the door's clock<br/>patches + rates daily,<br/>every source weekly,<br/>and on start when stale"]
         BAK["backup - postgres:16<br/>pg_dump nightly at 04:30,<br/>the newest 14 in ./backups"]
@@ -155,23 +155,21 @@ data healthcheck's 900 s, then exit. The data container's `/health`
 carries the state: compose's healthcheck holds `data` unhealthy until it
 is current, and `depends_on` starts `ui` and `refresher` only then. The
 board's `/health` is the engine's - the playbook and the database - and
-its healthcheck gates nothing. The board admits boards by the sixes their
-searches may enumerate, one `FIELD_BUDGET`'s worth at once
-(`serve.Admission`), so the pool and the fields in flight fit the ui
-container's 2 GiB. `orchestrator.py` waits only for a first reply and
+its healthcheck gates nothing. The board solves one board at a time
+(`serve.Admission`): a search is exact, holds its best sixes and not a
+field, and runs in the board's process, so memory sets no limit and a
+second board would only share the interpreter. `orchestrator.py` waits only for a first reply and
 reports the state in its verdict. [security.md](security.md) has
 the rest of the measures.
 
 Settings, from the environment or `.env` (the refresh and backup times are in [db.md](db.md)).
 Each is read where it is used, so a change takes effect on the next call -
-except the MCP server's token, `COUNTRIX_WORKERS` (read when the pool
-starts) and the refresh clock, which are read once at start:
+except the MCP server's token and the refresh clock, which are read once
+at start:
 
 | setting | default | meaning |
 | --- | --- | --- |
 | `COUNTRIX_STRATEGIES` | empty | a playbook folder other than `inference/strategies/`, relative to the repo root or absolute |
-| `COUNTRIX_WORKERS` | `max(6, min(cores, 12))` | the solver's worker processes |
-| `COUNTRIX_PARALLEL` | `1` | `0`: every board in one process |
 | `COUNTRIX_MCP_TOKEN` | unset | bearer token the MCP server requires over HTTP |
 | `DATABASE_URL` | unset | the PostgreSQL to use. Unset, the embedded pgserver cluster at `db/psql/cluster`, which `db_rebuild` builds: the local run, on the same tools, facts and strategies as the stack. With neither, `NoDatabaseError` |
 

@@ -2,8 +2,8 @@
 process: handle_board, both seats and the current comp; handle_strategies,
 the catalog and the default engine's weights; and handle_health, the
 catalog's size and the database's state. ADMISSION holds the boards in
-flight to one engine.FIELD_BUDGET of sixes, and a newer board from the same
-client supersedes one still solving. A handler that raises is answered at
+flight to BOARDS_AT_ONCE, and a newer board from the same client
+supersedes one still solving. A handler that raises is answered at
 the board's request boundary, by db.web.failure.
 """
 
@@ -24,6 +24,10 @@ from inference.strategy import CatalogError
 
 ADMIT_WAIT = 60.0           # seconds a board waits for room before it is turned away
 ADMIT_POLL = 0.5            # seconds between a waiting board's looks at its lane
+# boards solving at once in the board's process. A search holds its top K
+# sixes, not a field, so memory sets no limit; the work is pure Python under
+# one interpreter lock, so a second board would only halve the speed of both
+BOARDS_AT_ONCE = 1
 
 
 class BusyError(Exception):
@@ -31,30 +35,27 @@ class BusyError(Exception):
 
 
 class Admission:
-    """The boards solving in one process, admitted by the sixes their
-    searches may enumerate (engine.field_size of the pool). A board waits
-    while those in flight leave it less than `budget`, so the fields ranked
-    at once stay within one engine.FIELD_BUDGET's worth - about 550 MB
-    beside the pool, what the 2 GiB of the board's container was sized for.
-    A board alone is always admitted. A waiting board a newer one from its
-    client supersedes stops waiting; one still waiting after `wait` seconds
-    raises BusyError."""
+    """The boards solving in one process, each holding a share of `budget`:
+    the board's handler takes one of BOARDS_AT_ONCE. A board waits while
+    those in flight leave it less room than its share; a board alone is
+    always admitted. A waiting board a newer one from its client supersedes
+    stops waiting; one still waiting after `wait` seconds raises BusyError."""
 
-    def __init__(self, budget: int = engine.FIELD_BUDGET, wait: float = ADMIT_WAIT) -> None:
+    def __init__(self, budget: int = BOARDS_AT_ONCE, wait: float = ADMIT_WAIT) -> None:
         self.budget = budget
         self.wait = wait
         self._room = threading.Condition()
         self._held = 0
 
     def held(self) -> int:
-        """The sixes the boards in flight hold."""
+        """The shares the boards in flight hold."""
         with self._room:
             return self._held
 
-    def _take(self, sixes: int, superseded: Callable[[], bool]) -> None:
+    def _take(self, share: int, superseded: Callable[[], bool]) -> None:
         deadline = time.monotonic() + self.wait
         with self._room:
-            while self._held and self._held + sixes > self.budget:
+            while self._held and self._held + share > self.budget:
                 if superseded():
                     raise supersede.Superseded(supersede.MESSAGE)
                 left = deadline - time.monotonic()
@@ -63,19 +64,19 @@ class Admission:
                 self._room.wait(min(left, ADMIT_POLL))
             if superseded():             # room came, but a newer board took the lane first
                 raise supersede.Superseded(supersede.MESSAGE)
-            self._held += sixes
+            self._held += share
 
     @contextlib.contextmanager
-    def admitted(self, sixes: int, superseded: Callable[[], bool]) -> Iterator[None]:
-        """Hold `sixes` of the budget, at most all of it, while the block
+    def admitted(self, share: int, superseded: Callable[[], bool]) -> Iterator[None]:
+        """Hold `share` of the budget, at most all of it, while the block
         runs; raise BusyError or Superseded, holding nothing, when no room comes."""
-        sixes = min(sixes, self.budget)
-        self._take(sixes, superseded)
+        share = min(share, self.budget)
+        self._take(share, superseded)
         try:
             yield
         finally:
             with self._room:
-                self._held -= sixes
+                self._held -= share
                 self._room.notify_all()
 
 
@@ -110,13 +111,11 @@ def handle_board(cx: psycopg.Connection, query: Query) -> web.Reply:
     the lane is taken, so a malformed one supersedes nothing."""
     draft = parse_board(query)
     weights = catalog_module.parse_weights(query.get("weights", []))
-    pool, _ = engine.clamp_search(_first(query, "pool"))
     superseded = supersede.LATEST.take(_first(query, "client") or "")
     try:
-        with ADMISSION.admitted(engine.field_size(pool), superseded):
+        with ADMISSION.admitted(1, superseded):
             world = tables.load(cx)
-            brief = engine.Brief(pool_size=pool, weights=weights, countered=False,
-                                 superseded=superseded)
+            brief = engine.Brief(weights=weights, countered=False, superseded=superseded)
             return web.Reply(engine.board(world, draft, brief=brief).to_dict(), 200)
     except BusyError as busy:
         return web.Reply({"error": str(busy)}, 429)

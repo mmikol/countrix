@@ -12,9 +12,8 @@ the board or its pages.
 ```
 
 An `http.server` handler over psycopg, no web framework, no build step.
-The board computes the facts and the comps in its own process, the
-solver's worker pool warmed at launch, as the compose stack's `ui`
-container does. It writes nothing.
+The board computes the facts and the comps in its own process, as the
+compose stack's `ui` container does. It writes nothing.
 
 ## `board.py` and `pages.py` - the page and its endpoints
 
@@ -29,7 +28,7 @@ endpoints behind the host guard `db/web.py` puts on both servers
 | `/static/<file>` | `board.css`, `board.js`, `comps.js`, `playbook.js` and `bebas-neue.woff2`, nothing else |
 | `/api/roster` | the roster `facts/roster.py` builds, which the door's `roster` tool lists too: every hero (role, subrole, health pool, portrait, status, release day) and every map (mode, top style, sided or not), with the role icons and the patches newer than the rates |
 | `/api/facts?map=&side=&red=&blue=&bans=` | the FactSet for the board as JSON: the facts and their count |
-| `/api/board?map=&side=&red=&blue=&bans=[&weights=&client=&pool=]` | the board solved at any stage under the playbook tab's weights: the `board` tool's answer ([mcp.md](mcp.md#the-tools)) without the countered case, which the page never reads, from `serve.handle_board`. A board waits while the boards in flight hold one `FIELD_BUDGET`'s worth of sixes, and answers 429 after a minute (`serve.Admission`) |
+| `/api/board?map=&side=&red=&blue=&bans=[&weights=&client=]` | the board solved at any stage under the playbook tab's weights: the `board` tool's answer ([mcp.md](mcp.md#the-tools)) without the countered case, which the page never reads, from `serve.handle_board`. One board solves at a time; another waits, and answers 429 after a minute (`serve.Admission`) |
 | `/api/strategies` | the catalog: every constraint, heuristic and assumption with its kind, form, frontmatter and body, from `serve.handle_strategies` |
 | `/health` | the engine's health, from `serve.handle_health`: ok or degraded, the strategies, the drafts pending and the heroes, and the error naming what is out of reach. The ui container's healthcheck and `orchestrator.py` read it |
 | `/math` | `static/math.html` in the page shell, the constants it quotes (the default engine's three weights and `RATE_PICK_HALF`, `SYNERGY_PULL`, `REFERENCE_SIZE`, `NEED_BUDGET` and the search's four) filled in by `pages.py`: the equation, the scoring function with the default engine under the playbook, the board and how the layers fit |
@@ -175,9 +174,9 @@ sequenceDiagram
     Facts->>DB: load the World (25 queries)
     Facts-->>Board: F1..Fn - every fact about those heroes,<br/>the map, each team, the matchup
     Board->>Solver: /api/board (map, side, red, blue, bans)
-    Solver->>Solver: blue's seat: shapes the limits allow · per-role pools ·<br/>every candidate scored · local search
+    Solver->>Solver: blue's seat: shapes the limits allow · every legal six,<br/>bounded and pruned · the best proved, a few dozen scored in full
     Solver->>Solver: red's seat, the other side: their best counter to your picks
-    Solver->>Solver: both current comps: six locked -> ranked against the field;<br/>fewer -> scored with the optimal search's bounds
+    Solver->>Solver: both current comps: six locked -> ranked among every legal six;<br/>fewer -> scored with the optimal search's bounds
     Solver->>Facts: the FactSet for each (map, side, red, the six)
     Solver-->>Board: the game plan, the fight odds, blue's optimal with reasons and [F#]<br/>citations, red's likely starting comp, the suggestions for the empty slots
 ```

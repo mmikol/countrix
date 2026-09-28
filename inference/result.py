@@ -20,6 +20,7 @@ from inference import base as base_module
 from inference import catalog as catalog_module
 from inference.base import BaseWeights
 from inference.scoring import Candidate, Contribution
+from inference.solver import RANK_CAP
 from inference.strategy import Strategy
 
 # A result or a board as to_dict() serves it: a JSON object, read by the shells.
@@ -165,6 +166,7 @@ class Result:
     considered: int = 0
     seconds: float = 0.0
     rank: int | None = None
+    outranked: bool = False            # a full six RANK_CAP sixes outrank: no rank given
     playstyle: str = ""
     best: float | None = None          # the board's best score: what 100 means here
     floor: float | None = None         # the seat's floor: what 0 means here, else zero
@@ -191,7 +193,7 @@ class Result:
         for alt in self.alternatives:
             alt["normalized"] = _pct(alt["score"], self.best, self._zero()) if scoring else None
         if not scoring:
-            self.rank = None
+            self.rank, self.outranked = None, False
 
     def share(self) -> int:
         """The score's place between what 0 and 100 mean here, 0-100."""
@@ -213,6 +215,7 @@ class Result:
         self.barred = not_allowed(rules)
         self.contributions = [c for c in self.contributions if c["form"] == "limit"]
         self.alternatives, self.rank, self.considered = [], None, 0
+        self.outranked = False
 
     def unscored(self) -> str | None:
         """Why the result carries no share of a best, or None when it does.
@@ -312,6 +315,7 @@ class Result:
                 "playstyle": self.playstyle, "picks": self.picks,
                 "contributions": self.contributions, "violations": self.violations,
                 "alternatives": self.alternatives, "rank": self.rank,
+                "outranked": self.outranked,
                 "considered": self.considered, "seconds": round(self.seconds, 2),
                 "strategies": catalog_module.counts(self.catalog), "cited": cited,
                 "considerations": self.considerations, "pending": self.pending}
@@ -331,8 +335,7 @@ class Result:
         else:
             lines = [self._headline(), "  %s - score %.2f %s%s, %d candidates considered in"
                      " %.1fs%s" % (six, self.score, self._share_label(unscored),
-                                   " (rank %d among the feasible field)" % self.rank
-                                   if self.rank else "", self.considered, self.seconds, under)]
+                                   self._rank_label(), self.considered, self.seconds, under)]
         if unscored and not self.barred:
             lines.append("  UNSCORED: " + unscored.split(" - ", 1)[-1])
         if self.partial:
@@ -363,6 +366,14 @@ class Result:
             ", ".join(self.red) or "an unknown enemy",
             " (locked: %s)" % ", ".join(self.locked) if self.locked else "",
             " (banned: %s)" % ", ".join(self.bans) if self.bans else "")
+
+    def _rank_label(self) -> str:
+        """Where a full six ranks among the legal sixes, if it is ranked."""
+        if self.rank:
+            return " (rank %d among the legal sixes)" % self.rank
+        if self.outranked:
+            return " (outside the top %d of the legal sixes)" % RANK_CAP
+        return ""
 
     def _share_label(self, unscored: str | None) -> str:
         """The score's share of the best, or why there is none."""

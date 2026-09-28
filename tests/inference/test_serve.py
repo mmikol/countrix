@@ -1,6 +1,6 @@
 """The engine's handlers, which the board runs in its own process: they
-speak the results the engine returns, bound the search with the engine's
-clamp, admit boards by the sixes they may enumerate, and report the
+speak the results the engine returns, bound the alternatives with the
+engine's clamp, admit boards a share of the room at a time, and report the
 catalog and the database's health."""
 
 import pytest
@@ -11,34 +11,19 @@ from inference import catalog, serve
 from tests.inference import FIXTURE_PLAYBOOK
 
 
-def test_both_doors_bound_the_search_with_one_clamp():
-    """A caller naming pool or top reaches the same bounds through the board
-    as through the MCP tools: the engine owns the definition. Only a knob left
-    out takes the default; 0 is a number like any other, clamped to the floor
-    whether it comes as an int or as a query string's text."""
-    from inference.engine import POOL_CEILING, clamp_search
-    assert clamp_search(None, None) == (6, 5)                  # the defaults
-    assert clamp_search(0, 0) == (2, 1)                        # 0 is the floor, not unset
-    assert clamp_search("0", "0") == (2, 1)                    # on every door
-    assert clamp_search(-3, -3) == (2, 1)
-    assert clamp_search(1, 0.5) == (2, 1)
-    assert clamp_search(99, 99) == (POOL_CEILING, 20)
-    assert clamp_search("8", "3") == (8, 3)                    # a query string is text
+def test_both_doors_bound_the_alternatives_with_one_clamp():
+    """A caller naming top reaches the same bound through every door: the
+    engine owns the definition. Only a top left out takes the default; 0 is
+    a number like any other, clamped to the floor whether it comes as an int
+    or as a query string's text."""
+    from inference.engine import TOP_CEILING, TOP_DEFAULT, clamp_top
+    assert clamp_top(None) == TOP_DEFAULT == 5                 # the default
+    assert clamp_top(0) == clamp_top("0") == clamp_top(-3) == clamp_top(0.5) == 1
+    assert clamp_top(99) == TOP_CEILING == 20
+    assert clamp_top("3") == 3                                 # a query string is text
     for junk in ("x", [1], [], object()):                      # a refusal, not a crash
-        with pytest.raises(Refusal, match="must be numbers"):
-            clamp_search(junk)
-
-
-def test_the_pool_is_bounded_by_the_field_it_would_enumerate():
-    """pool=12, the clamp's old maximum, ran the inference container out of
-    memory: 1,345,960 legal sixes at about a kilobyte each against 2 GiB. The
-    clamp caps the pool at the most candidates per role whose field fits the
-    budget, and the default pool is far inside it."""
-    from inference import engine
-    assert engine.field_size(6) == 13_101 and engine.field_size(12) == 1_345_960
-    pool, _ = engine.clamp_search(12)
-    assert engine.field_size(pool) <= engine.FIELD_BUDGET < engine.field_size(pool + 1)
-    assert pool == engine.POOL_CEILING == 10
+        with pytest.raises(Refusal, match="must be a number"):
+            clamp_top(junk)
 
 
 def test_the_strategies_handler_lists_the_playbook_in_force():
@@ -65,7 +50,10 @@ def test_the_board_handler_serves_both_seats_and_the_current_comp(db):
         "blue": ["Reinhardt", "Zarya", "Widowmaker", "Bastion", "Ana", "Lúcio"]})
     current = data["current"]
     assert code == 200 and current["kind"] == "evaluate"
-    assert current["rank"] is None if current["unscored"] else current["rank"] >= 1
+    if current["unscored"]:
+        assert current["rank"] is None and not current["outranked"]
+    else:                               # ranked among the legal sixes, or outside RANK_CAP
+        assert (current["rank"] or 0) >= 1 or current["outranked"]
     with pytest.raises(Refusal, match="banned"):          # the boundary answers it 400
         serve.handle_board(db, {"red": ["Zarya"], "blue": ["Ana"], "bans": ["Ana"]})
     db.rollback()
@@ -73,23 +61,23 @@ def test_the_board_handler_serves_both_seats_and_the_current_comp(db):
 
 def test_a_refused_board_supersedes_nothing():
     """handle_board reads the whole query before it takes the client's lane,
-    so a board its parse refuses - a junk weight, a junk pool, a seventh
-    pick - leaves the board still solving in that lane alone. No database
-    is reached: each is refused before the World loads."""
+    so a board its parse refuses - a junk weight, a seventh pick - leaves
+    the board still solving in that lane alone. No database is reached:
+    each is refused before the World loads."""
     from inference import supersede
     ticket = supersede.LATEST.take("tab1")
     seven = ["Ana", "Ashe", "Baptiste", "Cassidy", "Genji", "Kiriko", "Mercy"]
-    for refused in ({"weights": ["junk"]}, {"pool": ["x"]}, {"red": seven}):
+    for refused in ({"weights": ["junk"]}, {"red": seven}):
         with pytest.raises(Refusal):
             serve.handle_board(None, {**refused, "client": ["tab1"]})
     assert ticket() is False
 
 
 def test_a_board_waits_for_room_and_holds_none_once_it_leaves():
-    """Admission counts the sixes each board in flight may enumerate: a board
-    alone is admitted whatever its field, a second waits until the first
-    leaves room, and nothing stays held after a board ends - raising
-    included."""
+    """Admission counts the share of its room each board in flight holds: a
+    board alone is admitted whatever its share, a second waits until the
+    first leaves room, and nothing stays held after a board ends - raising
+    included. The board's handler takes one of serve.BOARDS_AT_ONCE."""
     import threading
     admission = serve.Admission(budget=100, wait=5)
     order, inside, leave = [], threading.Event(), threading.Event()
@@ -254,7 +242,6 @@ def test_a_slider_weight_rides_the_board_and_a_malformed_one_is_refused(
     file's, and a weight that is not id:value is the caller's error. The
     synthetic World stands in for the database."""
     monkeypatch.setattr(tables, "load", lambda cx: synthetic_world)
-    monkeypatch.setenv("COUNTRIX_PARALLEL", "0")
     monkeypatch.setenv("COUNTRIX_STRATEGIES", FIXTURE_PLAYBOOK)
     heuristic = next(s for s in catalog.load(FIXTURE_PLAYBOOK) if s.kind == "heuristic")
     data, code = serve.handle_board(None, {

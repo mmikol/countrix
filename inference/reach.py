@@ -13,11 +13,12 @@ opposite - the search tries a few maps and a few reds, and a board it never visi
 seat the hero. A hero it finds nothing for is one worth looking at: a wrong number, a
 tool no metric reads, a rule that charges it for what it is not, or a board this search
 does not reach. Under the shipped playbook, the default engine and the healing floor,
-forty-two of the fifty-three released heroes have a board and eleven do not
-(tests/inference/test_reach.py names them). The `reach` tool runs the search;
-`.venv/bin/python -m tests.inference.record_reach` records a board per released hero in
-tests/fixtures/reach.json beside the objective it ran under, and the suite checks none
-is lost.
+forty-eight of the fifty-three released heroes have a board and five do not
+(tests/inference/test_reach.py names them). Each board's optimal six is exact
+(inference.solver), so a board found is a proof of the hero's seat there. The
+`reach` tool runs the search; `.venv/bin/python -m tests.inference.record_reach`
+records a board per released hero in tests/fixtures/reach.json beside the objective
+it ran under, and the suite checks none is lost.
 
     maps    the four its map rates lift it most on (its three best maps are among them)
     reds    none (blue counters the likely six); the heroes it answers, two a role, on
@@ -31,7 +32,7 @@ from facts import counters
 from facts.draft import MAX_BANS, SIDES, Draft, is_sided
 from facts.model import ROLES, Hero, Map, World
 from inference import engine
-from inference.solver import Infeasible
+from inference.solver import Infeasible, Unbounded
 
 MAPS = 4
 CLOSEST = 5         # boards the ban search starts from
@@ -101,7 +102,8 @@ def _rank(world: World, hero: Hero, name: str) -> bool:
 def search(world: World, name: str) -> Reach:
     """The first board that seats the hero, bans 0..MAX_BANS; with none, the
     closest it came, unseated. A board whose limits allow no six, or no six
-    holding the hero, is a miss, and the search goes on. It raises:
+    holding the hero, is a miss, as is one whose search refuses past its
+    budget (solver.Unbounded), and the search goes on. It raises:
 
         Refusal       an unknown or announced hero, as World.resolve refuses
                       one on every board tool
@@ -127,7 +129,7 @@ def search(world: World, name: str) -> Reach:
                                 "red": red, "banned": [], "six": top.blue, "gap": 0.0}
                     held = engine.infer(world, Draft(map_name=m.name, red=tuple(red),
                                                      blue=(hero.name,), side=side), top=1)
-                except Infeasible:
+                except (Infeasible, Unbounded):
                     continue
                 near.append(_Near(top.score - held.score, m.name, red, side))
     if not near:
@@ -164,7 +166,7 @@ def _banning(world: World, hero: Hero, map_name: str, red: list[str], side: str)
             held = engine.infer(world, Draft(map_name=map_name, red=tuple(red),
                                              blue=(hero.name,), bans=tuple(banned), side=side),
                                 top=1)
-        except Infeasible:
+        except (Infeasible, Unbounded):
             return None
         rivals = sorted((h for h in top.blue if h not in held.blue and h not in red),
                         key=lambda h: _rank(world, hero, h))
@@ -180,7 +182,7 @@ def six(world: World, board: Reach) -> list[str]:
     try:
         top = engine.infer(world, Draft(map_name=board["map"], red=tuple(board["red"]),
                                         bans=tuple(board["banned"]), side=board["side"]), top=1)
-    except Infeasible:
+    except (Infeasible, Unbounded):
         return []
     return top.blue
 

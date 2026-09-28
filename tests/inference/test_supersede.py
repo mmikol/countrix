@@ -1,82 +1,55 @@
-"""Latest wins in the pool: a superseded board's cancelled rounds; a
-superseded pooled board that raises, keeps the pool and is not solved again
-in this process; and a pooled board refused mid-pass, which cancels its
-queued tasks all the same."""
+"""Latest wins: a superseded board stops in the middle of a search, a
+refusal the doors answer as the caller's, and a board no newer one
+replaced asks its check as it goes and runs to the end."""
 
 import pytest
 
-from tests.inference import BRIEF, DEFAULT
-from tests.inference.tracing import TRACED, Call, traced_board
+from facts.draft import Draft
+from tests.inference import BRIEF
+
+# red revealed and one blue pick locked on a sided map: every seat of the board solves
+DRAFT = Draft("Harbor Gate", ("Anvil",), ("Balm",), side="attack")
 
 
-def test_a_superseded_search_cancels_every_task_that_has_not_started(
-        synthetic_world, scratch_playbook):
-    """Each round first asks whether a newer board from the same client has
-    replaced this one. Once one has, every task the board queued and no
-    worker took is cancelled, and the round raises Superseded - a Refusal,
-    which the doors answer 400 with no traceback."""
-    from concurrent.futures import Future
-
+def test_a_superseded_board_stops_in_the_middle_of_a_search(
+        monkeypatch, synthetic_world, scratch_playbook):
+    """Every CHECK_EVERY branches a search asks the board's check; once a
+    newer board from the same client has taken the lane, the check raises
+    Superseded there, and the board stops without finishing its seats. The
+    synthetic boards are small, so the check is asked at every branch."""
     from db import Refusal
-    from inference import parallel, supersede
+    from inference import engine, solver, supersede
+    monkeypatch.setattr(solver, "CHECK_EVERY", 1)
+    asked = []
 
-    class Queued:
-        def submit(self, task, *args):
-            return Future()                   # queued: no worker has taken it
-    newer = []
-    watch = supersede.Watch(lambda: bool(newer))
-    run = parallel.Run(Queued(), synthetic_world, scratch_playbook, None, 6, watch)
-    split = parallel.Split(run, parallel.Spec(TRACED, 6, DEFAULT), 3)
-    assert len(watch.futures) == 3 and not any(f.cancelled() for f in watch.futures)
-    newer.append("the next board")
+    def superseded():
+        asked.append(1)
+        return len(asked) > 40
+    walked = []
+    real = solver.Solver._branch
+
+    def branch(self, *args):
+        walked.append(1)
+        return real(self, *args)
+    monkeypatch.setattr(solver.Solver, "_branch", branch)
     with pytest.raises(supersede.Superseded):
-        split.rank_roster()
-    assert all(f.cancelled() for f in watch.futures)
+        engine.board(synthetic_world, DRAFT, catalog=scratch_playbook,
+                     brief=BRIEF._replace(superseded=superseded))
+    assert len(asked) == 41 and len(walked) < 45
     assert issubclass(supersede.Superseded, Refusal)
 
 
-def test_a_superseded_board_is_not_solved_again_in_this_process(
+def test_a_board_no_newer_one_replaced_runs_to_the_end(
         monkeypatch, synthetic_world, scratch_playbook):
-    """A superseded pooled board is not a dead worker: it raises, the pool is
-    kept, and the board is not run a second time here."""
-    from inference import engine, supersede
-    checks, trace = [], []
+    """A board whose lane no newer request took asks its check as it goes -
+    between its seats and every CHECK_EVERY branches - and is solved whole."""
+    from inference import engine, solver
+    monkeypatch.setattr(solver, "CHECK_EVERY", 16)
+    asked = []
 
     def superseded():
-        checks.append(1)
-        return len(checks) > 4
-    with pytest.raises(supersede.Superseded):
-        traced_board(monkeypatch, synthetic_world, scratch_playbook, pooled=True,
-                     brief=engine.Brief(superseded=superseded), trace=trace)
-    assert len(trace) == 4 and Call("drop") not in trace
-
-
-def test_a_pooled_board_that_refuses_mid_pass_cancels_every_task_it_queued(
-        monkeypatch, synthetic_world, scratch_playbook):
-    """A refusal is not a supersede, and no round's check raises it; the
-    board still cancels every task its pass queued and no worker took, so a
-    page that keeps asking for a board no six satisfies stacks no passes in
-    the pool. The pool is kept."""
-    from concurrent.futures import Future
-
-    from db import Refusal
-    from inference import engine, parallel
-    queued, dropped = [], []
-
-    class Queued:
-        def submit(self, task, *args):
-            future = Future()                 # queued: no worker has taken it
-            queued.append(future)
-            return future
-
-    def refuse(split):
-        raise Refusal("no composition satisfies the limits")
-    monkeypatch.setattr(parallel, "available", lambda catalog=None: True)
-    monkeypatch.setattr(parallel.POOL, "executor", lambda: parallel.Workers(Queued(), 6))
-    monkeypatch.setattr(parallel.POOL, "drop", lambda: dropped.append("drop"))
-    monkeypatch.setattr(parallel.Split, "rank_roster", refuse)
-    with pytest.raises(Refusal, match="no composition satisfies the limits"):
-        engine.board(synthetic_world, TRACED, catalog=scratch_playbook, brief=BRIEF)
-    assert len(queued) == 3 + 3                  # blue's and red's reference samples
-    assert all(f.cancelled() for f in queued)
-    assert dropped == []
+        asked.append(1)
+        return False
+    b = engine.board(synthetic_world, DRAFT, catalog=scratch_playbook,
+                     brief=BRIEF._replace(superseded=superseded))
+    assert b.fill is not None and b.countered is not None and len(asked) > 10

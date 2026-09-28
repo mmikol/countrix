@@ -87,8 +87,8 @@ services:
 
   data:
     <<: *app
-    deploy:                          # the door's solves, a board's on the
-      resources:                     # worker pool
+    deploy:                          # the door's solves: a board's exact
+      resources:                     # searches hold its top sixes, not a field
         limits:
           memory: 2g
           pids: 256
@@ -120,8 +120,8 @@ services:
 
   ui:
     <<: *app
-    deploy:                          # the solver's worker pool: ~70 MB a worker, twelve at
-      resources:                     # most, beside the boards in flight (inference/serve.py)
+    deploy:                          # the engine in the board's process, one board
+      resources:                     # solving at a time (inference/serve.py)
         limits:
           memory: 2g
           pids: 256
@@ -132,8 +132,6 @@ services:
       - "127.0.0.1:8017:8017"
     environment:
       <<: *env
-      # the solver's workers; empty is one per core, six to twelve (inference/parallel.py)
-      COUNTRIX_WORKERS: ${COUNTRIX_WORKERS:-}
     depends_on:
       data:
         condition: service_healthy

@@ -105,12 +105,14 @@ keeps it current.
   1,200 reference sixes, so one pathological six sets every share on the
   board and a roster or rates change moves them all through it; a floor
   far below the field crowds every share toward 100. A low quantile (the
-  5th percentile) holds still: each slice ships its sorted scores and the
-  parent merges them, bit for bit as today. Cost: half a day, and every
-  share moves once.
-- **Shard the local search by seed.** The countered case's refine is the
-  last serial block (~0.12 s). The result set holds; the reported
-  `considered` count depends on seed order and would change.
+  5th percentile) holds still, read off the sample's sorted scores. Cost:
+  half a day, and every share moves once.
+- **Bound the metric heuristics jointly.** The exact search bounds each
+  heuristic on a summed metric apart, so each takes its own best heroes;
+  folding such a term's line into the default engine's joint bound (its
+  metric is a per-pick sum) cut the reference playbook's nodes by half to
+  two thirds in the design's prototype. The shipped playbook does not
+  need it; a heavy playbook would. Cost: a day, with its fuzz.
 - **A strict dead-CSS test.** The test word-matches class names, so a dead
   compound selector passes (`.hcard .legend` did). Needs an exception list
   for the four classes built by concatenation.
@@ -193,6 +195,13 @@ few match-ups the wiki rates (the counters table is a list).
 
 ## Done
 
+- **The search is exact.** Branch and bound over every legal six of the
+  released roster replaces the per-role pool, its sweep and the local
+  search (`inference/bounds.py`, `inference/solver.py`); the process pool,
+  its two settings and the `pool` knob go, and a board solves in one
+  process. The search is held to enumeration in the suite and to a brute
+  force of every legal six on real boards (`tests/inference/prove_exact.py`),
+  and docs/inference.md says why (Why the search is exact).
 - **An unwritten synergy pair is unknown, not zero.** `pull_synergies`
   keeps every written Team Synergy cell in `synergy_cells` (migration
   029) and keeps a rating GOOD or better that has no advice text; the

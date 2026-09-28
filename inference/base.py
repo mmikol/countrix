@@ -300,6 +300,14 @@ class Base:
         w = self.scaled
         return w.rate * terms.rates + w.synergy * terms.synergy + w.counter * terms.counters
 
+    def unary(self, h: Hero, size: int) -> float:
+        """One pick's own part of value() in a team of `size`: its rate edge
+        over the team and its counter tally, weighted. value() is the sum of
+        these over the six plus the synergy term, which reads pairs; the
+        search's bound (inference.bounds) adds them up apart."""
+        w, edges = self.scaled, self._edges[h.id]
+        return w.rate * self._edge[h.id] / size + w.counter * (edges.answers - edges.exposures)
+
 
 # The facts the two terms no board fact states. A result's FactSet files the
 # seat's own six as "blue", whichever seat it is, so the facts are filed there

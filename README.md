@@ -27,9 +27,9 @@ hide the rate figures: Blizzard licenses those for personal use only.*
 - **Turns a draft into facts.** Map, side, bans and both teams' picks become
   numbered facts (F1, F2, ...): a hero on this map, against each enemy, beside
   each ally, the six against the six.
-- **Solves the comp.** A deterministic search enumerates the sixes each role's
-  strongest heroes allow, then climbs by local search over the whole roster.
-  A default engine scores every candidate on its win rates on the map, the
+- **Solves the comp.** An exact search - branch and bound over every legal
+  six of the released roster - proves the best six and the next best in
+  order, scoring a few dozen of seventeen million in full. A default engine scores every candidate on its win rates on the map, the
   wiki's synergies, a pair no article writes at the written pairs' mean,
   and its counters to the other side - the wiki's, and where the wiki says
   nothing, answers derived from the two kits and named
@@ -77,14 +77,16 @@ the solver reads nothing else.
 
 ## Engineering
 
-- **810 tests.** CI runs ruff, mypy and the 694 that need no database on
+- **823 tests.** CI runs ruff, mypy and the 705 that need no database on
   every push to main and every pull request; they cover 93% of the lines,
   held to 78%. With the database built, all of them run against a 75% floor.
 - **The search is held to brute force.** A CI gate enumerates every legal six
-  on six small synthetic boards and fails unless the search returns the true
-  maximum.
-- **Deterministic parallel search.** A process pool splits each board, and the
-  pooled and single-process answers are pinned to agree exactly.
+  on small synthetic boards and fails unless the search returns the true best
+  sixes in order, and a fuzz holds every bound to the sixes it covers; on the
+  built database a brute force of every legal six on real boards agrees with
+  it bit for bit.
+- **Deterministic.** A board is the same payload under any hash seed: one
+  total order, each six scored in one seat order.
 - **Typed throughout.** mypy checks every source module in CI; records that
   cross a module boundary are dataclasses, NamedTuples or TypedDicts.
 - **One door for writes.** 27 MCP tools over stdio, HTTP or in-process, each

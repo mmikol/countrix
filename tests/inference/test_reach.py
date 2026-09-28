@@ -22,8 +22,7 @@ from tests.inference import FIXTURE_PLAYBOOK, in_force, recorded
 from tests.inference import record_reach as recorder
 
 # named, not waived - see the test
-UNSEATED = {"Cassidy", "Domina", "Emre", "Freja", "Hazard", "Ramattra", "Shion", "Sierra",
-            "Sojourn", "Venture", "Zarya"}
+UNSEATED = {"Emre", "Freja", "Kiriko", "Sojourn", "Zarya"}
 
 
 @pytest.mark.invariant
@@ -43,17 +42,19 @@ def test_every_hero_reach_finds_a_board_for_is_still_seated_and_none_is_newly_lo
         else " - recorded under a different objective")
     assert len(fell) <= len(boards) // 5, "the recorded boards have gone stale%s: %s" % (
         stale, fell)
-    # Eleven heroes the recorder's search found no board for. That is not a proof none
+    # Five heroes the recorder's search found no board for. That is not a proof none
     # exists - the search tries four maps and a few reds per hero, so a board it
     # never visits could seat any of them - but it is what the search establishes,
     # and they are named rather than waived: a twelfth fails here. The default engine
     # and the healing floor score the shipped playbook's boards, and on the boards the
-    # search tries they value none of the eleven above its rivals for the seat, even
+    # search tries they value none of the five above its rivals for the seat, even
     # with five of them banned; the playbook's rules are what can answer it. They are
-    # not searched again on every run - eleven searches are a quarter hour, more under
+    # not searched again on every run - five searches are a quarter minute, more under
     # coverage - so one that comes to seat leaves UNSEATED when the recorder
     # re-records. The healing floor seated Illari and Lifeweaver and unseated Cassidy;
-    # summed healing seated Kiriko and unseated Zarya.
+    # summed healing seated Kiriko and unseated Zarya; the written pairs' mean for an
+    # unwritten synergy pair and the exact search, recorded together, seated Cassidy,
+    # Domina, Hazard, Ramattra, Shion, Sierra and Venture and unseated Kiriko.
     assert not UNSEATED - released, "not a released hero: %s" % ", ".join(UNSEATED - released)
     lost = [name for name in sorted((released - on_file - UNSEATED) | set(fell))
             if not reach.search(world, name)["seated"]]

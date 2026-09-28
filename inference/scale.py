@@ -1,28 +1,21 @@
 """One scale per board: what every heuristic on it is normalised against, as
 functions of an Objective.
 
-    sample              the REFERENCE: a seeded set of random legal sixes for this
-                        map and side. Heuristics are normalised against it, so infer,
-                        the fill and the current comp share one scale and a score
-                        means the same thing across calls. The seed is a string, so
-                        every process draws the same list and any of them can prepare
-                        a slice of it.
-    reference_bounds    each heuristic's low and high over one slice of the sample
-                        and of the board's field; the slices merge into the bounds
-                        freeze draws in one process, since both take them from
-                        _bounds_over
-    reference_standing  each hero's summed score across one slice of the reference
-                        sixes it is in: its mean is the objective's own ranking of the
-                        roster on this board, the default engine's terms included;
-                        and the slice's lowest score, whose least over the slices is
-                        the board's floor - the zero of every share on it
+    sample      the REFERENCE: a seeded set of random legal sixes for this map
+                and side. Heuristics are normalised against it, so infer, the
+                fill and the current comp share one scale and a score means the
+                same thing across calls. The seed is a string, so every process
+                draws the same list.
+    freeze      each heuristic's low and high over the sample and the board's
+                field, adopted by the objective, and the board's floor: the
+                lowest score among the reference sixes, the zero of every share
+                on it
 """
 
 import itertools
 import math
 import random
 from collections.abc import Iterable, Iterator, Sequence
-from dataclasses import dataclass, field
 
 from facts.model import ROLES, Hero
 from inference.scoring import Bounds, Candidate, Interval, Objective, SixKey
@@ -30,38 +23,7 @@ from inference.shapes import legal_shapes
 
 REFERENCE_SIZE = 1200
 REFERENCE_SEED = 20260913
-SCALE_POOL = 6                    # the field that fixes a board's scale, whatever pool is searched
-
-
-@dataclass(slots=True)
-class Standing:
-    """One hero's tally over reference sixes: its summed score in millionths
-    and the sixes it is in. Whole numbers, so slices add up the same in any
-    order; the mean is total / sixes."""
-    total: int = 0
-    sixes: int = 0
-
-
-@dataclass(slots=True)
-class Tally:
-    """Reference sixes scored on one board: each hero's Standing, by hero id,
-    and the floor - the lowest score among them, a share's zero; None while
-    no legal six is scored. Whole numbers and a least value, so slices fold
-    into the same tally in any order."""
-    heroes: dict[int, Standing] = field(default_factory=dict)
-    floor: float | None = None
-
-    def fold(self, part: "Tally") -> "Tally":
-        """Add one slice's tally into this one, in place."""
-        for hid, standing in part.heroes.items():
-            seen = self.heroes.get(hid)
-            if seen is None:
-                seen = self.heroes[hid] = Standing()
-            seen.total += standing.total
-            seen.sixes += standing.sixes
-        if part.floor is not None and (self.floor is None or part.floor < self.floor):
-            self.floor = part.floor
-        return self
+SCALE_POOL = 6                    # each role's heroes in the field that fixes a board's scale
 
 
 def sample(objective: Objective, size: int = REFERENCE_SIZE) -> list[Candidate]:
@@ -78,7 +40,7 @@ def sample(objective: Objective, size: int = REFERENCE_SIZE) -> list[Candidate]:
     an unchanged six, banning could raise the reported maximum over a
     smaller feasible set, and `the optimal comp for this board` would
     stop being a function of the composition. Bans still screen the
-    candidate field, in pools(), refine() and _pairs() - it is only the
+    search's candidates (inference.bounds.roster) - it is only the
     measuring stick that has to hold still."""
     m = objective.m
     rng = random.Random("%d|%s|%s" % (  # nosec B311  # a str seed, stable across processes
@@ -110,18 +72,16 @@ def sample(objective: Objective, size: int = REFERENCE_SIZE) -> list[Candidate]:
     return out
 
 
-def _prepared(objective: Objective, index: int = 0, count: int = 1) -> list[Candidate]:
-    """One slice of the sample prepared, minus what the limits refuse:
-    what every heuristic is normalised against."""
-    return [c for c in (objective.prepare(c) for c in sample(objective)[index::count])
-            if not c.violations]
+def _prepared(objective: Objective) -> list[Candidate]:
+    """The sample prepared, minus what the limits refuse: what every
+    heuristic is normalised against."""
+    return [c for c in (objective.prepare(c) for c in sample(objective)) if not c.violations]
 
 
 def _bounds_over(objective: Objective, prepared: Sequence[Candidate]) -> Bounds:
     """{heuristic id: Interval(low, high)} over prepared sixes. A heuristic
     no six here values is left out: the objective reads a missing id as
-    (0, 0), and a slice that never saw a value must not merge a (0, 0) into
-    the other slices' bounds."""
+    (0, 0)."""
     out: Bounds = {}
     for i, g in enumerate(objective.heuristics):
         values = [value for c in prepared if (value := c.raw[i]) is not None]
@@ -130,25 +90,12 @@ def _bounds_over(objective: Objective, prepared: Sequence[Candidate]) -> Bounds:
     return out
 
 
-def reference_bounds(objective: Objective, index: int = 0, count: int = 1) -> Bounds:
-    """{heuristic id: Interval(low, high)} over one slice of the sample AND of the
-    field, leaving out the heuristics the slice never valued. The slices
-    partition both, so merging their lows and highs gives what one process
-    freezes."""
-    prepared = _prepared(objective, index, count) + _field_sample(objective, index, count)
-    return _bounds_over(objective, prepared)
-
-
-def board_prior(objective: Objective, h: Hero, partners: int = 0) -> float:
-    """The ranking that cut the pools before the playbook ranked them itself:
-    the hero's win rate here, three points for each enemy it answers less
-    three for each that answers it, two for each locked pick it partners, one
-    for the map's style and one for a map it is best on.
-
-    With no partners it is the board's own ranking. A point per partner is
-    right when ranking a pool to search and wrong when choosing the field that
-    fixes the scale - that field has to be the same for every seat and every
-    set of locks on this board."""
+def board_prior(objective: Objective, h: Hero) -> float:
+    """The board's own ranking of a hero, which picks the field that fixes
+    the scale: its win rate here, three points for each enemy it answers
+    less three for each that answers it, one for the map's style and one
+    for a map it is best on. It reads no locked pick: the field has to be
+    the same for every seat and every set of locks on this board."""
     m, world = objective.m, objective.world
     here = h.map_win(m.id) if m is not None else None
     base = here if here is not None else (h.win if h.win is not None else 50.0)
@@ -156,7 +103,7 @@ def board_prior(objective: Objective, h: Hero, partners: int = 0) -> float:
     exposed = sum(1 for e in objective.red if world.is_countered_by(h.id, e.id))
     style = 1 if (m is not None and m.style_top in h.styles) else 0
     best = 1 if (m is not None and m.id in h.best_maps) else 0
-    return base + 3.0 * answers - 3.0 * exposed + 2.0 * partners + style + best
+    return base + 3.0 * answers - 3.0 * exposed + style + best
 
 
 def _board_pool(objective: Objective, role: str) -> list[Hero]:
@@ -164,8 +111,8 @@ def _board_pool(objective: Objective, role: str) -> list[Hero]:
     # not filtered by the bans, on purpose, exactly as sample() is not:
     # this field is half the population that fixes the scale, and a ban
     # that moved it would move the score of an unchanged six. Bans keep
-    # banned heroes out of the CANDIDATE field in pools(); the measuring
-    # stick has to hold still
+    # banned heroes out of the search's candidates; the measuring stick
+    # has to hold still
     heroes = [h for h in objective.world.heroes.values() if h.role == role and h.released]
     heroes.sort(key=lambda h: (-board_prior(objective, h), h.name))
     return heroes[:SCALE_POOL]
@@ -175,12 +122,10 @@ def _board_field(objective: Objective) -> Iterator[list[Hero]]:
     """The field this board would search with nothing locked: each role's
     top SCALE_POOL by the board's own prior, over every legal shape.
 
-    It must not read the locked picks, and it takes SCALE_POOL rather than
-    the pool this search happens to use. The bounds it feeds are the
-    board's one scale: `infer`, the fill, `current` and the countered
-    what-if run with different locks and different pool sizes on the same
-    board, and a scale that moved with either would make a current comp and
-    the optimal it is a share of two different numbers."""
+    It must not read the locked picks. The bounds it feeds are the board's
+    one scale: `infer`, the fill and `current` run with different locks on
+    the same board, and a scale that moved with them would make a current
+    comp and the optimal it is a share of two different numbers."""
     tanks, damage, supports = [_board_pool(objective, role) for role in ROLES]
     for t, d, s in legal_shapes(objective.catalog):
         if t > len(tanks) or d > len(damage) or s > len(supports):
@@ -191,7 +136,7 @@ def _board_field(objective: Objective) -> Iterator[list[Hero]]:
                     yield list(a) + list(b) + list(c)
 
 
-def _field_sample(objective: Objective, index: int = 0, count: int = 1) -> list[Candidate]:
+def _field_sample(objective: Objective) -> list[Candidate]:
     """The board's field, prepared but unscored.
 
     The sample alone is 1,200 random legal sixes, and the search picks from
@@ -200,43 +145,27 @@ def _field_sample(objective: Objective, index: int = 0, count: int = 1) -> list[
     rule stopped telling them apart, and a weight raised past that bought
     nothing. The field belongs in the population that sets the scale."""
     out = []
-    for size, heroes in enumerate(_board_field(objective)):
-        if size % count == index:
-            cand = objective.prepare(Candidate(heroes))
-            if not cand.violations:
-                out.append(cand)
+    for heroes in _board_field(objective):
+        cand = objective.prepare(Candidate(heroes))
+        if not cand.violations:
+            out.append(cand)
     return out
 
 
-def freeze(objective: Objective) -> Tally:
+def freeze(objective: Objective) -> float | None:
     """Bounds per heuristic from the reference sample and the field, adopted
-    by the objective; -> the reference sixes' tally under them, each hero's
-    standing and the floor. The sample is drawn once here, and nowhere else
-    in one process."""
+    by the objective; -> the floor, the lowest score among the reference
+    sixes under them, None where no legal six is drawn. The sample is drawn
+    once here. The field is read only where a heuristic on a metric exists:
+    the bounds read nothing else, so a playbook without one skips it and
+    lands on the same scale."""
     reference = _prepared(objective)
-    objective.adopt_bounds(_bounds_over(objective, reference + _field_sample(objective)))
-    return _tally(objective, reference)
+    field = _field_sample(objective) if objective.heuristics else []
+    objective.adopt_bounds(_bounds_over(objective, reference + field))
+    return _floor(objective, reference)
 
 
-def _tally(objective: Objective, prepared: Iterable[Candidate]) -> Tally:
-    """Each hero's Standing over prepared reference sixes, and the lowest
-    score among them."""
-    tally = Tally()
-    for cand in prepared:
-        score = objective.score(cand, detail=False).score
-        if tally.floor is None or score < tally.floor:
-            tally.floor = score
-        points = round(score * 1e6)
-        for h in cand.heroes:
-            seen = tally.heroes.get(h.id)
-            if seen is None:
-                seen = tally.heroes[h.id] = Standing()
-            seen.total += points
-            seen.sixes += 1
-    return tally
-
-
-def reference_standing(objective: Objective, index: int = 0, count: int = 1) -> Tally:
-    """One slice of the sample scored under the frozen bounds -> its tally,
-    the slice's floor with it."""
-    return _tally(objective, _prepared(objective, index, count))
+def _floor(objective: Objective, prepared: Iterable[Candidate]) -> float | None:
+    """The lowest score among prepared reference sixes."""
+    scores = [objective.score(cand, detail=False).score for cand in prepared]
+    return min(scores) if scores else None

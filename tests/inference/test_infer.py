@@ -1,6 +1,6 @@
 """infer() and a full six scored alone: locked picks and the queue's shape,
-an answer to a flier, a full six ranked against its field, a board no six
-satisfies, bans, one scale per board, an announced hero, the fill that
+an answer to a flier, a full six ranked against every legal six, a board
+no six satisfies, bans, one scale per board, an announced hero, the fill that
 keeps a lock, a seat's search timed from where it began, and no rank in an
 unscored field. Every board is the synthetic World's: no database."""
 
@@ -116,8 +116,7 @@ def test_scores_share_one_scale_per_board(synthetic_world):
     # around Balm
     b = engine.board(world, Draft("Harbor Gate", red, tuple(r.blue)), catalog=fix, brief=BRIEF)
     assert b.blue.blue == best.blue and b.current.to_dict()["normalized"] <= 100
-    again = engine.infer(world, Draft("Harbor Gate", red, ("Balm",)), pool_size=4, catalog=fix,
-                         base=DEFAULT)
+    again = engine.infer(world, Draft("Harbor Gate", red, ("Balm",)), catalog=fix, base=DEFAULT)
     rescored = evaluated(world, Draft("Harbor Gate", red, tuple(again.blue)), catalog=fix)
     assert abs(again.score - rescored.score) < 1e-9
 
@@ -138,8 +137,8 @@ def test_an_announced_hero_is_described_but_never_picked(synthetic_world):
     r = engine.infer(world, Draft(), catalog=fix, base=DEFAULT)
     assert h.name not in r.blue and all(a["blue"] for a in r.alternatives)
     assert not any(h.name in a["blue"] for a in r.alternatives)   # nor does the field hold it
-    # and under a playbook that ties most sixes, where the local search swaps freely:
-    # the announced hero reached the alternatives through refine once
+    # and under a playbook that ties most sixes, where the tie-break decides: an
+    # announced hero once reached the alternatives that way
     limit_only = [s for s in fix if s.form == "limit"]
     r = engine.infer(world, Draft(), catalog=limit_only, base=DEFAULT)
     assert h.name not in r.blue and not any(h.name in a["blue"] for a in r.alternatives)
@@ -164,27 +163,24 @@ def test_the_fill_is_the_optimal_whenever_the_optimal_holds_every_lock(synthetic
             assert fill.blue == best.blue, (map_name, hero, fill.blue)
 
 
-def test_a_seat_solved_across_the_pool_is_timed_from_when_its_search_began(
-        synthetic_world, scratch_playbook):
-    """A board's seat takes its Solved from a split that ran before the seat
-    is written up, so its seconds run from when the split was sent out: the
-    pooled search counts, and a seat reads the time the board took."""
+def test_a_seat_is_timed_from_when_its_search_began(
+        monkeypatch, synthetic_world, scratch_playbook):
+    """A seat's seconds run from when its search began, the scale and the
+    walk included: a search that takes a while reads it."""
     import time
 
-    from inference import engine, parallel
+    from inference import engine
     from inference.solver import Solver
     draft = Draft("Harbor Gate", ("Anvil",), side="attack")
-    m, red_h, _, _ = synthetic_world.resolve(draft.map_name, draft.red, (), ())
-    solved = Solver(synthetic_world, m, red=red_h, locked=[], side="attack",
-                    catalog=scratch_playbook, base=DEFAULT).solve(top=2)
+    solve = Solver.solve
+
+    def slow(solver, top=5):
+        time.sleep(0.3)
+        return solve(solver, top)
+    monkeypatch.setattr(Solver, "solve", slow)
     seat = engine._optimal(synthetic_world, draft, catalog=scratch_playbook, base=DEFAULT,
-                           pool_size=6, top=1, seat="blue", kind="infer", solved=solved,
-                           began=time.time() - 5)
-    assert seat.result.seconds >= 5 and seat.result.to_dict()["seconds"] >= 5
-    alone = engine._optimal(synthetic_world, draft, catalog=scratch_playbook, base=DEFAULT,
-                            pool_size=6, top=1, seat="blue", kind="infer", solved=None,
-                            began=None)
-    assert alone.result.seconds < 5 and parallel.NullSplit.started is None
+                           top=1, seat="blue", kind="infer")
+    assert 0.3 <= seat.result.seconds < 5 and seat.result.to_dict()["seconds"] >= 0.3
 
 
 def test_a_six_in_a_field_that_scores_nothing_has_no_rank(
@@ -209,4 +205,4 @@ def test_a_six_in_a_field_that_scores_nothing_has_no_rank(
     for scored in (evaluated(synthetic_world, board, catalog=scratch_playbook, base=OFF),
                    evaluated(synthetic_world, board, catalog=catalog.load(str(limit_only)))):
         assert scored.unscored() is None and scored.rank >= 1
-        assert "(rank %d among the feasible field)" % scored.rank in scored.rendered()
+        assert "(rank %d among the legal sixes)" % scored.rank in scored.rendered()

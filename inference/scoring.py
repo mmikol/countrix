@@ -11,19 +11,27 @@ their weight times bonus less penalty; assumptions are the agent's. A
 board, not once per candidate. A heuristic guarded on the six's own state
 is a need: see Objective.score(). The legal shapes live in
 inference.shapes.
+
+A six is scored in one seat order, whatever order it arrives in: tanks,
+then damage, then supports, each by hero id (Candidate). The score is then a
+function of the hero set, down to its last bit, which the exact search and
+its proofs need. Sixes rank by rank_key: the score to SCORE_PLACES decimal
+places, then the tie-break (the six's mean map win rate), then the names;
+two scores closer than that tie, and the tie-break decides.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Literal, NamedTuple, NotRequired, TypedDict
 
 from facts import compute, counters
-from facts.model import Hero, Map, World
+from facts.model import ROLES, Hero, Map, World
 from facts.team import NUMBER_TYPES, MetricBag, MetricValue, number, team_metrics
 from inference.base import COUNTERS, RATES, READS, SYNERGY, Base, BaseWeights, Terms
 from inference.expr import Expr, Scope, Value, scope
 from inference.strategy import Strategy, settled_by_board
 
 NEED_BUDGET = 2.0                 # the most one guarded state can cost
+SCORE_PLACES = 9                  # the decimal places a six's score ranks by
 
 
 class Interval(NamedTuple):
@@ -94,9 +102,10 @@ def _slot_gate(held: list[bool | None], slot: int, s: Strategy, sc: Scope) -> bo
     return gate
 
 
-def _norm(raw: float, lo: float, span: float | None, minimize: bool, need: bool) -> float:
+def normalised(raw: float, lo: float, span: float | None, minimize: bool, need: bool) -> float:
     """A heuristic's raw value on its reference scale, clamped to [0, 1] and
-    flipped where it minimises; with no spread, the middle."""
+    flipped where it minimises; with no spread, the middle. Monotone in the
+    raw value, so the search's bound reads it at the end of an interval."""
     if span is None:
         return 1.0 if need else 0.5    # a need nothing here can miss costs nothing
     norm = (raw - lo) / span
@@ -141,10 +150,22 @@ class Contribution(TypedDict):
 type SixKey = tuple[int, ...]
 
 
+# a role's place in the seat order a six is scored in
+ROLE_ORDER = {role: i for i, role in enumerate(ROLES)}
+
+
+def seat_order(h: Hero) -> tuple[int, int]:
+    """A pick's seat in the order every six is scored in: by role, then by
+    hero id."""
+    return ROLE_ORDER.get(h.role, len(ROLES)), h.id
+
+
 class Candidate:
-    """One six on its way through the search: its heroes, and once prepared
-    and scored its namespace, limit breaches, raw values, base terms, score,
-    tie-break and breakdown. A slim one keeps only the verdict."""
+    """One six on its way through the search: its heroes in seat order, and
+    once prepared and scored its namespace, limit breaches, raw values, base
+    terms, score, tie-break and breakdown. A slim one keeps only the
+    verdict. The seat order makes a six's score a function of its heroes:
+    sums over the picks, pairs and the first of equals all read one order."""
 
     __slots__ = (
         "contributions",
@@ -160,7 +181,7 @@ class Candidate:
     )
 
     def __init__(self, heroes: Iterable[Hero]) -> None:
-        self.heroes = tuple(heroes)
+        self.heroes = tuple(sorted(heroes, key=seat_order))
         self.key: SixKey = tuple(sorted(h.id for h in self.heroes))
         self.ns: Namespace | None = None
         self.scope: Scope | None = None
@@ -176,6 +197,19 @@ class Candidate:
     @property
     def names(self) -> list[str]:
         return [h.name for h in self.heroes]
+
+
+def quantized(score: float) -> float:
+    """A score as sixes rank by it: rounded to SCORE_PLACES decimal places.
+    Rounding is monotone, so a bound on a score bounds its rounding too."""
+    return round(score, SCORE_PLACES)
+
+
+def rank_key(c: Candidate) -> tuple[float, float, list[str]]:
+    """The order sixes rank in, best first: the quantized score, then the
+    tie-break, then the names sorted - a property of the hero set, so the
+    order is total and a function of the compositions alone."""
+    return (-quantized(c.score), -c.tiebreak, sorted(c.names))
 
 
 def _score_base(base: Base, cand: Candidate, out: list[Contribution] | None) -> float:
@@ -225,11 +259,13 @@ class Objective:
             "world": compute.world_metrics(world)}
         self.bounds: Bounds = {}             # heuristic id -> (min, max)
         self._norms: list[Norm] = []
-        # each heuristic paired with its gate - True or False where `when` is
-        # settled for the whole board, None where the candidate decides it -
-        # and with the slot it shares with every strategy guarded the same way;
-        # a limit with its require:, which every limit has and which always holds
+        # each strategy's gate - True or False where `when` is settled for the
+        # whole board, None where the candidate decides it; each heuristic
+        # paired with its gate and with the slot it shares with every strategy
+        # guarded the same way; a limit with its require:, which every limit
+        # has and which always holds
         gates, slots, self.gate_slots = self._gates()
+        self.gates = gates
         self._limits: list[tuple[Strategy, Expr]] = [
             (s, s.require) for s in self.limits if s.require is not None]
         self._scored = [(r, gates[r.id], slots.get(r.id, 0)) for r in self.scored]
@@ -329,10 +365,15 @@ class Objective:
 
     def adopt_bounds(self, bounds: Mapping[str, Interval]) -> None:
         """Each heuristic's low and high on this board, frozen here or
-        elsewhere: inference.scale draws them, and a board split across
-        processes merges its slices' lows and highs before any scores."""
+        elsewhere: inference.scale draws them, and a fill takes its seat's."""
         self.bounds = dict(bounds)
         self._freeze_norms()
+
+    @property
+    def norms(self) -> list[Norm]:
+        """Each heuristic's frozen scale, in catalog order: what the score
+        normalises by, and what the search's bound (inference.bounds) reads."""
+        return self._norms
 
     def _freeze_norms(self) -> None:
         """One Norm per heuristic for the scoring loop. A spread of None -
@@ -399,7 +440,7 @@ class Objective:
                         "applies": False, "raw": None, "norm": 0.0, "weighted": 0.0,
                         "metric": g.metric, "when": g.when.source if g.when else None})
                 continue
-            norm = _norm(raw, lo, span, minimize, need)
+            norm = normalised(raw, lo, span, minimize, need)
             weighted = weight * (norm - 1.0) if need else weight * norm
             total += weighted
             if out is not None:

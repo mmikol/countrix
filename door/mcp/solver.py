@@ -17,15 +17,12 @@ from inference.result import Result
 
 COMPACT_TERMS = 15        # the heaviest terms a compact reply carries
 
-# the search knobs as the tools describe them; clamp_search holds their rule
+# the search's one knob as the tools describe it; clamp_top holds its rule
 TOP: Property = {
     "type": "integer",
-    "description": "alternatives to return, 1 to %d (default %d)"
+    "description": "alternatives to return, 1 to %d (default %d): the next best sixes"
+                   " of the whole legal space, in order"
                    % (engine.TOP_CEILING, engine.TOP_DEFAULT)}
-POOL: Property = {
-    "type": "integer",
-    "description": "candidates per role the search keeps, 2 to %d (default %d)"
-                   % (engine.POOL_CEILING, engine.POOL_DEFAULT)}
 
 
 class WeightedTerm(TypedDict):
@@ -56,13 +53,13 @@ class CompactInfer(TypedDict):
     " the default engine (win rates, synergies, counters) and the"
     " markdown strategies in inference/strategies/ on top (players assumed"
     " to play optimally). Locked blue picks are kept; the rest is"
-    " searched, and picks no six completes within the playbook's limits"
-    " are refused as not allowed, the limits named. Returns the comp,"
+    " searched exactly - every legal six of the released, unbanned roster,"
+    " by branch and bound - and picks no six completes within the playbook's"
+    " limits are refused as not allowed, the limits named. Returns the comp,"
     " per-pick reasons with fact citations, the score breakdown per engine"
     " term and strategy, and alternatives.",
     {
         "top": TOP,
-        "pool": POOL,
         "compact": {"type": "boolean",
                     "description": "true: a reply small enough to carry under a"
                                    " playbook of hundreds. The structured payload"
@@ -73,12 +70,10 @@ class CompactInfer(TypedDict):
                                    " (the %d heaviest terms, each an id and its"
                                    " weighted value)" % COMPACT_TERMS}})
 def infer(
-        ctx: Context, draft: Draft, top: int | None = None, pool: int | None = None,
-        compact: bool = False) -> ToolReply:
+        ctx: Context, draft: Draft, top: int | None = None, compact: bool = False) -> ToolReply:
     with ctx.connect() as cx:
         world = tables.load(cx)
-    pool, top = engine.clamp_search(pool, top)
-    result = engine.infer(world, draft, pool_size=pool, top=top)
+    result = engine.infer(world, draft, top=engine.clamp_top(top))
     if compact:
         return ToolReply(*_compact(result))
     return ToolReply(result.rendered(), result.to_dict())
@@ -140,7 +135,6 @@ def reach_tool(ctx: Context, hero: str) -> ToolReply:   # _tool: inference.reach
     " from the data alone (a two-two-two from the map's pick rates and the"
     " wiki's synergies, past the bans; static for the board, no strategy read).",
     {
-        "pool": POOL,
         "weights": {"type": "object",
                     "description": "{heuristic id: 0..10} - weights to score this"
                                    " board under instead of the files' (the playbook"
@@ -148,11 +142,9 @@ def reach_tool(ctx: Context, hero: str) -> ToolReply:   # _tool: inference.reach
                                    " meta.md's meta, which scales the default engine"
                                    " (the Meta slider); the files are untouched"}})
 def board(
-        ctx: Context, draft: Draft, pool: int | None = None,
-        weights: Mapping[str, object] | None = None) -> ToolReply:
+        ctx: Context, draft: Draft, weights: Mapping[str, object] | None = None) -> ToolReply:
     with ctx.connect() as cx:
         world = tables.load(cx)
-    pool, _ = engine.clamp_search(pool)
-    brief = engine.Brief(pool_size=pool, weights=catalog.parse_weights(weights or {}))
+    brief = engine.Brief(weights=catalog.parse_weights(weights or {}))
     b = engine.board(world, draft, brief=brief)
     return ToolReply(b.rendered(), b.to_dict())

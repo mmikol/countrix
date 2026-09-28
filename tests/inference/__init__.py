@@ -88,12 +88,11 @@ def in_force() -> tuple[str, base.BaseStamp | None]:
 def evaluated(
         world: World, draft: Draft, *, catalog: list[Strategy],
         base: base.BaseWeights = DEFAULT) -> Result:
-    """Blue's full six (`draft.blue`) scored and ranked against the field its
-    seat would search, as the board scores its current comp, without the
-    board's other seats."""
-    return engine._evaluated(world, draft, catalog=catalog, base=base,
-                             pool_size=engine.POOL_DEFAULT, seat="blue", kind="evaluate",
-                             swept=None)
+    """Blue's full six (`draft.blue`) scored and ranked against every legal
+    six, as the board scores its current comp, without the board's other
+    seats."""
+    return engine._evaluated(world, draft, catalog=catalog, base=base, seat="blue",
+                             kind="evaluate", solved=None)
 
 
 def timeless(payload: dict[str, Any]) -> dict[str, Any]:

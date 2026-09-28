@@ -1,19 +1,22 @@
 """The default engine: each of its three terms worked by hand, the pick
 rate's pull toward a coin flip, the other side it reads - the likely six
-until that side locks a pick, from either seat - the sliced board against
-the one-process board, the facts its terms cite, and a playbook of
+until that side locks a pick, from either seat - a board the same under
+any hash seed, the facts its terms cite, and a playbook of
 assumptions alone scored by it, its best six the enumerated maximum. Every
 board is the synthetic World's: no database."""
 
 import copy
 import dataclasses
 import itertools
+import json
 import os
 import shutil
-from concurrent.futures import Future
+import subprocess
+import sys
 
 import pytest
 
+from db import ROOT
 from facts import compute, counters
 from facts.draft import Draft
 from facts.factset import FactSet
@@ -21,7 +24,6 @@ from facts.records import DerivedEdge, Fired, MapRate
 from inference import base, catalog, engine, scoring
 from inference.base import OFF
 from tests.inference import ASSUMPTIONS_ONLY, BRIEF, DEFAULT, FIXTURE_PLAYBOOK, timeless
-from tests.inference.tracing import TRACED
 
 SIX = ("Anvil", "Kite", "Rook", "Needle", "Balm", "Tansy")
 
@@ -181,49 +183,46 @@ def test_each_seat_reads_the_other_sides_likely_six_or_its_picks(synthetic_world
     assert c["likely"] and sorted(c["against"]) == sorted(likely)
 
 
-class Inline:
-    """An executor that runs each task as it is submitted, in this process:
-    the pool's slices, rounds and merges without its processes."""
+# red revealed and one blue pick locked on a sided map: every seat of the board solves
+TRACED = Draft("Harbor Gate", ("Anvil",), ("Balm",), side="attack")
 
-    def submit(self, fn, *args, **kwargs):
-        future = Future()
-        future.set_result(fn(*args, **kwargs))
-        return future
+# one board solved in a fresh process, its payload printed as JSON less the seconds
+ONE_BOARD = """
+import json, sys
+from facts.draft import Draft
+from inference import catalog, engine
+from tests import synthetic
+from tests.inference import timeless
+map_name, side, red, blue = json.loads(sys.argv[1])
+board = engine.board(synthetic.world(), Draft(map_name, tuple(red), tuple(blue), side=side),
+                     catalog=catalog.load(), brief=engine.Brief())
+print(json.dumps(timeless(board.to_dict()), sort_keys=True, default=str))
+"""
 
 
 @pytest.mark.parametrize("playbook", ["reference", "assumptions"])
-def test_the_sliced_board_agrees_with_one_process(monkeypatch, synthetic_world, tmp_path,
-                                                  playbook):
-    """Every search cut into four slices and run inline - the bounds widened,
-    the standings summed, the field ranked from the merged verdicts - is the
-    Board one process solves seat by seat, bit for bit, with the default
-    engine on: under the reference playbook and under assumptions alone,
-    where the engine is all that scores, with red revealed and with red's
-    likely six in its place, and with a full six on either side, which the
-    current comp and the countered case rank against the field the split
-    swept. The playbook is read from its folder, as a worker reads it."""
-    from inference import parallel, supersede
+def test_a_board_is_the_same_under_any_hash_seed(tmp_path, playbook):
+    """The search is exact and ranks by a total order, so nothing a set or a
+    dict iterates in reaches the answer: each board, solved in two fresh
+    processes whose string hashes differ, is the same payload, the seconds
+    aside - with the default engine on, under the reference playbook and
+    under assumptions alone, with red revealed and red's likely six in its
+    place, and a full six on either side."""
     folder = FIXTURE_PLAYBOOK
     if playbook == "assumptions":
         folder = str(tmp_path)
         for name in [s.id + ".md" for s in ASSUMPTIONS_ONLY] + [catalog.META_FILE]:
             shutil.copy(os.path.join(FIXTURE_PLAYBOOK, name), tmp_path)
-    monkeypatch.setenv("COUNTRIX_STRATEGIES", folder)
-    in_force = catalog.load()
-    brief = engine.Brief()
-    weights = engine.weights_in_force(brief.base)
-    assert weights == DEFAULT
     for draft in (Draft("Harbor Gate", side="attack"), TRACED,
                   Draft("Harbor Gate", ("Mortar",), SIX, side="attack"),
                   Draft("Harbor Gate", SIX, side="attack")):
-        sliced = engine._board_once(
-            synthetic_world, draft, catalog=in_force, brief=brief, base=weights,
-            workers=parallel.Workers(Inline(), 4), watch=supersede.Watch(None))
-        alone = engine._board_once(
-            synthetic_world, draft, catalog=in_force, brief=brief, base=weights, workers=None,
-            watch=supersede.Watch(None))
-        assert any(c["kind"] == "base" for c in sliced.blue.contributions)
-        assert timeless(sliced.to_dict()) == timeless(alone.to_dict()), draft
+        board = json.dumps([draft.map_name, draft.side, draft.red, draft.blue])
+        payloads = [subprocess.run(
+            [sys.executable, "-c", ONE_BOARD, board], cwd=ROOT, capture_output=True, text=True,
+            check=True, env={**os.environ, "PYTHONHASHSEED": seed,
+                             "COUNTRIX_STRATEGIES": folder}).stdout
+            for seed in ("1", "2")]
+        assert payloads[0] == payloads[1] and '"blue": {' in payloads[0], draft
 
 
 def test_every_base_term_cites_a_fact_the_result_carries(synthetic_world):
@@ -390,7 +389,6 @@ def test_a_board_that_names_no_weights_reads_the_playbooks_meta_file(
     meta.write_text(meta.read_text(encoding="utf-8").replace("meta: 1\n", "meta: 0.5\n"),
                     encoding="utf-8")
     monkeypatch.setenv("COUNTRIX_STRATEGIES", str(tmp_path))
-    monkeypatch.setenv("COUNTRIX_PARALLEL", "0")
     halved = dataclasses.replace(DEFAULT, meta=0.5)
     assert catalog.engine_weights() == halved == engine.weights_in_force(None)
     b = engine.board(synthetic_world, Draft("Harbor Gate", ("Mortar",), side="attack"))

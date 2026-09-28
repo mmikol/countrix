@@ -167,10 +167,8 @@ def view_math() -> str:
         "SYNERGY_PULL": compute.SYNERGY_PULL,
         "REFERENCE_SIZE": format(scale.REFERENCE_SIZE, ","),
         "NEED_BUDGET": scoring.NEED_BUDGET,
-        "PARTNER_POINTS": solver.PARTNER_POINTS,
-        "SEEDS": solver.SEEDS,
-        "SHAPE_REACH": solver.SHAPE_REACH,
-        "RESTARTS": solver.RESTARTS,
+        "SCORE_PLACES": scoring.SCORE_PLACES,
+        "RANK_CAP": solver.RANK_CAP,
         "FORMATION_RADIUS": scalars.FORMATION_RADIUS,
         "TEAMMATES": scalars.TEAMMATES,
         "TEAMMATES_BUT_ONE": scalars.TEAMMATES - 1})
