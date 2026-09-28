@@ -121,10 +121,10 @@ shares' sum, a split of 100, the share in the tooltip; with one seat
 scored, its share alone; with neither, the engine's verdict sits under
 them. Not a fitted probability. The default engine scores every seat, so
 the page's boards always carry a share; a seat reads *unscored*, picks or
-not, the engine's reason in the tooltips, only where a caller turns the
-engine off and the playbook holds no heuristic, or none applies to this
-board yet, or where the optimal scores no higher than the seat's floor. A
-seat whose picks are not allowed reads its badge's *not allowed*.
+not, the engine's reason in the tooltips, only where the optimal scores no
+higher than the seat's floor, as every six does when a caller turns the
+engine off under a playbook that scores nothing. A seat whose picks are
+not allowed reads its badge's *not allowed*.
 
 **The suggestions.** Blue's empty slots carry the fill - the best six that
 keeps your locked picks, the optimal six before any pick - each a click

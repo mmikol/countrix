@@ -56,15 +56,13 @@ class Admission:
         with self._room:
             while self._held and self._held + sixes > self.budget:
                 if superseded():
-                    raise supersede.Superseded(
-                        "a newer board from the same client superseded this one")
+                    raise supersede.Superseded(supersede.MESSAGE)
                 left = deadline - time.monotonic()
                 if left <= 0:
                     raise BusyError("the solver is busy with other boards; ask again")
                 self._room.wait(min(left, ADMIT_POLL))
             if superseded():             # room came, but a newer board took the lane first
-                raise supersede.Superseded(
-                    "a newer board from the same client superseded this one")
+                raise supersede.Superseded(supersede.MESSAGE)
             self._held += sixes
 
     @contextlib.contextmanager

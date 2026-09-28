@@ -99,7 +99,7 @@ question is allowed.
      a trait paid by several rules wants a small weight, not another 1.
    - **constraint**: a `require` that always holds ("at most two tanks"
      is `team.tanks <= 2`), and nothing weighted - no `when`, `bonus`,
-     `penalty`, `metric`, `direction`, `weight` or `confidence`. `params:`
+     `penalty`, `metric`, `direction` or `weight`. `params:`
      may hold its threshold ("never more than three supports" is
      `team.supports <= params.MAX_SUPPORTS`, `MAX_SUPPORTS: 3`). A rule
      that should cost rather than forbid is not a constraint: it is a

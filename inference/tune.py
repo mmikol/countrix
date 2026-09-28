@@ -14,8 +14,8 @@ tools mirror it into the database.
     complete("a-draft", {"metric": "team.dps_floor", "direction": "maximize",
                          "weight": 2}, "inferred from the prose")
 
-Fields: kind, category, metric, direction, weight, confidence, when,
-require, bonus, penalty (strategy.TUNABLE) and params.NAME. Every
+Fields: kind, category, metric, direction, weight, when, require,
+bonus, penalty (strategy.TUNABLE) and params.NAME. Every
 value is checked by strategy.checked_value, the rule the loader reads a
 file by, before any file is touched. Each of the three takes a reason and
 writes in one order (_commit): the edited (or new) file is loaded through
@@ -146,7 +146,7 @@ def edit_frontmatter(text: str, field: str, value: LineValue) -> tuple[str, str 
     return "---" + "\n".join(lines) + rest, old
 
 
-def validate(directory: str, strategy_id: str, new_text: str) -> list[Strategy]:
+def _trial_load(directory: str, strategy_id: str, new_text: str) -> list[Strategy]:
     """Load a copy of the catalog with this one file replaced; raise on error."""
     tmp = tempfile.mkdtemp(prefix="tune-")
     try:
@@ -246,7 +246,7 @@ def _commit(directory: str, sid: str, text: str,
     break str.splitlines() knows included - so neither opens a second log
     line; who asked is cut to MAX_BY characters, and a blank one is
     BY_SESSION."""
-    loaded = validate(directory, sid, text)
+    loaded = _trial_load(directory, sid, text)
     strategy = next((s for s in loaded if s.id == sid), None)
     if strategy is None:
         raise TuneError("%s.md lives beside the playbook and is not a strategy" % sid)

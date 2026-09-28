@@ -52,7 +52,6 @@ function why(c) {
 function barRow(c, mx) {
   var w = Math.abs(c.weighted || 0) / mx * 100;
   var detail = why(c);
-  if (c.confidence) detail += ' Scaled by ' + c.confidence + (typeof c.confidence_raw === 'number' ? ' = ' + (+c.confidence_raw).toFixed(2) : '') + '.';
   return "<div class='bar" + ((c.weighted || 0) < 0 ? ' neg' : '') + (c.applies === false ? ' off' : '') +
     "' data-id='" + esc(c.id) + "' title=\"" + esc(detail + (c.text ? '\n' + c.text : '')) + "\"><span class='lbl'>" +
     esc(c.id) + (c.fact ? " <span class='ev'>" + c.fact + '</span>' : '') +

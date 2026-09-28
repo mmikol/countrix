@@ -1,8 +1,7 @@
 """The search on a board: the enumerated maximum it must reach, shape
 limits, a charge for a rule broken that never prunes, a need and its budget,
 partners that only pay together, the scale a ban leaves alone, the ranking
-order and its tie-breaks, a rule scaled by the metric it names and the
-bounds its slices merge into, and the reference sample of a small roster.
+order and its tie-breaks, and the reference sample of a small roster.
 Every board is the synthetic World's: no database."""
 
 import copy
@@ -15,7 +14,7 @@ import pytest
 
 from db import Refusal
 from db.data.normalizer import name_key
-from facts.draft import Draft, board_side
+from facts.draft import Draft
 from facts.records import Synergy
 from facts.team import team_metrics
 from inference import catalog
@@ -64,7 +63,7 @@ def test_the_search_reaches_the_enumerated_maximum(synthetic_world, catalog_copy
     with open(os.path.join(catalog_copy, "role-queue.md"), "w", encoding="utf-8") as handle:
         handle.write(ROLE_QUEUE)
     fix = catalog.load(catalog_copy)
-    assert catalog.has_scoring_terms(fix)
+    assert any(s.weighs for s in fix)
 
     def searched(world, draft):
         m, red, locked, banned = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
@@ -206,8 +205,9 @@ def test_partners_that_only_pay_together_are_brought_in_together(synthetic_world
     """One slot at a time, a pair worth nothing apart is never met: each partner
     alone only costs. The playbook here pays one synergy pair, the two
     lowest-standing heroes of their roles, outside the pools. The best six holds
-    both, with the locked pick, the ban and the shape kept; the pair step off,
-    the search stops short of it."""
+    both, with the locked pick, the ban and the shape kept. The pair step off,
+    the restarts reach it, and the two-seat swap alone does too; with all
+    three off, the search stops short of it."""
     from inference import solver as solver_module
     world = synthetic_world
     # four a role are too few for a pool to leave anyone out once a pair's synergy
@@ -252,13 +252,19 @@ def test_partners_that_only_pay_together_are_brought_in_together(synthetic_world
         assert {a.name, b.name, "Anvil"} <= set(top.names) and "Needle" not in top.names
         assert sorted(h.role for h in top.heroes) == ["damage"] * 2 + ["support"] * 2 + ["tank"] * 2
         assert any(c["id"] == "together" and c["raw"] == 1 for c in top.contributions)
-        # with the pair step off, the two-at-once swap still reaches them: that is
-        # what it is for. Only with both off is a pair outside the pool unreachable,
-        # because a one-slot climb meets each partner alone and neither pays alone.
+        # with the pair step off, the restarts reach them first
         single = solver_on(paired)
         single._pairs = list                   # the pair step off
         pair_off = single.solve(top=1).ranked[0]
         assert {a.name, b.name} <= set(pair_off.names)
+
+        # and with the restarts off too, the two-at-once swap reaches them alone:
+        # that is what it is for
+        swap_only = solver_on(paired)
+        swap_only._pairs = list                # the pair step off
+        swap_only._restarts = lambda leader, roster, known, n=0: leader
+        swapped = swap_only.solve(top=1).ranked[0]
+        assert {a.name, b.name} <= set(swapped.names)
 
         # a pair outside the pool is unreachable only when all three are off: the
         # restarts can land on both partners at once, as can the two-at-once swap.
@@ -282,7 +288,7 @@ def test_a_ban_does_not_rescale_the_board(synthetic_world):
     from inference import solver as solver_module
     world = synthetic_world
     catalog = catalog_module.load(FIXTURE_PLAYBOOK)
-    assert catalog_module.has_scoring_terms(catalog)
+    assert any(s.weighs for s in catalog)
     red = ["Mortar", "Gale"]
     six = ["Anvil", "Kite", "Rook", "Needle", "Balm", "Tansy"]
     absent = [
@@ -317,49 +323,6 @@ def test_the_order_of_a_six_does_not_decide_the_ranking(synthetic_world):
     assert solver_module.Solver._rank_key(one) == solver_module.Solver._rank_key(other)
 
 
-def test_a_rule_scales_by_the_metric_it_names(synthetic_world, tmp_path):
-    """`confidence:` is an engine field, not a rule: a heuristic names any numeric
-    metric and its weight rides on that metric's place between the low and high of
-    whatever population the metric actually varies over. Nothing in the code knows
-    which metric any rule names. The rule is written here, beside the reference
-    playbook, so the test holds whatever the shipped playbook carries."""
-    from inference import engine, scoring
-    from inference import solver as solver_module
-    world = synthetic_world
-    # Salt Flats barely leans: poke over dive by a tenth of a point
-    world.map("Salt Flats").styles = {"poke": 1.0, "dive": 0.9, "brawl": -1.0}
-    shutil.copytree(FIXTURE_PLAYBOOK, tmp_path, dirs_exist_ok=True)
-    (tmp_path / "fit-the-map-style.md").write_text(
-        "---\nname: Pick into what the map rewards\nkind: heuristic\ncategory: map\n"
-        "metric: team.style_fit\ndirection: maximize\nweight: 2.5\nwhen: map.known == 1\n"
-        "confidence: map.style_margin\n---\n# Pick into what the map rewards\n\n"
-        "The share of the six tagged with the style the map rewards, weighed by how "
-        "hard the map leans.\n", encoding="utf-8")
-    playbook = catalog.load(str(tmp_path))
-    scaled = [s for s in playbook if getattr(s, "confidence", None)]
-    assert [s.id for s in scaled] == ["fit-the-map-style"]
-
-    def points(map_name, strategy_id):
-        m, red, _, _ = world.resolve(map_name, ["Anvil", "Gale"], [], [])
-        solver = solver_module.Solver(world, m, red=red, locked=[],
-                                      side=board_side(m, "attack"), catalog=playbook,
-                                      base=OFF)
-        solver.freeze_bounds()
-        best = engine.infer(world, Draft(map_name, ("Anvil", "Gale"),
-                                         side=board_side(m, "attack")),
-                            top=1, catalog=playbook, base=OFF)
-        cand = solver.prepare(scoring.Candidate([world.hero(n) for n in best.blue]))
-        solver.score(cand, detail=True)
-        return next(c for c in cand.contributions if c["id"] == strategy_id)
-
-    # the map that leans hardest pays the map-style rule; the one that barely leans
-    # pays almost none of it, and neither number is written anywhere
-    sure = points("Ember Ruins", "fit-the-map-style")
-    unsure = points("Salt Flats", "fit-the-map-style")
-    assert sure["confidence_raw"] > unsure["confidence_raw"]
-    assert sure["weighted"] > unsure["weighted"] * 5
-
-
 def test_style_ties_break_by_name_so_hash_order_cannot_reach_the_answer(synthetic_world):
     """A set of style names iterates in an order that changes with the process's
     hash seed; the tie-breaks must not depend on it - two views of the same
@@ -391,57 +354,6 @@ def test_style_ties_break_by_name_so_hash_order_cannot_reach_the_answer(syntheti
     once = engine.infer(world, Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm",)), catalog=fix)
     twice = engine.infer(world, Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm",)), catalog=fix)
     assert once.blue == twice.blue and abs(once.score - twice.score) < 1e-12
-
-
-def test_a_board_confidence_reads_the_boards_own_ban_count(synthetic_world, tmp_path):
-    """A confidence metric of the board is read over every map, and every map
-    reads it with this board's bans: map.bans is the count made in this match,
-    whatever map the population is drawn from."""
-    from inference import scoring
-    from inference import solver as solver_module
-    world = synthetic_world
-    shutil.copytree(FIXTURE_PLAYBOOK, tmp_path, dirs_exist_ok=True)
-    (tmp_path / "scale-by-the-bans.md").write_text(
-        "---\nname: Pick into what the map rewards once the bans are in\nkind: heuristic\n"
-        "category: map\nmetric: team.style_fit\ndirection: maximize\nweight: 2.5\n"
-        "when: map.known == 1\nconfidence: map.bans\n---\n"
-        "# Pick into what the map rewards once the bans are in\n\n"
-        "The share of the six tagged with the style the map rewards, weighed by how "
-        "many bans are made.\n", encoding="utf-8")
-    playbook = catalog.load(str(tmp_path))
-    m, red, _, banned = world.resolve("Harbor Gate", ["Mortar", "Gale"], [],
-                                      ["Needle", "Rook"])
-    solver = solver_module.Solver(world, m, red=red, locked=[], banned=banned, side="attack",
-                                  catalog=playbook, base=DEFAULT)
-    solver.freeze_bounds()
-    assert solver.bounds["scale-by-the-bans" + scoring.CONFIDENCE_KEY] == (2.0, 2.0)
-
-
-def test_merged_slices_bound_a_confidence_metric_as_one_process_does(synthetic_world, tmp_path):
-    """A slice in which no six values a heuristic leaves out its confidence
-    bounds as well as its own, so merging it adds nothing: a confidence metric
-    below zero on every six that values it keeps its high below zero, as the
-    bounds drawn in one process do."""
-    from inference import parallel, scale, scoring
-    with open(os.path.join(FIXTURE_PLAYBOOK, "meta-strength.md"), encoding="utf-8") as handle:
-        text = handle.read()
-    (tmp_path / "meta-strength.md").write_text(
-        text.replace("weight: 1\n", "weight: 1\nconfidence: team.pick_mass\n", 1),
-        encoding="utf-8")
-    playbook = catalog.load(str(tmp_path))
-    assert [h.confidence for h in playbook] == ["team.pick_mass"]
-    objective = scoring.Objective(synthetic_world, None, red=[], catalog=playbook, base=DEFAULT)
-    valued = []
-    for raw, sure in ((0.4, -2.0), (0.7, -1.0)):
-        cand = scoring.Candidate([])
-        cand.raw, cand.confidence = [raw], [sure]
-        valued.append(cand)
-    unvalued = scoring.Candidate([])
-    unvalued.raw, unvalued.confidence = [None], [None]
-    merged = parallel._widen(parallel._widen({}, scale._bounds_over(objective, valued)),
-                             scale._bounds_over(objective, [unvalued]))
-    assert merged == scale._bounds_over(objective, [*valued, unvalued])
-    assert merged["meta-strength" + scoring.CONFIDENCE_KEY] == scoring.Interval(-2.0, -1.0)
 
 
 def test_a_roster_with_fewer_legal_sixes_than_the_reference_is_sampled_whole(synthetic_world):

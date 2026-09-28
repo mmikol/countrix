@@ -3,8 +3,7 @@ each file parsed (inference.frontmatter) and checked (inference.strategy)
 into a Strategy, the whole ordered, mirrored into the `strategies` table
 under its own `sources` row (AUTHORED) and written into
 docs/inference.md; and what reads the playbook as a whole - the weights
-one board overrides, whether anything scores, the count per kind, the
-playbook's name and digest.
+one board overrides, the count per kind, the playbook's name and digest.
 """
 
 import copy
@@ -23,7 +22,6 @@ from inference.frontmatter import FrontmatterError, parse_frontmatter
 from inference.strategy import (
     FORMS,
     KINDS,
-    WEIGHED,
     WEIGHT_RANGE,
     CatalogError,
     Strategy,
@@ -51,24 +49,20 @@ def strategies_dir() -> str:
 
 DOCS_PATH = os.path.join(ROOT, "docs", "inference.md")
 NOT_STRATEGIES = ("README.md", "tuning-log.md")     # markdown that lives beside the files
-KIND_ORDER = {k: i for i, k in enumerate(KINDS)}
 
 
-def _read(directory: str, name: str, ids: set[str]) -> Strategy:
+def _read(directory: str, name: str) -> Strategy:
     """One strategy file, validated; any failure is a CatalogError naming the
     file."""
     sid = name[:-3]                       # the id IS the filename; nothing overrides it
     try:
         if not ID_RE.fullmatch(sid):
             raise CatalogError("%s: the filename must be lowercase-kebab" % name)
-        path = os.path.join(directory, name)
-        with open(path, encoding="utf-8") as handle:
+        with open(os.path.join(directory, name), encoding="utf-8") as handle:
             parsed = parse_frontmatter(handle.read())
         if "id" in parsed.meta and str(parsed.meta["id"]) != sid:
             raise CatalogError("%s: id: is the filename; drop it" % name)
-        if sid in ids:
-            raise CatalogError("%s: duplicate id %r" % (name, sid))
-        return Strategy(sid, parsed.meta, body=parsed.body, path=path)
+        return Strategy(sid, parsed.meta, body=parsed.body)
     except (CatalogError, FrontmatterError) as error:
         text = str(error)
         raise CatalogError(
@@ -92,15 +86,10 @@ def load(directory: str | None = None) -> list[Strategy]:
     heuristics (on a metric, then scored), then assumptions; drafts sit last
     within their kind."""
     directory = directory or strategies_dir()
-    out: list[Strategy] = []
-    ids: set[str] = set()
-    for name in strategy_files(directory):
-        strategy = _read(directory, name, ids)
-        ids.add(strategy.id)
-        out.append(strategy)
+    out = [_read(directory, name) for name in strategy_files(directory)]
     if not out:
         raise CatalogError("no strategies in %s" % directory)
-    out.sort(key=lambda s: (KIND_ORDER[s.kind], FORMS.index(s.form), s.category, s.id))
+    out.sort(key=lambda s: (KINDS.index(s.kind), FORMS.index(s.form), s.category, s.id))
     return out
 
 
@@ -150,13 +139,6 @@ def weighted(catalog: list[Strategy], weights: Mapping[str, float] | None) -> li
     return out
 
 
-def has_scoring_terms(catalog: Iterable[Strategy]) -> bool:
-    """Whether the playbook has any term that scores: a heuristic, on a
-    metric or scored. A playbook of limits and prose alone ties every legal
-    six at zero - the board then says "unscored" rather than 100 / 100."""
-    return any(s.form in WEIGHED for s in catalog)
-
-
 class KindCounts(TypedDict):
     """Strategies per kind, in KINDS order."""
     constraint: int
@@ -199,11 +181,9 @@ class MirrorSummary(KindCounts):
     pending: NotRequired[int]
 
 
-def mirror(
-        cx: psycopg.Connection, catalog: Sequence[Strategy],
-        directory: str | None = None) -> MirrorSummary:
+def mirror(cx: psycopg.Connection, catalog: Sequence[Strategy]) -> MirrorSummary:
     """Reload the strategies table from the files (whole truth), each row
-    naming the playbook it came from."""
+    naming the playbook in force."""
     cursor = cx.cursor()
     source_id = register_source(cursor, AUTHORED, now())
     cursor.execute("DELETE FROM strategies")
@@ -215,7 +195,7 @@ def mirror(
             (
                 s.id, s.name, s.kind, s.category, s.direction, s.metric,
                 s.weight if s.weighs else None, s.expressions or None,
-                _params_line(s) or None, s.body, playbook_name(directory), source_id))
+                _params_line(s) or None, s.body, playbook_name(), source_id))
     cx.commit()
     return MirrorSummary(**counts(catalog), total=len(catalog), tables=["strategies"])
 

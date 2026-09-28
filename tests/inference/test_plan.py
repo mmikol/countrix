@@ -5,7 +5,6 @@ stages it names, and nothing the board contradicts. Every board is the
 synthetic World's: no database."""
 
 import copy
-import os
 
 from facts import board_facts
 from facts.draft import Draft
@@ -50,7 +49,8 @@ def test_the_badge_is_worded_on_the_server():
     waiting = plan.momentum(plan.Seats(comp(["a"], 0, 0), comp([], 0, 0, seat="red")))
     for badge in waiting["badges"].values():                # picks or not
         assert badge["label"] == "unscored"
-        assert badge["tip"] == "unscored on this board - no scoring strategy applies yet"
+        assert badge["tip"] == ("unscored on this board - the optimal six scores 0.00, not above"
+                                " the floor of 0.00, so no comp is a share of it")
     empty = plan.momentum(plan.Seats(comp([], 0, 10), comp(["b"] * 6, 5, 10, seat="red")))
     assert empty["badges"]["blue"] == {
         "label": "100 / 100",
@@ -112,7 +112,7 @@ def test_a_style_the_plan_has_no_words_for_still_reads_as_advice(synthetic_world
     from inference import plan
     m = copy.copy(synthetic_world.map("Harbor Gate"))
     m.styles = {"flank": 1.0}
-    assert plan._style_read(m, "", [], None) == "The map rewards flank: play to its picks."
+    assert plan._style_read(m, "", []) == "The map rewards flank: play to its picks."
 
 
 def test_the_plan_names_the_terrain_the_facts_hold_and_no_other(
@@ -253,34 +253,6 @@ def test_the_plan_says_nothing_the_board_contradicts(synthetic_world):
     assert [world.hero(n) for n in divers[:len(alone)]] == sorted(
         alone, key=lambda h: -(h.map_win(m.id) or h.win or 0.0))[:plan.FAMILY_SIZE]
     assert "Tanks: %s." % ", ".join(plan._family(world, m, "poke", "tank", [])) in said
-
-
-def test_a_playbook_that_scores_nothing_gets_a_plan_that_claims_no_counter(
-        synthetic_world, tmp_path):
-    """With nothing scored, the default engine off, the six is only the highest
-    win rates the search found, so the plan says that: no counter to their
-    likely six, nothing built to fit together, and the style worded from the
-    roles the six actually holds - which a support-less six would not be told to lean on."""
-    import shutil
-
-    from inference import engine, plan
-    shutil.copy(os.path.join(FIXTURE_PLAYBOOK, "open-queue-tanks.md"), tmp_path)
-    limit_only = catalog.load(str(tmp_path))
-    assert not catalog.has_scoring_terms(limit_only)
-    for draft in (Draft(), Draft("Harbor Gate", side="attack")):
-        b = engine.board(synthetic_world, draft, catalog=limit_only, brief=engine.Brief(base=OFF))
-        assert "the six counters" not in b.plan, draft
-        assert "built to fit together" not in b.plan, draft
-        assert "the six is the highest win-rate six the search found" in b.plan, draft
-        assert "No red pick yet: their likely six is " in b.plan, draft
-        roles = [p["role"] for p in b.blue.picks]
-        for role in ("tank", "damage", "support"):
-            n = roles.count(role)
-            assert ("%d %s" % (n, role) if n else "no %s" % role) in b.plan, (draft, role)
-    lacking = {"tank": 2, "damage": 4, "support": 0}
-    assert plan._roles_in_words(lacking) == "2 tanks, 4 damage and no support"
-    assert "supports who can follow" not in plan._advice("dive", lacking)
-    assert "no support can follow" in plan._advice("dive", lacking)
 
 
 def test_the_plan_describes_the_six_the_comps_tab_shows(synthetic_world, scratch_playbook):

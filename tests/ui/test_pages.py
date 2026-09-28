@@ -211,7 +211,7 @@ def test_the_scripts_read_payload_keys_the_server_writes(synthetic_world, monkey
     read("hero role why evidence portrait", Pick.__annotations__)
     read(
         "id kind applies ok weighted form when bonus penalty norm spread need metric raw"
-        " weight confidence confidence_raw fact text", Contribution.__annotations__)
+        " weight fact text", Contribution.__annotations__)
     read("blue red odds verdict badges", Momentum.__annotations__)
     read("label tip", Badge.__annotations__)
     read(

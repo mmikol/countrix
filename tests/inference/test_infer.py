@@ -155,7 +155,7 @@ def test_the_fill_is_the_optimal_whenever_the_optimal_holds_every_lock(synthetic
     with Mizuki for Juno. With it on, the same playbook scores by the engine."""
     from inference import engine
     world = synthetic_world
-    assert not catalog.has_scoring_terms(ASSUMPTIONS_ONLY)
+    assert not any(s.weighs for s in ASSUMPTIONS_ONLY)
     for map_name in ("Harbor Gate", "Ember Ruins"):
         best = engine.infer(world, Draft(map_name), catalog=ASSUMPTIONS_ONLY, base=base)
         for hero in best.blue:

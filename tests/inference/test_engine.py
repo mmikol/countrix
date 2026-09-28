@@ -19,7 +19,6 @@ from facts.records import MapRate
 from facts.team import team_metrics
 from inference import catalog
 from inference.base import DEFAULT, OFF
-from inference.result import scores
 from tests.inference import ASSUMPTIONS_ONLY, FIXTURE_PLAYBOOK, heal_rate
 
 
@@ -190,10 +189,12 @@ NOT_ALLOWED = "not allowed: breaks At most three supports"
 
 
 def _support_limit(directory):
-    """A playbook of one limit, at most three supports, written in `directory`."""
+    """A playbook of one limit, at most three supports, written in `directory`
+    on a dial, as the shipped rule writes it."""
     with open(os.path.join(directory, "three-supports.md"), "w", encoding="utf-8") as handle:
         handle.write("---\nname: At most three supports\nkind: constraint\n"
-                     "require: team.supports <= 3\n---\n# At most three supports\n\n"
+                     "require: team.supports <= params.MAX_SUPPORTS\nparams:\n"
+                     "    MAX_SUPPORTS: 3\n---\n# At most three supports\n\n"
                      "A six fields at most three supports.\n")
     return catalog.load(str(directory))
 
@@ -202,7 +203,10 @@ def test_red_may_reveal_what_a_limit_forbids(synthetic_world, tmp_path):
     """A limit binds the sixes the playbook builds and blue's own picks, not
     the other side's revealed ones: red past it still gets its optimal and
     its current comp, read off its picks with no fill, and is never ruled
-    out."""
+    out. The limit reads a dial and is still a shape limit, so the shapes
+    the board carries stop at three supports. A full red six past it is
+    scored, ranked and shared, and says which limit it breaks; a draft
+    beside the limit is named, not scored."""
     from inference import engine
     world, cat = synthetic_world, _support_limit(tmp_path)
     d = engine.board(world, Draft("Harbor Gate", SUPPORTS), catalog=cat).to_dict()
@@ -211,6 +215,18 @@ def test_red_may_reveal_what_a_limit_forbids(synthetic_world, tmp_path):
     assert sorted(d["red_current"]["blue"]) == sorted(SUPPORTS)
     assert d["red_current"]["unscored"] is None and d["red_current"]["score"] is not None
     assert d["momentum"]["badges"]["red"]["label"] != "not allowed"
+    assert d["shapes"] and max(supports for _, _, supports in d["shapes"]) == 3
+    (tmp_path / "a-draft.md").write_text(
+        "---\nname: A draft\nkind: heuristic\n---\nprose\n", "utf-8")
+    b = engine.board(world, Draft("Harbor Gate", ("Anvil", "Mortar", *SUPPORTS)),
+                     catalog=catalog.load(str(tmp_path)))
+    red = b.red_current.to_dict()
+    assert red["kind"] == "evaluate" and red["violations"] == ["three-supports"]
+    assert red["rank"] is not None and red["normalized"] is not None
+    assert red["pending"] == ["a-draft"]
+    text = b.rendered()
+    assert "  VIOLATES: three-supports" in text
+    assert "  drafts not yet scored (run /strategy): a-draft" in text
 
 
 def test_blue_picks_that_break_a_limit_are_not_allowed_and_the_board_still_renders(
@@ -476,7 +492,7 @@ def test_the_healing_floor_scores_on_top_of_the_engine_and_off_leaves_it_alone(
     alone = engine.infer(w, draft, catalog=heal, base=OFF)
     assert [c["id"] for c in alone.contributions] == ["heal-rate"]
     assert alone.score == -2.0 * _shortfall(w, alone) == 0.0
-    assert scores(heal, OFF) and not scores(ASSUMPTIONS_ONLY, OFF)
+    assert any(s.weighs for s in heal) and not any(s.weighs for s in ASSUMPTIONS_ONLY)
     assert DEFAULT.on and not OFF.on
 
 

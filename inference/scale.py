@@ -24,18 +24,8 @@ import random
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 
-from facts import compute
 from facts.model import ROLES, Hero
-from facts.team import number
-from inference.scoring import (
-    CONFIDENCE_KEY,
-    Bounds,
-    Candidate,
-    Interval,
-    MetricKey,
-    Objective,
-    SixKey,
-)
+from inference.scoring import Bounds, Candidate, Interval, Objective, SixKey
 from inference.shapes import legal_shapes
 
 REFERENCE_SIZE = 1200
@@ -127,47 +117,16 @@ def _prepared(objective: Objective, index: int = 0, count: int = 1) -> list[Cand
             if not c.violations]
 
 
-def _spanning(values: Sequence[float]) -> Interval:
-    """The lowest and highest of values; 0.0 and 0.0 when there are none."""
-    return Interval(low=min(values), high=max(values)) if values else Interval(low=0.0, high=0.0)
-
-
-def _confidence_bounds(objective: Objective, spec: MetricKey, index: int,
-                       prepared: Sequence[Candidate]) -> Interval:
-    """The low and high a rule's confidence metric (`spec`, its namespace and
-    key) is read against.
-
-    A metric of the six varies across the reference sixes, so the reference
-    is its population. A metric of the board - the map, the world - is one
-    number here however the six changes, and normalising it against a sample
-    that cannot move it would call every board equally certain. Its
-    population is the other boards: the same metric over every map.
-    """
-    if spec.section == "map":
-        ban_count = len(objective.banned)
-        readings = [compute.map_metrics(m, objective.side, ban_count=ban_count).get(spec.key)
-                    for m in objective.world.maps.values()]
-        over = [float(number(v)) for v in readings if v is not None]
-        return _spanning(over)
-    seen = [value for c in prepared if (value := c.confidence[index]) is not None]
-    return _spanning(seen)
-
-
 def _bounds_over(objective: Objective, prepared: Sequence[Candidate]) -> Bounds:
-    """{heuristic id: Interval(low, high)} over prepared sixes, and under id +
-    CONFIDENCE_KEY the bounds of the confidence metric a heuristic names. A
-    heuristic no six here values is left out, its confidence entry with it:
-    the objective reads a missing id as (0, 0), and a slice that never saw a
-    value must not merge a (0, 0) into the other slices' bounds."""
+    """{heuristic id: Interval(low, high)} over prepared sixes. A heuristic
+    no six here values is left out: the objective reads a missing id as
+    (0, 0), and a slice that never saw a value must not merge a (0, 0) into
+    the other slices' bounds."""
     out: Bounds = {}
     for i, g in enumerate(objective.heuristics):
         values = [value for c in prepared if (value := c.raw[i]) is not None]
-        if not values:
-            continue
-        out[g.id] = _spanning(values)
-        spec = objective.confidence_metrics[i]
-        if spec is not None:
-            out[g.id + CONFIDENCE_KEY] = _confidence_bounds(objective, spec, i, prepared)
+        if values:
+            out[g.id] = Interval(low=min(values), high=max(values))
     return out
 
 

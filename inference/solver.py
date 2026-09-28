@@ -207,24 +207,21 @@ class Solver(Objective):
             size += 1
         return Swept(self, size, feasible)
 
-    def rank(self, feasible: list[Candidate], top: int = 5,
-                refine: bool = True) -> list[Candidate]:
+    def rank(self, feasible: list[Candidate], top: int = 5) -> list[Candidate]:
         """The best sixes of a swept field, refined and hydrated. The order is
         the _rank_key's alone, so it does not depend on how the sweep was
         split."""
         if not feasible:
             return []
         feasible.sort(key=self._rank_key)
-        if refine:
-            feasible = self.refine(feasible)
-        return [self.hydrate(c) for c in feasible[:top]]
+        return [self.hydrate(c) for c in self.refine(feasible)[:top]]
 
-    def solve(self, top: int = 5, refine: bool = True) -> Solved:
+    def solve(self, top: int = 5) -> Solved:
         """The best sixes, in this process."""
         self.freeze_bounds()
         swept = self.sweep()
         self.considered = swept.size
-        return Solved(self, self.rank(swept.feasible, top, refine))
+        return Solved(self, self.rank(swept.feasible, top))
 
     @staticmethod
     def _rank_key(c: Candidate) -> tuple[float, float, list[str]]:
@@ -240,12 +237,9 @@ class Solver(Objective):
         shape was searched. Then the best SEEDS sixes try each of the wiki's synergy pairs
         brought in two slots at once, and the swaps run on from any that gained:
         partners that pay only together are never met one swap at a time.
-
-        An empty field refines to an empty field: rank() returns before calling
-        it, and evaluate_comp refuses a board with no feasible six the way
-        infer does."""
-        if not ranked:
-            return []
+        The field is never empty: rank() returns before calling it, and
+        evaluate_comp refuses a board with no feasible six the way infer
+        does."""
         known = {c.key: c for c in ranked}
         starts = list(ranked[:SEEDS])
         shapes: set[tuple[str, ...]] = set()

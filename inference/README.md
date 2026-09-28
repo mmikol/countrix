@@ -364,7 +364,7 @@ the catalog is `docs/inference.md`.
 - `field-more-hit-points` - Field more hit points (heuristic). applies on 6/6 boards, spreads on 6.
   - https://www.reddit.com/r/Competitiveoverwatch/comments/b8l41z/satire_i_just_want_goats_to_die_says_owl_viewer/
   - https://www.reddit.com/r/OverwatchUniversity/comments/bwi0sl/widowmaker_is_the_reason_goats_is_meta_in_owl/
-- `fit-the-map-style` - Pick into what the map rewards (heuristic). applies on 5/6 boards, spreads on 5.
+- `fit-the-map-style` - Pick into what the map rewards (heuristic). applies on 5/6 boards, spreads on 5. It scaled its weight by `confidence: map.style_margin`, how hard the map leans; the field left the dialect on 2026-09-28 with no rule setting it, and a rebuild of this rule brings it back.
   - https://www.reddit.com/r/OverwatchUniversity/comments/9oo9zv/3_dps_exists_because_dps_are_largely_easy_to/
   - https://www.reddit.com/r/Competitiveoverwatch/comments/b8l41z/satire_i_just_want_goats_to_die_says_owl_viewer/
   - https://www.reddit.com/r/Competitiveoverwatch/comments/1wdhogb/calculating_the_map_synergy_of_every_overwatch/

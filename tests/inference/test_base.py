@@ -163,7 +163,6 @@ def test_each_seat_reads_the_other_sides_likely_six_or_its_picks(synthetic_world
     likely = empty.expected.blue
     # the plan says the six counters it, and names the engine's terms it is built on
     assert "No red pick yet: the six counters their likely six (" in empty.plan
-    assert "the highest win-rate six" not in empty.plan
     assert "Above all: win rates here" in empty.plan
     for seat, other in ((empty.blue, "red"), (empty.red, "blue")):
         [c] = [c for c in seat.contributions if c["id"] == base.COUNTERS]
@@ -199,8 +198,9 @@ def test_the_sliced_board_agrees_with_one_process(monkeypatch, synthetic_world, 
     Board one process solves seat by seat, bit for bit, with the default
     engine on: under the reference playbook and under assumptions alone,
     where the engine is all that scores, with red revealed and with red's
-    likely six in its place. The playbook is read from its folder, as a
-    worker reads it."""
+    likely six in its place, and with a full six on either side, which the
+    current comp and the countered case rank against the field the split
+    swept. The playbook is read from its folder, as a worker reads it."""
     from inference import parallel, supersede
     folder = FIXTURE_PLAYBOOK
     if playbook == "assumptions":
@@ -211,7 +211,9 @@ def test_the_sliced_board_agrees_with_one_process(monkeypatch, synthetic_world, 
     in_force = catalog.load()
     brief = engine.Brief()
     assert brief.base == DEFAULT
-    for draft in (Draft("Harbor Gate", side="attack"), TRACED):
+    for draft in (Draft("Harbor Gate", side="attack"), TRACED,
+                  Draft("Harbor Gate", ("Mortar",), SIX, side="attack"),
+                  Draft("Harbor Gate", SIX, side="attack")):
         sliced = engine._board_once(
             synthetic_world, draft, catalog=in_force, brief=brief,
             workers=parallel.Workers(Inline(), 4), watch=supersede.Watch(None))

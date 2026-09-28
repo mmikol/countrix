@@ -31,7 +31,7 @@ type ResultKind = Literal["infer", "evaluate", "current", "countered", "fill", "
 class Pick(TypedDict):
     """One hero of a result's six, with the reason it is there and the ids of
     the facts the reason cites. A solved six carries each hero's subrole and
-    portrait; red's likely six carries the pick rate it rests on instead."""
+    portrait; red's likely six carries neither."""
     hero: str
     role: str
     locked: bool
@@ -39,7 +39,6 @@ class Pick(TypedDict):
     evidence: list[str]
     subrole: NotRequired[str]
     portrait: NotRequired[str | None]
-    rate: NotRequired[float | None]
 
 
 class Alternative(TypedDict):
@@ -129,20 +128,11 @@ HEADINGS: dict[ResultKind, str] = {
     "infer": "optimal comp", "evaluate": "evaluation", "current": "current comp",
     "countered": "if countered optimally", "fill": "your picks, the rest filled",
     "expected": "their likely starting comp"}
-# the reason while the default engine is off and the playbook scores nothing
-UNSCORED = ("unscored - the playbook in force holds no heuristic, so every legal six ties at"
-            " zero; add one and the board scores")
 # the reason red's likely six carries no share while the default engine is on:
 # it is drawn, never scored
 LIKELIHOOD = (
     "unscored - a likelihood from the map's pick rates and the wiki's synergies, which"
     " nothing scores")
-
-
-def scores(catalog: Iterable[Strategy], base: BaseWeights) -> bool:
-    """Whether anything scores a six: the default engine, or a term of the
-    playbook's. With neither, every legal six ties at zero."""
-    return base.on or catalog_module.has_scoring_terms(catalog)
 
 
 @dataclass(kw_only=True, eq=False)
@@ -230,10 +220,9 @@ class Result:
         100 by definition - it is the reference, and scored always; red's
         likely six is a likelihood, never scored, and says so while the
         default engine is on; any other comp reads unscored when nothing can
-        be a share of anything: the default engine is off and the playbook
-        holds no term that scores, or none of its terms applies to this board
-        (a heuristic waiting on its `when`), so the best six itself sums to
-        zero, or the best six scores no higher than the seat's floor."""
+        be a share of anything: the best six scores no higher than the seat's
+        floor, as every six does with the default engine off under a playbook
+        that scores nothing."""
         if self.barred is not None:
             return self.barred
         if self.kind == "infer":
@@ -243,30 +232,15 @@ class Result:
         return self.waiting()
 
     def waiting(self) -> str | None:
-        """The reason nothing on this board scores, or None: read off any
-        result, the optimal included (a seat with no picks has no comp to read
-        it from)."""
-        if not scores(self.catalog, self.base):
-            return UNSCORED
+        """The reason nothing on this board scores, or None: the optimal six
+        scores no higher than the seat's floor, so no comp is a share of it.
+        Read off any result, the optimal included (a seat with no picks has no
+        comp to read it from)."""
         best, floor = self._hundred(), self._zero()
         if best > floor:
             return None
-        below = ("unscored on this board - the optimal six scores %.2f, not above the floor"
-                 " of %.2f, so no comp is a share of it" % (best, floor))
-        if self.base.on:                             # the engine's terms always apply
-            return below
-        by_id = {s.id: s for s in self.catalog}
-        waiting = []
-        for c in self.contributions:
-            s = by_id.get(c["id"])
-            if s is None:
-                continue
-            if c["applies"] and s.form != "limit":   # terms apply: the best is just low
-                return below
-            if not c["applies"]:
-                waiting.append("%s waits for %s" % (s.name, s.when.source) if s.when else s.name)
-        return ("unscored on this board - no scoring strategy applies yet"
-                + (": " + "; ".join(waiting) if waiting else ""))
+        return ("unscored on this board - the optimal six scores %.2f, not above the floor"
+                " of %.2f, so no comp is a share of it" % (best, floor))
 
     def record_candidate(self, cand: Candidate, fs: FactSet, considered: int) -> None:
         """Write a scored candidate onto the result: its score, breakdown and

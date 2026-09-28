@@ -151,15 +151,15 @@ value.
 | kind | form | frontmatter | what the solver does |
 | --- | --- | --- | --- |
 | constraint | limit | `require: <expr>`, any threshold it reads under `params:`, and nothing weighted | discards a candidate that fails; never scores |
-| heuristic | heuristic | `metric`, `direction` (`maximize` or `minimize`), `weight`, optionally `confidence` | normalises the metric to [0, 1] on the board's scale (flipped for minimize) and adds `weight x norm` |
+| heuristic | heuristic | `metric`, `direction` (`maximize` or `minimize`), `weight` | normalises the metric to [0, 1] on the board's scale (flipped for minimize) and adds `weight x norm` |
 | heuristic | scored | `bonus: <expr>` and/or `penalty: <expr>`, `weight` | adds `weight x (bonus - penalty)` |
 | assumption | | nothing: prose by definition | nothing: the solver takes it as given and the agent holds a comp to it |
 | constraint or heuristic | draft | name, kind and prose only | nothing yet: shown and served until `/strategy` infers the rest or turns it into an assumption |
 
 Constraints cut the space; heuristics weigh what is left. A constraint
 always holds and is never weighted: it carries no `when`, `bonus`,
-`penalty`, `metric`, `direction`, `weight` or `confidence`, and anything
-weighted is a heuristic. A rule that should cost rather than forbid is a
+`penalty`, `metric`, `direction` or `weight`, and anything weighted is a
+heuristic. A rule that should cost rather than forbid is a
 scored heuristic, `when: not (<the rule>)` with its `penalty`; `soft:`
 is refused, and so is any key that is not a field. A heuristic weighs a
 metric or an expression, never both, and takes an optional `when` guard,
@@ -169,8 +169,7 @@ six's own state (`team.*` or `matchup.*`) is a need: it adds
 weight, and the needs on one guard cost `NEED_BUDGET` (2) together at
 most. The scale is a seeded
 sample of 1200 legal sixes plus the field of each role's top six by the
-board's prior (`inference/scale.py`), and `confidence` names a second
-metric that scales the weight by how strongly the premise holds.
+board's prior (`inference/scale.py`).
 
 A strategy's prose is three sentences at most (`add_strategy` refuses
 more): the claim, why and when, what is measured.

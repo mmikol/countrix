@@ -1,8 +1,9 @@
 """The frontmatter dialect a strategy file opens with: `key: value` lines
 between two `---` fences, and one level of indented mapping under a key
 with no value (`params:`). A value is a quoted or bare string, an int, a
-float, a boolean, null, or a [list] of those; a bare word is a string. A
-`#` line is a comment; a `#` after a value is part of the value.
+float, true, false or null; any other bare word is a string, `no` and
+`yes` included. A `#` line is a comment; a `#` after a value is part of
+the value.
 
     ---
     name: Answer every revealed enemy
@@ -16,13 +17,12 @@ float, a boolean, null, or a [list] of those; a bare word is a string. A
 import re
 from typing import NamedTuple
 
-# one value: a string, a number, a boolean, a [list] of values, or null
-type Scalar = str | int | float | bool | list[Scalar] | None
+# one value: a string, a number, a boolean, or null
+type Scalar = str | int | float | bool | None
 # a file's frontmatter: flat keys, and one level of indented mapping (params:)
 type Frontmatter = dict[str, Scalar | dict[str, Scalar]]
 
-_WORDS: dict[str, bool | None] = {"true": True, "yes": True, "false": False, "no": False,
-                                  "null": None, "none": None, "~": None}
+_WORDS: dict[str, bool | None] = {"true": True, "false": False, "null": None}
 _INTEGER = re.compile(r"[-+]?\d+(?:_\d+)*\Z")      # what int() reads
 
 
@@ -55,9 +55,6 @@ def _scalar(text: str) -> Scalar:
         return ""
     if text[0] == text[-1] and text[0] in "\"'" and len(text) >= 2:
         return text[1:-1]
-    if text.startswith("[") and text.endswith("]"):
-        inner = text[1:-1].strip()
-        return [_scalar(p) for p in inner.split(",")] if inner else []
     low = text.lower()
     if low in _WORDS:
         return _WORDS[low]

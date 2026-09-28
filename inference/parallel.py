@@ -134,21 +134,19 @@ def available(catalog: list[Strategy] | None = None) -> bool:
     return parallel and catalog is None and (os.cpu_count() or 1) > 1
 
 
-def warm(world: World | None = None) -> int:
+def warm() -> int:
     """Start the workers now, so the first board does not pay for it: they
-    read the playbook in force, and take a copy of the world when one is
-    given. Returns the number started, 0 where there is no pool. A playbook
-    that does not load is written to stderr and keeps the workers, which
-    read it again on their next task; until it is fixed, board() raises the
-    same CatalogError in this process. Any other failure is written to
-    stderr, drops the pool and returns 0, and the first board starts the
-    pool again."""
+    read the playbook in force. Returns the number started, 0 where there is
+    no pool. A playbook that does not load is written to stderr and keeps
+    the workers, which read it again on their next task; until it is fixed,
+    board() raises the same CatalogError in this process. Any other failure
+    is written to stderr, drops the pool and returns 0, and the first board
+    starts the pool again."""
     if not available():
         return 0
     workers = POOL.executor()                 # more tasks than workers, so each gets one
-    args = POOL.world_blob(world) if world is not None else (None, None)
     playbook = catalog_module.strategies_dir()
-    futures = [workers.executor.submit(_prime, playbook, *args) for _ in range(workers.size * 3)]
+    futures = [workers.executor.submit(_prime, playbook) for _ in range(workers.size * 3)]
     try:
         for future in futures:
             future.result()
@@ -164,12 +162,10 @@ def warm(world: World | None = None) -> int:
     return workers.size
 
 
-def _prime(playbook: str, token: str | None = None, data: bytes | None = None) -> int:
-    """In a worker: read the playbook in `playbook`, the parent's folder, and
-    hold the world, so the first slice does not."""
+def _prime(playbook: str) -> int:
+    """In a worker: read the playbook in `playbook`, the parent's folder, so
+    the first slice does not."""
     _HELD.playbook(playbook)
-    if token is not None and data is not None:
-        _HELD.world_of(token, data)
     return os.getpid()
 
 

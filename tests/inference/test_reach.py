@@ -15,8 +15,7 @@ import pytest
 
 from db import Refusal
 from facts.model import World
-from inference import base, catalog, reach
-from inference.result import scores
+from inference import base, reach
 from inference.solver import Infeasible
 from tests.inference import FIXTURE_PLAYBOOK, in_force, recorded
 from tests.inference import record_reach as recorder
@@ -29,11 +28,8 @@ UNSEATED = {"Cassidy", "Domina", "Emre", "Freja", "Hazard", "Ramattra", "Shion",
 @pytest.mark.invariant
 def test_every_hero_reach_finds_a_board_for_is_still_seated_and_none_is_newly_lost(world):
     # reach.json is recorded under the shipped playbook - its assumptions and the healing
-    # floor - on top of the default engine. With nothing scoring every six ties and the
-    # tie-break alone seats heroes; a board that no longer seats its hero is searched
-    # for anew.
-    if not scores(catalog.load(), base.DEFAULT):
-        pytest.skip("nothing scores: no hero is the right pick")
+    # floor - on top of the default engine; a board that no longer seats its hero is
+    # searched for anew.
     fixture = recorded("reach")
     boards = fixture["boards"]
     released = {h.name for h in world.heroes.values() if h.released}
@@ -137,6 +133,62 @@ def test_a_hero_its_best_map_favours_is_seated_there_with_no_ban(synthetic_world
     assert (board["seated"], board["banned"], board["map"], board["red"], board["gap"]) == (
         True, [], "Harbor Gate", [], 0.0)
     assert "Anvil" in board["six"] and reach.seated(synthetic_world, board)
+
+
+# four of a six, none of them a tank
+REST = ("Rook", "Needle", "Balm", "Tansy")
+
+
+def _boards(monkeypatch, maps, top_of, held_score):
+    """The search stubbed onto `maps`, red empty: each unlocked board's top
+    six is top_of(its bans), scoring 3; with Anvil locked, the six holds
+    Anvil as its one tank and scores held_score(its map). Returns the bans
+    each unlocked board was solved under."""
+    import types
+    monkeypatch.setattr(reach, "maps", lambda world, hero: [world.map(n) for n in maps])
+    monkeypatch.setattr(reach, "reds", lambda world, hero: [[]])
+    seen = []
+
+    def infer(world, draft, **kw):
+        if draft.blue:
+            return types.SimpleNamespace(blue=["Anvil", *REST, "Sorrel"],
+                                         score=held_score(draft.map_name))
+        seen.append(draft.bans)
+        return types.SimpleNamespace(blue=top_of(draft.bans), score=3.0)
+    monkeypatch.setattr(reach.engine, "infer", infer)
+    return seen
+
+
+def test_a_rival_banned_out_of_the_heros_seat_seats_it(synthetic_world, monkeypatch):
+    """Harbor Gate's optimal six fields Mortar and Kite in Anvil's role, and
+    the six that holds Anvil neither: the ban search bans the first, Mortar,
+    and the board solved again seats Anvil. The board recorded is the first
+    side tried."""
+    def top_of(bans):
+        return ["Anvil" if "Mortar" in bans else "Mortar", "Kite", *REST]
+    seen = _boards(monkeypatch, ["Harbor Gate"], top_of, lambda map_name: 1.0)
+    board = reach.search(synthetic_world, "Anvil")
+    assert board == {"hero": "Anvil", "seated": True, "map": "Harbor Gate", "side": "attack",
+                     "red": [], "banned": ["Mortar"], "six": top_of(("Mortar",)), "gap": 0.0}
+    assert ("Mortar",) in seen
+
+
+def test_a_ban_search_that_runs_out_returns_the_closest_board(synthetic_world, monkeypatch):
+    """Every round seats a new rival in Anvil's role and never Anvil, so each
+    board's ban search stops at the bans a match allows (two here): the
+    search returns the board Anvil came closest on, unseated, unbanned and
+    with no six, the gap the smallest it fell short by."""
+    monkeypatch.setattr(reach, "MAX_BANS", 2)
+    rivals = ("Kite", "Mortar", "Quarry")
+
+    def top_of(bans):
+        return [next(r for r in rivals if r not in bans), *REST, "Myrrh"]
+    gaps = {"Harbor Gate": 1.0, "Ember Ruins": 2.5}
+    seen = _boards(monkeypatch, list(gaps), top_of, gaps.__getitem__)
+    board = reach.search(synthetic_world, "Anvil")
+    assert board == {"hero": "Anvil", "seated": False, "map": "Ember Ruins", "side": "",
+                     "red": [], "banned": [], "six": [], "gap": 0.5}
+    assert ("Kite", "Mortar") in seen and max(len(bans) for bans in seen) == 2
 
 
 class _Connected:

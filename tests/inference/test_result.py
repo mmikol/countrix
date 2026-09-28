@@ -2,9 +2,6 @@
 facts a pick and a contribution cite, and the queue a win rate names.
 Every board is the synthetic World's: no database."""
 
-import os
-import shutil
-
 from facts import board_facts
 from facts.draft import Draft
 from inference import catalog
@@ -19,9 +16,9 @@ def test_a_playbook_that_scores_nothing_reads_unscored(synthetic_world):
     from inference import engine
     world = synthetic_world
     reference = catalog.load(FIXTURE_PLAYBOOK)
-    assert catalog.has_scoring_terms(reference)
+    assert any(s.weighs for s in reference)
     limit_only = [h for h in reference if h.form == "limit"]
-    assert limit_only and not catalog.has_scoring_terms(limit_only)
+    assert limit_only and not any(s.weighs for s in limit_only)
     draft = Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm", "Anvil"))
     b = engine.board(world, draft, catalog=limit_only, brief=engine.Brief(base=OFF))
     d = b.to_dict()
@@ -56,66 +53,6 @@ def test_the_default_engine_scores_a_playbook_that_scores_nothing(synthetic_worl
     assert "unscored" not in {badge["label"] for badge in d["momentum"]["badges"].values()}
     assert "unscored" not in d["momentum"]["verdict"]
     assert d["expected"]["unscored"] == LIKELIHOOD and d["expected"]["normalized"] is None
-
-
-def test_a_scoring_strategy_that_waits_on_its_board_reads_unscored_with_the_reason(
-        synthetic_world, tmp_path):
-    """With the default engine off, a playbook whose only scoring term is
-    guarded (hitscan cover while red fields a flier) scores nothing until the
-    guard holds: the best six itself is zero, so no comp is a share of
-    anything - the board says which strategy waits and for what, and scores
-    once the flier appears."""
-    from inference import engine
-    world = synthetic_world
-    off = engine.Brief(base=OFF)
-    # the two-tank limit and one guarded heuristic: a scoring term that waits on red
-    shutil.copy(os.path.join(FIXTURE_PLAYBOOK, "open-queue-tanks.md"), tmp_path)
-    (tmp_path / "fliers-need-cover.md").write_text(
-        "---\nname: Fliers need hitscan cover\nkind: heuristic\ndirection: maximize\n"
-        "metric: team.hitscan\nweight: 1\nwhen: enemy.light_flyers >= 1\n---\nx\n", "utf-8")
-    scratch = catalog.load(str(tmp_path))
-    assert catalog.has_scoring_terms(scratch)
-    grounded = engine.board(world, Draft("Harbor Gate", ("Anvil", "Balm"), ("Mortar", "Needle")),
-                            catalog=scratch, brief=off).to_dict()
-    for key in ("blue", "red"):
-        assert grounded[key]["scoring"] is True and grounded[key]["normalized"] == 100
-    for key in ("current", "red_current", "fill"):
-        assert grounded[key]["scoring"] is False and grounded[key]["normalized"] is None
-        assert "Fliers need hitscan cover waits for enemy.light_flyers >= 1" in \
-            grounded[key]["unscored"]
-    # against red's optimal six the guard may hold (their best counter can field a flier):
-    # then that one result scores, and says nothing about waiting
-    countered = grounded["countered"]
-    assert countered["scoring"] is (countered["unscored"] is None)
-    assert grounded["momentum"]["verdict"].startswith("unscored on this board")
-    assert "waits for enemy.light_flyers >= 1" in grounded["momentum"]["verdict"]
-    # no picks at all: blue's seat counters red's likely six, the optimal is the
-    # reference (100), and the verdict is the plain "no picks yet"
-    empty = engine.board(world, Draft(), catalog=scratch, brief=off).to_dict()
-    assert empty["blue"]["normalized"] == 100 and empty["blue"]["unscored"] is None
-    # enemy.light_flyers counts fliers tanks aside: a flying tank does not raise the guard
-    if any(
-            world.hero(name).flyer and world.hero(name).role != "tank"
-            for name in empty["expected"]["blue"]):
-        assert empty["momentum"]["verdict"] == "no picks yet on either side"
-    else:                         # the likely six fields no such flier: the one rule waits here too
-        assert "waits for enemy.light_flyers >= 1" in empty["momentum"]["verdict"]
-    assert empty["blue"]["red"] == empty["expected"]["blue"]           # countering the likely six
-    flying = engine.board(world, Draft("Harbor Gate", ("Mortar", "Gale"), ("Anvil", "Needle")),
-                          catalog=scratch, brief=off).to_dict()
-    assert flying["blue"]["scoring"] is True and flying["blue"]["normalized"] == 100
-    assert flying["current"]["unscored"] is None
-    assert flying["current"]["normalized"] is None   # partial: the fill holds the share
-    # blue fields no flier, so red's seat still waits: the verdict reads each side on its own
-    assert flying["red_current"]["scoring"] is False
-    verdict = flying["momentum"]["verdict"]
-    assert verdict.startswith("blue %d / 100" % flying["fill"]["normalized"])
-    assert "red unscored: Fliers need hitscan cover waits for enemy.light_flyers >= 1" in verdict
-    assert flying["momentum"]["blue"] == flying["fill"]["normalized"]
-    assert flying["momentum"]["red"] is None and flying["momentum"]["odds"] is None
-    badges = flying["momentum"]["badges"]            # each badge reads its own seat too
-    assert badges["blue"]["label"] == "%d / 100" % flying["fill"]["normalized"]
-    assert badges["red"] == {"label": "unscored", "tip": flying["red_current"]["unscored"]}
 
 
 def test_the_rendered_breakdown_marks_a_need():

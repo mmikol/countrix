@@ -23,6 +23,10 @@ class Superseded(Refusal):
     caller has already asked for the board it wants."""
 
 
+# what a superseded board says, wherever it stops
+MESSAGE = "a newer board from the same client superseded this one"
+
+
 class Latest:
     """Latest wins, per client: each board request takes a ticket under its
     client's name, and a ticket is superseded as soon as a newer one is taken
@@ -81,4 +85,4 @@ class Watch:
         request has replaced this board."""
         if self.superseded is not None and self.superseded():
             self.cancel_all()
-            raise Superseded("a newer board from the same client superseded this one")
+            raise Superseded(MESSAGE)

@@ -23,20 +23,18 @@ from inference.base import COUNTERS, RATES, READS, SYNERGY, Base, BaseWeights, T
 from inference.expr import Expr, Scope, Value, scope
 from inference.strategy import Strategy, settled_by_board
 
-CONFIDENCE_KEY = "\x00confidence"   # a rule's scale bounds, beside its own
 NEED_BUDGET = 2.0                 # the most one guarded state can cost
 
 
 class Interval(NamedTuple):
-    """The low and high a heuristic's raw value, or its confidence metric, is
-    read against on one board."""
+    """The low and high a heuristic's raw value is read against on one board."""
     low: float
     high: float
 
 
 # The records the objective passes around. A namespace is the metric bags by
 # section.
-type Bounds = dict[str, Interval]               # id, or id + CONFIDENCE_KEY -> low, high
+type Bounds = dict[str, Interval]               # heuristic id -> low, high
 type Namespace = dict[str, MetricBag]
 
 
@@ -49,15 +47,13 @@ class MetricKey(NamedTuple):
 class Norm(NamedTuple):
     """One heuristic's frozen scale for the scoring loop: the strategy, its
     reference low and spread (None where the sample never moved), its weight,
-    whether it minimises, whether it is a need, and its confidence metric's
-    bounds where it names one."""
+    whether it minimises, and whether it is a need."""
     strategy: Strategy
     low: float
     span: float | None
     weight: float
     minimize: bool
     need: bool
-    scale: Interval | None
 
 
 _EMPTY: MetricBag = {}
@@ -111,22 +107,6 @@ def _norm(raw: float, lo: float, span: float | None, minimize: bool, need: bool)
     return 1.0 - norm if minimize else norm
 
 
-def _certainty(scale: Interval, scale_raw: float) -> float:
-    """How far a rule's confidence metric sits between its reference low and
-    high, in [0, 1]. A rule that names one is worth its weight only where that
-    metric is at its high, and nothing where it is at the low: a premise that
-    barely holds barely counts."""
-    scale_lo, scale_hi = scale
-    # anchor at zero where the metric never goes below it: the least certain
-    # board seen is not the same as no certainty at all, and taking it as the
-    # floor would pay that board nothing
-    if scale_lo >= 0.0:
-        scale_lo = 0.0
-    width = scale_hi - scale_lo
-    sure = 1.0 if width <= 0 else (scale_raw - scale_lo) / width
-    return 0.0 if sure < 0.0 else 1.0 if sure > 1.0 else sure
-
-
 class Contribution(TypedDict):
     """One term in a six's score, the default engine's or a strategy's: the
     `contributions` array of the public payload. Every term carries the
@@ -150,8 +130,6 @@ class Contribution(TypedDict):
     when: NotRequired[str | None]      # a heuristic, on a metric or scored
     spread: NotRequired[bool]          # an applying heuristic
     need: NotRequired[bool]
-    confidence: NotRequired[str | None]
-    confidence_raw: NotRequired[float | None]
     bonus: NotRequired[float]          # a scored heuristic
     penalty: NotRequired[float]
     fact: NotRequired[str]             # the board fact that states the metric, if any
@@ -169,7 +147,6 @@ class Candidate:
     tie-break and breakdown. A slim one keeps only the verdict."""
 
     __slots__ = (
-        "confidence",
         "contributions",
         "heroes",
         "key",
@@ -191,10 +168,9 @@ class Candidate:
         self.tiebreak = 0.0
         self.contributions: list[Contribution] = []
         self.violations: list[str] = []
-        # one metric value per heuristic, in catalog order, and its confidence
-        # metric where it names one, else None; empty on a slim candidate
+        # one metric value per heuristic, in catalog order, where it applies,
+        # else None; empty on a slim candidate
         self.raw: Sequence[float | None] = []
-        self.confidence: Sequence[float | None] = []
         self.terms: Terms | None = None       # the default engine's, where it is on
 
     @property
@@ -259,9 +235,6 @@ class Objective:
         self._scored = [(r, gates[r.id], slots.get(r.id, 0)) for r in self.scored]
         self._heuristics = [(g, gates[g.id], slots.get(g.id, 0), *_split_key(g.metric))
                             for g in self.heuristics]
-        # the same, for whatever metric a rule scales itself by; None where none
-        self.confidence_metrics = [_split_key(g.confidence) if g.confidence else None
-                                   for g in self.heuristics]
         # a heuristic guarded on the six's own state is a need: see score().
         # Needs that share a guard share NEED_BUDGET: the state costs at most
         # that much however many rules the playbook writes about it
@@ -285,7 +258,7 @@ class Objective:
         sc = scope(self.static)
         gates: dict[str, bool | None] = {}
         slots: dict[str, int] = {}
-        groups: dict[object, int] = {}
+        groups: dict[tuple[str, tuple[tuple[str, float], ...]], int] = {}
         for s in self.catalog:
             if s.when is None:
                 gates[s.id] = True
@@ -294,12 +267,7 @@ class Objective:
                 gates[s.id] = bool(s.when.evaluate(sc))
             else:
                 gates[s.id] = None
-                key: object
-                try:
-                    key = (s.when.source, tuple(sorted(s.params.items())))
-                    hash(key)
-                except TypeError:          # a param the dialect read as a list
-                    key = s.id
+                key = (s.when.source, tuple(sorted(s.params.items())))
                 slots[s.id] = groups.setdefault(key, len(groups))
         return gates, slots, len(groups)
 
@@ -334,25 +302,10 @@ class Objective:
             else:
                 keep(None)
         cand.raw = raw
-        cand.confidence = self._confidence_values(ns, raw)
         if self.base is not None:
             cand.terms = self.base.terms(cand.heroes, number(ns["team"]["synergy_score"]))
         cand.tiebreak = number(ns["team"]["map_win_mean"])
         return cand
-
-    def _confidence_values(self, ns: Namespace,
-                           raw: Sequence[float | None]) -> list[float | None]:
-        """Each heuristic's confidence metric on this six, where it names one
-        and applies; None elsewhere."""
-        confidence: list[float | None] = []
-        for i, spec in enumerate(self.confidence_metrics):
-            if spec is None or raw[i] is None:
-                confidence.append(None)
-                continue
-            value = ns.get(spec.section, _EMPTY).get(spec.key)
-            confidence.append(float(value) if isinstance(value, NUMBER_TYPES)
-                              else _not_a_number(value))
-        return confidence
 
     @staticmethod
     def slim(cand: Candidate) -> Candidate:
@@ -361,7 +314,7 @@ class Objective:
         once and reads only their score, tie-break and picks; the winners are
         hydrated again before they are shown."""
         cand.ns = cand.scope = None
-        cand.raw = cand.confidence = ()
+        cand.raw = ()
         cand.terms = None
         cand.contributions = []
         return cand
@@ -390,8 +343,7 @@ class Objective:
             self._norms.append(Norm(
                 strategy=g, low=lo, span=hi - lo if hi > lo else None,
                 weight=g.weight * self._needs.get(g.id, 1.0),
-                minimize=g.direction == "minimize", need=g.id in self._needs,
-                scale=self.bounds.get(g.id + CONFIDENCE_KEY) if g.confidence else None))
+                minimize=g.direction == "minimize", need=g.id in self._needs))
 
     # --- the score -------------------------------------------------------------
 
@@ -438,10 +390,8 @@ class Objective:
 
     def _score_heuristics(self, cand: Candidate, total: float,
                           out: list[Contribution] | None) -> float:
-        """The heuristics' terms: weight x norm, a need weight x (norm - 1),
-        each scaled by its confidence metric where it names one."""
-        for raw, scale_raw, (g, lo, span, weight, minimize, need, scale) in zip(
-                cand.raw, cand.confidence, self._norms, strict=True):
+        """The heuristics' terms: weight x norm, a need weight x (norm - 1)."""
+        for raw, (g, lo, span, weight, minimize, need) in zip(cand.raw, self._norms, strict=True):
             if raw is None:
                 if out is not None:
                     out.append({
@@ -450,8 +400,6 @@ class Objective:
                         "metric": g.metric, "when": g.when.source if g.when else None})
                 continue
             norm = _norm(raw, lo, span, minimize, need)
-            if scale is not None and scale_raw is not None:
-                weight = weight * _certainty(scale, scale_raw)
             weighted = weight * (norm - 1.0) if need else weight * norm
             total += weighted
             if out is not None:
@@ -459,8 +407,7 @@ class Objective:
                             "applies": True, "raw": raw, "norm": norm,
                             "weighted": weighted, "metric": g.metric,
                             "when": g.when.source if g.when else None,
-                            "spread": span is not None, "need": need,
-                            "confidence": g.confidence, "confidence_raw": scale_raw})
+                            "spread": span is not None, "need": need})
         return total
 
     def _score_scored(self, sc: Scope, held: list[bool | None], total: float,

@@ -24,15 +24,13 @@ constraint, heuristic or assumption, and the form is read off the fields
     limit       a CONSTRAINT: `require: <expr>` must hold, always - a six
                 that fails is never a candidate. A constraint is never
                 weighted: it carries no when, bonus, penalty, metric,
-                direction, weight or confidence.
+                direction or weight.
     heuristic   a HEURISTIC on a metric: a numeric fact key (`metric`),
                 min-max normalised against the board's scale
                 (inference.scale: a seeded reference sample of legal sixes
                 and the board's field) and weighted; `direction`, maximize
-                or minimize, says which end is good, and an optional
-                `confidence` metric scales the weight by how strongly the
-                premise holds. Guarded on the six's own state it is a need:
-                weight x (norm - 1).
+                or minimize, says which end is good. Guarded on the six's
+                own state it is a need: weight x (norm - 1).
     scored      a HEURISTIC on an expression: `bonus: <expr>` and/or
                 `penalty: <expr>`, and the solver adds
                 `weight x (bonus - penalty)` while `when` holds.
@@ -128,9 +126,6 @@ FIELDS: dict[str, Field] = {
     "metric": Field("line", "heuristics: a numeric key from `metrics`"),
     "direction": Field("choice", "heuristics: which end of the metric is good", DIRECTIONS),
     "weight": Field("number", "heuristics: 0..10; 1-4 is the working range"),
-    "confidence": Field(
-        "line", "heuristics on a metric: a numeric metric that scales the term by how"
-        " strongly its premise holds"),
     "when": Field("expression", "heuristics: a guard expression; optional"),
     "require": Field("expression", "constraints: the limit, an expression that always holds"),
     "bonus": Field(
@@ -141,7 +136,7 @@ FIELDS: dict[str, Field] = {
     "params": Field("params", "NAME: number dials the expressions read as params.NAME"),
 }
 # what a constraint never carries: it is a limit that always holds, never weighted
-NOT_A_LIMIT = ("when", "bonus", "penalty", "metric", "direction", "weight", "confidence")
+NOT_A_LIMIT = ("when", "bonus", "penalty", "metric", "direction", "weight")
 # the fields a writer sets one at a time; a dial is params.NAME
 TUNABLE = tuple(field for field in FIELDS if field not in ("name", "params"))
 FIELD_RULE = "field must be one of %s or params.NAME" % ", ".join(TUNABLE)
@@ -284,7 +279,6 @@ class StrategyRecord(TypedDict):
     direction: str | None
     metric: str | None
     weight: float
-    confidence: str | None
     when: str | None
     require: str | None
     bonus: str | None
@@ -297,8 +291,8 @@ class Strategy:
     """One strategy file, parsed and checked: its fields, its expressions
     compiled, and the form they make it."""
 
-    def __init__(self, strategy_id: str, meta: Frontmatter, body: str, path: str) -> None:
-        self.id, self.body, self.path = strategy_id, body, path
+    def __init__(self, strategy_id: str, meta: Frontmatter, body: str) -> None:
+        self.id, self.body = strategy_id, body
         try:
             _check_keys(meta)
             self.name = _text(meta, "name") or strategy_id.replace("-", " ")
@@ -310,11 +304,6 @@ class Strategy:
                 "direction", direction, DIRECTIONS)
             # an absent weight reads 1, a blank one 0
             self.weight = _number("weight", meta.get("weight", 1.0) or 0.0)
-            # A metric that says how strongly this rule's own premise holds. It
-            # scales the term through the same reference bounds the metric uses,
-            # so a rule whose premise is barely true contributes barely anything.
-            # Declared, not coded: nothing here knows which metric any rule names.
-            self.confidence = _text(meta, "confidence")
             self.when = compile_expr(_text(meta, "when"))
             self.require = compile_expr(_text(meta, "require"))
             self.bonus = compile_expr(_text(meta, "bonus"))
@@ -331,7 +320,6 @@ class Strategy:
         reported."""
         known = compute.registry()
         self._check_heuristic(known)
-        self._check_confidence(known)
         self._check_kind(meta)
         self._check_names(known)
 
@@ -345,18 +333,6 @@ class Strategy:
                                % (self.id, self.metric))
         if self.metric in compute.TEXT_METRICS:
             raise CatalogError("%s: metric %r is text, not a number" % (self.id, self.metric))
-
-    def _check_confidence(self, known: Mapping[str, str]) -> None:
-        if self.confidence is None:
-            return
-        if self.confidence not in known:
-            raise CatalogError("%s: confidence %r is not a metric" % (self.id, self.confidence))
-        if self.confidence in compute.TEXT_METRICS:
-            raise CatalogError("%s: confidence %r is text, not a number"
-                               % (self.id, self.confidence))
-        if self.form != "heuristic":
-            raise CatalogError("%s: only a heuristic on a metric scales by a confidence"
-                               % self.id)
 
     def _check_kind(self, meta: Frontmatter) -> None:
         """What each kind may not carry: an assumption anything to score, a
@@ -447,7 +423,6 @@ class Strategy:
                 "pending": self.pending, "need": self.need,
                 "category": self.category, "direction": self.direction,
                 "metric": self.metric, "weight": self.weight,
-                "confidence": self.confidence,
                 "when": self.when.source if self.when else None,
                 "require": self.require.source if self.require else None,
                 "bonus": self.bonus.source if self.bonus else None,

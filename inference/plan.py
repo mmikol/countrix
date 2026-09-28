@@ -2,10 +2,7 @@
 the badge above each picker, and the game plan - the ground, what to play
 on it, what red's picks mean, the family of heroes to stay in and what the
 six is built for - worded from the facts, the default engine's terms and
-the strategies the solver scored. Where nothing scores - the default engine
-off and a playbook with no scoring term - the six is only the highest win
-rates the search found, and the plan says so: it claims no counter and no
-fit, and words the style from the roles the six holds.
+the strategies the solver scored.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
@@ -14,7 +11,7 @@ from typing import NamedTuple
 from facts.board_facts import StageTerrainValue, TerrainValue
 from facts.draft import TEAM_SIZE
 from facts.factset import FactSet
-from facts.model import ROLES, Hero, Map, World
+from facts.model import Hero, Map, World
 from facts.team import team_metrics, text
 from facts.team_facts import counted
 from inference import base
@@ -26,7 +23,6 @@ from inference.result import (
     Odds,
     Result,
     rates_queue,
-    scores,
 )
 
 
@@ -48,8 +44,7 @@ def momentum(seats: Seats) -> Momentum:
     """Who the picks favour, read off the two current comps on their own
     optimals' scales: blue's share of its best counter to red's selection,
     red's share of its best counter to blue's. A seat with no picks has no
-    contributions to name a waiting strategy by, so its reason is read off
-    its optimal instead.
+    comp to read, so its reason is read off its optimal instead.
 
     A half-drafted seat is read through its fill - the best six reachable from
     what it has - on both sides alike. Scoring the picks alone sums over a
@@ -216,30 +211,6 @@ THEIR_LEAN = {
     "poke": "they want to chip from range - close the distance behind cover or take the"
             " sightlines first",
 }
-# what each style asks of each role, for a six the playbook did not score and
-# so may lack a role: (the clause when the six holds the role, when it has none)
-ROLE_PLAY = {
-    "dive": {
-        "tank": ("commit together behind a mobile front line",
-                 "commit together with no tank to lead"),
-        "damage": ("let the flankers pick the target", "pick the target together"),
-        "support": ("get out with supports who can follow", "get out fast - no support can follow"),
-    },
-    "brawl": {
-        "tank": ("hold ground behind the front line",
-                 "hold ground as a group with no tank in front"),
-        "damage": ("win the close-range trade", "trade at close range with what you have"),
-        "support": ("sustain the front line with area healing",
-                    "keep fights short - nothing heals the front line"),
-    },
-    "poke": {
-        "tank": ("take the long sightlines behind your front line",
-                 "take the long sightlines and stay off the front"),
-        "damage": ("chip from range", "make them walk into what range you have"),
-        "support": ("keep it up with healers who reach",
-                    "take no trade you cannot win at range - no healer reaches you"),
-    },
-}
 SIDE_PLAY = {
     "attack":
         "attacking: you have to break their hold, so take the high ground before you"
@@ -301,15 +272,13 @@ def plan(
     so that picks can be tailored toward the optimal without matching it.
     Ends with what it rests on."""
     lean = six.playstyle
-    scoring = scores(six.catalog, six.base)
     yours = _yours(six)
-    read = _ground(m, side, six.facts, scoring)
-    for sentence in (_keeps(six, yours),
-                     _style_read(m, lean, red_h, None if scoring else _roles(six))):
+    read = _ground(m, side, six.facts)
+    for sentence in (_keeps(six, yours), _style_read(m, lean, red_h)):
         if sentence is not None:
             read.append(sentence)
     lines = [" ".join(read)]
-    for line in (_them(world, m, red_h, lean, six, scoring),
+    for line in (_them(world, m, red_h, lean, six),
                  _family_line(world, m, lean, bans), _above_all(six, lean)):
         if line is not None:
             lines.append(line)
@@ -337,19 +306,13 @@ def _keeps(six: Result, yours: Sequence[str]) -> str | None:
     return None
 
 
-def _ground(m: Map | None, side: str, facts: FactSet | None, scoring: bool) -> list[str]:
-    """The ground: the map's mode, the terrain its facts stress, and the side;
-    and, where nothing scores (`scoring` false: the default engine off and
-    no scoring strategy), what the six is instead."""
+def _ground(m: Map | None, side: str, facts: FactSet | None) -> list[str]:
+    """The ground: the map's mode, the terrain its facts stress, and the side."""
     if m is None:
         return ["No map yet, so this is the meta's best six: what is winning right now, built"
-                " to fit together." if scoring else "No map yet, and the playbook scores"
-                " nothing, so the six is the highest win-rate six the search found."]
+                " to fit together."]
     ground = MODE_GROUND.get(m.mode or "", "the fight follows the objective")
     read = ["%s is a %s map: %s." % (m.name, m.mode, ground)]
-    if not scoring:
-        read.append("The playbook scores nothing, so the six is the highest win-rate six the"
-                    " search found.")
     if facts is not None:
         read += _terrain(m, facts)
     if side in SIDE_PLAY:
@@ -378,59 +341,35 @@ def _terrain(m: Map, facts: FactSet) -> list[str]:
     return read
 
 
-def _style_read(
-        m: Map | None, lean: str, red_h: Sequence[Hero],
-        roles: Mapping[str, int] | None) -> str | None:
-    """What to play: the style the map rewards against the six's lean. With
-    `roles`, the six's count per role where nothing scores, the lean names
-    them and the advice is worded from them."""
+def _style_read(m: Map | None, lean: str, red_h: Sequence[Hero]) -> str | None:
+    """What to play: the style the map rewards against the six's lean."""
     map_style = m.style_top if m is not None else ""
-    shape = " with %s" % _roles_in_words(roles) if roles is not None else ""
     if map_style and lean == map_style:
-        return ("The map rewards %s and the six leans into it%s: %s."
-                % (lean, shape, _advice(lean, roles)))
+        return "The map rewards %s and the six leans into it: %s." % (lean, _advice(lean))
     if map_style and lean:
-        return ("The map rewards %s, but %sthe six leans %s%s: %s."
-                % (map_style, "against this red " if red_h else "", lean, shape,
-                   _advice(lean, roles)))
+        return ("The map rewards %s, but %sthe six leans %s: %s."
+                % (map_style, "against this red " if red_h else "", lean, _advice(lean)))
     if lean:
-        return "The six leans %s%s: %s." % (lean, shape, _advice(lean, roles))
+        return "The six leans %s: %s." % (lean, _advice(lean))
     if map_style:
-        return "The map rewards %s: %s." % (map_style, _advice(map_style, None))
+        return "The map rewards %s: %s." % (map_style, _advice(map_style))
     return None
 
 
-def _roles(six: Result) -> dict[str, int]:
-    """How many of the six's picks play each role."""
-    return {role: sum(1 for p in six.picks if p["role"] == role) for role in ROLES}
-
-
-def _roles_in_words(roles: Mapping[str, int]) -> str:
-    """A six's roles in words: "2 tanks, 2 damage and 2 supports", "no support"."""
-    words = []
-    for role, plural in (("tank", "tanks"), ("damage", "damage"), ("support", "supports")):
-        n = roles[role]
-        words.append("no %s" % role if n == 0 else "%d %s" % (n, role if n == 1 else plural))
-    return _and(words)
-
-
-def _advice(lean: str, roles: Mapping[str, int] | None) -> str:
-    """How to play the six's lean: the style's advice, or, with `roles`, what
-    the style asks of each role the six holds and how to play without the
-    ones it lacks."""
-    if roles is None or lean not in ROLE_PLAY:
-        return STYLE_PLAY.get(lean, "play to its picks")
-    return "; ".join(ROLE_PLAY[lean][role][0 if roles[role] else 1] for role in ROLES)
+def _advice(lean: str) -> str:
+    """How to play a style: its advice, or, for a style the plan has no
+    words for, its picks."""
+    return STYLE_PLAY.get(lean, "play to its picks")
 
 
 def _them(
-        world: World, m: Map | None, red_h: Sequence[Hero], lean: str, blue_r: Result,
-        scoring: bool) -> str | None:
+        world: World, m: Map | None, red_h: Sequence[Hero], lean: str,
+        blue_r: Result) -> str | None:
     """What red's picks mean: their lean against the six's, and which picks
     of the six answer which of theirs - read off the hero.vs_answers facts
     the picks cite. With nothing revealed, their likely six (_unrevealed)."""
     if not red_h:
-        return _unrevealed(blue_r, scoring)
+        return _unrevealed(blue_r)
     n = len(red_h)
     theirs = team_metrics(world, red_h, m, [])
     red_lean = text(theirs["style_lean"]) or text(theirs["style_top"])
@@ -446,13 +385,13 @@ def _them(
     return them + _answers([h.name for h in red_h], _answered(blue_r))
 
 
-def _unrevealed(six: Result, scoring: bool) -> str | None:
+def _unrevealed(six: Result) -> str | None:
     """Their likely six while red has revealed nothing: the six searched as
-    its counter says so; blue's own six, or one nothing scored, counters
-    nothing, and the plan only names it."""
+    its counter says so; blue's own six counters nothing, and the plan only
+    names it."""
     if not six.red:
         return None
-    if scoring and six.kind != "evaluate":
+    if six.kind != "evaluate":
         return "No red pick yet: the six counters their likely six (%s)." % ", ".join(six.red)
     return "No red pick yet: their likely six is %s." % _and(six.red)
 

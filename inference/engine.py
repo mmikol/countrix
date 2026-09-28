@@ -642,6 +642,6 @@ def _expected(
     return Result(kind="expected", map_name=m.name if m else None, red=[],
                   blue=[p["hero"] for p in likely], locked=[], catalog=catalog, base=base,
                   bans=list(draft.bans), side=draft.side, seat="red",
-                  picks=[Pick(hero=p["hero"], role=p["role"], rate=p["rate"],
-                              locked=p["locked"], why=p["why"], evidence=[])
+                  picks=[Pick(hero=p["hero"], role=p["role"], locked=p["locked"], why=p["why"],
+                              evidence=[])
                          for p in likely])

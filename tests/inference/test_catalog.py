@@ -155,12 +155,16 @@ def test_a_folder_that_is_not_there_holds_no_playbook(tmp_path):
         catalog.playbook_digest(str(tmp_path / "gone"))
 
 
-def test_frontmatter_parses_scalars_lists_and_params():
+def test_frontmatter_parses_scalars_and_params():
+    """true, false and null are the dialect's only words: No, yes, ~ and a
+    bracketed value stay the text they are, so a strategy named No keeps
+    its name."""
     meta, body = parse_frontmatter(
-        "---\nname: X\nweight: 2.5\nsoft: true\ntags: [a, b]\nn: -4\nf: 1e3\nw: word\nz: ~\n"
-        "params:\n  K: 3\n---\n# X\nbody\n")
-    assert meta == {"name": "X", "weight": 2.5, "soft": True, "tags": ["a", "b"], "n": -4,
-                    "f": 1000.0, "w": "word", "z": None, "params": {"K": 3}}
+        "---\nname: No\nweight: 2.5\nsoft: true\nhard: false\nn: -4\nf: 1e3\nw: word\n"
+        "z: null\nyes: yes\nt: ~\ntags: [a, b]\nparams:\n  K: 3\n---\n# X\nbody\n")
+    assert meta == {"name": "No", "weight": 2.5, "soft": True, "hard": False, "n": -4,
+                    "f": 1000.0, "w": "word", "z": None, "yes": "yes", "t": "~",
+                    "tags": "[a, b]", "params": {"K": 3}}
     assert type(meta["n"]) is int and type(meta["f"]) is float
     assert body == "# X\nbody"
     parsed = parse_frontmatter("---\nname: Y\n---\nprose\n")
@@ -206,7 +210,6 @@ def test_the_shipped_healing_floor_is_a_scored_heuristic_at_weight_two():
     assert heal.penalty is not None and heal.penalty.source == "matchup.heal_shortfall"
     assert heal.when is None and heal.bonus is None and heal.require is None
     assert {k: heal.to_dict()[k] for k in HEAL_RATE} == HEAL_RATE
-    assert catalog.has_scoring_terms(shipped)
     assert [h.id for h in shipped if h.form == "scored"] == ["heal-rate"]
 
 
@@ -287,10 +290,6 @@ def test_a_constraint_is_a_limit_a_heuristic_weighs_and_an_assumption_is_prose(t
                 "---\nname: b\nkind: heuristic\nbonus: params.x\nparams:\n  x: 1\n---\nx\n"):
         with pytest.raises(CatalogError):
             load_one(bad)
-    # a confidence scales a metric's term, so a scored heuristic's is refused as such
-    with pytest.raises(CatalogError, match="only a heuristic on a metric scales by a confidence"):
-        load_one("---\nname: b\nkind: heuristic\nbonus: team.tanks\nconfidence: team.tanks\n"
-                 "---\nx\n")
 
 
 def test_a_key_that_is_not_a_field_is_refused_by_name(tmp_path):

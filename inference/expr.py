@@ -72,7 +72,7 @@ type Value = int | float | bool | str | list[Value] | tuple[Value, ...] | None
 
 
 class ExprError(ValueError):
-    pass
+    """An expression the whitelist refuses, or one that fails as it runs."""
 
 
 NAMESPACES = ("team", "enemy", "matchup", "map", "world", "params")
@@ -255,12 +255,10 @@ class Expr:
 
     # --- evaluation ----------------------------------------------------------
 
-    def evaluate[V](self, namespace: Mapping[str, dict[str, V]] | Scope) -> Value:
-        """Evaluate against {"team": {...}, ...}; a Scope is used as is."""
-        scope = namespace if isinstance(namespace, Scope) else Scope(
-            (k, Section(v)) for k, v in namespace.items())
+    def evaluate(self, sc: Scope) -> Value:
+        """Evaluate against a Scope, which scope() builds from the namespaces."""
         try:
-            return eval(self.code, _GLOBALS, scope)  # nosec B307  # whitelisted AST, no builtins
+            return eval(self.code, _GLOBALS, sc)  # nosec B307  # whitelisted AST, no builtins
         except TypeError as error:            # e.g. a text metric in arithmetic
             raise ExprError("%r: %s" % (self.source, error)) from error
         except (RecursionError, MemoryError, OverflowError) as error:
@@ -275,7 +273,8 @@ _RULES: dict[type[ast.AST], Callable[..., Iterable[ast.AST]]] = {
     ast.Attribute: Expr._attribute, ast.Name: Expr._name,
 }
 
-_GLOBALS: dict[str, object] = dict(FUNCTIONS, __builtins__={})
+# no builtins: the Scope serves every name the code reads, the helpers included
+_GLOBALS: dict[str, object] = {"__builtins__": {}}
 
 
 def scope[V](namespace: Mapping[str, dict[str, V]]) -> Scope:
