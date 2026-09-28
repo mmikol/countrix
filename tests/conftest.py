@@ -38,11 +38,11 @@ def _dsn():
 @pytest.fixture(scope="session", autouse=True)
 def no_cluster_after_a_database_free_run():
     """A run that starts with no cluster at db/psql/cluster ends with none:
-    only db_init and db_rebuild create one, through psql.boot, and a probe,
-    a served /health or a test that reads resolves through default_dsn,
-    which never does. CI never sets COUNTRIX_NO_DATABASE, and a fresh clone
-    with pgserver installed is where a first touch once created one, so the
-    check holds whatever that variable says."""
+    only db_rebuild creates one, through psql.boot, and a probe, a served
+    /health or a test that reads resolves through default_dsn, which never
+    does. CI never sets COUNTRIX_NO_DATABASE, and a fresh clone with
+    pgserver installed is where a first touch once created one, so the check
+    holds whatever that variable says."""
     absent = not os.path.exists(DEFAULT_DB_DIR)
     yield
     if absent:

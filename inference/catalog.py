@@ -63,13 +63,12 @@ def _read(directory: str, name: str, ids: set[str]) -> Strategy:
             raise CatalogError("%s: the filename must be lowercase-kebab" % name)
         path = os.path.join(directory, name)
         with open(path, encoding="utf-8") as handle:
-            raw = handle.read()
-        parsed = parse_frontmatter(raw)
+            parsed = parse_frontmatter(handle.read())
         if "id" in parsed.meta and str(parsed.meta["id"]) != sid:
             raise CatalogError("%s: id: is the filename; drop it" % name)
         if sid in ids:
             raise CatalogError("%s: duplicate id %r" % (name, sid))
-        return Strategy(sid, parsed.meta, body=parsed.body, raw=raw, path=path)
+        return Strategy(sid, parsed.meta, body=parsed.body, path=path)
     except (CatalogError, FrontmatterError) as error:
         text = str(error)
         raise CatalogError(

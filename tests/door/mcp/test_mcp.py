@@ -1,8 +1,8 @@
 """The door speaks the protocol: the real server spawned over
 stdio, and the server's dispatch - the schema check every call passes, a
-refusal answered as the caller's error, a fault as the server's, and the
-strategy resources. None of it needs a database (tools/list and
-list_sources read nothing). This module holds the tool set a session sees.
+refusal answered as the caller's error, a fault as the server's. None of it
+needs a database (tools/list and metrics read nothing). This module holds
+the tool set a session sees.
 The HTTP door, the tools themselves, the registry and the entry point have
 modules of their own (test_mcp_http, test_mcp_tools, test_mcp_registry,
 test_mcp_entry)."""
@@ -18,7 +18,7 @@ from db import ROOT, Refusal
 from door.mcp import stdio, tools
 from door.mcp.schema import Tool, tool_schema
 from door.mcp.server import Server
-from inference import catalog, tune
+from inference import tune
 
 
 def _talk(messages):
@@ -47,7 +47,7 @@ def test_initialize_then_list_tools_over_stdio():
     names = {t["name"] for t in replies[1]["result"]["tools"]}
     assert {"pull_heroes", "pull_rates", "pull_seasons", "pull_synergies", "sync_all",
             "db_rebuild", "db_migrate", "query",
-            "facts", "infer", "evaluate", "board", "strategies", "load_authored",
+            "facts", "infer", "board", "strategies", "load_authored",
             "tune", "tuning_log", "metrics",
             "add_strategy", "infer_strategy", "db_docs"} <= names
     assert len(names) == len(tools.REGISTRY)      # every registered tool is served
@@ -60,17 +60,14 @@ def test_tools_call_without_a_database_and_unknown_method():
     replies = _talk([
         {
             "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-            "params": {"name": "list_sources", "arguments": {}}},
+            "params": {"name": "metrics", "arguments": {}}},
         {"jsonrpc": "2.0", "id": 2, "method": "no/such/method"},
         {"jsonrpc": "2.0", "id": 3, "method": "resources/list"},
     ])
-    text = replies[0]["result"]["content"][0]["text"]
-    assert "blizzard" in text and "wiki" in text
-    assert "pull_counters" in next(line for line in text.splitlines() if line.startswith("wiki"))
+    assert "team.coverage_share" in replies[0]["result"]["content"][0]["text"]
     assert replies[0]["result"]["isError"] is False
-    assert replies[1]["error"]["code"] == -32601
-    uris = {r["uri"] for r in replies[2]["result"]["resources"]}
-    assert "strategy://tuning-log" in uris
+    # the door serves tools alone: resources/list is a method it does not know
+    assert [r["error"]["code"] for r in replies[1:]] == [-32601, -32601]
 
 
 def test_bad_json_is_a_parse_error_not_a_crash():
@@ -85,17 +82,18 @@ def test_bad_json_is_a_parse_error_not_a_crash():
     assert lines[1]["id"] == 9
 
 
-def test_a_stdio_batch_is_answered_with_one_array():
-    """A batch on one line gets one line back, an array of the answers; a
-    notification in it gets none."""
-    server = Server([Tool("t", "d", tool_schema(), lambda **kw: ("ok", {}))])
+def test_a_batch_is_a_request_of_the_wrong_shape_and_runs_no_tool():
+    """The protocol the door speaks has no batches: a JSON array on one line
+    is answered with one INVALID_REQUEST, and no call in it runs."""
+    ran = []
+    server = Server([Tool("t", "d", tool_schema(), lambda **kw: ran.append(kw) or ("ok", {}))])
     out = io.StringIO()
     call = {"jsonrpc": "2.0", "id": 1, "method": "tools/call",
             "params": {"name": "t", "arguments": {}}}
-    notice = {"jsonrpc": "2.0", "method": "notifications/initialized"}
-    stdio.serve(server, [json.dumps([call, notice])], out)
+    stdio.serve(server, [json.dumps([call, call])], out)
     [answered] = [json.loads(line) for line in out.getvalue().splitlines()]
-    assert [r["result"]["isError"] for r in answered] == [False]
+    assert answered["error"] == {"code": -32600, "message": "expected an object"}
+    assert ran == []
 
 
 def test_tool_refuses_unknown_and_missing_arguments():
@@ -165,16 +163,14 @@ def test_a_fault_inside_a_tool_is_internal_and_logged_not_a_bad_parameter():
         "code": -32602, "message": "no tool named 'nope'"}
     assert call("tools/call", {"name": "t", "arguments": [1]})["error"] == {
         "code": -32602, "message": "arguments must be an object"}
-    assert call("resources/read", {})["error"]["code"] == -32602
-    assert call("resources/read", {"uri": "strategy://x"})["error"]["code"] == -32602
 
 
 def test_a_request_of_the_wrong_shape_is_the_callers_error_and_logs_nothing():
     """A method that is not a string, params that are not an object, a tool
-    name or a uri that is not a string: each is the request's error, never a
-    fault with a traceback in the log. A notification still gets no reply."""
+    name that is not a string: each is the request's error, never a fault
+    with a traceback in the log. A notification still gets no reply."""
     logged = []
-    server = Server([], tools.StrategyResources(), log=logged.append)
+    server = Server([], log=logged.append)
 
     def error(message):
         return server.handle(dict({"jsonrpc": "2.0", "id": 1}, **message))["error"]
@@ -183,57 +179,24 @@ def test_a_request_of_the_wrong_shape_is_the_callers_error_and_logs_nothing():
         "code": -32602, "message": "params must be an object"}
     assert error({"method": "tools/call", "params": {"name": ["t"]}}) == {
         "code": -32602, "message": "no tool named ['t']"}
-    assert error({"method": "resources/read", "params": {"uri": 5}}) == {
-        "code": -32602, "message": "uri must be a string"}
     assert server.handle({"jsonrpc": "2.0", "method": "notifications/initialized",
                           "params": [1]}) is None
     assert logged == []
 
 
-def test_the_strategy_resources_answer_an_unknown_uri_as_a_bad_parameter():
-    """The one implementation of the resources a server serves: an id no file
-    holds is a bad parameter, and a strategy's uri reads back its file."""
-    server = Server([], tools.StrategyResources(), log=lambda message: None)
-
-    def read(uri):
-        return server.handle({"jsonrpc": "2.0", "id": 1, "method": "resources/read",
-                              "params": {"uri": uri}})
-    missing = read("strategy://nope")["error"]
-    assert missing == {"code": -32602, "message": "no resource at strategy://nope"}
-    first = catalog.load()[0]
-    assert read("strategy://" + first.id)["result"]["contents"][0]["text"] == first.raw
-
-
-def test_a_key_error_while_reading_a_resource_is_the_servers_fault(monkeypatch):
-    """Only NoSuchResourceError says the uri names nothing. A KeyError raised
-    while a resource is read - inside the catalog, say - is INTERNAL, with
-    its traceback in the log, as a fault inside a tool is."""
-    def broken(directory=None):
-        raise KeyError("inside the catalog")
-    monkeypatch.setattr(catalog, "load", broken)
-    logged = []
-    server = Server([], tools.StrategyResources(), log=logged.append)
-    fault = server.handle({"jsonrpc": "2.0", "id": 1, "method": "resources/read",
-                           "params": {"uri": "strategy://coverage"}})["error"]
-    assert fault["code"] == -32603 and fault["message"].startswith("KeyError")
-    assert logged and "Traceback" in logged[0]
-
-
 def test_a_broken_playbook_is_a_server_fault_at_the_door(tmp_path, monkeypatch):
     """A playbook that does not load is the operator's to fix, not the caller's:
-    every tool and resource that reads it answers INTERNAL with the catalog's
-    own message and logs the traceback."""
+    a tool that reads it answers INTERNAL with the catalog's own message and
+    logs the traceback."""
     empty = tmp_path / "playbook"
     empty.mkdir()
     monkeypatch.setenv("COUNTRIX_STRATEGIES", str(empty))
     logged = []
     server = Server(tools.REGISTRY.bind(tools.Context(dsn="postgresql://nowhere")),
-                    tools.StrategyResources(), log=logged.append)
-    for method, params in (("tools/call", {"name": "strategies", "arguments": {}}),
-                           ("resources/list", {})):
-        fault = server.handle({"jsonrpc": "2.0", "id": 1, "method": method,
-                               "params": params})["error"]
-        assert fault["code"] == -32603
-        assert fault["message"].startswith("CatalogError: no strategies in")
-    assert logged and all("Traceback" in entry for entry in logged)
+                    log=logged.append)
+    fault = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                           "params": {"name": "strategies", "arguments": {}}})["error"]
+    assert fault["code"] == -32603
+    assert fault["message"].startswith("CatalogError: no strategies in")
+    assert logged and "Traceback" in logged[0]
 

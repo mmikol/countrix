@@ -1,14 +1,14 @@
 """The Streamable HTTP transport, the data-layer container's door: a client
-POSTs JSON-RPC to /mcp and gets the response as JSON (notifications get
-202). No server-initiated streams, so GET /mcp is 405; DELETE ends a
-session. /health reports the database the tools are pointed at; a status
-that raises answers 500 with its type and message (db.web.failure).
+POSTs one JSON-RPC message to /mcp and gets the response as JSON (a
+notification gets 202). No server-initiated streams and no sessions, so
+GET /mcp is 405. /health reports the database the tools are pointed at; a
+status that raises answers 500 with its type and message (db.web.failure).
 
 db.web's guard refuses a request that does not name this server before any
 of it runs. The door then asks for the bearer token when one is set,
 refuses a body not labelled application/json with 415, caps a body at
-MAX_BODY and a batch at MAX_BATCH messages, and holds each client address
-to RATE_LIMIT tool calls a RATE_WINDOW.
+MAX_BODY, and holds each client address to RATE_LIMIT tool calls a
+RATE_WINDOW.
 """
 
 import hmac
@@ -17,7 +17,6 @@ import os
 import sys
 import threading
 import time
-import uuid
 from collections.abc import Callable, Iterable, Mapping
 from urllib.parse import urlsplit
 
@@ -26,15 +25,14 @@ from door.mcp.server import PARSE_ERROR, Server, error_response
 
 MAX_BODY = 1 << 20            # one request is a tool call, not an upload
 DRAIN_CHUNK = 1 << 16         # bytes read at a time from an oversize body
-MAX_BATCH = 20                # messages in one JSON-RPC batch
 RATE_LIMIT = 120              # tool calls per client address per RATE_WINDOW
 RATE_WINDOW = 60              # seconds
 MAX_TRACKED_CLIENTS = 1000    # past this, clients unseen for a window are forgotten
 
 
 class _RejectedError(Exception):
-    """A request to /mcp the door turns away before any message in it is
-    handled: the status, the JSON body - {"error": reason} unless the reply
+    """A request to /mcp the door turns away before its message is handled:
+    the status, the JSON body - {"error": reason} unless the reply
     needs its own - and any headers."""
 
     def __init__(
@@ -60,7 +58,7 @@ class HttpHandler(web.Handler):
         if path == "/mcp":
             return self._json(
                 {"error": "this server has no server-initiated stream; POST JSON-RPC to /mcp"},
-                405, {"Allow": "POST, DELETE"})
+                405, {"Allow": "POST"})
         self._json({"error": "nothing here"}, 404)
 
     def _check_token(self) -> None:
@@ -73,22 +71,10 @@ class HttpHandler(web.Handler):
             raise _RejectedError(401, "a bearer token is required",
                                  headers={"WWW-Authenticate": "Bearer"})
 
-    def do_DELETE(self) -> None:
-        """Ends a session. This server keeps no session state to end, and the
-        request passes the guard and the token check anyway, so every method
-        on /mcp is guarded alike."""
-        if urlsplit(self.path).path != "/mcp":
-            return self._json({"error": "nothing here"}, 404)
-        try:
-            self._check_token()
-        except _RejectedError as rejected:
-            return self._json(rejected.payload, rejected.code, rejected.headers)
-        self._json(None)
-
     def do_POST(self) -> None:
-        """One JSON-RPC message or batch: the token checked, the body's JSON
-        label checked, the body read, admitted against the batch size and the
-        client's rate, then handled."""
+        """One JSON-RPC message: the token checked, the body's JSON label
+        checked, the body read, a tool call admitted against the client's
+        rate, then handled - 202 for a notification, else the answer."""
         if urlsplit(self.path).path != "/mcp":
             return self._json({"error": "nothing here"}, 404)
         try:
@@ -96,11 +82,11 @@ class HttpHandler(web.Handler):
             if not (self.headers.get("Content-Type") or "").startswith("application/json"):
                 raise _RejectedError(415, "a JSON body is required")
             message = self._read_message()
-            messages = message if isinstance(message, list) else [message]
-            self._admit(messages)
+            self._admit(message)
         except _RejectedError as rejected:
             return self._json(rejected.payload, rejected.code, rejected.headers)
-        self._dispatch(messages, batched=isinstance(message, list))
+        response = self.server.mcp.handle(message)
+        self._json(response, 202 if response is None else 200)
 
     def _read_message(self) -> object:
         """The request's JSON body, decoded - `null` included, which is a
@@ -128,27 +114,13 @@ class HttpHandler(web.Handler):
             raise _RejectedError(
                 400, "bad JSON", error_response(None, PARSE_ERROR, "bad JSON")) from None
 
-    def _admit(self, messages: list[object]) -> None:
-        """Refuse a batch past MAX_BATCH, and tool calls past the client
-        address's rate - the budget is the host's, not a claimed session's."""
-        if len(messages) > MAX_BATCH:
-            raise _RejectedError(413, "at most %d messages per batch" % MAX_BATCH)
-        calls = sum(1 for m in messages if isinstance(m, dict) and m.get("method") == "tools/call")
-        if calls and not self.server.admit(self.client_address[0], calls):
+    def _admit(self, message: object) -> None:
+        """Refuse a tool call past the client address's rate: the budget is
+        the host's."""
+        if (isinstance(message, dict) and message.get("method") == "tools/call"
+                and not self.server.admit(self.client_address[0])):
             raise _RejectedError(429, "too many calls; try again in a minute",
                                  headers={"Retry-After": str(RATE_WINDOW)})
-
-    def _dispatch(self, messages: list[object], *, batched: bool) -> None:
-        """Handle each message, then reply: 202 when nothing needs an answer,
-        else the answers - a list for a batch - with a new Mcp-Session-Id
-        after an initialize."""
-        responses = [r for r in (self.server.mcp.handle(m) for m in messages) if r is not None]
-        headers: dict[str, str] = {}
-        if any(isinstance(m, dict) and m.get("method") == "initialize" for m in messages):
-            headers["Mcp-Session-Id"] = uuid.uuid4().hex
-        if not responses:
-            return self._json(None, 202, headers)
-        self._json(responses if batched else responses[0], 200, headers)
 
 
 class HttpServer(web.LocalServer):
@@ -167,16 +139,16 @@ class HttpServer(web.LocalServer):
         self._calls: dict[str, list[float]] = {}
         self._lock = threading.Lock()
 
-    def admit(self, client: str, calls: int = 1) -> bool:
-        """A sliding window of RATE_WINDOW seconds per client address; False
-        past the limit."""
+    def admit(self, client: str) -> bool:
+        """One tool call against a sliding window of RATE_WINDOW seconds per
+        client address; False past the limit."""
         now = time.monotonic()
         with self._lock:
             recent = [t for t in self._calls.get(client, ()) if now - t < RATE_WINDOW]
-            if len(recent) + calls > self.rate_limit:
+            if len(recent) >= self.rate_limit:
                 self._calls[client] = recent
                 return False
-            recent.extend([now] * calls)
+            recent.append(now)
             self._calls[client] = recent
             if len(self._calls) > MAX_TRACKED_CLIENTS:
                 self._calls = {

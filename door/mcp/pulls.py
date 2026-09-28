@@ -10,18 +10,14 @@ the summary back.
 """
 
 import functools
-import os
 import time
 from collections.abc import Callable, Mapping
-from typing import TypedDict
 
 import psycopg
 
 from db.data import PullSummary, cache
-from db.data.blizzard import BLIZZARD
 from db.data.blizzard import heroes as blizzard_heroes
 from db.data.blizzard import meta as blizzard_meta
-from db.data.wiki import WIKI
 from db.data.wiki import heroes as wiki_heroes
 from db.data.wiki import maps as wiki_maps
 from db.data.wiki import matchups as wiki_matchups
@@ -53,32 +49,6 @@ def _summary(name: str, stored: str, summary: PullSummary) -> ToolReply:
             value = ", ".join(str(v) for v in value) or "-"
         lines.append("  %-16s %s" % (key, value))
     return ToolReply("\n".join(lines), dict(summary))
-
-
-class SourceRow(TypedDict):
-    """A source as list_sources reports it: its code, name and address, the
-    pages its cache holds and the pulls that read it."""
-    code: str
-    name: str
-    url: str
-    cached_pages: int
-    tools: list[str]
-
-
-@tool(
-    "list_sources", "The sources the data layer pulls from, what each"
-    " supplies, and how many pages its cache holds.")
-def list_sources(ctx: Context) -> ToolReply:
-    rows: list[SourceRow] = []
-    for source in (BLIZZARD, WIKI):
-        path = ctx.caches[source.code]
-        cached = len(os.listdir(path)) if os.path.isdir(path) else 0
-        rows.append(SourceRow(
-            code=source.code, name=source.name, url=source.url, cached_pages=cached,
-            tools=[s.name for s in ctx.tools.pulls() if s.source == source.code]))
-    text = "\n".join("%-12s %-24s %4d cached pages  tools: %s" % (
-        r["code"], r["name"], r["cached_pages"], ", ".join(r["tools"])) for r in rows)
-    return ToolReply(text, {"sources": rows})
 
 
 def _pull(ctx: Context, source: str, fn: PullFn, refresh: bool) -> PullSummary:

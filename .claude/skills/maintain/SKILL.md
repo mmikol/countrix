@@ -115,8 +115,8 @@ is a lesson the next run relearns.
   against a database with no tables. Now: check 1 reads GitHub's run
   after every push and reproduces a disagreement in a fresh clone; the
   `dsn` fixture rides on `db`, which skips unless the database is built;
-  and `default_dsn()` no longer creates a cluster - only `db_init` and
-  `db_rebuild` do, through `psql.boot`.
+  and `default_dsn()` no longer creates a cluster - only `db_rebuild`
+  does, through `psql.boot`.
 - **A test that cannot fail tests nothing.** An `assert ... or True` and
   a validation that skipped on every run (its source stopped publishing)
   sat in the suite as if they counted. Now: a run greps the tests for

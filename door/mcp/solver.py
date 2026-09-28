@@ -1,7 +1,7 @@
-"""The inference layer through the door: the solver's infer, evaluate, reach
-and board. infer, evaluate and board are board tools (boards.board_tool);
-reach takes a hero. Each call loads a World from the database the context
-points at, and none of these tools writes.
+"""The inference layer through the door: the solver's infer, reach and
+board. infer and board are board tools (boards.board_tool); reach takes a
+hero. Each call loads a World from the database the context points at, and
+none of these tools writes.
 """
 
 from collections.abc import Mapping
@@ -103,21 +103,6 @@ def _compact(result: Result) -> tuple[str, CompactInfer]:
                  % (", ".join(silent) or "none"))
     lines += ["  %+.2f  %s" % (c["weighted"], c["id"]) for c in largest]
     return "\n".join(lines), payload
-
-
-@board_tool(
-    "evaluate", "Score a FULL blue six against the default engine and the"
-    " strategies without searching: the breakdown per engine term and"
-    " strategy, and how it ranks against the optimum. A six that breaks one"
-    " of the playbook's limits is not allowed: refused, the rules named.",
-    required=["blue"])
-def evaluate(ctx: Context, draft: Draft) -> ToolReply:
-    # the schema requires blue: the engine takes a full six, so a call
-    # without one never reaches the engine
-    with ctx.connect() as cx:
-        world = tables.load(cx)
-    result = engine.evaluate(world, draft)
-    return ToolReply(result.rendered(), result.to_dict())
 
 
 @tool(

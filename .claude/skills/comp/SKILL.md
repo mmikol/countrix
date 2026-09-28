@@ -46,7 +46,7 @@ shows). Prefer whichever is connected; they expose the same tools.
    citable: the catalog's shape. The game is 6v6 Open
    Queue: six picks, at most two tanks. The playbook itself - STRATEGIES
    = CONSTRAINTS ∪ HEURISTICS ∪ ASSUMPTIONS - is three kinds of markdown
-   file (read them with the `strategies` tool or as MCP resources):
+   file (read them with the `strategies` tool):
    constraints (a limit that always holds), heuristics (a weighted metric
    or a scored adjustment) and assumptions (prose, taken as given - the
    ground rules).

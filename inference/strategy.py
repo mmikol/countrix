@@ -297,8 +297,8 @@ class Strategy:
     """One strategy file, parsed and checked: its fields, its expressions
     compiled, and the form they make it."""
 
-    def __init__(self, strategy_id: str, meta: Frontmatter, body: str, raw: str, path: str) -> None:
-        self.id, self.body, self.raw, self.path = strategy_id, body, raw, path
+    def __init__(self, strategy_id: str, meta: Frontmatter, body: str, path: str) -> None:
+        self.id, self.body, self.path = strategy_id, body, path
         try:
             _check_keys(meta)
             self.name = _text(meta, "name") or strategy_id.replace("-", " ")

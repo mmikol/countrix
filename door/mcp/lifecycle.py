@@ -1,6 +1,6 @@
 """The database's life: which database the tools point at and how ready it
-is, creating, migrating and rebuilding it, the generated docs, and
-read-only SQL against it.
+is, migrating and rebuilding it, the generated docs, and read-only SQL
+against it.
 
 db_rebuild drops every table. A playbook that does not load refuses the
 rebuild before anything is dropped: sync_all mirrors it only after every
@@ -113,20 +113,6 @@ def _snapshots(cx: psycopg.Connection) -> list[Snapshot]:
     return [Snapshot(id=i, captured=str(c), queue=q, source=s) for i, c, q, s in cx.execute("""
         select ms.snapshot_id, ms.captured_at::date, ms.queue, src.code
         from meta_snapshots ms join sources src using(source_id) order by 1""")]
-
-
-@tool(
-    "db_init", "Apply the migrations to an EMPTY database (schema only;"
-    " sync_all fills it). Refuses a database that already has tables. Creates"
-    " the embedded cluster first when DATABASE_URL is unset and none is built.")
-def db_init(ctx: Context) -> ToolReply:
-    with ctx.connect(boot=True) as cx:
-        if schema.table_count(cx):
-            raise Refusal("the database already has tables; db_rebuild"
-                          " starts over")
-        schema.apply(cx, schema.read_migrations())
-        n = schema.table_count(cx)
-    return ToolReply("db_init: %d tables, no data" % n, {"table_count": n})
 
 
 @tool(

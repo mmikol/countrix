@@ -84,7 +84,7 @@ frontmatter, and the solver reads nothing else.
   pooled and single-process answers are pinned to agree exactly.
 - **Typed throughout.** mypy checks every source module in CI; records that
   cross a module boundary are dataclasses, NamedTuples or TypedDicts.
-- **One door for writes.** 31 MCP tools over stdio, HTTP or in-process, each
+- **One door for writes.** 28 MCP tools over stdio, HTTP or in-process, each
   schema-checked; the query tool runs as a read-only database login.
 - **Hardened containers.** Three services share one image and, with the
   nightly `pg_dump`, run unprivileged on a read-only root with every capability

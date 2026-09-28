@@ -1,8 +1,8 @@
 """One gate for every door: the same over-limit board sent through the page's
-facts endpoint and its board handler, the four MCP board tools and the
+facts endpoint and its board handler, the three MCP board tools and the
 engine's three entry points is refused with the same message on each, and
-a six the playbook's limits rule out is refused by every evaluate and
-every infer.
+a six the playbook's limits rule out is refused by the engine's evaluate
+and every infer.
 The page's board route is not listed: it opens a connection and hands the
 query to serve.handle_board, which is a door here. The synthetic World
 stands in for the database and the reference playbook for the live one,
@@ -26,7 +26,7 @@ SEVEN = ("Balm", "Myrrh", "Sorrel", "Tansy", "Rook", "Needle", "Flint")
 FACTS_DOORS = ("page api_facts", "mcp facts")
 SOLVING_DOORS = (
     "page handle_board",
-    "mcp infer", "mcp evaluate", "mcp board",
+    "mcp infer", "mcp board",
     "engine infer", "engine evaluate", "engine board")
 DOORS = (*FACTS_DOORS, *SOLVING_DOORS)
 
@@ -70,7 +70,6 @@ def doors(synthetic_world, monkeypatch):
         "page handle_board": lambda board: serve.handle_board(None, query(board)),
         "mcp facts": tool("facts"),
         "mcp infer": tool("infer"),
-        "mcp evaluate": tool("evaluate"),
         "mcp board": tool("board"),
         "engine infer": solved(engine.infer),
         "engine evaluate": solved(engine.evaluate),
@@ -100,9 +99,9 @@ def test_every_door_that_solves_refuses_a_third_red_tank(doors, door):
 def test_every_door_that_evaluates_or_infers_refuses_a_six_its_limits_rule_out(
         doors, synthetic_world, monkeypatch, tmp_path):
     """A full blue six that breaks one of the playbook's limits is not
-    allowed: the evaluate tool and the engine's, under the playbook in
-    force, refuse it with the rule's name before any search, and every infer
-    that is handed it as locked picks refuses them in the same words."""
+    allowed: the engine's evaluate, under the playbook in force, refuses it
+    with the rule's name before any search, and every infer that is handed
+    it as locked picks refuses them in the same words."""
     (tmp_path / "three-supports.md").write_text(
         "---\nname: At most three supports\nkind: constraint\nrequire: team.supports <= 3\n"
         "---\n# At most three supports\n\nA six fields at most three supports.\n",
@@ -113,6 +112,6 @@ def test_every_door_that_evaluates_or_infers_refuses_a_six_its_limits_rule_out(
     in_force = {
         "engine evaluate": lambda board: engine.evaluate(synthetic_world, Draft(**board)),
         "engine infer": lambda board: engine.infer(synthetic_world, Draft(**board))}
-    for door in ("mcp evaluate", "engine evaluate", "mcp infer", "engine infer"):
+    for door in ("engine evaluate", "mcp infer", "engine infer"):
         with pytest.raises(Refusal, match=r"^not allowed: breaks At most three supports$"):
             in_force.get(door, doors[door])(board)

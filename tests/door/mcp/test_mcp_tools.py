@@ -125,11 +125,11 @@ def test_query_refuses_file_and_server_reaching_sql_before_connecting():
         nowhere.call("query", sql=long)
 
 
-def test_only_db_init_and_db_rebuild_create_the_cluster(tmp_path, monkeypatch):
-    """The two tools that build the database reach psql.boot, which may
-    create the embedded cluster; every other tool resolves through
-    default_dsn, which never does. A dsn given to the Context is used as it
-    is, and neither is asked."""
+def test_only_db_rebuild_creates_the_cluster(tmp_path, monkeypatch):
+    """The tool that builds the database reaches psql.boot, which may create
+    the embedded cluster; every other tool resolves through default_dsn,
+    which never does. A dsn given to the Context is used as it is, and
+    neither is asked."""
 
     def refuse(said):
         def stub():
@@ -137,12 +137,12 @@ def test_only_db_init_and_db_rebuild_create_the_cluster(tmp_path, monkeypatch):
         return stub
     monkeypatch.setattr(psql, "boot", refuse("boot asked"))
     monkeypatch.setattr(psql, "default_dsn", refuse("resolver asked"))
-    for name, asked in (("db_init", "boot asked"), ("db_rebuild", "boot asked"),
-                        ("db_status", "resolver asked"), ("db_migrate", "resolver asked")):
+    for name, asked in (("db_rebuild", "boot asked"), ("db_status", "resolver asked"),
+                        ("db_migrate", "resolver asked")):
         with pytest.raises(psql.NoDatabaseError, match=asked):
             tools.Context().call(name)
     with pytest.raises(psycopg.OperationalError):
-        tools.Context(dsn="postgresql://nobody@127.0.0.1:9/nowhere").call("db_init")
+        tools.Context(dsn="postgresql://nobody@127.0.0.1:9/nowhere").call("db_rebuild")
 
 
 def test_a_rebuild_refuses_a_playbook_that_does_not_load_before_it_drops_anything(
@@ -253,9 +253,8 @@ def test_a_board_tool_hands_its_function_one_draft(tmp_path, monkeypatch):
     Offline(dsn="postgresql://nowhere").call(
         "facts", map="Ilios", red=["Ana"], bans=["Mei"])
     assert seen == [Draft("Ilios", ("Ana",), (), ("Mei",), "")]
-    for name in ("facts", "infer", "evaluate", "board"):
+    for name in ("facts", "infer", "board"):
         assert list(tools.REGISTRY.get(name).schema["properties"])[:5] == list(boards.BOARD)
-    assert tools.REGISTRY.get("evaluate").schema["required"] == ["blue"]
 
 
 def test_readiness_is_the_first_unmet_condition(monkeypatch):

@@ -69,10 +69,10 @@ and each module's docstring says what it reads.
 
 | file | purpose |
 | --- | --- |
-| `__init__.py` | where the database is: `default_dsn` resolves `DATABASE_URL`, else the embedded cluster at `db/psql/cluster` once one is built, and never creates one; `boot`, for `db_init` and `db_rebuild` alone, creates it; with neither, `NoDatabaseError`. Its docstring maps the helpers every writer needs |
+| `__init__.py` | where the database is: `default_dsn` resolves `DATABASE_URL`, else the embedded cluster at `db/psql/cluster` once one is built, and never creates one; `boot`, for `db_rebuild` alone, creates it; with neither, `NoDatabaseError`. Its docstring maps the helpers every writer needs |
 | `schema.py` | the migrations and the `schema_migrations` ledger; `state` (empty, stale, unfilled or current), which `python -m db.psql.schema` prints for the container entrypoint; `rebuild`; `generate_docs`, the two sections at the end of this document, each table described by the `--` block above its `CREATE TABLE` or a later `COMMENT ON TABLE` |
 | `migrations/` | The schema as a sequence, one file per step: `001` sources and the foundation, `002` heroes, `003` maps, `004` meta, `005` playbook, `006` inference, `007` the three layers, `008` the ledger, `009` and `014` the tables that recorded matches, added and dropped again, `010` constraints and heuristics (the `strategies` table), `011` and `012` the `matrix_reader` login the `query` tool connects as, with the dynamic-SQL functions withdrawn from `PUBLIC`, `013` the assumption kind, `015` announced heroes, `016` the playbook each `strategies` row was mirrored from, `017` that column's comment, `018` `map_playstyle` and `comp_archetypes` dropped, `seasons` and `synergies` pulled from the wiki, `019` `map_strategy` and the third source's rates, snapshots and `sources` row dropped, `counters` pulled from the wiki, `020` `map_terrain`, the terrain features each map's wiki article names, `021` `stage_terrain`, with every Hybrid map's two phases and an Escort map's named stretches stored as stages, `022` the `strategies.playbook` comment under the Countrix name, `023` the columns nothing read dropped - `raw_value` on the three stat tables, `patches.platform` and `url`, `subroles.icon_url`, `stat_keys.label` and `unit`, `roles.name`, `024` and `027` the tables that recorded the owner's games, added and dropped again, `025` the 6v6 kit beside the 5v5 one: `heroes.health_6v6`, `shield_6v6` and `armor_6v6`, and `kit_6v6`, each 6v6 line of a hero's article, `026` `counters.basis` and `evidence`: each counter edge marked with the part of the article it was read in, the Match-Up column or the Strategy section, a Strategy edge with its sentence. A statement in an applied migration is never edited; a change is a new file, and a populated database catches up with `db_migrate`. The `--` prose above each `CREATE TABLE` is the data dictionary's text, and is kept current. |
-| `cluster/` | the embedded Postgres `db_init` or `db_rebuild` creates through pgserver (gitignored); a reader starts it on first touch and never creates it. The compose stack runs its own Postgres, the `db` service, which the host reaches through `./docker-db` |
+| `cluster/` | the embedded Postgres `db_rebuild` creates through pgserver (gitignored); a reader starts it on first touch and never creates it. The compose stack runs its own Postgres, the `db` service, which the host reaches through `./docker-db` |
 
 ## The order of a build
 
@@ -86,12 +86,11 @@ repo root) make every build after the first cost almost no requests.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> empty: docker compose up<br/>(on a host, db_init or db_rebuild<br/>creates the cluster)
-    empty --> unfilled: db_init<br/>every migration, no data
+    [*] --> empty: docker compose up<br/>(on a host, db_rebuild<br/>creates the cluster)
+    empty --> unfilled: db_rebuild<br/>every migration, no data yet
     unfilled --> current: sync_all<br/>every pull + load_authored
     current --> stale: a migration file<br/>the ledger lacks
     stale --> current: db_migrate<br/>keeps the data
-    empty --> current: db_rebuild
     unfilled --> current: db_rebuild
     stale --> current: db_rebuild<br/>drops the rates history
     current --> current: the refresher - pull_seasons + pull_rates daily,<br/>sync_all weekly, entities upsert in place,<br/>rates APPEND a dated snapshot
@@ -110,17 +109,15 @@ and refresher containers wait on.
 
 The `refresher` container runs the door's clock, `door/refresh.py`: once
 a day `pull_seasons` and `pull_rates` (a new dated snapshot), then the
-strategies mirror, or `sync_all` with refresh on in their place
-once the wiki cache is older than `COUNTRIX_REFRESH_FULL_DAYS`. A page
-that fails to refetch keeps its cached copy and is listed under `stale`;
-a rates pull that read one stamps no snapshot and replies
-`pull_rates: nothing stored; stale: N`.
+strategies mirror, or `sync_all` with refresh on in their place once the
+wiki cache is a week old, and a refresh at once on start when the cached
+pages are 20 hours old. A page that fails to refetch keeps its cached
+copy and is listed under `stale`; a rates pull that read one stamps no
+snapshot and replies `pull_rates: nothing stored; stale: N`.
 
 | setting | default | meaning |
 | --- | --- | --- |
 | `COUNTRIX_REFRESH_AT` | `05:00` | daily time, in the container's `TZ` (UTC unless set) |
-| `COUNTRIX_REFRESH_MAX_AGE_HOURS` | `20` | refresh on start when the cache is older than this |
-| `COUNTRIX_REFRESH_FULL_DAYS` | `7` | refetch every source (not just the daily set) when the wiki cache is older than this |
 | `COUNTRIX_BACKUP_AT` | `04:30` | the nightly dump's time, in the backup container's `TZ` (UTC unless set) - [The nightly dump](#the-nightly-dump) |
 
 ## The nightly dump

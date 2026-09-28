@@ -156,8 +156,6 @@ services:
     environment:
       <<: *env
       COUNTRIX_REFRESH_AT: ${COUNTRIX_REFRESH_AT:-05:00}
-      COUNTRIX_REFRESH_MAX_AGE_HOURS: ${COUNTRIX_REFRESH_MAX_AGE_HOURS:-20}
-      COUNTRIX_REFRESH_FULL_DAYS: ${COUNTRIX_REFRESH_FULL_DAYS:-7}
       TZ: ${TZ:-UTC}
     depends_on:
       data:

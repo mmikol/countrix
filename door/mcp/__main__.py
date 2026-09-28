@@ -70,7 +70,7 @@ def _http_command_line(argv: list[str]) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     ctx = tools.Context()
-    server = Server(tools.REGISTRY.bind(ctx), tools.StrategyResources())
+    server = Server(tools.REGISTRY.bind(ctx))
     if not argv:
         stdio.serve(server)
         return 0

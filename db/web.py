@@ -129,7 +129,7 @@ class Handler(BaseHTTPRequestHandler):
             self, payload: object, code: int = 200,
             headers: Mapping[str, str] | None = None) -> None:
         """A JSON reply; a payload of None is an empty body with no content
-        type - the MCP door's 202, and its DELETE."""
+        type - the MCP door's 202."""
         if payload is None:
             return self._send(b"", None, code, headers)
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")

@@ -44,8 +44,8 @@ A page rebound by DNS sends its own host name, so the Host check stops it.
 
 **The door checks who is knocking.** It listens on 0.0.0.0:8020 inside
 its container, so every container on the stack network reaches it as
-`data`. `door/mcp/http.py` caps a request at one megabyte and a batch at
-twenty messages, refuses a body not labelled `application/json` with
+`data`. `door/mcp/http.py` takes one JSON-RPC message a request, caps it
+at one megabyte, refuses a body not labelled `application/json` with
 415, allows 120 tool calls per client address a minute and answers 429
 past that, and asks for `Authorization: Bearer <token>` when
 `COUNTRIX_MCP_TOKEN` is set in `.env`; `.mcp.json` sends it. `/health`

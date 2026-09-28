@@ -1,22 +1,21 @@
-"""The protocol: JSON-RPC 2.0 messages answered from a server's tools and
-resources, whichever transport carries them - stdio.py one message per line,
-http.py a POST each.
+"""The protocol: JSON-RPC 2.0 messages answered from a server's tools,
+whichever transport carries them - stdio.py one message per line, http.py a
+POST each.
 
 A Server speaks the parts a tool host needs: `initialize`, `ping`,
-`tools/list`, `tools/call`, `resources/list`, `resources/read`,
-`resources/templates/list` and an empty `prompts/list`. A tools/call is
+`tools/list` and `tools/call`, one message at a time. A tools/call is
 checked against the tool's schema (schema.Tool). Logs go to stderr unless
 the server is told otherwise - over stdio, stdout is the wire.
 """
 
 import traceback
 from collections.abc import Callable, Iterable, Mapping
-from typing import NotRequired, Protocol, TypedDict
+from typing import NotRequired, TypedDict
 
 from db import Log, Refusal, to_stderr
 from door.mcp.schema import Tool
 
-PROTOCOL_VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")
+PROTOCOL_VERSION = "2025-06-18"
 SERVER_INFO = {"name": "countrix", "version": "2.1.0"}
 
 # A JSON object: a request's params as json.loads reads them, or a method's
@@ -78,51 +77,16 @@ class InvalidParamsError(Exception):
     that logs a traceback."""
 
 
-class Resource(TypedDict):
-    """A resource as resources/list lists it."""
-    uri: str
-    name: str
-    description: str
-    mimeType: str
-
-
-class ResourceText(TypedDict):
-    """A resource as resources/read returns it: its uri, its type and its text."""
-    uri: str
-    mimeType: str
-    text: str
-
-
-class NoSuchResourceError(KeyError):
-    """No resource at the uri a caller asked for - told apart from a KeyError
-    raised while reading one, which is the server's fault."""
-
-    def __str__(self) -> str:
-        return "no resource at %s" % self.args[0]
-
-
-class Resources(Protocol):
-    """What a server serves as MCP resources: a listing, and one resource by
-    uri, a NoSuchResourceError when nothing is at it."""
-
-    def list(self) -> list[Resource]: ...
-
-    def read(self, uri: str) -> ResourceText: ...
-
-
 # One method's handler: the request's params -> the result.
 type Method = Callable[[Message], Mapping[str, object]]
 
 
 class Server:
-    """The protocol over any transport: its tools by name, the resources it
-    serves, and where it logs (stderr unless told)."""
+    """The protocol over any transport: its tools by name, and where it logs
+    (stderr unless told)."""
 
-    def __init__(
-            self, tools: Iterable[Tool], resources: Resources | None = None, *,
-            log: Log | None = None) -> None:
+    def __init__(self, tools: Iterable[Tool], *, log: Log | None = None) -> None:
         self.tools = {t.name: t for t in tools}
-        self.resources = resources
         self.log: Log = log or to_stderr
 
     def handle(self, message: object) -> Response | None:
@@ -164,23 +128,14 @@ class Server:
             "ping": lambda p: {},
             "tools/list": self._tools_list,
             "tools/call": self._tools_call,
-            "resources/list": self._resources_list,
-            "resources/read": self._resources_read,
-            "resources/templates/list": lambda p: {"resourceTemplates": []},
-            "prompts/list": lambda p: {"prompts": []},
         }
 
     # --- methods -------------------------------------------------------
 
     def _initialize(self, params: Message) -> Message:
-        asked = params.get("protocolVersion")
-        version = asked if asked in PROTOCOL_VERSIONS else PROTOCOL_VERSIONS[0]
         return {
-            "protocolVersion": version,
-            "capabilities": {"tools": {"listChanged": False},
-                             "resources": {"subscribe": False,
-                                           "listChanged": False},
-                             "prompts": {"listChanged": False}},
+            "protocolVersion": PROTOCOL_VERSION,
+            "capabilities": {"tools": {"listChanged": False}},
             "serverInfo": SERVER_INFO,
             "instructions": (
                 "Countrix: the data layer (pull_* tools scrape, clean and"
@@ -188,8 +143,8 @@ class Server:
                 " facts layer (facts: every fact the database holds about a"
                 " board of map + red + blue picks) and the inference layer"
                 " (infer: the optimal composition under the markdown"
-                " strategies; evaluate: score a full six). Read-only SQL"
-                " via query."),
+                " strategies; board: the whole board, your six scored)."
+                " Read-only SQL via query."),
         }
 
     def _tools_list(self, params: Message) -> Message:
@@ -212,21 +167,3 @@ class Server:
                               isError=True)
         return ToolResult(content=[TextContent(type="text", text=text)], isError=False,
                           structuredContent=structured)
-
-    def _resources_list(self, params: Message) -> Message:
-        if self.resources is None:
-            return {"resources": []}
-        return {"resources": self.resources.list()}
-
-    def _resources_read(self, params: Message) -> Message:
-        if "uri" not in params:
-            raise InvalidParamsError("missing parameter 'uri'")
-        if self.resources is None:
-            raise InvalidParamsError("this server serves no resources")
-        uri = params["uri"]
-        if not isinstance(uri, str):
-            raise InvalidParamsError("uri must be a string")
-        try:
-            return {"contents": [self.resources.read(uri)]}
-        except NoSuchResourceError as unknown:
-            raise InvalidParamsError(str(unknown)) from unknown

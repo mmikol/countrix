@@ -1,7 +1,6 @@
 """The playbook through the door: the metric vocabulary a strategy may
 reference, the catalog, the tools that write a strategy file - tune,
-add_strategy, infer_strategy - the tuning log, and the strategy files
-served as MCP resources.
+add_strategy, infer_strategy - and the tuning log.
 
 Every write validates through the catalog, rewrites the docs catalog for the
 shipped playbook and logs a reasoned line (inference.tune does all three),
@@ -16,7 +15,6 @@ import os
 from db import ROOT, Refusal
 from door.mcp.registry import Context, tool
 from door.mcp.schema import Properties, Property, ToolReply
-from door.mcp.server import NoSuchResourceError, Resource, ResourceText
 from facts import compute
 from inference import catalog, tune
 from inference.strategy import FIELDS, TUNABLE, Field, FieldKind
@@ -171,25 +169,3 @@ def tuning_log(ctx: Context, lines: int = 20) -> ToolReply:
     tail = tune.log_tail(lines)
     return ToolReply("\n".join(tail) or "no tuning yet", {"lines": tail})
 
-
-class StrategyResources:
-    """The strategies files (and the tuning log), readable as MCP resources."""
-
-    def list(self) -> list[Resource]:
-        out = [Resource(uri="strategy://" + s.id, name=s.name,
-                        description="%s (%s)" % (s.kind, s.category),
-                        mimeType="text/markdown") for s in catalog.load()]
-        out.append(Resource(uri="strategy://tuning-log", name="tuning log",
-                            description="every change to the strategies, with reasons",
-                            mimeType="text/markdown"))
-        return out
-
-    def read(self, uri: str) -> ResourceText:
-        sid = uri.replace("strategy://", "", 1)
-        if sid == "tuning-log":
-            return ResourceText(uri=uri, mimeType="text/markdown",
-                                text="\n".join(tune.log_tail(1000)) or "no tuning yet")
-        for s in catalog.load():
-            if s.id == sid:
-                return ResourceText(uri=uri, mimeType="text/markdown", text=s.raw)
-        raise NoSuchResourceError(uri)

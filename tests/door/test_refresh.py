@@ -1,6 +1,7 @@
 """The daily refresh's clock: the scheduler's arithmetic, the cache ages
-that make a refresh due, the loop, the command line and the tools each
-refresh calls. Pure - stubbed tools, no network, no database."""
+that make a refresh due, the loop, the time it reads from the environment
+and the tools each refresh calls. Pure - stubbed tools, no network, no
+database."""
 
 from datetime import datetime
 
@@ -46,67 +47,46 @@ def test_refresh_once_survives_a_bad_day(monkeypatch):
 def test_the_loop_refreshes_stale_data_on_start_then_waits(monkeypatch):
     runs, waits = [], []
     monkeypatch.setattr(refresh, "cache_age_hours", lambda *a: 30.0)
-    monkeypatch.setattr(refresh, "refresh_once",
-                        lambda ctx, log, **kw: runs.append(kw) or (True, ""))
+    monkeypatch.setattr(refresh, "refresh_once", lambda ctx, log: runs.append(ctx) or (True, ""))
 
     def sleep(seconds):
         waits.append(seconds)
         if len(waits) == 2:
             raise KeyboardInterrupt
     with pytest.raises(KeyboardInterrupt):
-        refresh.run_forever(None, refresh.Schedule("05:00", 20, 7), log=lambda m: None,
-                            sleep=sleep)
-    assert runs == [{"full_days": 7}] * 2 and all(0 < w <= 24 * 3600 for w in waits)
+        refresh.run_forever("ctx", "05:00", log=lambda m: None, sleep=sleep)
+    assert runs == ["ctx"] * 2 and all(0 < w <= 24 * 3600 for w in waits)
 
 
-def test_a_schedule_refuses_a_time_that_is_not_hh_mm():
+def test_the_loop_refuses_a_time_that_is_not_hh_mm_before_it_refreshes(monkeypatch):
+    monkeypatch.setattr(refresh, "refresh_once", lambda ctx, log: pytest.fail("it refreshed"))
     with pytest.raises(ValueError, match="HH:MM"):
-        refresh.Schedule("5pm", 20, 7)
+        refresh.run_forever("ctx", "5pm", log=lambda m: None)
 
 
-def test_the_command_line_exits_with_the_refresh_verdict(monkeypatch, capsys):
-    verdicts = iter([(False, "down"), (True, "")])
-    monkeypatch.setattr(refresh, "refresh_once", lambda ctx, **kw: next(verdicts))
-    assert refresh.main(["--once"]) == 1
-    assert refresh.main(["--once"]) == 0
-    # --help prints the docstring's usage map as written, not reflowed
-    with pytest.raises(SystemExit) as helped:
-        refresh.main(["--help"])
-    assert helped.value.code == 0
-    assert "\n    python -m door.refresh --once       one refresh" in capsys.readouterr().out
-
-
-def test_the_refresh_clock_is_read_from_the_environment_at_start(monkeypatch):
+def test_the_refresh_time_is_read_from_the_environment_at_start(monkeypatch):
     # tools.Context resolves its dsn lazily, so nothing here touches a database
-    schedules, once = [], []
-    monkeypatch.setattr(refresh, "run_forever",
-                        lambda ctx, schedule: schedules.append(schedule))
-    monkeypatch.setattr(refresh, "refresh_once",
-                        lambda ctx, **kw: once.append(kw) or (True, ""))
+    times = []
+    monkeypatch.setattr(refresh, "run_forever", lambda ctx, at: times.append(at))
     monkeypatch.setenv("COUNTRIX_REFRESH_AT", "06:30")
-    monkeypatch.setenv("COUNTRIX_REFRESH_MAX_AGE_HOURS", "5")
-    monkeypatch.setenv("COUNTRIX_REFRESH_FULL_DAYS", "3")
-    refresh.main([])
-    assert refresh.main(["--once"]) == 0 and once[-1]["full_days"] == 3.0
-    for name in ("COUNTRIX_REFRESH_AT", "COUNTRIX_REFRESH_MAX_AGE_HOURS",
-                 "COUNTRIX_REFRESH_FULL_DAYS"):
-        monkeypatch.delenv(name)
-    refresh.main([])
-    assert schedules == [refresh.Schedule("06:30", 5.0, 3.0),
-                         refresh.Schedule("05:00", 20.0, 7.0)]
+    refresh.main()
+    monkeypatch.delenv("COUNTRIX_REFRESH_AT")
+    refresh.main()
+    assert times == ["06:30", refresh.DEFAULT_AT]
 
 
 def test_full_refresh_is_due_when_the_slow_caches_are_stale(tmp_path):
-    assert refresh.full_due(7, [str(tmp_path / "none")]) is True        # nothing cached
+    assert refresh.FULL_DAYS == 7
+    assert refresh.full_due([str(tmp_path / "none")]) is True        # nothing cached
     write_aged(tmp_path / "Ana.wikitext", "x", hours=24 * 3)
-    assert refresh.full_due(7, [str(tmp_path)]) is False
+    assert refresh.full_due([str(tmp_path)]) is False
     write_aged(tmp_path / "Ana.wikitext", "x", hours=24 * 8)
-    assert refresh.full_due(7, [str(tmp_path)]) is True
+    assert refresh.full_due([str(tmp_path)]) is True
     # the daily refresh refetches the Season pages; the rest still says stale
     write_aged(tmp_path / "Mei.wikitext", "x", hours=24 * 9)
     write_aged(tmp_path / "Season.wikitext", "x", hours=1)
-    assert refresh.full_due(7, [str(tmp_path)]) is True
-    assert refresh.full_due(7) in (True, False)     # the default reads the wiki cache
+    assert refresh.full_due([str(tmp_path)]) is True
+    assert refresh.full_due() in (True, False)     # the default reads the wiki cache
 
 
 def test_daily_refresh_touches_only_what_moves(monkeypatch):
@@ -114,8 +94,8 @@ def test_daily_refresh_touches_only_what_moves(monkeypatch):
     calls = []
     monkeypatch.setattr(tools.Context, "call", lambda ctx, name, **kw: calls.append(
         (name, kw.get("refresh"))) or ToolReply("%s: ok\n  rows  1" % name, {}))
-    ok, text = refresh.refresh_once(tools.Context(dsn="postgresql://nowhere"),
-                                    lambda m: None, full=False)
+    monkeypatch.setattr(refresh, "full_due", lambda: False)
+    ok, text = refresh.refresh_once(tools.Context(dsn="postgresql://nowhere"), lambda m: None)
     # seasons first: the day's snapshots are stamped with the season live today
     assert ok and calls == [("pull_seasons", True), ("pull_rates", True),
                             ("load_authored", None)]
@@ -128,7 +108,7 @@ def test_daily_refresh_touches_only_what_moves(monkeypatch):
     # the calls above are stubbed, so a renamed tool would pass them: the names are checked here
     assert {name for name, _ in calls} <= set(tools.REGISTRY.names())
     calls.clear()
-    ok, text = refresh.refresh_once(tools.Context(dsn="postgresql://nowhere"),
-                                    lambda m: None, full=True)
+    monkeypatch.setattr(refresh, "full_due", lambda: True)
+    ok, text = refresh.refresh_once(tools.Context(dsn="postgresql://nowhere"), lambda m: None)
     assert ok and calls == [("sync_all", True)] and text == "sync_all: ok"
     assert {name for name, _ in calls} <= set(tools.REGISTRY.names())

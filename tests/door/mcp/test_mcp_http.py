@@ -1,8 +1,7 @@
 """The door over Streamable HTTP, the data-layer container's: the real
 server spawned on a free port, and an in-process HttpServer for the guards -
-the origin check, the bearer token, the JSON label, the body and batch caps,
-the rate limit per client address, and /health's 500 for a status that
-raises."""
+the origin check, the bearer token, the JSON label, the body cap, the rate
+limit per client address, and /health's 500 for a status that raises."""
 
 import http.client
 import json
@@ -70,36 +69,34 @@ def _post(base, payload, headers=None):
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
             body = response.read()
-            return response.status, dict(response.headers), json.loads(body) if body else None
+            return response.status, json.loads(body) if body else None
     except urllib.error.HTTPError as error:
         body = error.read()
-        return error.code, dict(error.headers), json.loads(body) if body else None
+        return error.code, json.loads(body) if body else None
 
 
 def test_http_transport_initializes_lists_and_calls(http_server):
-    status, headers, reply = _post(http_server, {
+    status, reply = _post(http_server, {
         "jsonrpc": "2.0", "id": 1, "method": "initialize",
         "params": {"protocolVersion": "2025-06-18", "capabilities": {},
                    "clientInfo": {"name": "test", "version": "0"}}})
     assert status == 200 and reply["result"]["serverInfo"]["name"] == "countrix"
-    assert headers.get("Mcp-Session-Id")
-    status, _, reply = _post(http_server, {"jsonrpc": "2.0",
-                                           "method": "notifications/initialized"})
+    status, reply = _post(http_server, {"jsonrpc": "2.0",
+                                        "method": "notifications/initialized"})
     assert status == 202 and reply is None
-    status, _, reply = _post(http_server, {"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
+    status, reply = _post(http_server, {"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
     assert status == 200 and any(t["name"] == "infer" for t in reply["result"]["tools"])
-    status, _, reply = _post(http_server, {"jsonrpc": "2.0", "id": 3, "method": "tools/call",
-                                           "params": {"name": "list_sources",
-                                                      "arguments": {}}})
-    assert status == 200 and "wiki" in reply["result"]["content"][0]["text"]
+    status, reply = _post(http_server, {"jsonrpc": "2.0", "id": 3, "method": "tools/call",
+                                        "params": {"name": "metrics", "arguments": {}}})
+    assert status == 200 and "team.coverage_share" in reply["result"]["content"][0]["text"]
 
 
 def test_http_transport_guards_get_origin_and_health(http_server):
     with pytest.raises(urllib.error.HTTPError) as blocked:
         urllib.request.urlopen(http_server + "/mcp", timeout=10)
     assert blocked.value.code == 405
-    status, _, _ = _post(http_server, {"jsonrpc": "2.0", "id": 9, "method": "ping"},
-                         {"Origin": "https://evil.example"})
+    status, _ = _post(http_server, {"jsonrpc": "2.0", "id": 9, "method": "ping"},
+                      {"Origin": "https://evil.example"})
     assert status == 403
     health = json.load(urllib.request.urlopen(http_server + "/health", timeout=10))
     assert health["status"] == "degraded" and health["error"]
@@ -109,23 +106,10 @@ def test_http_transport_guards_get_origin_and_health(http_server):
             http_server + "/health", headers={"Host": "evil.example"}), timeout=10)
     assert foreign.value.code == 403
 
-    def delete(path="/mcp", headers=None):
-        request = urllib.request.Request(http_server + path, method="DELETE",
-                                         headers=headers or {})
-        try:
-            with urllib.request.urlopen(request, timeout=10) as response:
-                return response.status
-        except urllib.error.HTTPError as error:
-            return error.code
-
-    assert delete() == 200                                   # ends a session it never kept
-    assert delete(headers={"Origin": "https://evil.example"}) == 403
-    assert delete("/nope") == 404
-
 
 def _http_server(token=None, rate_limit=120, status=lambda: {"status": "ok"}):
     ctx = tools.Context(dsn="postgresql://nowhere")
-    mcp = Server(tools.REGISTRY.bind(ctx), None)
+    mcp = Server(tools.REGISTRY.bind(ctx))
     httpd = HttpServer(("127.0.0.1", 0), mcp, status, token=token,
                        rate_limit=rate_limit)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
@@ -146,7 +130,7 @@ def _knock(url, body, headers=None):
 def test_the_door_requires_its_token_when_one_is_set():
     httpd, url = _http_server(token="s3cret")
     call = {"jsonrpc": "2.0", "id": 1, "method": "tools/call",
-            "params": {"name": "list_sources", "arguments": {}}}
+            "params": {"name": "metrics", "arguments": {}}}
     assert _knock(url, call)[0] == 401
     assert _knock(url, call, {"Authorization": "Bearer wrong"})[0] == 401
     code, reply = _knock(url, call, {"Authorization": "Bearer s3cret"})
@@ -157,13 +141,12 @@ def test_the_door_requires_its_token_when_one_is_set():
 def test_the_door_refuses_huge_bodies_and_rate_limits_a_client():
     httpd, url = _http_server(rate_limit=3)
     call = {"jsonrpc": "2.0", "id": 1, "method": "tools/call",
-            "params": {"name": "list_sources", "arguments": {}}}
+            "params": {"name": "metrics", "arguments": {}}}
     assert _knock(url, b"x" * ((1 << 20) + 1))[0] == 413
-    codes = [_knock(url, call, {"Mcp-Session-Id": "one"})[0] for _ in range(4)]
-    assert codes == [200, 200, 200, 429]
-    assert _knock(url, call, {"Mcp-Session-Id": "two"})[0] == 429     # the budget is the host's
-    batch = [dict(call, id=i) for i in range(21)]
-    assert _knock(url, batch) == (413, {"error": "at most 20 messages per batch"})
+    assert [_knock(url, call)[0] for _ in range(4)] == [200, 200, 200, 429]
+    # a batch is no message the door answers: one INVALID_REQUEST, no call run
+    assert _knock(url, [call, call]) == (200, {
+        "jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "expected an object"}})
     httpd.shutdown()
 
 

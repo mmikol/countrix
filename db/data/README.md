@@ -763,17 +763,14 @@ under one cutoff, the moment it began, so a page one pull fetched is read
 from the cache by the next.
 `db_rebuild` drops every table, reapplies the migrations and runs
 `sync_all`; without refresh it rebuilds from the caches at almost no
-requests. `list_sources` reports each source, its cached page count and
-the pulls that read it.
+requests.
 
 The refresher ([door/refresh.py](../../door/refresh.py)) runs pull_seasons
 and pull_rates with refresh on each day, then `load_authored`; on a day the
-wiki cache is older than `COUNTRIX_REFRESH_FULL_DAYS`, `sync_all` with
-refresh on runs in their place. Its settings are in
-[docs/db.md](../../docs/db.md#keeping-it-fresh).
+wiki cache is a week old, `sync_all` with refresh on runs in their place.
+Its setting is in [docs/db.md](../../docs/db.md#keeping-it-fresh).
 
 ```bash
-.venv/bin/python -m door.mcp call list_sources                    # the sources, their caches, their pulls
 .venv/bin/python -m door.mcp call pull_maps                       # one pull, from the cache
 .venv/bin/python -m door.mcp call pull_rates '{"refresh": true}'  # one pull, refetched
 .venv/bin/python -m door.mcp call sync_all                        # every pull, in order

@@ -46,12 +46,7 @@ def test_seasons_and_synergies_are_pulls_in_dependency_order():
 def test_every_pull_reads_blizzard_or_the_wiki():
     assert {spec.source for spec in tools.REGISTRY.pulls()} == {"blizzard", "wiki"}
     assert set(db.CACHE_DIRS) == {"blizzard", "wiki"}
-    nowhere = tools.Context(dsn="postgresql://nowhere")
-    assert set(nowhere.caches) == {"blizzard", "wiki"}
-    _text, data = nowhere.call("list_sources")
-    assert [s["code"] for s in data["sources"]] == ["blizzard", "wiki"]
-    assert sorted(t for s in data["sources"] for t in s["tools"]) == sorted(
-        spec.name for spec in tools.REGISTRY.pulls())
+    assert set(tools.Context(dsn="postgresql://nowhere").caches) == {"blizzard", "wiki"}
 
 
 class Offline(tools.Context):

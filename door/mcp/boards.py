@@ -1,11 +1,11 @@
 """The board a board tool takes: BOARD's five properties - map, red, blue,
 bans, side - and board_tool, the decorator that registers a tool over them
 and hands its function the one Draft they name. The facts family's facts and
-the solver family's infer, evaluate and board are declared through it.
+the solver family's infer and board are declared through it.
 """
 
 import functools
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 
 from door.mcp.registry import Context, tool
 from door.mcp.schema import Properties, ToolReply
@@ -58,14 +58,14 @@ def _board_call(fn: BoardFn, ctx: Context, /, **arguments: object) -> ToolReply:
 
 
 def board_tool(
-        name: str, description: str, properties: Properties | None = None,
-        required: Sequence[str] = ()) -> Callable[[BoardFn], BoardFn]:
+        name: str, description: str,
+        properties: Properties | None = None) -> Callable[[BoardFn], BoardFn]:
     """The decorator that registers a board tool: BOARD's five properties
     first, then its own, and the function called with the one Draft they name
     and the rest of the arguments. The call wears the function's name and
     module, which is its family; the function is returned as it is."""
     def decorate(fn: BoardFn) -> BoardFn:
         call = functools.update_wrapper(functools.partial(_board_call, fn), fn)
-        tool(name, description, dict(BOARD, **(properties or {})), required)(call)
+        tool(name, description, dict(BOARD, **(properties or {})))(call)
         return fn
     return decorate

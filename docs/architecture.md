@@ -170,7 +170,7 @@ starts) and the refresh clock, which are read once at start:
 | `COUNTRIX_WORKERS` | `max(6, min(cores, 12))` | the solver's worker processes |
 | `COUNTRIX_PARALLEL` | `1` | `0`: every board in one process |
 | `COUNTRIX_MCP_TOKEN` | unset | bearer token the MCP server requires over HTTP |
-| `DATABASE_URL` | unset | the PostgreSQL to use. Unset, the embedded pgserver cluster at `db/psql/cluster`, which `db_init` or `db_rebuild` builds: the local run, on the same tools, facts and strategies as the stack. With neither, `NoDatabaseError` |
+| `DATABASE_URL` | unset | the PostgreSQL to use. Unset, the embedded pgserver cluster at `db/psql/cluster`, which `db_rebuild` builds: the local run, on the same tools, facts and strategies as the stack. With neither, `NoDatabaseError` |
 
 ## The skills
 

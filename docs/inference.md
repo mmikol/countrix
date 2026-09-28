@@ -127,9 +127,8 @@ picks in the same words.
 
 Drop a markdown file into `strategies/` and it is live: the solver reads
 the directory on every call, the board's playbook panel shows it, the
-`strategies` tool and the `strategy://` resources serve it, and
-`load_authored` mirrors it into the `strategies` table. The frontmatter
-is the whole contract:
+`strategies` tool serves it, and `load_authored` mirrors it into the
+`strategies` table. The frontmatter is the whole contract:
 
 ```markdown
 ---

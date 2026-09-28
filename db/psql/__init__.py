@@ -4,8 +4,8 @@
                         embedded cluster at db/psql/cluster once one is
                         built (pgserver starts it on first touch); it never
                         creates a cluster
-    boot                the same for db_init and db_rebuild alone, creating
-                        the embedded cluster when none is built
+    boot                the same for db_rebuild alone, creating the
+                        embedded cluster when none is built
     NoDatabaseError     no DATABASE_URL and no embedded cluster to use; a
                         host without pgserver must set DATABASE_URL
     UNREACHABLE         the errors that mean the database is out of reach
@@ -54,8 +54,8 @@ except ImportError:     # the image and CI filter it out of requirements.txt
 class NoDatabaseError(Exception):
     """DATABASE_URL is unset and there is no embedded cluster to use: none is
     built at db/psql/cluster, or there is no pgserver to run one. Readers
-    report it as the database out of reach; db_init and db_rebuild create
-    the cluster through boot."""
+    report it as the database out of reach; db_rebuild creates the cluster
+    through boot."""
 
 
 # Every way the database can be out of reach, which a health endpoint reports
@@ -94,9 +94,9 @@ def default_dsn() -> str:
 
 
 def boot() -> str:
-    """Where db_init and db_rebuild write: $DATABASE_URL, or the embedded
-    cluster, created at db/psql/cluster when none is built. Only those two
-    tools call it; every reader resolves through default_dsn."""
+    """Where db_rebuild writes: $DATABASE_URL, or the embedded cluster,
+    created at db/psql/cluster when none is built. Only that tool calls it;
+    every reader resolves through default_dsn."""
     return os.environ.get("DATABASE_URL") or _embedded()
 
 

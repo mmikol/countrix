@@ -190,8 +190,8 @@ def test_a_host_without_pgserver_is_told_to_set_database_url(monkeypatch, tmp_pa
 def test_a_probe_with_no_cluster_is_degraded_and_creates_none(monkeypatch, tmp_path):
     """default_dsn resolves and never creates: with no DATABASE_URL and no
     cluster built it raises NoDatabaseError before pgserver is asked, and
-    /health answers degraded with the variable to set. Only db_init and
-    db_rebuild create a cluster, through psql.boot."""
+    /health answers degraded with the variable to set. Only db_rebuild
+    creates a cluster, through psql.boot."""
     cluster = tmp_path / "cluster"
 
     class NoServer:
