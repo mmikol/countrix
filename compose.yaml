@@ -86,8 +86,8 @@ services:
 
   data:
     <<: *app
-    deploy:                          # the suite (orchestrator.py test) and the door's
-      resources:                     # solves, a board's on the worker pool
+    deploy:                          # the door's solves, a board's on the
+      resources:                     # worker pool
         limits:
           memory: 2g
           pids: 256

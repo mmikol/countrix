@@ -6,35 +6,34 @@ description: Keep Countrix clean - run the code checks, keep the documentation c
 You are the repo's maintainer. The bar is the one the project was built
 to: one door (the MCP tools), each thing documented once (in `docs/` or
 its docstring), one definition of everything, nothing stale, nothing
-dead, the tests green three ways. Run the checks first, judge second,
+dead, the tests green two ways. Run the checks first, judge second,
 change only what a check or the user points at, and leave a report.
 
 ## The checks, in order
 
-1. **Lint, types and tests, three ways.** From the repo root:
+1. **Lint, types and tests, two ways.** From the repo root:
 
        .venv/bin/ruff check db facts inference door ui tests orchestrator.py
        .venv/bin/python -m mypy db facts inference door ui orchestrator.py
        .venv/bin/python -m pytest -q -p no:cacheprovider --cov
        COUNTRIX_NO_DATABASE=1 .venv/bin/python -m pytest -q -p no:cacheprovider \
            --cov --cov-fail-under=78
-       .venv/bin/python orchestrator.py test        # inside the image, if the stack is up
 
    `--cov` alone: the sources, the bar and the report's shape are
    pyproject.toml's, defined once.
 
-   The bar is 75% of the code under test where the database exists (the
-   local run and the image); CI, which builds none, holds 78%. The
-   third run is what CI sees - but not exactly: GitHub runs from a fresh
-   clone with no `.env`, no caches and no cluster, so after every push
-   read the run itself with `gh run list --limit 3` (the repository is
-   private, so the anonymous API cannot see it; `gh` is installed at
-   `~/.local/bin/gh` and signed in as the user) and, when it disagrees
-   with the local run, reproduce it in a fresh clone with a fresh venv
-   before touching anything. A failure is the first thing to fix or
-   report; never mark a failing test skipped to get green, and never
-   weaken an assertion to pass - a test that cannot fail (`or True`, a
-   comparison that always skips) is deleted, not kept.
+   The bar is 75% of the code under test where the database exists; CI,
+   which builds none, holds 78%. The second run is what CI sees - but not
+   exactly: GitHub runs from a fresh clone with no `.env`, no caches and
+   no cluster, so after every push read the run itself with
+   `gh run list --limit 3` (the repository is private, so the anonymous
+   API cannot see it; `gh` is installed at `~/.local/bin/gh` and signed
+   in as the user) and, when it disagrees with the local run, reproduce
+   it in a fresh clone with a fresh venv before touching anything. A
+   failure is the first thing to fix or report; never mark a failing test
+   skipped to get green, and never weaken an assertion to pass - a test
+   that cannot fail (`or True`, a comparison that always skips) is
+   deleted, not kept.
 
 2. **The documentation is current.** `tests/test_docs.py` fails when the
    generated sections of `docs/` are behind the code; the fix is the
@@ -155,9 +154,6 @@ is a lesson the next run relearns.
   TABLE`, or, where the text is a `COMMENT ON` statement an applied
   migration ran, adds the next migration with the new comment (as `022`
   does); `db_docs` carries it into `docs/db.md`.
-- **The image bakes the tests in.** `orchestrator.py test` ran the old
-  tests until the image was rebuilt. Now: `orchestrator.py up` (which
-  rebuilds) before `orchestrator.py test`, always.
 - **A test bound to the playbook in force.** Solver tests read
   `catalog.load()` and so proved whatever rules the user had that day;
   one picked "any heuristic" and would have raised on a playbook with
@@ -208,10 +204,6 @@ is a lesson the next run relearns.
   it. Now: every fact that lists names sorts ties by name, and the
   parity test (`test_the_board_splits_its_solves...`) is the check that
   the two paths agree byte for byte.
-- **The container is small and read-only.** A pool of 8 with no locks
-  needs more than the data container's 1 GiB, and coverage cannot write
-  `/app/.coverage`. Now: tests solve at the default pool, and the image
-  run points `COVERAGE_FILE` at the tmpfs.
 - **Single pulls append.** A rates pull against the Docker database
   appends a dated snapshot every time. Now: tests run the pulls inside a
   rolled-back transaction.

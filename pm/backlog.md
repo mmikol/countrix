@@ -116,10 +116,9 @@ keeps it current.
   cache-driven pulls roll back. Cost: an hour; risk: a test that assumed
   it ran alone.
 - **One writer at a time.** Nothing serialises the writers across
-  processes: the refresher's start-up refresh and the agents' `sync_all`
-  both run on a bare `orchestrator.py` when the caches are a day old, so
-  Blizzard is asked at twice its pace and two DELETE-then-INSERT reloads
-  can interleave. A `pg_try_advisory_lock` taken by `refresh_once` and
+  processes: the refresher's start-up refresh and a session's `sync_all`
+  can run together when the caches are a day old, so Blizzard is asked
+  at twice its pace and two DELETE-then-INSERT reloads can interleave. A `pg_try_advisory_lock` taken by `refresh_once` and
   the door's pulls, `sync_all`, `db_rebuild`, `db_migrate` and
   `load_authored`, with the callers told to wait on it, serialises every
   writer whichever process it runs in. Cost: half a day.

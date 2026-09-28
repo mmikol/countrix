@@ -829,9 +829,7 @@ pull reads one of the two.
    the map leaves out.
 7. A tool in `door/mcp/pulls.py`, `@pull_tool(...)`, placed in dependency
    order. Regenerate docs/mcp.md, and add the tool to the set
-   `tests/door/mcp/test_mcp.py` holds. For the refresh agents to call it,
-   `orchestrator.AGENT_TOOL_NAMES` and the backticked names in
-   `.claude/skills/refresh/SKILL.md` change together.
+   `tests/door/mcp/test_mcp.py` holds.
 
    ```bash
    .venv/bin/python -c "from door.mcp import tools; tools.REGISTRY.write_docs()"

@@ -1,5 +1,5 @@
 # countrix: one image for every role - the door (the MCP server and its tools),
-# the board with the inference engine, the refresher - and the tests.
+# the board with the inference engine, the refresher.
 # compose.yaml runs one container per role from it; docker-entrypoint.sh picks
 # the role.
 FROM python:3.12-slim
@@ -13,12 +13,11 @@ WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1
 COPY requirements.txt .
-# without pgserver: the embedded cluster is a host build target, and inside the
-# image every container reaches a real postgres service over DATABASE_URL. Nor
-# ruff and mypy, about 100 MB installed: nothing in the image lints or
-# type-checks (CI does). pytest and pytest-cov stay for `orchestrator.py test`,
-# which runs the suite here.
-RUN grep -vE '^(pgserver|ruff|mypy)' requirements.txt | pip install --no-cache-dir -r /dev/stdin
+# the runtime block only. Without pgserver: the embedded cluster is a host
+# build target, and inside the image every container reaches a real postgres
+# service over DATABASE_URL. Nor the development block: nothing in the image
+# lints, type-checks or runs the tests (the host and CI do).
+RUN grep -vE '^(pgserver|pytest|ruff|mypy)' requirements.txt | pip install --no-cache-dir -r /dev/stdin
 
 COPY . .
 RUN mkdir -p .cache-blizzard .cache-wiki \

@@ -13,7 +13,6 @@
 #
 # Anything else is run as a command in the image:
 #   docker compose run data python -m door.mcp call sync_all
-#   docker compose run data pytest -q
 set -e
 role="${1:-ui}"
 case "$role" in

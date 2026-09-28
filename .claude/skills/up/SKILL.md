@@ -5,7 +5,7 @@ description: Bring the whole countrix stack up and current - database, the door 
 
 Bring everything up and prove it is ready. Run, from the repo root:
 
-    .venv/bin/python orchestrator.py up    # or without `up`, to also run the agents
+    .venv/bin/python orchestrator.py up
 
 It builds the one image, starts the containers (`db`, `data`, `ui`,
 `refresher`, `backup`), waits for the data layer and the board to
@@ -18,9 +18,9 @@ answer, and prints a verdict. A first build scrapes the sources once
    Report the URLs it prints (board http://localhost:8017, MCP over HTTP
    http://localhost:8020/mcp) and the line "rates captured YYYY-MM-DD".
 2. `NOT READY` names the problem. The usual fixes, in order: a stale bind
-   mount after moving directories -> `docker compose up -d --force-recreate`
-   (the script already tries this once); a schema behind the migrations ->
-   the `data` container rebuilds on its own, wait and run
+   mount after moving directories -> `docker compose up -d --force-recreate`,
+   as the verdict prints; a schema behind the migrations -> the `data`
+   container rebuilds on its own, wait and run
    `.venv/bin/python orchestrator.py status` again; the database never
    became reachable -> `docker compose logs db`; a strategy file does not
    load -> the run stops before the containers start, or the verdict's
@@ -35,18 +35,18 @@ answer, and prints a verdict. A first build scrapes the sources once
    failure: no nightly dump is being taken - report it with
    `docker compose logs backup`.
 3. If the rates capture date is not today and the user is about to play,
-   offer `.venv/bin/python orchestrator.py refresh` (or the `sync_all` tool
-   with `refresh: true` on the `countrix-docker` MCP server). The
-   refresher container refreshes daily on its own and on start when the
-   caches are a day old, so this is rarely needed.
-4. Never run `docker compose down -v`: that deletes the database volume
+   offer the `sync_all` tool with `refresh: true` on the `countrix-docker`
+   MCP server. The refresher container refreshes daily on its own and on
+   start when the caches are a day old, so this is rarely needed.
+4. A line "N draft(s) awaiting /strategy" is not a failure: the solver
+   ignores a draft, and `/strategy` completes it with the user.
+5. Never run `docker compose down -v`: that deletes the database volume
    (the rebuild costs a scrape, and the rates history comes back only from
    a dump in `backups/`).
 
 `.venv/bin/python orchestrator.py status` answers "is it up?" without
-touching anything; `.venv/bin/python orchestrator.py test` runs the suite
-inside the image. The orchestrator needs the repo's venv: it imports
-inference.derive, which loads psycopg.
+touching anything. The orchestrator needs the repo's venv: it loads the
+catalog to check the playbook, and the catalog loads psycopg.
 
 ## What is data
 

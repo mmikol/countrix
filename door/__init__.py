@@ -5,7 +5,7 @@ The door gates every write to Postgres and the playbook. The code that
 writes lives with what it writes - the pulls in db.data,
 inference.catalog.mirror, which reloads the strategies table, and
 inference.tune, which edits the playbook's files - and is called only from
-a door tool, or from inference.derive inside a run the door started.
+a door tool.
 Reads bypass the door: the facts and inference layers connect through
 db.psql.default_dsn(). The door imports db, facts and inference, and none
 of them imports it.

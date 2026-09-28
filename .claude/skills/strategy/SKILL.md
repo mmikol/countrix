@@ -156,16 +156,12 @@ enemy fields two or more mobility tools, reward each crowd-control tool,
 capped at three - `when: enemy.mobility_count >= 2`,
 `bonus: min(team.cc_count, 3) * 0.75`, weight 1.
 
-## Drafts the engine derives itself
+## The drafts dropped in by hand
 
 A file dropped into `inference/strategies/` with only a name, a kind and
-prose is a draft. On a host where the claude CLI is signed in, the engine
-derives its frontmatter without you: `load_authored`, `orchestrator.py up`
-and the `derive_strategies` tool ask `claude -p` the same question this
-skill answers and store the result through the same validated path. This
-skill is the interactive version - use it when the colleague wants to see
-and discuss the inference, or when `strategies` shows a draft the engine
-could not complete (its log line says why).
+prose is a draft. The solver ignores it, `strategies` lists it as
+pending, and nothing completes it but this skill: infer its frontmatter
+as above and store it through `infer_strategy`.
 
 ## Ground rules
 

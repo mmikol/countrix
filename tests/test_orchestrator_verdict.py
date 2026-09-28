@@ -106,7 +106,7 @@ def test_a_playbook_the_image_refuses_and_the_checkout_loads_names_the_old_image
     code: a file that code refuses while this checkout loads it means the
     image predates the checkout, and the verdict says `up` rebuilds it. A
     file the checkout refuses too is the file's fault, and a stale mount is
-    the mount's: neither gets the line."""
+    the mount's: neither gets the line, and the mount gets its fix."""
     refused = {
         "status": "degraded", "heroes": 54,
         "error": "heal-rate: a heuristic weighs a metric; require/bonus/penalty belong to a"
@@ -123,6 +123,7 @@ def test_a_playbook_the_image_refuses_and_the_checkout_loads_names_the_old_image
     stale = {"status": "degraded", "error": "no strategies in /app/inference/strategies"}
     ok, lines = orchestrator.verdict(dict(served, inference=stale, playbook=None))
     assert not any("predates" in line for line in lines)
+    assert lines[2] == "inference: " + orchestrator.RECREATE     # the fix, printed
 
 
 def test_the_verdict_warns_when_no_nightly_dump_is_being_taken():

@@ -1,39 +1,28 @@
-"""The orchestrator: the end-to-end run, from a shell or a Claude Code session.
+"""The orchestrator: the Docker stack, from a shell or a Claude Code session.
 
-    python orchestrator.py            run: everything below, then leave the app up
+    python orchestrator.py            up, when no verb is named
     python orchestrator.py up         build the image, start the containers, wait -
                                       the data container builds the database when
-                                      it is empty or stale; drafts pending in the
-                                      playbook are completed on the host
-    python orchestrator.py agents     Claude Code, headless, on the /refresh skill:
-                                      refresh the data, complete the drafts,
-                                      re-infer with restraint, regenerate the docs
+                                      it is empty or stale - then the verdict
     python orchestrator.py status     what is running, how fresh the data is, the URLs
-    python orchestrator.py refresh    refetch every source now (no agents)
-    python orchestrator.py test       the test suite inside the image, with the coverage bar
     python orchestrator.py down       stop everything (the database volume stays)
 
-The agents run on the host, on the subscription (the claude CLI, signed in
-once); without the CLI the run still brings the stack up and says so. It
-imports the standard library, db's ROOT, db.web's JSON reader,
-door.mcp.client's tools/call, inference.derive, the headless claude
-recipe, and the catalog, to check the playbook before the stack starts;
-run it with .venv/bin/python, since inference.derive loads psycopg. Exit
-code 0 means everything answered.
+It imports the standard library, db's ROOT, db.web's JSON reader and the
+catalog, to check the playbook before the stack starts; run it with
+.venv/bin/python, since the catalog loads psycopg. Exit code 0 means
+everything answered.
 """
 
 import json
 import os
-import subprocess  # nosec B404  # docker compose and the claude CLI, argv lists, never a shell
+import subprocess  # nosec B404  # docker compose, argv lists, never a shell
 import sys
 import time
-from collections.abc import Callable, Mapping
-from datetime import timedelta
+from collections.abc import Callable
 from typing import Any, NamedTuple, NotRequired, TypedDict
 
 from db import ROOT, web
-from door.mcp import client
-from inference import catalog, derive
+from inference import catalog
 from inference.strategy import CatalogError
 
 # the compose stack's ports on this host (compose.yaml)
@@ -51,18 +40,16 @@ BACKUP_SERVICE = "backup"
 PROBE = BOARD + "/api/board?map=King%27s%20Row&red=Zarya&red=Pharah&side=attack"
 
 MINUTE = 60                         # seconds
-HOUR = 60 * MINUTE
-# a derive on the host: every draft refused once, each attempt at the CLI's
-# timeout, then the mirror into the stack's database
-DERIVE_TIMEOUT = 2 * derive.MAX_PER_RUN * derive.TIMEOUT + 5 * MINUTE
+# the fix for a bind mount gone stale, which the verdict prints
+RECREATE = "a stale bind mount - run `docker compose up -d --force-recreate`"
 
 
-def sh(*args: str, timeout: float, env: Mapping[str, str] | None = None) -> None:
-    """Run one command, in `env` when one is given; a failure or an overrun
-    past `timeout` seconds stops the run."""
+def sh(*args: str, timeout: float) -> None:
+    """Run one command; a failure or an overrun past `timeout` seconds stops
+    the run."""
     try:
-        result = subprocess.run(  # nosec B603  # argv lists built here from literals and this interpreter, never a shell
-            list(args), timeout=timeout, env=env)
+        result = subprocess.run(  # nosec B603  # argv lists built here from literals, never a shell
+            list(args), timeout=timeout)
     except subprocess.TimeoutExpired as error:
         raise SystemExit("error: %s did not finish within %d minutes"
                          % (" ".join(args), timeout // MINUTE)) from error
@@ -215,18 +202,20 @@ def inference_verdict(inf: dict[str, Any] | None, board: Probe | None,
     """The inference layer answers on the board, sees the playbook, and solves
     a board. A playbook the board's container refuses while this checkout
     loads it (`loads_here`) is read by older code: the image predates the
-    checkout."""
+    checkout. A folder that reads empty there is a stale mount, and the
+    verdict prints the fix."""
     if not inf:
         return Verdict(False, ["inference: not answering"])
     if inf.get("status") != "ok":
         lines = ["inference: %s" % inf.get("error", inf.get("status"))]
-        if loads_here and "strategies" not in inf and not stale_mount(inf):
+        if stale_mount(inf):
+            lines.append("inference: %s" % RECREATE)
+        elif loads_here and "strategies" not in inf:
             lines.append("inference: this checkout loads that playbook, so the image's code"
                          " predates it - `orchestrator.py up` rebuilds the image")
         return Verdict(False, lines)
     if not inf.get("strategies"):
-        return Verdict(False, ["inference: no strategies visible (a stale bind mount -"
-                               " run `docker compose up -d --force-recreate`)"])
+        return Verdict(False, ["inference: no strategies visible (%s)" % RECREATE])
     pending = inf.get("pending")
     summary = "inference: %d strategies, %d heroes%s" % (
         inf["strategies"], inf.get("heroes", 0),
@@ -295,40 +284,6 @@ def dotenv() -> dict[str, str]:
     return out
 
 
-def token() -> str | None:
-    """The MCP door's bearer token: the environment's, else .env's."""
-    return os.environ.get("COUNTRIX_MCP_TOKEN") or dotenv().get("COUNTRIX_MCP_TOKEN")
-
-
-def mcp(name: str, arguments: dict[str, Any] | None = None, timeout: float = 10 * MINUTE) -> str:
-    """Call one tool on the stack's MCP endpoint -> its text. A reply that is
-    not the tool's answer raises RuntimeError with its message: the tool's
-    refusal, the door turning the call away, or no server answering."""
-    reply = client.call_tool(MCP_URL, name, arguments or {}, token=token(), timeout=timeout)
-    if reply.is_error:
-        raise RuntimeError(reply.text)
-    return reply.text
-
-
-def derive_pending(h: Health) -> bool:
-    """The stack's pending drafts completed on the host, where the claude
-    CLI lives, through ./docker-db: .env fills what the environment lacks -
-    POSTGRES_PASSWORD for docker-db, COUNTRIX_STRATEGIES for the playbook
-    the stack serves - so derive_strategies' own mirror writes the stack's
-    strategies table. True when drafts were pending and the derive ran, so
-    the health is stale."""
-    pending = (h["inference"] or {}).get("pending")
-    if not pending:
-        return False
-    print("%d draft strategy(ies) await frontmatter; deriving on the host..." % pending)
-    env = dict(os.environ)
-    env.update({k: v for k, v in dotenv().items() if k not in env})
-    sh(
-        os.path.join(ROOT, "docker-db"), sys.executable, "-m", "door.mcp", "call",
-        "derive_strategies", env=env, timeout=DERIVE_TIMEOUT)
-    return True
-
-
 def stale_mount(inf: dict[str, Any] | None) -> bool:
     """The playbook's folder reads as empty or missing inside the board's
     container - a bind mount gone stale - rather than a file in it that does
@@ -354,8 +309,8 @@ def playbook_problem() -> str | None:
 
 def up() -> int:
     """Check the playbook, build the image, make backups/, start the
-    containers, wait for each container, complete pending drafts on the
-    host -> the verdict's exit code."""
+    containers, wait for each container -> the verdict's exit code. Pending
+    drafts stay pending: the verdict counts them for /strategy."""
     problem = playbook_problem()
     if problem:
         return report(False, ["playbook: %s - the stack would not start on it: the user"
@@ -369,96 +324,12 @@ def up() -> int:
     print("waiting for the containers (a first build scrapes the sources: minutes)...")
     wait_for(URLS["data"], 30 * MINUTE, "the data layer")
     wait_for(URLS["ui"], 10 * MINUTE, "the board")
-    h = health()
-    if derive_pending(h):
-        h = health()
-    ok, lines = verdict(h)
-    if not ok and stale_mount(h["inference"]):
-        print("stale bind mounts detected; recreating the containers...")
-        sh("docker", "compose", "up", "-d", "--force-recreate", timeout=10 * MINUTE)
-        wait_for(URLS["ui"], 5 * MINUTE, "the board")
-        ok, lines = verdict(health())
-    return report(ok, lines)
+    return report(*verdict(health()))
 
 
 def status() -> int:
     """The verdict, touching nothing."""
     return report(*verdict(health()))
-
-
-# The agents' run may call exactly these tools - the ones the /refresh skill
-# names - on either server, and no built-in tool at all: no shell, no file
-# edits, no web.
-AGENT_TOOL_NAMES = ("db_status", "strategies", "tuning_log", "metrics", "facts", "infer",
-                    "query", "sync_all", "pull_rates", "pull_counters", "pull_synergies",
-                    "pull_seasons", "load_authored", "infer_strategy", "tune", "db_docs",
-                    "reach")
-# A refresh pull fetches dozens of pages at a polite pace: minutes, not the
-# seconds a tool call is given by default. MCP_TOOL_TIMEOUT is read in
-# milliseconds.
-AGENT_TOOL_TIMEOUT_MS = str(timedelta(minutes=45) // timedelta(milliseconds=1))
-AGENT_RUN_TIMEOUT = 4 * HOUR
-AGENT_TOOLS = ",".join("mcp__%s__%s" % (server, name)
-                       for server in ("countrix-docker", "countrix")
-                       for name in AGENT_TOOL_NAMES)
-
-
-def agents_command(claude: str | None = None) -> list[str]:
-    """The headless run: Claude Code in print mode on the /refresh skill, with
-    the stack's MCP tools allowed and nothing else."""
-    binary = claude or derive.require_cli()
-    return [binary, "-p", "/refresh", "--output-format", "text",
-            "--mcp-config", os.path.join(ROOT, ".mcp.json"), "--strict-mcp-config",
-            "--allowedTools", AGENT_TOOLS, "--tools", "", "--max-turns", "80",
-            "--no-session-persistence"]
-
-
-def agents() -> int:
-    """The agents' run, on the host, on the subscription; schedule it with cron
-    or launchd."""
-    print("agents: Claude Code, headless, on the /refresh skill (minutes)...")
-    try:
-        command = agents_command()
-    except derive.CliUnavailableError as error:
-        return report(False, [str(error)])
-    env = derive.clean_env()
-    env.update({k: v for k, v in dotenv().items() if k not in env})   # the token, for .mcp.json
-    env.setdefault("MCP_TOOL_TIMEOUT", AGENT_TOOL_TIMEOUT_MS)
-    env.setdefault("MCP_TIMEOUT", AGENT_TOOL_TIMEOUT_MS)
-    try:
-        done = subprocess.run(  # nosec B603  # argv from agents_command: the resolved claude binary and literal flags
-            command, cwd=ROOT, env=env, text=True, capture_output=True,
-            timeout=AGENT_RUN_TIMEOUT)
-    except subprocess.TimeoutExpired:
-        return report(False, ["agents: claude -p did not finish within %d hours"
-                              % (AGENT_RUN_TIMEOUT // HOUR)])
-    said = (done.stdout.strip() + "\n" + done.stderr.strip()).strip()
-    if done.returncode != 0 and derive.not_signed_in(said):
-        print(
-            "agents: skipped - the claude CLI is not signed in; run `%s login` once on"
-            " this machine (the stack is up; drafts stay pending)" % command[0])
-        return 0
-    print(said)
-    if done.returncode != 0:
-        return report(False, ["agents: claude -p exited %d" % done.returncode])
-    return status()
-
-
-def run() -> int:
-    """The stack up, the agents' run when the CLI is here, the app left running."""
-    code = up()
-    if code:
-        return code
-    if derive.available():
-        code = agents()
-        if code:
-            return code
-    else:
-        print(
-            "agents: skipped - no claude CLI signed in on this host (the stack is up;"
-            " drafts stay pending)")
-    print("\nthe app is up: %s" % BOARD)
-    return 0
 
 
 def report(ok: bool, lines: list[str]) -> int:
@@ -470,26 +341,6 @@ def report(ok: bool, lines: list[str]) -> int:
     return 0 if ok else 1
 
 
-def refresh() -> int:
-    """Refetch every source through the data layer's sync_all, then the status."""
-    print("refreshing every source through the data layer (minutes at a polite pace)...")
-    try:
-        print(mcp("sync_all", {"refresh": True}, timeout=HOUR))
-    except RuntimeError as error:
-        return report(False, ["refresh: sync_all failed - %s" % error])
-    return status()
-
-
-def test() -> int:
-    """The suite inside the image: coverage writes to the tmpfs (the root is
-    read-only); the shipped playbook is used whatever .env names."""
-    sh(
-        "docker", "compose", "run", "--rm", "-e", "COVERAGE_FILE=/tmp/.coverage",
-        "-e", "COUNTRIX_STRATEGIES=", "data",
-        "python", "-m", "pytest", "-q", "-p", "no:cacheprovider", "--cov", timeout=HOUR)
-    return 0
-
-
 def down() -> int:
     """Stop the containers; the database volume stays."""
     sh("docker", "compose", "down", timeout=5 * MINUTE)
@@ -498,12 +349,10 @@ def down() -> int:
 
 
 def main(argv: list[str]) -> int:
-    """Run one verb, `run` when none is named -> its exit code; 2, with the
+    """Run one verb, `up` when none is named -> its exit code; 2, with the
     usage on stderr, for anything else."""
-    verbs: dict[str, Callable[[], int]] = {
-        "run": run, "up": up, "agents": agents, "status": status, "refresh": refresh,
-        "test": test, "down": down}
-    verb = argv[0] if argv else "run"
+    verbs: dict[str, Callable[[], int]] = {"up": up, "status": status, "down": down}
+    verb = argv[0] if argv else "up"
     if len(argv) > 1 or verb not in verbs:
         print(__doc__, file=sys.stderr)
         return 2

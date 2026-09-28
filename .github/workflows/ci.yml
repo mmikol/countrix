@@ -5,8 +5,8 @@
 # when db/psql/cluster is absent (tests/conftest.py; COUNTRIX_NO_DATABASE=1
 # reproduces that locally), so what runs here is ruff, mypy and every test that
 # needs no database, and CI holds that suite to 78% coverage. The runs with a
-# database - the local one and `orchestrator.py test` inside the image -
-# enforce the 75% pyproject.toml sets.
+# database - the local cluster, or the stack's through ./docker-db - enforce
+# the 75% pyproject.toml sets.
 
 name: ci
 

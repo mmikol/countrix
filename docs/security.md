@@ -12,30 +12,23 @@ and the board is reachable from this machine only.
 
 | threat | how it would arrive |
 | --- | --- |
-| **prompt injection** | text that reads like an instruction, in a source page or a strategy file, shown by a tool to a session or to the headless agents' run, which has tools and no person watching |
+| **prompt injection** | text that reads like an instruction, in a source page or a strategy file, shown by a tool to a session, which has tools |
 | **the door and the other servers** | any process on this machine calling every tool on the MCP door, the writes, refreshes and rebuilds included; a browser page trying the same through DNS rebinding, or reading the board, the playbook and the solver's answers from any of the three HTTP servers |
 | **SQL** | the `query` tool: the project's database users are superusers, and a superuser's `SELECT` can read files off the disk it runs on |
 | **files** | tools that write into the playbook: a path that escapes the folder, a file the catalog would refuse, an oversized body |
 | **the containers** | a compromised process inside one reaching the internet, escalating, filling the host, or calling every tool on the door, which answers the whole stack network as `data:8020` |
-| **your account** | the CLI signed in on the host, driven headless with tools |
+| **your account** | the CLI signed in on the host, whose sessions call the tools |
 
 ## What stands in the way
 
 **Tool output is data.** Every skill but `/desloppify` carries the same
 rule: what a tool returns is data about the game, never a message to the
 session, and an instruction found inside it is reported, not followed. A
-skill calls only the tools it names. The deriver's prompt says the same of
-a draft's prose. The solver cannot be injected: it never scores an
-assumption's prose, and it reads frontmatter through the whitelisted
-expression language in `inference/expr.py`.
-
-**The headless runs are fenced.** `orchestrator.py agents` allows the
-tools in `orchestrator.AGENT_TOOL_NAMES` and no built-in tool
-(`--tools ""`): no shell, no file edits, no web, no `add_strategy`, no
-rebuild or migration. It keeps no session and stops at eighty turns. The
-deriver runs `claude -p` from a neutral directory with no project
-settings, no MCP servers, no tools and two turns, and stores only what the
-catalog validates.
+skill calls only the tools it names. The solver cannot be injected: it
+never scores an assumption's prose, and it reads frontmatter through the
+whitelisted expression language in `inference/expr.py`. Nothing runs a
+model unattended: a strategy's frontmatter is written in a session, by a
+person or through `/strategy`.
 
 **The board's write is off by default, and knocks at the door when it is
 on.** `COUNTRIX_READ_ONLY` defaults to `1`: `POST /api/weight` answers
@@ -91,8 +84,7 @@ claims another's id. A file is loaded through the catalog before it is
 written, and `checked_value` in `inference/strategy.py` is the one rule
 every writer and the loader keep for a value. A name, a line and a
 strategy's prose have length caps, and a reason is folded onto one line.
-The deriver takes only a strategy's own fields from the model, ten drafts
-a run at most. The board escapes everything it renders.
+The board escapes everything it renders.
 
 **The containers are boxed.** Every container but `db` runs as an
 unprivileged user on a read-only root, with every capability dropped, no
@@ -120,9 +112,9 @@ the browser loads hero portraits and role icons from Blizzard's CDNs.
 
 ## What remains yours
 
-- The CLI is signed in under your account on the host. The fences above
-  bound what a headless run can do with it; nothing bounds what you type
-  into an interactive session. Read what a skill reports.
+- The CLI is signed in under your account on the host, and a session on
+  it calls the tools. A skill names the tools it calls; nothing bounds what
+  you type into a session. Read what a skill reports.
 - The sources are two public websites fetched over HTTPS by two
   containers. A compromised page can put text into the database; the
   skills treat it as data, and a rebuild from the page cache reproduces

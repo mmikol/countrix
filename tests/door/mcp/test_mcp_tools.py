@@ -163,16 +163,9 @@ def test_metrics_tool_serves_the_vocabulary():
     assert text.splitlines()[0].startswith("team.")
 
 
-def test_derive_strategies_is_idle_with_nothing_pending():
-    text, data = tools.Context(dsn="postgresql://nowhere").call("derive_strategies")
-    assert data["skipped"] == "nothing pending" and "nothing pending" in text
-    assert data["deferred"] == 0
-
-
 def test_every_playbook_write_mirrors_the_catalog_once(tmp_path, monkeypatch):
     """tune, add_strategy and infer_strategy each reload the strategies table
-    once, after the write; derive_strategies with nothing derived connects to
-    nothing."""
+    once, after the write."""
     for name in catalog.strategy_files(FIXTURE_PLAYBOOK):
         shutil.copy(os.path.join(FIXTURE_PLAYBOOK, name), tmp_path / name)
     monkeypatch.setenv("COUNTRIX_STRATEGIES", str(tmp_path))
@@ -197,8 +190,6 @@ def test_every_playbook_write_mirrors_the_catalog_once(tmp_path, monkeypatch):
         direction="maximize", weight=1)
     assert len(mirrored) == 3
     assert not [h.id for h in catalog.load() if h.pending]
-    _, data = ctx.call("derive_strategies")
-    assert data["derived"] == [] and len(mirrored) == 3
 
 
 def test_add_strategy_stores_a_charge_with_a_numeric_penalty(tmp_path, monkeypatch):

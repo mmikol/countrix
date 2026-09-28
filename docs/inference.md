@@ -192,19 +192,16 @@ The solver never infers a formula or a weight from prose; a model does.
 The `/strategy` skill turns a name, a kind and up to three sentences into
 frontmatter, or into `kind: assumption` where nothing is measurable, and
 stores it through `add_strategy`. A file dropped in with only a name, a
-kind and prose is a draft, which `/strategy` completes through
-`infer_strategy`. Where the claude CLI is signed in - the host -
-`derive.py` completes drafts headless on `claude -p` when
-`load_authored`, `orchestrator.py up` or `derive_strategies` runs. No
-API key anywhere.
+kind and prose is a draft, which the solver ignores until `/strategy`
+completes it through `infer_strategy`. No API key anywhere.
 
 ## How the weights move
 
 The default engine's weights are constants in `inference/base.py`, and no
 slider moves them. The board's sliders override a weight for one board -
 `weights=<id>:<0..10>` on `/board`, `weights` on the `board` tool - and
-every result names the weights it was scored under. Four tools write a strategy file - `tune`,
-`add_strategy`, `infer_strategy` and `derive_strategies` - each validated
+every result names the weights it was scored under. Three tools write a strategy file - `tune`,
+`add_strategy` and `infer_strategy` - each validated
 through the catalog before it writes and logged with its reason in
 `strategies/tuning-log.md`; a slider's *store* is a `tune` call, which
 the board offers only with `COUNTRIX_READ_ONLY=0`.

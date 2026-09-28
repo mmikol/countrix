@@ -20,7 +20,6 @@ The playbook, which imports nothing from the search:
                   and documents them; AUTHORED, the `sources` row the
                   mirror carries
     tune          one validated, logged edit to a strategy file; add and complete
-    derive        the engine asking the model for a draft's frontmatter
 
 The search, which reads the playbook:
 

@@ -74,7 +74,7 @@ frontmatter, and the solver reads nothing else.
 
 ## Engineering
 
-- **952 tests, 97% line coverage** with the database built, against a 75%
+- **879 tests, 97% line coverage** with the database built, against a 75%
   floor. CI runs ruff, mypy and the database-free suite, held to 78%, on every
   push to main and every pull request.
 - **The search is held to brute force.** A CI gate enumerates every legal six
@@ -84,7 +84,7 @@ frontmatter, and the solver reads nothing else.
   pooled and single-process answers are pinned to agree exactly.
 - **Typed throughout.** mypy checks every source module in CI; records that
   cross a module boundary are dataclasses, NamedTuples or TypedDicts.
-- **One door for writes.** 36 MCP tools over stdio, HTTP or in-process, each
+- **One door for writes.** 31 MCP tools over stdio, HTTP or in-process, each
   schema-checked; the query tool runs as a read-only database login.
 - **Hardened containers.** Three services share one image and, with the
   nightly `pg_dump`, run unprivileged on a read-only root with every capability
@@ -93,7 +93,7 @@ frontmatter, and the solver reads nothing else.
 - **Tested documentation.** Relative links resolve, every setting is documented,
   and the generated schema, tool and catalog references match a fresh render.
 
-About 18,000 lines of Python and 14,000 of tests. Python 3.12, PostgreSQL 16,
+About 20,000 lines of Python and 15,000 of tests. Python 3.12, PostgreSQL 16,
 psycopg, requests and beautifulsoup4 for the scrapers, the standard library's
 HTTP server with no web framework, plain JavaScript with no build step, Docker
 Compose.
@@ -128,8 +128,6 @@ which scores the sixes on their win rates, synergies and counters.
 
 ```bash
 .venv/bin/python orchestrator.py status    # what is running, how fresh the data is
-.venv/bin/python orchestrator.py refresh   # refetch every source now
-.venv/bin/python orchestrator.py test      # the test suite inside the image
 .venv/bin/python orchestrator.py down      # stop everything; the database volume stays
 ```
 
@@ -154,16 +152,14 @@ holds the database:
 .venv/bin/python -m mypy db facts inference door ui orchestrator.py
 .venv/bin/python -m pytest -q --cov                                     # the full suite, 75% floor
 COUNTRIX_NO_DATABASE=1 .venv/bin/python -m pytest -q --cov --cov-fail-under=78   # what CI runs
+./docker-db .venv/bin/python -m pytest -q                               # against the stack's database
 ```
 
 Open the repo in [Claude Code](https://claude.com/claude-code) and the skills
 are there: `/comp` drafts a comp with cited reasons, `/tune` and `/strategy`
 edit the playbook through the door, `/heroes`, `/maps` and `/patches` keep
 the data current, `/maintain` runs the checks and keeps the docs current.
-[CLAUDE.md](CLAUDE.md) is the guide a session reads first. A bare
-`orchestrator.py` is `up` followed by the refresh agents: headless Claude Code
-sessions on the `/refresh` skill that refetch the sources and may tune the
-playbook. Without the `claude` CLI it stops after `up` and says what it skipped.
+[CLAUDE.md](CLAUDE.md) is the guide a session reads first.
 
 ## Documentation
 

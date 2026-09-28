@@ -39,8 +39,8 @@ Code on your subscription, and the board never calls a model.
 | folder | what it is | read |
 | --- | --- | --- |
 | `db/` | **DATA LAYER** - `data/` and `psql/` pull every source, clean it and store it, with the schema, its migrations and the embedded cluster; `web.py` is what the three HTTP servers share, from the Host-and-Origin guard to the one JSON reader. The bottom of the import graph: it imports nothing above it, and the layers over it read Postgres directly, over `db.psql.default_dsn()` | [db.md](db.md) |
-| `facts/` | **FACTS LAYER** - everything the database knows about a board: the World (the database in memory), the metrics registry, the FactSet. It imports only `db`; the solver, the deriver, the door and the board read the same numbers through it | [`facts/__init__.py`](../facts/__init__.py) |
-| `inference/` | **INFERENCE LAYER** - the playbook of constraints, heuristics and assumptions in markdown, the solver, the tuning loop, the deriver | [inference.md](inference.md) |
+| `facts/` | **FACTS LAYER** - everything the database knows about a board: the World (the database in memory), the metrics registry, the FactSet. It imports only `db`; the solver, the door and the board read the same numbers through it | [`facts/__init__.py`](../facts/__init__.py) |
+| `inference/` | **INFERENCE LAYER** - the playbook of constraints, heuristics and assumptions in markdown, the solver, the tuning loop | [inference.md](inference.md) |
 | `door/` | **THE DOOR** over all three layers - `mcp/`, the MCP server and its tools, under which every write runs; `refresh.py`, the clock that runs the tools daily and weekly | [mcp.md](mcp.md) |
 | `ui/` | **THE BOARD** - the page (map, sides, bans, red and blue rosters) over the facts layer's facts and the inference layer's answer: `board.py`, `pages.py` and `static/` - the only presentation code | [ui.md](ui.md) |
 | `tests/` | one folder per layer beside the root files' tests, with `synthetic.py`, a World of twelve released heroes, one announced hero and three maps built by hand, so a test works out its expected values with no database; `tests/fixtures/playbook/`, the reference playbook of every kind and form of strategy that the solver tests run on in place of `inference/strategies/`; and `tests/inference/record_reach.py`, the recorder that writes `tests/fixtures/reach.json`, a board per released hero, run from the repo root as `.venv/bin/python -m tests.inference.record_reach` | |
@@ -102,12 +102,12 @@ read Postgres directly ([mcp.md](mcp.md)).
 
 | file | purpose |
 | --- | --- |
-| `orchestrator.py` | the end-to-end run. `.venv/bin/python orchestrator.py` brings the stack up (the data container pulls and ingests when the database is empty or stale), runs the agents headless on the `/refresh` skill, and leaves the app running. Verbs: `run` (default) · `up` · `agents` · `status` · `refresh` · `test` · `down` |
+| `orchestrator.py` | the stack from a shell. `.venv/bin/python orchestrator.py` brings it up (the data container pulls and ingests when the database is empty or stale), waits, solves one board and prints the verdict. Verbs: `up` (default) · `status` · `down` |
 | `compose.yaml` | one container per role: `db` (PostgreSQL 16), `data` (the door: builds the database, then serves every MCP tool over HTTP), `ui` (the board, with the inference engine in the board's process and the solver's worker pool beside it), `refresher` (the door's clock) and `backup` (the nightly `pg_dump` into `backups/`). The three app containers share one image; `db` and `backup` run postgres's. Every container but `db` runs unprivileged on a read-only root with every capability dropped and memory and process limits; `db` keeps the five capabilities the postgres image needs to start as root, with no read-only root and no limits. Every port is published on 127.0.0.1 only. Bind mounts keep the caches, `inference/strategies`, `docs` and `backups` on the host, so tuning, authoring and regenerating need no rebuild |
 | `Dockerfile` | the one image, run as an unprivileged user (uid 1000, or `COUNTRIX_UID`/`GID` from `.env` on a Linux host whose checkout is owned by someone else); `docker-entrypoint.sh` takes the role as its argument and, for `data`, builds the database when it is empty, unfilled or behind the migrations |
-| `docker-db` | run any host command against the compose database: `./docker-db .venv/bin/python -m door.mcp call infer '{"map": "Ilios"}'`; `orchestrator.py up` derives the stack's pending drafts through it |
+| `docker-db` | run any host command against the compose database: `./docker-db .venv/bin/python -m door.mcp call infer '{"map": "Ilios"}'`, or the suite: `./docker-db .venv/bin/python -m pytest -q` |
 | `.mcp.json` | registers the two MCP servers a Claude Code session sees: `countrix` (stdio, the local cluster) and `countrix-docker` (HTTP, the stack's database) - [mcp.md](mcp.md) |
-| `requirements.txt` | psycopg, requests, beautifulsoup4 and pgserver pinned (pgserver is the embedded PostgreSQL a host build uses; the image and CI filter it out, since neither starts a cluster), then pytest and pytest-cov, and ruff and mypy pinned, since a new release of either finds new errors in unchanged code. CI and a local check run ruff and mypy; the image leaves them out |
+| `requirements.txt` | psycopg, requests, beautifulsoup4 and pgserver pinned (pgserver is the embedded PostgreSQL a host build uses; the image and CI filter it out, since neither starts a cluster), then pytest and pytest-cov, and ruff and mypy pinned, since a new release of either finds new errors in unchanged code. CI and a local check run all four; the image leaves them out |
 | `pyproject.toml` | ruff's rules (line length 100; outside the tests, an import sits in the module's import block); mypy's, which hold every function in `db`, `facts`, `inference`, `door`, `ui` and `orchestrator.py` to full annotations; the coverage bar, 75% where a database exists |
 | `pytest.ini` | the `invariant` marker for tests that need a built database |
 | `CLAUDE.md` | what a Claude Code session reads before it changes code: the commands, the layers in brief, what the tests hold a change to, the house rules and style |
@@ -176,7 +176,6 @@ refresh clock, which are read once at start:
 | `COUNTRIX_INFERENCE_HOST`, `COUNTRIX_INFERENCE_PORT` | `127.0.0.1`, `8019` | where the inference service listens, run on its own (`python -m inference.serve`); the stack runs none |
 | `COUNTRIX_INFERENCE_URL` | unset | the inference service the board delegates to; its handlers run in the board's process when unset, as in the stack. http or https: any other scheme stops the board at launch |
 | `COUNTRIX_MCP_TOKEN` | unset | bearer token the MCP server requires over HTTP |
-| `COUNTRIX_CLAUDE` | `claude` on `PATH`, else `~/.local/bin/claude` | the CLI the agents and `derive` run |
 | `COUNTRIX_MCP_URL` | unset | the MCP server the board's write goes to, a `tune`; in-process through the same registry when unset. http or https, like the inference URL |
 | `COUNTRIX_REPO_URL` | `https://github.com/mmikol/countrix` | the repository the board's header links to |
 | `DATABASE_URL` | unset | the PostgreSQL to use. Unset, the embedded pgserver cluster at `db/psql/cluster`, which `db_init` or `db_rebuild` builds: the local run, on the same tools, facts and strategies as the stack. With neither, `NoDatabaseError` |
@@ -197,8 +196,7 @@ holds the whole playbook; [mcp.md](mcp.md) has the servers and every tool.
 | `/patches` | pulls the patch list and, when a patch shipped since the capture, refetches what it changes: rates, kits, Blizzard's text | when a patch drops |
 | `/heroes` | adds or refreshes heroes: Blizzard's roster, the wiki's kits, styles and synergies, the announced heroes ahead of release, counters | when the roster moves |
 | `/maps` | adds or refreshes maps: the pool, modes and stages, their terrain, the per-map rates, the style each map rewards | when the pool moves |
-| `/refresh` | the agents' run: refresh, complete drafts, re-infer with restraint, regenerate, report | when `orchestrator.py agents` runs; the refresher container refreshes the data daily without it |
-| `/maintain` | the repo's maintainer: lint, types and tests three ways, docs current, stale names, dead code, layout, security posture, a report | after changes |
+| `/maintain` | the repo's maintainer: lint, types and tests two ways, docs current, stale names, dead code, layout, security posture, a report | after changes |
 | `/desloppify` | the desloppify harness's own skill, as `update-skill` writes it (CLAUDE.md): scores the code and drives the cleanup loop | when you ask for a score |
 
 ## The scope

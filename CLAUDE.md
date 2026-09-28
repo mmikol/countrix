@@ -31,13 +31,12 @@ COUNTRIX_NO_DATABASE=1 .venv/bin/python -m pytest -q -rs -p no:cacheprovider --c
 .venv/bin/python -m door.mcp list                 # the MCP tools; `call <tool> '<json>'` runs one in-process
 .venv/bin/python -m door.mcp call db_docs         # regenerate every generated doc section (needs the database)
 .venv/bin/python -m ui.board --port 8018          # the board, engine in-process (8017 is the compose board)
-.venv/bin/python orchestrator.py up|test|status|down   # the Docker stack; `up` rebuilds the image `test` runs in
+.venv/bin/python orchestrator.py up|status|down   # the Docker stack; a bare orchestrator.py is up
 ```
 
-A bare `orchestrator.py` is `run`: `up`, then the headless `claude -p /refresh`
-agents, which refetch the sources and may tune the playbook. Pulls and
-`db_rebuild` read the page caches, which keep a page forever; `'{"refresh":
-true}'` refetches everything from the network, minutes at the polite pace.
+Pulls and `db_rebuild` read the page caches, which keep a page forever;
+`'{"refresh": true}'` refetches everything from the network, minutes at the
+polite pace. The stack's `refresher` container refreshes the data daily.
 
 Tests marked `invariant` need the database and skip without one, through
 the `db` fixture. The suite targets `db/psql/cluster` when that
@@ -188,10 +187,8 @@ db <- facts <- inference <- door <- ui.
   an empty database: an invariant test applies it to a scratch database
   on the target server and compares the tables with the built one.
 - Only a door tool in `door/mcp/` calls the playbook's writers -
-  `catalog.mirror`, `tune.tune`/`add`/`complete`, `derive.derive` - and
-  `inference/derive.py`, which completes drafts inside a run the door
-  started. A new call site elsewhere fails the test; route it through a
-  tool.
+  `catalog.mirror` and `tune.tune`/`add`/`complete`. A new call site
+  elsewhere fails the test; route it through a tool.
 - Each layer imports only the layers below it: `db/` imports nothing above
   it, `facts/` only `db/`, `inference/` `db/` and `facts/`, `door/` all
   three; `ui/`, `tests/` and `orchestrator.py` import any of them. An
@@ -206,11 +203,9 @@ db <- facts <- inference <- door <- ui.
   compared with a fresh render. Never edit it by hand; change the source
   (a `@tool` description, strategy frontmatter, a migration comment) and
   regenerate.
-- Adding or renaming an MCP tool: regenerate docs/mcp.md; the backticked tool
-  names in `.claude/skills/refresh/SKILL.md` must equal
-  `orchestrator.AGENT_TOOL_NAMES`; each house skill must still name the tools
-  `MUST_NAME` (tests/test_docs.py) lists; tests/door/mcp/test_mcp.py holds the
-  tool set too.
+- Adding or renaming an MCP tool: regenerate docs/mcp.md; each house skill
+  must still name the tools `MUST_NAME` (tests/test_docs.py) lists;
+  tests/door/mcp/test_mcp.py holds the tool set too.
 - A new strategy file is cited as a ``- `id` `` line in `inference/README.md`.
   A house skill or a doc names a strategy only by an id the playbook
   holds: a backticked id the record cites and `inference/strategies/`
@@ -248,11 +243,11 @@ db <- facts <- inference <- door <- ui.
 ## House rules
 
 - A session never hand-edits the playbook. Changes go through `tune`,
-  `add_strategy`, `infer_strategy` or `derive_strategies` (`load_authored`
-  also derives drafts where the claude CLI is signed in). They validate,
-  rewrite the docs catalog for the shipped playbook and append a reasoned
-  line to `tuning-log.md` beside the playbook in force. A draft the user drops
-  in by hand (name, kind, prose) is input; the tools fill its frontmatter.
+  `add_strategy` or `infer_strategy`. They validate, rewrite the docs
+  catalog for the shipped playbook and append a reasoned line to
+  `tuning-log.md` beside the playbook in force. A draft the user drops in
+  by hand (name, kind, prose) is input; `/strategy` fills its frontmatter
+  through `infer_strategy`.
   Called without `directory=`, `tune`/`add`/`complete` rewrite the live
   playbook, so tests pass a temporary copy.
 - Migrations are `db/psql/migrations/NNN_name.sql`; new ones wrap in

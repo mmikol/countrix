@@ -20,14 +20,6 @@ DOCS = os.path.join(ROOT, "docs")
 SKILLS = os.path.join(ROOT, ".claude", "skills")
 LINK_RE = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 
-# the git index and the .claude folder are not in the Docker image; the
-# tests that read them skip there, not fail. A worktree's .git is a file.
-needs_git = pytest.mark.skipif(
-    not os.path.exists(os.path.join(ROOT, ".git")) or not shutil.which("git"),
-    reason="needs the git checkout")
-needs_skills = pytest.mark.skipif(not os.path.isdir(SKILLS),
-                                  reason="the skills are not in the image")
-
 
 def _read(*parts):
     with open(os.path.join(ROOT, *parts), encoding="utf-8") as handle:
@@ -95,16 +87,14 @@ def test_every_setting_the_code_reads_is_documented():
 
 
 # a call that writes the playbook's files or reloads the strategies table
-WRITER_RE = re.compile(r"\b(?:catalog|catalog_module)\.mirror\(|\btune\.(?:tune|add|complete)\("
-                       r"|\bderive\.derive\(")
+WRITER_RE = re.compile(r"\b(?:catalog|catalog_module)\.mirror\(|\btune\.(?:tune|add|complete)\(")
 
 
 def test_only_the_door_calls_the_playbook_writers():
     """docs/architecture.md's rule: the door gates every write. The code that
     writes the playbook and its table lives in inference/ (catalog.mirror,
-    tune.tune, tune.add, tune.complete, and derive.derive over them), and only
-    a door tool calls it - or inference/derive.py, inside a run the door
-    started. The board stores a weight through ctx.call, not tune."""
+    tune.tune, tune.add, tune.complete), and only a door tool calls it. The
+    board stores a weight through ctx.call, not tune."""
     assert WRITER_RE.search("        catalog.mirror(cx, cat)")
     assert not WRITER_RE.search('tool_context().call("tune", **arguments)')
     outside = []
@@ -112,7 +102,7 @@ def test_only_the_door_calls_the_playbook_writers():
         relative = os.path.relpath(path, ROOT)
         with open(path, encoding="utf-8") as handle:
             calls = WRITER_RE.search(handle.read())
-        if calls and not relative.startswith("door/mcp/") and relative != "inference/derive.py":
+        if calls and not relative.startswith("door/mcp/"):
             outside.append(relative)
     assert not outside, outside
 
@@ -260,7 +250,6 @@ def test_the_migrations_row_names_every_migration():
     assert not missing, missing
 
 
-@needs_git
 def test_the_overview_names_everything_at_the_root():
     tracked = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True,
                              text=True).stdout.split()
@@ -279,7 +268,6 @@ def _maps(doc, entry):
     return re.search(r"^ {2,}%s(?:\.py)?/?(?: {2,}|$)" % re.escape(stem), doc, re.M) is not None
 
 
-@needs_git
 def test_every_package_map_names_what_the_package_holds():
     """A package's __init__ docstring maps every tracked module, folder and
     file in it, the way the overview maps the root."""
@@ -317,8 +305,6 @@ MUST_NAME = {   # a skill is a playbook over these tools; if a tool is renamed, 
     "comp": {"infer", "facts", "board"},
     "tune": {"tune", "tuning_log", "strategies"},
     "strategy": {"metrics", "strategies", "add_strategy", "infer_strategy", "board", "db_docs"},
-    "refresh": {"db_status", "sync_all", "pull_seasons", "pull_rates", "pull_synergies",
-                "pull_counters", "infer_strategy", "db_docs", "load_authored"},
     "maintain": {"db_docs", "db_status", "strategies"},
     "patches": {"pull_patches", "pull_rates", "pull_kits", "pull_heroes", "db_docs"},
     "heroes": {"roster", "pull_heroes", "pull_kits", "pull_synergies", "pull_counters"},
@@ -332,7 +318,6 @@ def _skills():
             if os.path.isfile(os.path.join(SKILLS, name, "SKILL.md"))}
 
 
-@needs_skills
 def test_every_skill_has_frontmatter_and_names_its_tools():
     """Coverage, not identity: a coding tool may install its own playbook
     beside ours, and a skill this repo does not own does not decide the run."""
@@ -349,7 +334,6 @@ def test_every_skill_has_frontmatter_and_names_its_tools():
         assert MUST_NAME[name] <= named, (name, MUST_NAME[name] - named)
 
 
-@needs_skills
 def test_the_strategy_skill_names_only_arguments_the_writes_take():
     """A backticked word in the /strategy skill is a tool, an argument of
     add_strategy, infer_strategy or tune, the server's name or the breakdown's
@@ -363,8 +347,7 @@ def test_the_strategy_skill_names_only_arguments_the_writes_take():
 
 
 def test_the_overview_indexes_every_skill():
-    """docs/architecture.md's skills table has a row for every house skill.
-    It reads no skill file, so it runs in the image too."""
+    """docs/architecture.md's skills table has a row for every house skill."""
     doc = _read("docs", "architecture.md")
     for name in MUST_NAME:
         assert "| `/%s` |" % name in doc, name
@@ -388,7 +371,6 @@ def test_every_shipped_strategy_is_in_the_playbook_sources():
     assert shipped and shipped <= cited, sorted(shipped - cited)
 
 
-@needs_skills
 def test_the_skills_name_only_strategies_the_playbook_holds():
     """A skill's worked example or a doc's rule names a strategy by its id;
     an id the record cites and inference/strategies/ no longer holds is a

@@ -1,16 +1,14 @@
 """The playbook through the door: the metric vocabulary a strategy may
 reference, the catalog, the tools that write a strategy file - tune,
-add_strategy, infer_strategy, derive_strategies - the tuning log, and the
-strategy files served as MCP resources.
+add_strategy, infer_strategy - the tuning log, and the strategy files
+served as MCP resources.
 
 Every write validates through the catalog, rewrites the docs catalog for the
 shipped playbook and logs a reasoned line (inference.tune does all three),
 then reloads the strategies table from the files (_remirror): the database
-half of the write, and the one step this module adds. derive_strategies
-reloads only when it completed a draft, since otherwise it wrote nothing.
-The frontmatter fields the writes take are declared from
-inference.strategy.FIELDS, the rule that checks them, so the door admits
-what a file may hold.
+half of the write, and the one step this module adds. The frontmatter
+fields the writes take are declared from inference.strategy.FIELDS, the
+rule that checks them, so the door admits what a file may hold.
 """
 
 import os
@@ -20,7 +18,7 @@ from door.mcp.registry import Context, tool
 from door.mcp.schema import Properties, Property, ToolReply
 from door.mcp.server import NoSuchResourceError, Resource, ResourceText
 from facts import compute
-from inference import catalog, derive, tune
+from inference import catalog, tune
 from inference.strategy import FIELDS, TUNABLE, Field, FieldKind
 
 
@@ -80,7 +78,7 @@ STRATEGY_FIELDS: Properties = {
 
 
 # who asked, for the log line: the three writers take it alike, so a
-# headless agent names itself whichever it calls
+# caller names itself whichever it calls
 BY: Properties = {
     "by": {"type": "string", "description": "who asked, for the log line (default %s;"
                                            " the board says so)" % tune.BY_SESSION}}
@@ -161,21 +159,6 @@ def infer_strategy(
     _remirror(ctx)
     return ToolReply("%s is now %s: %s\n%s" % (id, done["form"], ", ".join(
         "%s=%s" % kv for kv in done["set"].items()), done["line"]), done)
-
-
-@tool(
-    "derive_strategies", "Complete every draft (a strategy with only a name, a kind"
-    " and prose) by asking Claude Code in print mode - the subscription, no key -"
-    " for the frontmatter, validated through the catalog and logged. Runs where"
-    " the claude CLI is signed in (the host); elsewhere drafts stay pending.",
-    {"ids": {
-        "type": "array", "items": {"type": "string"},
-        "description": "which drafts (default: all)"}})
-def derive_strategies(ctx: Context, ids: list[str] | None = None) -> ToolReply:
-    result = derive.derive(ids, log=ctx.log)
-    if result["derived"]:
-        _remirror(ctx)
-    return ToolReply(derive.derive_rendered(result), result)
 
 
 @tool(

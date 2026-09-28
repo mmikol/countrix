@@ -18,8 +18,7 @@ one of them.
     schema       a tool as the protocol serves it: its arguments as JSON
                  Schema, its reply, and the Tool that checks every call
     client       the one client that calls the door over HTTP: call_tool, a
-                 tools/call read into a CallReply, for the board and
-                 orchestrator.py
+                 tools/call read into a CallReply, for the board
     registry     the one Registry every family declares its tools into, the
                  order it lists the families in, and the Context a call
                  lands in

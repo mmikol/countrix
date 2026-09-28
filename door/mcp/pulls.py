@@ -32,7 +32,7 @@ from db.data.wiki import synergies as wiki_synergies
 from db.data.wiki import terrain as wiki_terrain
 from door.mcp.registry import REFRESH, Context, tool
 from door.mcp.schema import ToolReply
-from inference import catalog, derive
+from inference import catalog
 
 # A pull's own function: the source module's run(connection, pull).
 type PullFn = Callable[[psycopg.Connection, cache.PullContext], PullSummary]
@@ -219,16 +219,11 @@ def pull_counters(connection: psycopg.Connection, pull: cache.PullContext) -> Pu
 
 @tool(
     "load_authored", "Store the playbook, the one input a user writes: the mirror"
-    " of the strategies in inference/strategies/. A whole-truth reload; where the"
-    " claude CLI is present, it first completes pending drafts as"
-    " derive_strategies does, writing their files and the tuning log.")
+    " of the strategies in inference/strategies/. A whole-truth reload; a draft"
+    " is mirrored as it is and counted, for /strategy to complete.")
 def load_authored(ctx: Context) -> ToolReply:
     with ctx.connect() as cx:
         cat = catalog.load()
-        if any(s.pending for s in cat) and derive.available():
-            # drafts on a host with the CLI: the engine derives them now
-            ctx.log(derive.derive_rendered(derive.derive(log=ctx.log)))
-            cat = catalog.load()
         summary = catalog.mirror(cx, cat)
         pending = [s.id for s in cat if s.pending]
         if pending:
