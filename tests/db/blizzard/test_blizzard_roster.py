@@ -209,7 +209,7 @@ def test_a_hero_page_that_will_not_fetch_is_recorded_and_the_rest_are_stored(mon
         return HERO if key == "tracer" else ROSTER
     monkeypatch.setattr(blizzard_heroes, "cached_get", pages)
     connection = RecordingConnection()
-    summary = blizzard_heroes.run(connection, cache.PullContext(None, log=lambda line: None))
+    summary = blizzard_heroes.run(connection, cache.PullContext("cache", log=lambda line: None))
     assert [line.split(":")[0] for line in summary["missing"]] == ["Ana"]
     assert summary["heroes"] == 2 and summary["abilities"] == 2 and summary["perks"] == 4
     [cursor] = connection.cursors
@@ -233,5 +233,5 @@ def test_a_changed_hero_page_fails_the_pull_and_is_not_counted_missing(monkeypat
     monkeypatch.setattr(blizzard_heroes, "cached_get", pages)
     connection = RecordingConnection()
     with pytest.raises(BlizzardError, match="tracer: expected 1 carousel, found 0"):
-        blizzard_heroes.run(connection, cache.PullContext(None, log=lambda line: None))
+        blizzard_heroes.run(connection, cache.PullContext("cache", log=lambda line: None))
     assert connection.cursors == [] and connection.commits == 0

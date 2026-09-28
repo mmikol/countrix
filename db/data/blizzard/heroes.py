@@ -220,9 +220,9 @@ def _clear_wiki_kits(
     that holds no Blizzard row in the table: the wiki's kit of a hero it
     announced, or of one listed on a pull its page would not fetch in. The
     wiki stores that kit in an order of its own, and Blizzard's carousel,
-    weapon first, would collide with it on position. The stats and perk
-    links cascade with the rows; pull_kits, run after, adds back what
-    Blizzard omits. A hero whose page would not fetch keeps its rows."""
+    weapon first, would collide with it on position. The stats cascade
+    with the rows; pull_kits, run after, adds back what Blizzard omits. A
+    hero whose page would not fetch keeps its rows."""
     for table, parsed in (("abilities", abilities_by_slug), ("perks", perks_by_slug)):
         cursor.execute(
             SQL("DELETE FROM {table} WHERE hero_id IN"

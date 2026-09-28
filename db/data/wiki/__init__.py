@@ -16,14 +16,13 @@ Page to table, each ends in run(connection, pull):
                     Match-Up column and its Strategy section
     patches         game versions from the Patches cargo table
     playstyles      the team-composition playstyles (dive, brawl, poke)
-    seasons         the seasons that have started, from the Season pages
     synergies       pairs that work together, from the same section's
                     Synergy column
 
 The heroes pull's kit pipeline, no run():
 
     kits/           each hero's kit: read from its Cargo rows and its
-                    article, its stats, weapons and modifiers parsed, stored
+                    article, its stats and weapons parsed, stored
 
 The readers the loaders share, no run():
 

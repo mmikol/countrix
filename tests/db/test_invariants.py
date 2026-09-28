@@ -113,16 +113,13 @@ def test_no_measurement_is_stored_twice(one):
 
 # --- snapshots: population and delineation -------------------------------
 
-def test_every_snapshot_is_fully_delineated(one):
-    assert one("""select count(*) from meta_snapshots
-                  where patch_id is null or season_id is null""") == 0
+def test_every_snapshot_names_its_patch(one):
+    assert one("select count(*) from meta_snapshots where patch_id is null") == 0
 
 
-def test_delineators_predate_their_capture(one):
-    assert one("""select count(*) from meta_snapshots ms
-        join patches p using(patch_id) join seasons s using(season_id)
-        where p.released > ms.captured_at::date
-            or s.started > ms.captured_at::date""") == 0
+def test_a_snapshots_patch_predates_its_capture(one):
+    assert one("""select count(*) from meta_snapshots ms join patches p using(patch_id)
+        where p.released > ms.captured_at::date""") == 0
 
 
 def test_meta_records_the_queue_it_came_from(rows):
@@ -165,12 +162,6 @@ def test_synergies_are_the_wikis_scored_one_or_two_with_a_short_note(rows, one):
                   join heroes a on a.hero_id = s.hero_id
                   join heroes b on b.hero_id = s.other_id
                   where a.status <> 'released' or b.status <> 'released'""") == 0
-
-
-def test_seasons_have_started_and_name_their_wiki_page(one):
-    assert one("select count(*) from seasons") > 0
-    assert one("select count(*) from seasons where started > current_date") == 0
-    assert one("select count(*) from seasons where note not like 'Season/%'") == 0
 
 
 def test_synergies_are_canonical_pairs(one):

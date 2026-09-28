@@ -38,8 +38,8 @@ change only what a check or the user points at, and leave a report.
 2. **The documentation is current.** `tests/test_docs.py` fails when the
    generated sections of `docs/` are behind the code; the fix is the
    `db_docs` tool (`.venv/bin/python -m door.mcp call db_docs`, or the tool
-   on the MCP server), which rewrites the ER diagrams and data dictionary
-   in `docs/db.md`, the catalog in `docs/inference.md` and the tool
+   on the MCP server), which rewrites the data dictionary in
+   `docs/db.md`, the catalog in `docs/inference.md` and the tool
    reference in `docs/mcp.md`. The hand-written parts are yours: after a
    change to a module, a tool, a skill, a verb or a folder, read what
    describes it and make it say what is true now: the module's docstring

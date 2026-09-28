@@ -56,7 +56,7 @@ How they fit:
 flowchart LR
     subgraph SOURCES["sources (free, no data APIs)"]
         BLZ["Blizzard<br/>roster, portraits, rates"]
-        WIKI["Overwatch wiki<br/>kits, numbers, keywords,<br/>maps, terrain, patches, seasons,<br/>styles, synergies, counters"]
+        WIKI["Overwatch wiki<br/>kits, numbers, keywords,<br/>maps, terrain, patches,<br/>styles, synergies, counters"]
     end
 
     subgraph DATA["the door - door/mcp/ (an MCP server over all three layers)"]
@@ -128,7 +128,7 @@ flowchart LR
         DATA["data - the door<br/>builds when empty or stale,<br/>then MCP over HTTP :8020/mcp"]
         UI["ui - the board and the<br/>INFERENCE ENGINE :8017<br/>facts and comps in-process,<br/>the solver's worker pool"]
         DBC["db - postgres:16<br/>volume pgdata"]
-        REF["refresher - the door's clock<br/>seasons + rates daily,<br/>every source weekly,<br/>and on start when stale"]
+        REF["refresher - the door's clock<br/>patches + rates daily,<br/>every source weekly,<br/>and on start when stale"]
         BAK["backup - postgres:16<br/>pg_dump nightly at 04:30,<br/>the newest 14 in ./backups"]
     end
     SESSION -->|".mcp.json: countrix-docker"| DATA
@@ -202,9 +202,9 @@ over them; a line whose 5v5 figure has moved since the wiki wrote it is
 left unapplied and named on the board. The 5v5 figures stay stored, so a
 5v5 reading of the kit is one constant away. No source publishes Open
 Queue rates, so META is Competitive Role Queue on console (Americas), and
-every snapshot fact says so. Rates carry the patch and season they were captured under, and
-the board warns when patches shipped since. Judgements (counters,
-synergies, playstyles) are tier- and region-agnostic by design, and a
+every snapshot fact says so. Rates carry the patch they were captured
+under, and the board warns when patches shipped since. Judgements
+(counters, synergies, playstyles) are tier- and region-agnostic by design, and a
 table is a table: every row carries its source, and that is the only
 distinction drawn between measured, judged and hand-written data. One
 input is hand-written: the strategies. Players are assumed to play

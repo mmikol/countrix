@@ -2,15 +2,13 @@
 
 Loads weapons and their firing configs, classifies every ability, adds the
 abilities Blizzard does not publish, stores each ability's keywords, and
-attaches stat measurements to abilities, weapons and perks, with the
-modifiers an ability applies and the abilities a perk alters, then the 6v6
+attaches stat measurements to abilities, weapons and perks, then the 6v6
 kit beside the 5v5 one: the pools on the hero's row, the lines in kit_6v6.
-The weapon, stat, modifier and 6v6 tables are reloaded whole; the hero,
-ability and perk rows blizzard.heroes owns are filled in, never replaced.
+The weapon, stat and 6v6 tables are reloaded whole; the hero, ability and
+perk rows blizzard.heroes owns are filled in, never replaced.
 """
 
 import dataclasses
-import re
 from collections.abc import Iterable, Mapping
 from types import MappingProxyType
 from typing import NamedTuple, TypedDict
@@ -20,7 +18,6 @@ from psycopg.sql import SQL
 
 from db import KIND_WEAPON, PERK_TIERS, psql
 from db.data.normalizer import ability_key, name_key
-from db.data.wiki.kits import modifiers
 from db.data.wiki.kits.hero_articles import HeroProfile
 from db.data.wiki.kits.kit_rows import AbilityEntry, HeroKit, PerkEntry, WeaponEntry
 from db.data.wiki.kits.measurements import parse_measurements
@@ -64,10 +61,8 @@ class KitCounts(TypedDict):
     classified: int
     added: int
     abilities_with_stats: int
-    modifiers: int
     perks_announced: int
     perks_with_stats: int
-    perk_links: int
     health: int
     six_pools: int
     six_lines: int
@@ -83,30 +78,6 @@ class _StorePass:
     kind_ids: Mapping[str, int]
     source_id: int
     tally: KitCounts
-
-
-def _insert_modifiers(store_pass: _StorePass, ability_id: int, entry: AbilityEntry) -> None:
-    """Store the buffs and debuffs an ability applies to someone's numbers."""
-    cursor = store_pass.cursor
-    keywords = entry["keywords"]
-    for code, value_text in entry["stats"].items():
-        affects = modifiers.affected_quantity(code, value_text, keywords)
-        if affects is None:
-            continue                # not a modifier stat, or the wording settles nothing
-        for measured in parse_measurements(value_text, "percent"):
-            if measured.value is None or measured.numerator is None:
-                continue
-            cursor.execute(
-                "INSERT INTO ability_modifiers (ability_id, stat_key_id, affects,"
-                " applies_to, magnitude, unit, source_id)"
-                " VALUES (%s, %s, %s, %s, %s, %s, %s)"
-                " ON CONFLICT (ability_id, stat_key_id, affects, magnitude)"
-                " DO NOTHING",
-                (ability_id, store_pass.key_ids[code], affects,
-                 modifiers.applies_to(code, value_text, keywords),
-                 measured.value, measured.numerator, store_pass.source_id),
-            )
-            store_pass.tally["modifiers"] += cursor.rowcount
 
 
 def _register_stat_keys(
@@ -248,32 +219,11 @@ def _load_abilities(
         if entry["stats"]:
             store_pass.tally["abilities_with_stats"] += 1
         _insert_stats(store_pass, "ability_stats", "ability_id", ability_id, entry["stats"])
-        _insert_modifiers(store_pass, ability_id, entry)
-
-
-def _abilities_named_in(description: str, ability_names: Iterable[str]) -> list[str]:
-    """Ability names this text names, longest first so overlaps resolve.
-
-    Matching is scoped to one hero's kit, so a bare name cannot collide with a
-    different hero's ability.
-    """
-    found: list[str] = []
-    for name in sorted(ability_names, key=len, reverse=True):
-        # Skip a name already covered by a longer one just matched.
-        if re.search(r"\b%s\b" % re.escape(name), description) and not any(
-                name in seen for seen in found):
-            found.append(name)
-    return found
 
 
 def _load_perks(store_pass: _StorePass, hero_id: int, perks: list[PerkEntry]) -> None:
-    """Perk stats, and the link from a perk to the ability it alters."""
+    """Each perk's stats; an announced hero's perks get rows of their own."""
     cursor = store_pass.cursor
-    ability_names: list[str] = [
-        row[0] for row in cursor.execute(
-            "SELECT name FROM abilities WHERE hero_id = %s", (hero_id,)
-        ).fetchall()
-    ]
     perk_ids: dict[str, int] = {
         ability_key(row[0]): row[1]
         for row in cursor.execute(
@@ -309,20 +259,11 @@ def _load_perks(store_pass: _StorePass, hero_id: int, perks: list[PerkEntry]) ->
         if entry["stats"]:
             store_pass.tally["perks_with_stats"] += 1
         _insert_stats(store_pass, "perk_stats", "perk_id", perk_id, entry["stats"])
-        for name in _abilities_named_in(entry["description"], ability_names):
-            cursor.execute(
-                "INSERT INTO perk_ability_effects (perk_id, ability_id,"
-                " source_id) SELECT %s, ability_id, %s FROM abilities"
-                " WHERE hero_id = %s AND name = %s"
-                " ON CONFLICT DO NOTHING",
-                (perk_id, store_pass.source_id, hero_id, name),
-            )
-            store_pass.tally["perk_links"] += cursor.rowcount
 
 
 # Every table the store reloads whole, dependents first.
-RELOADED = ("kit_6v6", "ability_modifiers", "perk_ability_effects", "perk_stats",
-            "weapon_stats", "ability_stats", "weapon_configs", "weapons")
+RELOADED = ("kit_6v6", "perk_stats", "weapon_stats", "ability_stats", "weapon_configs",
+            "weapons")
 
 
 class Stored(NamedTuple):
@@ -363,8 +304,7 @@ def store(
     kind_ids = psql.lookup_ids(cursor, "ability_kinds", "code", "kind_id")
     store_pass = _StorePass(cursor, key_ids, kind_ids, source_id, KitCounts(
         weapons=0, configs=0, stats=0, classified=0, added=0, abilities_with_stats=0,
-        modifiers=0, perks_announced=0, perks_with_stats=0, perk_links=0, health=0,
-        six_pools=0, six_lines=0))
+        perks_announced=0, perks_with_stats=0, health=0, six_pools=0, six_lines=0))
 
     for hero_name, profile in profiles.items():
         hero_id = hero_ids.get(name_key(hero_name))

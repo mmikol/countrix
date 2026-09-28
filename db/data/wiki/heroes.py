@@ -116,6 +116,5 @@ def run(connection: psycopg.Connection, pull: cache.PullContext) -> KitsSummary:
         **stored.tally, cargo_rows=len(rows), supplemented=supplement.stats,
         missing=supplement.articles.missing, unknown_heroes=stored.unknown_heroes,
         announced=announced, rejected_6v6=rejected,
-        tables=["abilities", "ability_stats", "ability_modifiers", "weapons",
-                "weapon_configs", "weapon_stats", "perks", "perk_stats",
-                "perk_ability_effects", "stat_keys", "heroes", "kit_6v6"])
+        tables=["abilities", "ability_stats", "weapons", "weapon_configs", "weapon_stats",
+                "perks", "perk_stats", "stat_keys", "heroes", "kit_6v6"])

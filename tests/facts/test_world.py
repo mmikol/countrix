@@ -22,8 +22,8 @@ def test_every_data_table_is_read_by_the_load(world, rows):
         t for (t,) in rows("select tablename from pg_tables where schemaname='public'")
         if t != "schema_migrations" and not re.search(r"\b%s\b" % t, src)]
     assert unread == [], unread
-    modifiers = sum(len(h.modifiers) for h in world.heroes.values())
-    assert modifiers == rows("select count(*) from ability_modifiers")[0][0]
+    perks = sum(len(h.perks) for h in world.heroes.values())
+    assert perks == rows("select count(*) from perks")[0][0]
 
 
 @pytest.mark.invariant

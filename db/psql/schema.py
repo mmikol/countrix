@@ -11,8 +11,8 @@ and the generated documentation.
     drop_all, rebuild        drop every table and reapply every migration
     table_prose              a table's description: the -- block directly
                              above its CREATE TABLE
-    generate_docs            the ERD and data dictionary of docs/db.md from
-                             the live schema
+    generate_docs            the data dictionary of docs/db.md from the live
+                             schema
 
     python -m db.psql.schema     print the state (the container entrypoint's
                                  probe); exit 1 when the database never answers
@@ -24,7 +24,7 @@ import os
 import re
 import sys
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal, NamedTuple
 
@@ -46,7 +46,7 @@ DOC_DOMAIN = {
     "010_constraints_and_heuristics.sql": "INFERENCE",
     "020_map_terrain.sql": "MAPS", "021_stage_terrain.sql": "MAPS",
     "025_kit_6v6.sql": "HEROES"}
-# The domains in the order the diagrams and the dictionary list them.
+# The domains in the order the dictionary lists them.
 DOMAINS = ("HEROES", "MAPS", "META", "PLAYBOOK", "INFERENCE")
 
 
@@ -242,7 +242,7 @@ def _foreign_keys(connection: psycopg.Connection) -> list[ForeignKey]:
         " WHERE c.contype = 'f' AND c.connamespace = 'public'::regnamespace"
         " ORDER BY 1, 2, 5, 3, 4").fetchall()
     # a column under two keys (its own, and part of a composite) is documented
-    # by the narrower one; the composite still draws its edge in the diagram
+    # by the narrower one
     return [ForeignKey(child=child, column=column, parent=parent, parent_column=parent_column)
             for child, column, parent, parent_column, _ in rows]
 
@@ -255,56 +255,6 @@ def _columns(connection: psycopg.Connection, table: str) -> list[Column]:
         (table,)).fetchall()
     return [Column(name=name, data_type=data_type, nullable=nullable == "YES")
             for name, data_type, nullable in rows]
-
-
-def _edges(fks: list[ForeignKey], keep: Callable[[str], bool]) -> list[str]:
-    """The mermaid lines for the id columns of the child tables `keep` accepts,
-    one per edge, sorted; the edges to `sources` are left off."""
-    seen: set[str] = set()
-    for fk in fks:
-        if fk.column.endswith("_id") and fk.parent != "sources" and keep(fk.child):
-            seen.add('    %s ||--o{ %s : "%s"' % (fk.parent, fk.child, fk.column))
-    return sorted(seen)
-
-
-def _erd(tables: list[str], fks: list[ForeignKey], domain: dict[str, str]) -> str:
-    """The ER diagrams: one per domain, then the whole database."""
-    erd = [
-        "Five domains. Three hold the data the sources are pulled for: which",
-        "hero (HEROES), on which map (MAPS), performing how well (META).",
-        "Every domain",
-        "yields independent facts (a selection's own row) and dependent ones",
-        "(the selection joined with others: map_meta is heroes ⋈ maps ⋈ meta,",
-        "counters and synergies are heroes ⋈ heroes), and a join belongs to",
-        "every domain it touches. Two are the playbook's record: the",
-        "judgements pulled from the wiki (PLAYBOOK) and the mirror of the",
-        "strategies that the inference layer solves with (INFERENCE). The",
-        "strategies are the one input a user writes; every other table is",
-        "pulled. The composition is the argmax of the strategies - the",
-        "constraints, heuristics and assumptions in inference/strategies/ -",
-        "over the facts.",
-        "",
-        "```",
-        "DATA        = HEROES ∪ MAPS ∪ META",
-        "FACTS(D)    = INDEPENDENT(D) ∪ DEPENDENT(D)   for each domain D: its rows; its joins",
-        "FACTS       = FACTS(HEROES) ∪ FACTS(MAPS) ∪ FACTS(META)",
-        "STRATEGIES  = CONSTRAINTS ∪ HEURISTICS ∪ ASSUMPTIONS",
-        "COMP        = ARGMAX[ STRATEGIES( FACTS ) ]",
-        "```",
-        "",
-        "Every table but `sources` and `schema_migrations` also carries",
-        "`source_id` -> `sources` and a `cao` timestamp. Those edges are left off -",
-        "they would connect `sources` to %d tables and obscure everything else."
-        % (len(tables) - 2),
-        "",
-    ]
-    for d in DOMAINS:
-        members = {t for t, owner in domain.items() if owner == d}
-        erd += ["#### %s" % d, "", "```mermaid", "erDiagram",
-                *_edges(fks, members.__contains__), "```", ""]
-    erd += ["#### The whole database", "", "```mermaid", "erDiagram",
-            *_edges(fks, lambda child: True), "```", ""]
-    return "\n".join(erd)
 
 
 def _dictionary(
@@ -347,17 +297,16 @@ def _dictionary(
 
 
 def generate_docs(connection: psycopg.Connection, path: str | None = None) -> str:
-    """Write the ER diagrams and the data dictionary into docs/db.md (or
-    `path`) from the live schema and the migrations' prose -> a summary line."""
+    """Write the data dictionary into docs/db.md (or `path`) from the live
+    schema and the migrations' prose -> a summary line."""
     origins = _migration_tables()
     tables = table_names(connection)
     columns = {t: _columns(connection, t) for t in tables}
     fks = _foreign_keys(connection)
     domain = {t: DOC_DOMAIN.get(origins.get(t, NO_ORIGIN).migration, "foundation") for t in tables}
     path = path or os.path.join(ROOT, "docs", "db.md")
-    embed(path, "erd", _erd(tables, fks, domain))
     embed(path, "dictionary", _dictionary(tables, columns, fks, domain, origins))
-    return "regenerated the schema sections of docs/db.md: %d tables" % len(tables)
+    return "regenerated the data dictionary of docs/db.md: %d tables" % len(tables)
 
 
 # --- the entrypoint's probe ----------------------------------------------

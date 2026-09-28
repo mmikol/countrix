@@ -1,8 +1,7 @@
 """The store stage of the kits pull, db/data/wiki/kits/kit_store.py, over a
 recording cursor: the tables it reloads, the stat keys, the pools a profile
-sets, weapons and their configs, the abilities it classifies and adds, a
-modifier read off an ability's wording, perk stats and the abilities a perk
-alters, an announced hero's perks, and the 6v6 kit beside the 5v5 one. No
+sets, weapons and their configs, the abilities it classifies and adds, perk
+stats, an announced hero's perks, and the 6v6 kit beside the 5v5 one. No
 database."""
 
 from db import KIND_ABILITY, KIND_PASSIVE
@@ -34,8 +33,8 @@ def _perk(name, tier="minor", description="", **stats):
 def test_the_store_reloads_the_kit_tables_and_fills_what_blizzard_loaded():
     """Anvil's hammer and Barrier Field are on file from Blizzard: the store
     classifies both, adds the passive Blizzard does not publish with the
-    damage it shrugs off, stats every piece, links the perk to the ability
-    it names, and skips a wiki page that is no hero."""
+    damage it shrugs off, stats every piece, and skips a wiki page that is
+    no hero."""
     anvil = HeroKit(
         weapons=[_weapon("Rocket Hammer", damage="100")],
         abilities=[_ability("Barrier Field", barrier_health="1200"),
@@ -48,7 +47,6 @@ def test_the_store_reloads_the_kit_tables_and_fills_what_blizzard_loaded():
         ('SELECT "code", "kind_id" FROM "ability_kinds"', KINDS),
         ("SELECT name, ability_id FROM abilities", [("Barrier Field", 11), ("Rocket Hammer", 10)]),
         ("SELECT coalesce(max(position), -1) + 1 FROM abilities", [(2,)]),
-        ("SELECT name FROM abilities", [("Barrier Field",), ("Rocket Hammer",), ("Steadfast",)]),
         ("SELECT name, perk_id FROM perks", [("Shield Bash", 21)])])
     profiles = {"Anvil": HeroProfile(health=400, shield=0, armor=300),
                 "Nobody": HeroProfile(health=1, shield=None, armor=None)}
@@ -56,10 +54,10 @@ def test_the_store_reloads_the_kit_tables_and_fills_what_blizzard_loaded():
     assert unknown == ["All heroes"]
     assert tally == {
         "weapons": 1, "configs": 1, "stats": 4, "classified": 2, "added": 1,
-        "abilities_with_stats": 2, "modifiers": 1, "perks_announced": 0,
-        "perks_with_stats": 1, "perk_links": 1, "health": 1, "six_pools": 0, "six_lines": 0}
+        "abilities_with_stats": 2, "perks_announced": 0, "perks_with_stats": 1, "health": 1,
+        "six_pools": 0, "six_lines": 0}
     # the reloaded tables go first, dependents before what they hang on
-    assert [text for text, _ in cursor.statements[:8]] == [
+    assert [text for text, _ in cursor.statements[:len(kit_store.RELOADED)]] == [
         'DELETE FROM "%s"' % table for table in kit_store.RELOADED]
     # every code any kit carries, sorted
     assert cursor.written("INSERT INTO stat_keys") == [
@@ -74,11 +72,6 @@ def test_the_store_reloads_the_kit_tables_and_fills_what_blizzard_loaded():
     assert cursor.written("UPDATE abilities") == [(1, "melee", 10), (2, None, 11)]
     assert cursor.written("INSERT INTO abilities") == [
         (1, 4, "Steadfast", "Takes less damage.", None, 2, SOURCE)]
-    # Steadfast, id 7, reduces the damage its owner takes
-    assert cursor.written("INSERT INTO ability_modifiers") == [
-        (7, 4, "damage_taken", "self", 30.0, "percent", SOURCE)]
-    assert cursor.written("INSERT INTO perk_ability_effects") == [
-        (21, SOURCE, 1, "Barrier Field")]
     stats = [params for text, params in cursor.statements if text.startswith(
         ('INSERT INTO "weapon_stats"', 'INSERT INTO "ability_stats"', 'INSERT INTO "perk_stats"'))]
     assert [(owner, key, value) for owner, key, value, *_ in stats] == [

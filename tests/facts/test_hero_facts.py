@@ -11,7 +11,7 @@ from facts.draft import Draft
 from facts.factset import FactSet
 from facts.kit import KitPiece, Stat
 from facts.model import Resolved
-from facts.records import Modifier, PerkEffect, Rates
+from facts.records import Rates
 
 
 def _facts(world, name, *, team="blue", map_name=None, red=(), blue=()):
@@ -145,8 +145,6 @@ def test_the_kit_is_told_piece_by_piece(synthetic_world):
                                     den_value=None, condition="per shell", text="30"))
     perk = KitPiece("Longer Punch", "perk:minor", "Rocket Punch travels further.")
     kite.abilities, kite.weapons, kite.perks = [slam], [gun], [perk]
-    kite.perk_effects = [PerkEffect("Longer Punch", "Rocket Punch")]
-    kite.modifiers = [Modifier("Rocket Punch", "move_speed", "self", 30.0, "percent")]
     fs = _facts(w, "Kite")
     assert _texts(fs, "hero.ability", "Kite") == [
         "Kite - Rocket Punch (ability): A fist that flies."]
@@ -158,10 +156,6 @@ def test_the_kit_is_told_piece_by_piece(synthetic_world):
     assert _texts(fs, "hero.weapon_stat", "Kite") == ["Kite's Burst damage: 30 hp (per shell)"]
     assert _texts(fs, "hero.perk", "Kite") == [
         "Kite perk (minor) - Longer Punch: Rocket Punch travels further."]
-    assert _texts(fs, "hero.perk_effect", "Kite") == [
-        "Kite's perk Longer Punch alters Rocket Punch"]
-    assert _texts(fs, "hero.modifier", "Kite") == [
-        "Kite's Rocket Punch changes move speed by +30% on self"]
 
 
 def test_the_rates_and_what_they_warn_of(synthetic_world):

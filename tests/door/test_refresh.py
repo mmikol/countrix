@@ -82,9 +82,9 @@ def test_full_refresh_is_due_when_the_slow_caches_are_stale(tmp_path):
     assert refresh.full_due([str(tmp_path)]) is False
     write_aged(tmp_path / "Ana.wikitext", "x", hours=24 * 8)
     assert refresh.full_due([str(tmp_path)]) is True
-    # the daily refresh refetches the Season pages; the rest still says stale
+    # the daily refresh refetches the Patches table; the rest still says stale
     write_aged(tmp_path / "Mei.wikitext", "x", hours=24 * 9)
-    write_aged(tmp_path / "Season.wikitext", "x", hours=1)
+    write_aged(tmp_path / "cargo_patches.json", "x", hours=1)
     assert refresh.full_due([str(tmp_path)]) is True
     assert refresh.full_due() in (True, False)     # the default reads the wiki cache
 
@@ -96,11 +96,11 @@ def test_daily_refresh_touches_only_what_moves(monkeypatch):
         (name, kw.get("refresh"))) or ToolReply("%s: ok\n  rows  1" % name, {}))
     monkeypatch.setattr(refresh, "full_due", lambda: False)
     ok, text = refresh.refresh_once(tools.Context(dsn="postgresql://nowhere"), lambda m: None)
-    # seasons first: the day's snapshots are stamped with the season live today
-    assert ok and calls == [("pull_seasons", True), ("pull_rates", True),
+    # patches first: the day's snapshot is stamped with the patch live today
+    assert ok and calls == [("pull_patches", True), ("pull_rates", True),
                             ("load_authored", None)]
     # the log keeps each tool's headline line, not its counts
-    assert text == "pull_seasons: ok; pull_rates: ok; load_authored: ok"
+    assert text == "pull_patches: ok; pull_rates: ok; load_authored: ok"
     # the hero articles (kits, synergies, counters) are the full refresh's: a
     # daily refetch would keep the wiki cache young and full_due() never true
     assert not set(refresh.DAILY) & {"pull_kits", "pull_synergies", "pull_counters"}

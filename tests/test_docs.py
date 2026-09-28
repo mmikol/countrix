@@ -413,16 +413,13 @@ def test_the_catalog_document_matches_the_strategy_files(copy_of):
 
 
 @pytest.mark.invariant
-def test_the_schema_sections_match_the_live_database(db, copy_of):
+def test_the_data_dictionary_matches_the_live_database(db, copy_of):
     from db.psql import schema
     committed = _read("docs", "db.md")
     fresh = copy_of("docs/db.md")
     schema.generate_docs(db, fresh)
     with open(fresh, encoding="utf-8") as handle:
         text = handle.read()
-    assert _section(text, "erd") == _section(committed, "erd"), (
-        "docs/db.md's ER diagrams are behind the schema: run"
-        " `.venv/bin/python -m door.mcp call db_docs`")
     assert _section(text, "dictionary") == _section(committed, "dictionary"), (
         "docs/db.md's data dictionary is behind the database: run"
         " `.venv/bin/python -m door.mcp call db_docs`")

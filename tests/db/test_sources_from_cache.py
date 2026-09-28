@@ -256,10 +256,7 @@ def test_wiki_counters_pull_from_the_cache_and_stamp_no_snapshot(ctx, snapshots,
 
 
 @needs_caches
-def test_wiki_seasons_and_synergies_pull_from_the_cache(ctx, snapshots):
-    text, data = ctx.call("pull_seasons")
-    assert text.startswith("pull_seasons: seasons stored") and data["seasons"] > 20
-    assert data["stamped"] == snapshots and data["tables"] == ["seasons", "meta_snapshots"]
+def test_wiki_synergies_pull_from_the_cache(ctx):
     text, data = ctx.call("pull_synergies")
     assert text.startswith("pull_synergies: pairs stored") and data["synergies"] > 100
     assert 0 < data["mutual"] < data["synergies"] and data["unmatched"] == []

@@ -18,66 +18,41 @@ read opens its own connection through `db.psql.default_dsn()`.
 .venv/bin/python -m door.mcp call pull_rates '{"refresh": true}'
 ```
 
-## Layout
+## The layout
 
-```
-db/
-  __init__.py        where things live, and the scope; the package's map
-  web.py             what the two HTTP servers share and the one JSON reader
-  data/              the sources, page to table
-    blizzard/        overwatch.blizzard.com
-    wiki/            overwatch.fandom.com
-      kits/          the heroes pull's kit pipeline
-    cache.py         the page cache, its freshness policy and the request loop
-    normalizer.py    matching hero, map and ability names across sources
-  psql/              the database: where it is, the schema, the ledger
-    migrations/      the schema as a sequence
-    cluster/         the embedded Postgres a local build creates (gitignored)
-```
-
-### What the layer shares
-
-| file | purpose |
-| --- | --- |
-| `__init__.py` | what the whole layer agrees on: the paths, the `sources` row (`Source`), `ROLES` in `role_id` order, the seeded ability kinds and perk tiers, the rates scope (console, controller, Americas), `Refusal`, the one error a caller can fix, `Log`, and `embed`, which rewrites a generated doc section |
-| `data/__init__.py` | `PullSummary`, what every pull's `run()` returns, and `ArticlePullSummary`, which adds the pages that would not fetch |
-| `data/cache.py` | the page cache, its freshness and the one request loop: `cached_get`, `cached`, `request` under a `RequestPolicy`, and `PullContext`, what a pull's `run()` takes beside its connection |
-| `data/normalizer.py` | one hero, map or ability across sources: `name_key`, `hero_key` through `RENAMED`, `slug`, `ability_key` and `index` |
-| `web.py` | what the two HTTP servers share: the Host and Origin guard, the reply to a request that raised, and `read_json`, the one HTTP reader, which `orchestrator.py` reads the stack's health with |
+Each package's `__init__.py` docstring maps its modules, and each
+module's docstring says what it reads. The two tables below hold what
+the maps leave out: which pull writes which tables, and the schema's
+steps.
 
 ### `data/` - one package per source
 
 | module | writes | runs after |
 | --- | --- | --- |
 | `blizzard/heroes.py` - `pull_heroes` | `roles`, `subroles`, `heroes`, `abilities`, `perks` | nothing: it runs first |
-| `wiki/heroes.py` - `pull_kits` | `abilities`, `ability_stats`, `ability_modifiers`, `weapons`, `weapon_configs`, `weapon_stats`, `perks`, `perk_stats`, `perk_ability_effects`, `stat_keys`, `heroes`, `kit_6v6` | `pull_heroes` |
+| `wiki/heroes.py` - `pull_kits` | `abilities`, `ability_stats`, `weapons`, `weapon_configs`, `weapon_stats`, `perks`, `perk_stats`, `stat_keys`, `heroes`, `kit_6v6` | `pull_heroes` |
 | `wiki/maps.py` - `pull_maps` | `game_modes`, `maps`, `map_modes`, `map_stages` | - |
 | `wiki/terrain.py` - `pull_terrain` | `map_terrain`, `stage_terrain` | `pull_maps` |
 | `wiki/patches.py` - `pull_patches` | `patches` | - |
-| `wiki/seasons.py` - `pull_seasons` | `seasons`, and each `meta_snapshots` row's season | - |
-| `blizzard/meta.py` - `pull_rates` | `regions`, `competitive_tiers`, `meta_snapshots`, `hero_meta`, `map_meta` | `pull_heroes`, `pull_maps`, `pull_patches`, `pull_seasons` |
+| `blizzard/meta.py` - `pull_rates` | `regions`, `competitive_tiers`, `meta_snapshots`, `hero_meta`, `map_meta` | `pull_heroes`, `pull_maps`, `pull_patches` |
 | `wiki/playstyles.py` - `pull_playstyles` | `playstyle` | `pull_heroes` |
 | `wiki/synergies.py` - `pull_synergies` | `synergies` | `pull_heroes` |
 | `wiki/matchups.py` - `pull_counters` | `counters` | `pull_heroes` |
 
 `wiki/kits/` is the kit pipeline `pull_kits` runs; `wiki/markup.py`,
 `wiki/matchup_tables.py` and `wiki/strategy_sections.py` read the wiki's
-markup and store nothing. Each package's `__init__.py` maps its modules,
-and each module's docstring says what it reads.
+markup and store nothing.
 
-### `psql/` - the database
+### `psql/migrations/` - the schema as a sequence
 
-| file | purpose |
+| folder | what it holds |
 | --- | --- |
-| `__init__.py` | where the database is: `default_dsn` resolves `DATABASE_URL`, else the embedded cluster at `db/psql/cluster` once one is built, and never creates one; `boot`, for `db_rebuild` alone, creates it; with neither, `NoDatabaseError`. Its docstring maps the helpers every writer needs |
-| `schema.py` | the migrations and the `schema_migrations` ledger; `state` (empty, stale, unfilled or current), which `python -m db.psql.schema` prints for the container entrypoint; `rebuild`; `generate_docs`, the two sections at the end of this document, each table described by the `--` block above its `CREATE TABLE` or a later `COMMENT ON TABLE` |
-| `migrations/` | The schema as a sequence, one file per step: `001` sources and the foundation, `002` heroes, `003` maps, `004` meta, `005` playbook, `006` inference, `007` the three layers, `008` the ledger, `009` and `014` the tables that recorded matches, added and dropped again, `010` constraints and heuristics (the `strategies` table), `011` and `012` the `matrix_reader` login the `query` tool connects as, with the dynamic-SQL functions withdrawn from `PUBLIC`, `013` the assumption kind, `015` announced heroes, `016` the playbook each `strategies` row was mirrored from, `017` that column's comment, `018` `map_playstyle` and `comp_archetypes` dropped, `seasons` and `synergies` pulled from the wiki, `019` `map_strategy` and the third source's rates, snapshots and `sources` row dropped, `counters` pulled from the wiki, `020` `map_terrain`, the terrain features each map's wiki article names, `021` `stage_terrain`, with every Hybrid map's two phases and an Escort map's named stretches stored as stages, `022` the `strategies.playbook` comment under the Countrix name, `023` the columns nothing read dropped - `raw_value` on the three stat tables, `patches.platform` and `url`, `subroles.icon_url`, `stat_keys.label` and `unit`, `roles.name`, `024` and `027` the tables that recorded the owner's games, added and dropped again, `025` the 6v6 kit beside the 5v5 one: `heroes.health_6v6`, `shield_6v6` and `armor_6v6`, and `kit_6v6`, each 6v6 line of a hero's article, `026` `counters.basis` and `evidence`: each counter edge marked with the part of the article it was read in, the Match-Up column or the Strategy section, a Strategy edge with its sentence. A statement in an applied migration is never edited; a change is a new file, and a populated database catches up with `db_migrate`. The `--` prose above each `CREATE TABLE` is the data dictionary's text, and is kept current. |
-| `cluster/` | the embedded Postgres `db_rebuild` creates through pgserver (gitignored); a reader starts it on first touch and never creates it. The compose stack runs its own Postgres, the `db` service, which the host reaches through `./docker-db` |
+| `migrations/` | The schema as a sequence, one file per step: `001` sources and the foundation, `002` heroes, `003` maps, `004` meta, `005` playbook, `006` inference, `007` the three layers, `008` the ledger, `009` and `014` the tables that recorded matches, added and dropped again, `010` constraints and heuristics (the `strategies` table), `011` and `012` the `matrix_reader` login the `query` tool connects as, with the dynamic-SQL functions withdrawn from `PUBLIC`, `013` the assumption kind, `015` announced heroes, `016` the playbook each `strategies` row was mirrored from, `017` that column's comment, `018` `map_playstyle` and `comp_archetypes` dropped, `seasons` and `synergies` pulled from the wiki, `019` `map_strategy` and the third source's rates, snapshots and `sources` row dropped, `counters` pulled from the wiki, `020` `map_terrain`, the terrain features each map's wiki article names, `021` `stage_terrain`, with every Hybrid map's two phases and an Escort map's named stretches stored as stages, `022` the `strategies.playbook` comment under the Countrix name, `023` the columns nothing read dropped - `raw_value` on the three stat tables, `patches.platform` and `url`, `subroles.icon_url`, `stat_keys.label` and `unit`, `roles.name`, `024` and `027` the tables that recorded the owner's games, added and dropped again, `025` the 6v6 kit beside the 5v5 one: `heroes.health_6v6`, `shield_6v6` and `armor_6v6`, and `kit_6v6`, each 6v6 line of a hero's article, `026` `counters.basis` and `evidence`: each counter edge marked with the part of the article it was read in, the Match-Up column or the Strategy section, a Strategy edge with its sentence, `028` the data nothing read dropped - `seasons` and `meta_snapshots.season_id`, `ability_modifiers`, `perk_ability_effects`. A statement in an applied migration is never edited; a change is a new file, and a populated database catches up with `db_migrate`. The `--` prose above each `CREATE TABLE` is the data dictionary's text, and is kept current. |
 
 ## The order of a build
 
 `sync_all` runs the pulls in dependency order - `blizzard.heroes`,
-`wiki.heroes`, `wiki.maps`, `wiki.terrain`, `wiki.patches`, `wiki.seasons`,
+`wiki.heroes`, `wiki.maps`, `wiki.terrain`, `wiki.patches`,
 `blizzard.meta`, `wiki.playstyles`, `wiki.synergies`, `wiki.matchups` -
 then `load_authored`. Entity tables refresh in place;
 each rates pull appends a dated snapshot, the series the trend facts
@@ -93,7 +68,7 @@ stateDiagram-v2
     stale --> current: db_migrate<br/>keeps the data
     unfilled --> current: db_rebuild
     stale --> current: db_rebuild<br/>drops the rates history
-    current --> current: the refresher - pull_seasons + pull_rates daily,<br/>sync_all weekly, entities upsert in place,<br/>rates APPEND a dated snapshot
+    current --> current: the refresher - pull_patches + pull_rates daily,<br/>sync_all weekly, entities upsert in place,<br/>rates APPEND a dated snapshot
 ```
 
 `db_rebuild` drops every table, reapplies the migrations and runs
@@ -108,7 +83,7 @@ and refresher containers wait on.
 ## Keeping it fresh
 
 The `refresher` container runs the door's clock, `door/refresh.py`: once
-a day `pull_seasons` and `pull_rates` (a new dated snapshot), then the
+a day `pull_patches` and `pull_rates` (a new dated snapshot), then the
 strategies mirror, or `sync_all` with refresh on in their place once the
 wiki cache is a week old, and a refresh at once on start when the cached
 pages are 20 hours old. A page that fails to refetch keeps its cached
@@ -252,165 +227,9 @@ document quotes none of them.
 ## The schema
 
 Generated from the live database by
-`.venv/bin/python -m door.mcp call db_docs`; the two sections between the
-markers are rewritten in place, the rest of this document is written by
+`.venv/bin/python -m door.mcp call db_docs`; the section between the
+markers is rewritten in place, the rest of this document is written by
 hand.
-
-### Entity relationship diagrams
-
-<!-- generated:erd -->
-Five domains. Three hold the data the sources are pulled for: which
-hero (HEROES), on which map (MAPS), performing how well (META).
-Every domain
-yields independent facts (a selection's own row) and dependent ones
-(the selection joined with others: map_meta is heroes ⋈ maps ⋈ meta,
-counters and synergies are heroes ⋈ heroes), and a join belongs to
-every domain it touches. Two are the playbook's record: the
-judgements pulled from the wiki (PLAYBOOK) and the mirror of the
-strategies that the inference layer solves with (INFERENCE). The
-strategies are the one input a user writes; every other table is
-pulled. The composition is the argmax of the strategies - the
-constraints, heuristics and assumptions in inference/strategies/ -
-over the facts.
-
-```
-DATA        = HEROES ∪ MAPS ∪ META
-FACTS(D)    = INDEPENDENT(D) ∪ DEPENDENT(D)   for each domain D: its rows; its joins
-FACTS       = FACTS(HEROES) ∪ FACTS(MAPS) ∪ FACTS(META)
-STRATEGIES  = CONSTRAINTS ∪ HEURISTICS ∪ ASSUMPTIONS
-COMP        = ARGMAX[ STRATEGIES( FACTS ) ]
-```
-
-Every table but `sources` and `schema_migrations` also carries
-`source_id` -> `sources` and a `cao` timestamp. Those edges are left off -
-they would connect `sources` to 34 tables and obscure everything else.
-
-#### HEROES
-
-```mermaid
-erDiagram
-    abilities ||--o{ ability_modifiers : "ability_id"
-    abilities ||--o{ ability_stats : "ability_id"
-    abilities ||--o{ perk_ability_effects : "ability_id"
-    ability_kinds ||--o{ abilities : "kind_id"
-    heroes ||--o{ abilities : "hero_id"
-    heroes ||--o{ kit_6v6 : "hero_id"
-    heroes ||--o{ perks : "hero_id"
-    heroes ||--o{ weapons : "hero_id"
-    perk_tiers ||--o{ perks : "tier_id"
-    perks ||--o{ perk_ability_effects : "perk_id"
-    perks ||--o{ perk_stats : "perk_id"
-    roles ||--o{ heroes : "role_id"
-    roles ||--o{ subroles : "role_id"
-    stat_keys ||--o{ ability_modifiers : "stat_key_id"
-    stat_keys ||--o{ ability_stats : "stat_key_id"
-    stat_keys ||--o{ kit_6v6 : "stat_key_id"
-    stat_keys ||--o{ perk_stats : "stat_key_id"
-    stat_keys ||--o{ weapon_stats : "stat_key_id"
-    subroles ||--o{ heroes : "role_id"
-    subroles ||--o{ heroes : "subrole_id"
-    weapon_config_slots ||--o{ weapon_configs : "slot_id"
-    weapon_configs ||--o{ weapon_stats : "config_id"
-    weapons ||--o{ weapon_configs : "weapon_id"
-```
-
-#### MAPS
-
-```mermaid
-erDiagram
-    game_modes ||--o{ map_modes : "mode_id"
-    map_stages ||--o{ stage_terrain : "stage_id"
-    maps ||--o{ map_modes : "map_id"
-    maps ||--o{ map_stages : "map_id"
-    maps ||--o{ map_terrain : "map_id"
-```
-
-#### META
-
-```mermaid
-erDiagram
-    competitive_tiers ||--o{ hero_meta : "tier_id"
-    competitive_tiers ||--o{ map_meta : "tier_id"
-    heroes ||--o{ hero_meta : "hero_id"
-    heroes ||--o{ map_meta : "hero_id"
-    map_stages ||--o{ map_meta : "stage_id"
-    maps ||--o{ map_meta : "map_id"
-    meta_snapshots ||--o{ hero_meta : "snapshot_id"
-    meta_snapshots ||--o{ map_meta : "snapshot_id"
-    patches ||--o{ meta_snapshots : "patch_id"
-    regions ||--o{ hero_meta : "region_id"
-    regions ||--o{ map_meta : "region_id"
-    seasons ||--o{ meta_snapshots : "season_id"
-```
-
-#### PLAYBOOK
-
-```mermaid
-erDiagram
-    heroes ||--o{ counters : "countered_by_id"
-    heroes ||--o{ counters : "hero_id"
-    heroes ||--o{ playstyle : "hero_id"
-    heroes ||--o{ synergies : "hero_id"
-    heroes ||--o{ synergies : "other_id"
-```
-
-#### INFERENCE
-
-```mermaid
-erDiagram
-```
-
-#### The whole database
-
-```mermaid
-erDiagram
-    abilities ||--o{ ability_modifiers : "ability_id"
-    abilities ||--o{ ability_stats : "ability_id"
-    abilities ||--o{ perk_ability_effects : "ability_id"
-    ability_kinds ||--o{ abilities : "kind_id"
-    competitive_tiers ||--o{ hero_meta : "tier_id"
-    competitive_tiers ||--o{ map_meta : "tier_id"
-    game_modes ||--o{ map_modes : "mode_id"
-    heroes ||--o{ abilities : "hero_id"
-    heroes ||--o{ counters : "countered_by_id"
-    heroes ||--o{ counters : "hero_id"
-    heroes ||--o{ hero_meta : "hero_id"
-    heroes ||--o{ kit_6v6 : "hero_id"
-    heroes ||--o{ map_meta : "hero_id"
-    heroes ||--o{ perks : "hero_id"
-    heroes ||--o{ playstyle : "hero_id"
-    heroes ||--o{ synergies : "hero_id"
-    heroes ||--o{ synergies : "other_id"
-    heroes ||--o{ weapons : "hero_id"
-    map_stages ||--o{ map_meta : "stage_id"
-    map_stages ||--o{ stage_terrain : "stage_id"
-    maps ||--o{ map_meta : "map_id"
-    maps ||--o{ map_modes : "map_id"
-    maps ||--o{ map_stages : "map_id"
-    maps ||--o{ map_terrain : "map_id"
-    meta_snapshots ||--o{ hero_meta : "snapshot_id"
-    meta_snapshots ||--o{ map_meta : "snapshot_id"
-    patches ||--o{ meta_snapshots : "patch_id"
-    perk_tiers ||--o{ perks : "tier_id"
-    perks ||--o{ perk_ability_effects : "perk_id"
-    perks ||--o{ perk_stats : "perk_id"
-    regions ||--o{ hero_meta : "region_id"
-    regions ||--o{ map_meta : "region_id"
-    roles ||--o{ heroes : "role_id"
-    roles ||--o{ subroles : "role_id"
-    seasons ||--o{ meta_snapshots : "season_id"
-    stat_keys ||--o{ ability_modifiers : "stat_key_id"
-    stat_keys ||--o{ ability_stats : "stat_key_id"
-    stat_keys ||--o{ kit_6v6 : "stat_key_id"
-    stat_keys ||--o{ perk_stats : "stat_key_id"
-    stat_keys ||--o{ weapon_stats : "stat_key_id"
-    subroles ||--o{ heroes : "role_id"
-    subroles ||--o{ heroes : "subrole_id"
-    weapon_config_slots ||--o{ weapon_configs : "slot_id"
-    weapon_configs ||--o{ weapon_stats : "config_id"
-    weapons ||--o{ weapon_configs : "weapon_id"
-```
-<!-- /generated:erd -->
 
 ### Data dictionary
 
@@ -425,9 +244,9 @@ was read. Every table but `sources` and `schema_migrations` carries both;
 | domain | tables |
 | --- | --- |
 | **foundation** | `schema_migrations` · `sources` |
-| **HEROES** | `abilities` · `ability_kinds` · `ability_modifiers` · `ability_stats` · `heroes` · `kit_6v6` · `perk_ability_effects` · `perk_stats` · `perk_tiers` · `perks` · `roles` · `stat_keys` · `subroles` · `weapon_config_slots` · `weapon_configs` · `weapon_stats` · `weapons` |
+| **HEROES** | `abilities` · `ability_kinds` · `ability_stats` · `heroes` · `kit_6v6` · `perk_stats` · `perk_tiers` · `perks` · `roles` · `stat_keys` · `subroles` · `weapon_config_slots` · `weapon_configs` · `weapon_stats` · `weapons` |
 | **MAPS** | `game_modes` · `map_modes` · `map_stages` · `map_terrain` · `maps` · `stage_terrain` |
-| **META** | `competitive_tiers` · `hero_meta` · `map_meta` · `meta_snapshots` · `patches` · `regions` · `seasons` |
+| **META** | `competitive_tiers` · `hero_meta` · `map_meta` · `meta_snapshots` · `patches` · `regions` |
 | **PLAYBOOK** | `counters` · `playstyle` · `synergies` |
 | **INFERENCE** | `strategies` |
 
@@ -456,22 +275,6 @@ kind_id is NULL until pull_kits sets it. Blizzard's markup labels neither weapon
 | --- | --- | --- | --- |
 | `kind_id` | smallint | no |  |
 | `code` | text | no |  |
-
-#### `ability_modifiers`
-
-*HEROES · `002_heroes.sql`*
-
-affects names the quantity scaled, so a query can find every effect on outgoing damage without knowing which stat it was published under. damage_dealt · damage_taken · healing_received · healing_dealt · movement_speed magnitude is a signed percentage: +50 amplifies, -45 reduces.
-
-| column | type | null | references |
-| --- | --- | --- | --- |
-| `modifier_id` | integer | no |  |
-| `ability_id` | integer | no | `abilities.ability_id` |
-| `stat_key_id` | integer | no | `stat_keys.stat_key_id` |
-| `affects` | text | no |  |
-| `applies_to` | text | yes |  |
-| `magnitude` | numeric | no |  |
-| `unit` | text | no |  |
 
 #### `ability_stats`
 
@@ -660,7 +463,6 @@ A map's terrain, counted in its wiki article (pull_terrain). The sections about 
 | `platform` | text | no |  |
 | `input` | text | yes |  |
 | `patch_id` | integer | yes | `patches.patch_id` |
-| `season_id` | integer | yes | `seasons.season_id` |
 
 #### `patches`
 
@@ -673,15 +475,6 @@ The game versions the meta moves with. A win rate is true of a patch, so a snaps
 | `patch_id` | integer | no |  |
 | `name` | text | no |  |
 | `released` | date | no |  |
-
-#### `perk_ability_effects`
-
-*HEROES · `002_heroes.sql`*
-
-| column | type | null | references |
-| --- | --- | --- | --- |
-| `perk_id` | integer | no | `perks.perk_id` |
-| `ability_id` | integer | no | `abilities.ability_id` |
 
 #### `perk_stats`
 
@@ -762,19 +555,6 @@ Which playstyle a hero belongs to, straight from the wiki's team composition pag
 | --- | --- | --- | --- |
 | `filename` | text | no |  |
 | `applied_at` | timestamp with time zone | no |  |
-
-#### `seasons`
-
-*META · `004_meta.sql`*
-
-Seasons: the coarser delineator. A patch tweaks numbers; a season swaps the hero pool and map rotation, so a snapshot records both. Pulled from the wiki's Season pages (pull_seasons): every season that has started, with its start date; note is the wiki subpage it came from. Reloaded whole; every rates snapshot is restamped with its season.
-
-| column | type | null | references |
-| --- | --- | --- | --- |
-| `season_id` | integer | no |  |
-| `name` | text | no |  |
-| `started` | date | no |  |
-| `note` | text | yes |  |
 
 #### `sources`
 

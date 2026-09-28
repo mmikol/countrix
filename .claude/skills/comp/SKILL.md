@@ -75,10 +75,11 @@ shows). Prefer whichever is connected; they expose the same tools.
   for Open Queue. Lean on them for direction, not decimals;
   RANK-SENSITIVE facts matter if the user names a rank.
 - Never build a comp that dies with a likely ban (the ban facts say who).
-- The compose stack's `refresher` refetches the rates daily and every
-  source weekly, so the facts should open with today's capture. If they instead warn that
-  patches shipped since capture, weight kit facts and the playbook over
-  rates, say so, and offer to run `sync_all` with `refresh: true`.
+- The compose stack's `refresher` refetches the patch list and the rates
+  daily and every source weekly, so the facts should open with today's
+  capture. If they instead warn that patches shipped since capture,
+  weight kit facts and the playbook over rates, say so, and offer to run
+  `sync_all` with `refresh: true`.
 
 ## What is data
 

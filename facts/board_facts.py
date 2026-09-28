@@ -96,9 +96,9 @@ def generate(world: World, draft: Draft) -> FactSet:
 def _meta_facts(fs: FactSet, world: World) -> None:
     for s in world.snapshots:                 # one per source: its newest capture
         fs.add("meta", "snapshot", "meta.snapshot",
-            "%s rates: captured %s, %s (%s), %s - %s, %s, %s"
+            "%s rates: captured %s, %s (%s) - %s, %s, %s"
             % (s["source"], s["captured"], s["patch"] or "an unknown patch",
-                s["released"] or "-", s["season"] or "unknown season",
+                s["released"] or "-",
                 s["queue"].replace("competitive_", "").replace("_", " "), s["platform"],
                 s["region"] or "region unstated"),
             value=s, source="meta_snapshots")

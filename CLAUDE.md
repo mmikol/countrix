@@ -210,8 +210,8 @@ db <- facts <- inference <- door <- ui.
   holds: a backticked id the record cites and `inference/strategies/`
   lacks is a dropped rule, and fails.
 - A new table carries `source_id` and `cao`, has rows and is named in
-  `facts/tables.py` (a test greps its source); regenerate the schema
-  sections of docs/db.md. Its migration also wants a `schema.DOC_DOMAIN`
+  `facts/tables.py` (a test greps its source); regenerate the data
+  dictionary in docs/db.md. Its migration also wants a `schema.DOC_DOMAIN`
   entry keyed by filename, or docs/db.md files it under foundation - no
   test catches that one.
 - A new metric: an entry in `TEAM_METRICS` (`VERSUS_METRICS` for one that

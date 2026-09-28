@@ -1,7 +1,7 @@
 """The page cache in db/data/cache.py and the wiki's requests through it:
-refetch by age, keep the old page when the source fails, retry a rate
-limit, ask for an article once. Pure - fake sessions, no network, no
-database."""
+keep a page until a refresh's cutoff, keep the old page when the source
+fails, retry a rate limit, ask for an article once. Pure - fake sessions,
+no network, no database."""
 
 import os
 import time
@@ -53,29 +53,13 @@ def write_aged(path, text, hours=48):
     os.utime(str(path), (stamp, stamp))
 
 
-def test_a_pull_context_keeps_a_page_forever_unless_its_max_age_says_otherwise(tmp_path):
-    """The freshness rides the context a pull is handed, so a run() called
-    outside the door reads what it is told: a context that names no max_age
-    keeps every cached page, one that names an age refetches only an older
-    page, and 0 refetches it whatever its age."""
-    write_aged(tmp_path / "k.html", "cached", hours=48)
-    session = FakeSession("new page")
-    kept = cache.PullContext(str(tmp_path), session=session)
-    assert kept.max_age is None
-    assert cache.cached_get(kept, "u", "k", policy=INSTANT) == "cached"
-    younger = cache.PullContext(str(tmp_path), session=session, max_age=72 * 3600)
-    assert cache.cached_get(younger, "u", "k", policy=INSTANT) == "cached"
-    assert session.calls == 0
-    refresh = cache.PullContext(str(tmp_path), session=session, max_age=0)
-    assert cache.cached_get(refresh, "u", "k", policy=INSTANT) == "new page"
-    assert session.calls == 1
-    assert kept.max_age is None                     # one pull's refresh leaves another's be
-
-
-def test_a_fresh_cache_is_read_without_fetching(tmp_path):
-    write_aged(tmp_path / "k.html", "cached")
+def test_a_context_with_no_cutoff_keeps_a_page_forever(tmp_path):
+    """A build from the caches: a page a year old is read, and nothing is
+    asked for."""
+    write_aged(tmp_path / "k.html", "cached", hours=365 * 24)
     session = FakeSession()
     pull = cache.PullContext(str(tmp_path), session=session)
+    assert pull.cutoff is None
     assert cache.cached_get(pull, "u", "k", policy=INSTANT) == "cached"
     assert session.calls == 0
 
@@ -94,12 +78,10 @@ def test_refresh_refetches_a_page_written_before_it_began_and_rewrites_the_cache
     later = cache.PullContext(str(tmp_path), session=FakeSession("newer page"), cutoff=began)
     assert cache.cached_get(later, "u", "k", policy=INSTANT) == "new page"
     assert later.session.calls == 0
-    # the rewritten page is fresh under any finite max_age, and stale only to a
-    # refresh that begins after it was written
-    assert not cache.is_stale(str(tmp_path / "k.html"), 3600)
-    assert not cache.is_stale(str(tmp_path / "k.html"), None)
-    assert not cache.is_stale(str(tmp_path / "k.html"), None, began)
-    assert cache.is_stale(str(tmp_path / "k.html"), None, time.time() + 60)
+    # the rewritten page is stale only to a refresh that begins after it
+    newest = cache.PullContext(
+        str(tmp_path), session=FakeSession("newest page"), cutoff=time.time() + 60)
+    assert cache.cached_get(newest, "u", "k", policy=INSTANT) == "newest page"
 
 
 def test_a_failed_refetch_keeps_the_cached_copy(tmp_path):
@@ -109,7 +91,7 @@ def test_a_failed_refetch_keeps_the_cached_copy(tmp_path):
     twice = cache.RequestPolicy(attempts=2, backoff=0, delay=0)
     lines = []
     pull = cache.PullContext(str(tmp_path), session=FakeSession(fail=True), log=lines.append,
-                             max_age=0)
+                             cutoff=time.time())
     assert cache.cached_get(pull, "u", "k", policy=twice) == "yesterday"
     [stale] = pull.stale
     assert stale.startswith("k.html: u failed after 2 attempts") and "source down" in stale
@@ -121,10 +103,10 @@ def test_a_failed_refetch_keeps_the_cached_copy(tmp_path):
     assert len(pull.stale) == 1
 
 
-def test_attempts_count_every_request_the_first_included():
+def test_attempts_count_every_request_the_first_included(tmp_path):
     session = FakeSession(fail=True)
     with pytest.raises(cache.FetchError, match="after 3 attempts"):
-        cache.cached_get(cache.PullContext(None, session=session), "u", "k",
+        cache.cached_get(cache.PullContext(str(tmp_path), session=session), "u", "k",
                          policy=cache.RequestPolicy(attempts=3, backoff=0, delay=0))
     assert session.calls == 3
 
@@ -132,10 +114,10 @@ def test_attempts_count_every_request_the_first_included():
 def test_wiki_cargo_and_wikitext_keep_stale_copies_too(tmp_path, instant_wiki):
     write_aged(tmp_path / "cargo_abilities.json", '[{"a": "1"}]')
     write_aged(tmp_path / "Ana.wikitext", "{{Infobox}}")
-    down = cache.PullContext(str(tmp_path), session=FakeSession(fail=True), max_age=0)
+    down = cache.PullContext(str(tmp_path), session=FakeSession(fail=True), cutoff=time.time())
     up = cache.PullContext(
         str(tmp_path), session=FakeSession(payload={"cargoquery": [{"title": {"a": "2"}}]}),
-        max_age=0)
+        cutoff=time.time())
     assert wiki.cargo_query(down, "Abilities", ("a",)) == [{"a": "1"}]
     assert wiki.fetch_wikitext(down, "Ana") == "{{Infobox}}"
     assert wiki.cargo_query(up, "Abilities", ("a",)) == [{"a": "2"}]
@@ -151,38 +133,41 @@ def test_a_changed_wiki_response_shape_keeps_the_stale_copy(tmp_path, instant_wi
     write_aged(cached / "cargo_abilities.json", '[{"a": "1"}]')
     no_wikitext = FakeSession(payload={"parse": {}})
     no_title = FakeSession(payload={"cargoquery": [{"row": {}}]})
+    now = time.time()
     assert wiki.fetch_wikitext(
-        cache.PullContext(str(cached), session=no_wikitext, max_age=0), "Ana") == "{{Infobox}}"
+        cache.PullContext(str(cached), session=no_wikitext, cutoff=now), "Ana") == "{{Infobox}}"
     assert wiki.cargo_query(
-        cache.PullContext(str(cached), session=no_title, max_age=0), "Abilities",
+        cache.PullContext(str(cached), session=no_title, cutoff=now), "Abilities",
         ("a",)) == [{"a": "1"}]
     with pytest.raises(wiki.WikiError, match="no wikitext"):
-        wiki.fetch_wikitext(cache.PullContext(str(empty), session=no_wikitext, max_age=0), "Ana")
+        wiki.fetch_wikitext(cache.PullContext(str(empty), session=no_wikitext, cutoff=now), "Ana")
     with pytest.raises(wiki.WikiError, match="a row has no title"):
         wiki.cargo_query(
-            cache.PullContext(str(empty), session=no_title, max_age=0), "Abilities", ("a",))
+            cache.PullContext(str(empty), session=no_title, cutoff=now), "Abilities", ("a",))
 
 
 CARGO_PAGE = {"cargoquery": [{"title": {"a": "1"}}]}
 
 
-def test_the_wiki_retries_a_429_and_reads_the_next_answer(instant_wiki):
+def test_the_wiki_retries_a_429_and_reads_the_next_answer(tmp_path, instant_wiki):
     session = FakeSession(answers=[FakeResponse(status=429), FakeResponse(payload=CARGO_PAGE)])
-    assert wiki.cargo_query(cache.PullContext(None, session=session), "T", ["a"]) == [{"a": "1"}]
+    pull = cache.PullContext(str(tmp_path), session=session)
+    assert wiki.cargo_query(pull, "T", ["a"]) == [{"a": "1"}]
     assert session.calls == 2
 
 
-def test_a_rate_limit_stated_in_the_body_is_retried(instant_wiki):
+def test_a_rate_limit_stated_in_the_body_is_retried(tmp_path, instant_wiki):
     limited = FakeResponse(payload={"error": {"info": "Rate limit exceeded"}})
     session = FakeSession(answers=[limited, FakeResponse(payload=CARGO_PAGE)])
-    assert wiki.cargo_query(cache.PullContext(None, session=session), "T", ["a"]) == [{"a": "1"}]
+    pull = cache.PullContext(str(tmp_path), session=session)
+    assert wiki.cargo_query(pull, "T", ["a"]) == [{"a": "1"}]
     assert session.calls == 2
 
 
-def test_an_article_that_fails_is_asked_for_once(instant_wiki):
+def test_an_article_that_fails_is_asked_for_once(tmp_path, instant_wiki):
     session = FakeSession(fail=True)
     with pytest.raises(cache.FetchError):
-        wiki.fetch_wikitext(cache.PullContext(None, session=session), "Ana")
+        wiki.fetch_wikitext(cache.PullContext(str(tmp_path), session=session), "Ana")
     assert session.calls == 1
 
 

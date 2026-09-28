@@ -219,7 +219,7 @@ def _hero_weapons(fs: FactSet, h: Hero, team: Seat) -> None:
 
 
 def _hero_perks(fs: FactSet, h: Hero, team: Seat) -> None:
-    """The perks and their stats, what each alters, and every ability modifier."""
+    """The perks and their stats."""
     name = h.name
     for p in h.perks:
         fs.add("hero", name, "hero.perk", "%s perk (%s) - %s: %s"
@@ -230,16 +230,6 @@ def _hero_perks(fs: FactSet, h: Hero, team: Seat) -> None:
                 fs.add("hero", name, "hero.perk_stat", "%s's perk %s %s: %s"
                     % (name, p.name, code.replace("_", " "), s.rendered()),
                     value=s.value, unit=s.unit_num, source="perk_stats", team=team)
-    for perk, ability in h.perk_effects:
-        fs.add("hero", name, "hero.perk_effect", "%s's perk %s alters %s"
-            % (name, perk, ability), value={"perk": perk, "ability": ability},
-            source="perk_ability_effects", team=team)
-    for aname, affects, applies, magnitude, unit in h.modifiers:
-        fs.add("hero", name, "hero.modifier", "%s's %s changes %s by %+g%s%s"
-            % (name, aname, affects.replace("_", " "), magnitude,
-                "%" if unit == "percent" else " " + unit,
-                " on %s" % applies if applies else ""),
-            value=magnitude, source="ability_modifiers", team=team)
 
 
 # --- the rates ----------------------------------------------------------------

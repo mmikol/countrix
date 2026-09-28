@@ -13,8 +13,8 @@ def test_every_fact_is_keyed_and_the_meta_comes_first(synthetic_world):
     fs = board_facts.generate(synthetic_world, Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm",)))
     assert all(f.key and f.scope and f.text for f in fs.facts)
     assert fs.facts[0].scope == "meta" and fs.facts[0].text == (
-        "blizzard rates: captured 2026-09-01, September 1, 2026 Patch (2026-09-01),"
-        " Season 1 - role queue, pc, Americas")
+        "blizzard rates: captured 2026-09-01, September 1, 2026 Patch (2026-09-01)"
+        " - role queue, pc, Americas")
     assert {"map", "hero", "team", "matchup", "playbook"} <= {f.scope for f in fs.facts}
 
 

@@ -20,10 +20,8 @@ from facts.records import (
     KitChange,
     KitLine,
     MapRate,
-    Modifier,
     Pairing,
     Patch,
-    PerkEffect,
     Rates,
     Snapshot,
     StageTerrain,
@@ -55,8 +53,6 @@ class Hero:
     abilities: list[KitPiece] = field(default_factory=list)
     weapons: list[KitPiece] = field(default_factory=list)
     perks: list[KitPiece] = field(default_factory=list)
-    modifiers: list[Modifier] = field(default_factory=list)
-    perk_effects: list[PerkEffect] = field(default_factory=list)    # a perk, the ability it alters
     # the wiki's 6v6 kit as stored - a pool's 6v6 figure, the 6v6 lines - and
     # what the format in force did with each (facts.kit_format)
     six_pools: dict[str, int] = field(default_factory=dict)

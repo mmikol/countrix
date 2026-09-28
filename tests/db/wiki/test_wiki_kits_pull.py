@@ -31,7 +31,7 @@ def _subrole(params):
 
 
 def _pull(lines):
-    return cache.PullContext(None, log=lines.append)
+    return cache.PullContext("cache", log=lines.append)
 
 
 def test_an_announced_hero_is_stored_from_its_article_and_the_rest_are_reported():

@@ -147,8 +147,8 @@ def db_rebuild(ctx: Context, refresh: bool = False) -> ToolReply:
 
 
 @tool(
-    "db_docs", "Regenerate the generated sections of the docs: the ERD and data"
-    " dictionary in docs/db.md from the live schema, the catalog and vocabulary in"
+    "db_docs", "Regenerate the generated sections of the docs: the data dictionary"
+    " in docs/db.md from the live schema, the catalog and vocabulary in"
     " docs/inference.md from the strategies files, the tool reference in docs/mcp.md.")
 def db_docs(ctx: Context) -> ToolReply:
     with ctx.connect() as cx:

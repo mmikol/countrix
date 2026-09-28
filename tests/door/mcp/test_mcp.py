@@ -45,7 +45,7 @@ def test_initialize_then_list_tools_over_stdio():
     assert replies[0]["result"]["protocolVersion"] == "2025-06-18"
     assert replies[0]["result"]["serverInfo"]["name"] == "countrix"
     names = {t["name"] for t in replies[1]["result"]["tools"]}
-    assert {"pull_heroes", "pull_rates", "pull_seasons", "pull_synergies", "sync_all",
+    assert {"pull_heroes", "pull_rates", "pull_patches", "pull_synergies", "sync_all",
             "db_rebuild", "db_migrate", "query",
             "facts", "infer", "board", "strategies", "load_authored",
             "tune", "tuning_log", "metrics",

@@ -27,7 +27,7 @@ from db.data import PullSummary, cache
 from db.data.blizzard import BLIZZARD, RATES_URL, BlizzardError, attr
 from db.data.cache import cache_key, cached_get
 from db.data.normalizer import index, name_key
-from db.psql import current_patch, current_season
+from db.psql import current_patch
 
 # --- extract: markup -> Python ---------------------------------------------
 
@@ -186,11 +186,9 @@ def _store(
 
     cursor.execute(
         "INSERT INTO meta_snapshots (captured_at, queue, platform, input,"
-        " patch_id, season_id, source_id)"
-        " VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING snapshot_id",
-        (
-            cao, QUEUE_NAME, PLATFORM, INPUT_DEVICE,
-            current_patch(cursor), current_season(cursor), source_id),
+        " patch_id, source_id)"
+        " VALUES (%s, %s, %s, %s, %s, %s) RETURNING snapshot_id",
+        (cao, QUEUE_NAME, PLATFORM, INPUT_DEVICE, current_patch(cursor), source_id),
     )
     snapshot_id = psql.scalar(cursor)
 

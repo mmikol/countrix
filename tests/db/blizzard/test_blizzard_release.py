@@ -52,8 +52,8 @@ def test_a_listed_hero_trades_the_wikis_kit_for_blizzards_carousel(sandbox):
     Doctrine's was. Blizzard's carousel puts the weapon at 0 and the ultimate
     last, and reorders and renames perks: the pull stores it without a
     UniqueViolation, and Herald keeps Blizzard's rows alone, the wiki's stats
-    and perk links gone with the rows they hung on. Warden's page would not
-    fetch, so its wiki rows stay as they were."""
+    gone with the rows they hung on. Warden's page would not fetch, so its
+    wiki rows stay as they were."""
     cursor = sandbox.cursor()
     wiki_id = psql.scalar(cursor.execute("SELECT source_id FROM sources WHERE code = 'wiki'"))
     subrole = Subrole(*cursor.execute(
@@ -84,9 +84,8 @@ def test_a_listed_hero_trades_the_wikis_kit_for_blizzards_carousel(sandbox):
         "SELECT perk_id FROM perks WHERE hero_id = %s", (herald,))]
     hung = (
         "SELECT (SELECT count(*) FROM ability_stats WHERE ability_id = ANY(%s)),"
-        " (SELECT count(*) FROM perk_stats WHERE perk_id = ANY(%s)),"
-        " (SELECT count(*) FROM perk_ability_effects WHERE perk_id = ANY(%s))")
-    assert cursor.execute(hung, (ability_ids, perk_ids, perk_ids)).fetchone() == (1, 1, 1)
+        " (SELECT count(*) FROM perk_stats WHERE perk_id = ANY(%s))")
+    assert cursor.execute(hung, (ability_ids, perk_ids)).fetchone() == (1, 1)
 
     carousel = [
         AbilityText("Test Rifle", "Fires.", 0), AbilityText("Test Drones", "Heals.", 1),
@@ -107,7 +106,7 @@ def test_a_listed_hero_trades_the_wikis_kit_for_blizzards_carousel(sandbox):
     assert perks == [
         (1, 1, "Test Grace", "blizzard"), (1, 2, "Test Siphon", "blizzard"),
         (2, 1, "Test Price", "blizzard"), (2, 2, "Test Transfusion", "blizzard")]
-    assert cursor.execute(hung, (ability_ids, perk_ids, perk_ids)).fetchone() == (0, 0, 0)
+    assert cursor.execute(hung, (ability_ids, perk_ids)).fetchone() == (0, 0)
     assert _kit(cursor, warden) == warden_wiki
     assert cursor.execute(
         "SELECT DISTINCT status FROM heroes WHERE hero_id IN (%s, %s)",

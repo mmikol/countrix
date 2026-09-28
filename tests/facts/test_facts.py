@@ -44,7 +44,7 @@ def test_every_named_hero_gets_a_deep_stack_of_independent_facts(world):
 def test_the_whole_database_becomes_facts(world):
     fs = board_facts.generate(world, Draft("King's Row", ("Zarya",), ("Ana",)))
     keys = {f.key for f in fs.facts}
-    assert {"hero.perk_effect", "playbook.catalog"} <= keys, keys
+    assert {"hero.perk_stat", "playbook.catalog"} <= keys, keys
     # one population of rates, Blizzard's
     assert {s["source"] for s in world.snapshots} == {"blizzard"}
     assert any("Americas" in f.text for f in fs.facts if f.key == "meta.snapshot")

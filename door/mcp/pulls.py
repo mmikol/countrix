@@ -23,7 +23,6 @@ from db.data.wiki import maps as wiki_maps
 from db.data.wiki import matchups as wiki_matchups
 from db.data.wiki import patches as wiki_patches
 from db.data.wiki import playstyles as wiki_playstyles
-from db.data.wiki import seasons as wiki_seasons
 from db.data.wiki import synergies as wiki_synergies
 from db.data.wiki import terrain as wiki_terrain
 from door.mcp.registry import REFRESH, Context, tool
@@ -90,9 +89,9 @@ def pull_tool(
 
 # Registration order is dependency order, and sync_all runs the pulls in it:
 # heroes before what links to them, maps and their stages before the terrain
-# counted for them, seasons and patches before the pull that stamps a
-# snapshot (rates). Each body looks its module's run up when it is called, so
-# a test that replaces the run replaces the pull's.
+# counted for them, patches before the pull that stamps a snapshot (rates).
+# Each body looks its module's run up when it is called, so a test that
+# replaces the run replaces the pull's.
 
 @pull_tool(
     "pull_heroes", "Blizzard's roster: heroes, roles, subroles, portraits,"
@@ -139,14 +138,6 @@ def pull_terrain(connection: psycopg.Connection, pull: cache.PullContext) -> Pul
     " which game version it measured.", source="wiki", stored="patches stored")
 def pull_patches(connection: psycopg.Connection, pull: cache.PullContext) -> PullSummary:
     return wiki_patches.run(connection, pull)
-
-
-@pull_tool(
-    "pull_seasons", "The wiki's Season pages: every season that has started,"
-    " with its start date. Restamps every rates snapshot with its season. Run"
-    " before pull_rates.", source="wiki", stored="seasons stored")
-def pull_seasons(connection: psycopg.Connection, pull: cache.PullContext) -> PullSummary:
-    return wiki_seasons.run(connection, pull)
 
 
 @pull_tool(

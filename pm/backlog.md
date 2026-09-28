@@ -85,9 +85,9 @@ keeps it current.
   the match-up reader gives no verdict on about two in three written
   wiki cells, and seven hero articles have no written cell. Cost: two
   days.
-- **Facts no metric reads.** `ability_modifiers` holds speed, damage-taken
-  and healing-received buffs; no metric in
-  `facts/team.py` or `facts/compute.py` reads `hero.modifiers`. Knockbacks as their own
+- **Facts no metric reads.** The ability stats hold speed buffs and
+  damage cuts (`mspeed_buff`, `damage_red`) that no metric in
+  `facts/team.py` or `facts/compute.py` reads. Knockbacks as their own
   count (Control's edges), damage beams apart from healing beams, area
   healing apart from area damage. Cost: a day each.
 - **One hero on most boards.** D.Mon is in most optimal sixes on the
@@ -122,11 +122,6 @@ keeps it current.
   the door's pulls, `sync_all`, `db_rebuild`, `db_migrate` and
   `load_authored`, with the callers told to wait on it, serialises every
   writer whichever process it runs in. Cost: half a day.
-- **Patches daily.** `door/refresh.py`'s DAILY set pulls seasons and
-  rates but not patches, so a day's snapshot is stamped with a patch list
-  up to a week old and the board's patch-since-capture warning comes up to
-  a week late. `pull_patches` first in DAILY is one Cargo query. Cost: an
-  hour with its test.
 
 ## Fact engine: more dependent variables
 
@@ -162,8 +157,8 @@ yield, best first:
   plus a constant in `facts/compute.py` of which tool beats which.
   Cost: two days, half of it the constant.
 - **History across captures.** Every rates pull appends a snapshot; only the last step
-  is a fact. A hero's win-rate series, who is rising and falling this
-  season, and the patch each change followed. Cost: a day.
+  is a fact. A hero's win-rate series, who is rising and falling, and the
+  patch each change followed. Cost: a day.
 - **Gaps named, not counted.** Coverage says "answers 2/3 red picks";
   name the unanswered pick, the pick nobody protects, the enemy nobody
   out-ranges. Cost: an hour each.

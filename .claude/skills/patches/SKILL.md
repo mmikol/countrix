@@ -1,6 +1,6 @@
 ---
 name: patches
-description: Bring Countrix's database up to date with the game's patches - pull the patch list, see whether a patch shipped since the rates were captured, refetch what a patch changes (the season, rates, kits, Blizzard's hero text), and report what moved. Use when the user says a patch dropped, asks "are we on the latest patch", "update for the patch", or the facts warn that patches shipped since capture.
+description: Bring Countrix's database up to date with the game's patches - pull the patch list, see whether a patch shipped since the rates were captured, refetch what a patch changes (the rates, kits, Blizzard's hero text), and report what moved. Use when the user says a patch dropped, asks "are we on the latest patch", "update for the patch", or the facts warn that patches shipped since capture.
 ---
 
 Keep the database on the current patch. Work through the
@@ -15,13 +15,11 @@ the one the board shows) when it answers, else `countrix`.
 2. **Nothing new?** Say so - the patch on record, its date, the capture
    date - and stop. A refetch for nothing is unkind to the sources.
 3. **A patch shipped.** In this order, one call at a time (a pull takes
-   minutes; wait for each): `pull_seasons` with `refresh: true` (a season
-   opens with a patch, and a snapshot is stamped with the season live
-   that day), `pull_rates` with `refresh: true` (a new dated snapshot,
-   stamped with the patch and the season), `pull_heroes` with
-   `refresh: true` (Blizzard's ability text and any hero the patch
-   released), `pull_kits` with `refresh: true` (the numbers a patch
-   changes: damage, cooldowns, health). `pull_kits` comes after
+   minutes; wait for each): `pull_rates` with `refresh: true` (a new dated
+   snapshot, stamped with the patch), `pull_heroes` with `refresh: true`
+   (Blizzard's ability text and any hero the patch released), `pull_kits`
+   with `refresh: true` (the numbers a patch changes: damage, cooldowns,
+   health). `pull_kits` comes after
    `pull_heroes`: a hero the patch released trades the wiki's kit for
    Blizzard's text there, and gets its numbers back only from `pull_kits`.
    If the patch reworked a hero,

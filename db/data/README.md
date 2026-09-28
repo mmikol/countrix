@@ -22,7 +22,7 @@ the rows land, this folder is how they get there.
 | who | what it does with this folder |
 | --- | --- |
 | [door/mcp/pulls.py](../../door/mcp/pulls.py) | calls every `run()`: one `pull_*` tool per source and domain, and `sync_all` over them all. Outside the tests, nothing else calls one |
-| `db/psql/` | lends the runs the helpers they write with: `register_source`, `lookup_ids`, `identifier`, `scalar`, `now`, `current_patch`, `current_season` and `SEASON_ON_DATE` |
+| `db/psql/` | lends the runs the helpers they write with: `register_source`, `lookup_ids`, `identifier`, `scalar`, `now` and `current_patch` |
 | `facts/` | imports only `normalizer` from this folder - `name_key` in `tables.py` and `model.py`, `ability_key` in `kit_format.py` - to key a name the way the pulls keyed it |
 | the rest | reads the tables over `db.psql.default_dsn()`, never this folder |
 
@@ -89,7 +89,6 @@ db/data/
     maps.py               pull_maps: modes, maps and stages
     terrain.py            pull_terrain: each map article's ground, counted
     patches.py            pull_patches: the game versions
-    seasons.py            pull_seasons: the seasons that have started
     playstyles.py         pull_playstyles: dive, brawl, poke
     synergies.py          pull_synergies: the Team Synergy column
     matchups.py           pull_counters: the Match-Up column and Strategy
@@ -100,7 +99,6 @@ db/data/
       six_a_side.py       an article -> its 6v6 kit
       measurements.py     a stat value -> its measurements
       weapons.py          firing modes grouped into weapons
-      modifiers.py        a buff's quantity and target, off its wording
       kit_store.py        the kits into the tables
 ```
 
@@ -123,10 +121,9 @@ What a run takes beside its connection, a frozen dataclass in `cache.py`:
 
 | field | what it is | default |
 | --- | --- | --- |
-| `cache_dir` | the source's page cache folder; None reads through no cache | required |
+| `cache_dir` | the source's page cache folder | required |
 | `session` | the requests session every page is fetched on | `cache.session()` |
 | `log` | where progress lines go | `db.to_stderr` |
-| `max_age` | the seconds a cached page stays fresh | None |
 | `cutoff` | a `time.time()` stamp: a page written before it is stale | None |
 | `stale` | 'file: error' for each page whose refetch failed and whose cached copy was read | an empty list |
 
@@ -138,7 +135,7 @@ never prints. The door passes the log of the call the pull runs under.
 
 | type | fields | returned by |
 | --- | --- | --- |
-| `PullSummary` | `tables`, the tables the run wrote, empty when it wrote none; `stale`, filled by the door | pull_rates, pull_patches, pull_seasons, pull_playstyles |
+| `PullSummary` | `tables`, the tables the run wrote, empty when it wrote none; `stale`, filled by the door | pull_rates, pull_patches, pull_playstyles |
 | `ArticlePullSummary` | the same, and `missing`: 'name: error' for each page or article that would not fetch | pull_heroes, pull_kits, pull_maps, pull_terrain, pull_synergies, pull_counters |
 
 Both are TypedDicts in `__init__.py`, and each pull's summary subclasses
@@ -155,7 +152,6 @@ out of sight:
 | `announced` | pull_kits | a hero stored ahead of release from its `{{Upcoming}}` article |
 | `rejected_6v6` | pull_kits | a 6v6 figure that should parse and does not |
 | `without_text` | pull_terrain | a map whose article keeps under 60 words about the ground |
-| `upcoming` | pull_seasons | a season not yet started, or with no full start date |
 | `skipped` | pull_patches | a count, not a list: the patch pages with no date |
 | `unpaired` | pull_synergies | a released hero in no pair, with the reason |
 | `contradicted` | pull_counters | a pair two articles' Match-Up cells read opposite ways |
@@ -187,9 +183,8 @@ wrote and read.
    degrades.** A page a reader checks and does not recognise raises
    `BlizzardError` or `WikiError` once it is cached, and fails the pull:
    the roster and every hero page, the rates table and its filters, the
-   Maps article and the Hybrid lead, the Season pages, the Team
-   Composition page, and a synergies or counters pull that reads no claim
-   at all. A reader of one article per entity takes what it finds: a map
+   Maps article and the Hybrid lead, the Team Composition page, and a
+   synergies or counters pull that reads no claim at all. A reader of one article per entity takes what it finds: a map
    whose Gameplay section it cannot read gets no stages, and an article
    with too little kept terrain text is named in `without_text`. A page
    that would not fetch falls back to its stale copy, else to a `missing`
@@ -201,7 +196,7 @@ wrote and read.
 | --- | --- | --- |
 | upsert in place | pull_heroes, pull_maps, pull_patches, and the heroes pull_kits announces | an entity keeps its id, and the rows that hang off it survive |
 | fill in | pull_kits, on the hero, ability and perk rows pull_heroes owns | Blizzard's text stays; the wiki adds kinds, keywords, pools and what Blizzard omits |
-| reload whole | pull_kits's weapon, stat, modifier, perk-link and 6v6 tables (`stat_keys` is upserted), pull_terrain, pull_seasons, pull_playstyles, pull_synergies, pull_counters | the page is the whole truth: a row the source dropped goes |
+| reload whole | pull_kits's weapon, stat and 6v6 tables (`stat_keys` is upserted), pull_terrain, pull_playstyles, pull_synergies, pull_counters | the page is the whole truth: a row the source dropped goes |
 | append | pull_rates | each run is one more dated snapshot, and the series is history |
 
 pull_maps never deletes: the rates snapshots hang off `maps`, and a
@@ -242,21 +237,19 @@ A-Z, a-z and 0-9 becomes one underscore, so "King's Row" is
    read, named in `pull.stale` and logged with its age in hours.
 4. With no copy at all, the failure surfaces.
 
-Without a `cache_dir`, `cached` only produces. `cached_get` is `cached`
-over one GET under a policy, which Blizzard's pages use; the wiki's
-`cargo_query` and `fetch_wikitext` run `cached` over its API.
+`cached_get` is `cached` over one GET under a policy, which Blizzard's
+pages use; the wiki's `cargo_query` and `fetch_wikitext` run `cached` over
+its API.
 
 ### The freshness
 
-`is_stale(path, max_age, cutoff)`: a cached page is stale when it is older
-than `max_age` seconds, or was written before `cutoff`. A bound that is
-None never makes a page stale.
+A cached page is stale when it was written before the pull's `cutoff`, a
+`time.time()` stamp. Without a cutoff no page is stale.
 
-| `max_age` | `cutoff` | a cached page is | who runs this way |
-| --- | --- | --- | --- |
-| None | None | fresh forever: the source is asked only for a page the cache lacks | every pull without refresh, and so `db_rebuild`: a build from the caches |
-| None | the moment the refresh began | fetched again when written before it, read when written since | a pull called with `{"refresh": true}`; `sync_all`'s pulls under one shared cutoff |
-| seconds | - | fetched again once older than that | no door tool; it serves a caller that wants an age bound, the tests among them |
+| `cutoff` | a cached page is | who runs this way |
+| --- | --- | --- |
+| None | fresh forever: the source is asked only for a page the cache lacks | every pull without refresh, and so `db_rebuild`: a build from the caches |
+| the moment the refresh began | fetched again when written before it, read when written since | a pull called with `{"refresh": true}`; `sync_all`'s pulls under one shared cutoff |
 
 A refresh is a cutoff, not an age of zero, because an age of zero would
 refetch a page that one pull of the same refresh just wrote. Under
@@ -283,10 +276,6 @@ so:
   snapshot is stamped, `tables` is empty, the reply reads
   `pull_rates: nothing stored; stale: N`, and the newest snapshot stays
   the last real capture.
-- pull_seasons reads its era subpages one by one, not through
-  `fetch_articles`: a subpage with neither a fetch nor a copy fails the
-  pull whole, since a missing era would stamp its snapshots with an
-  earlier era's season.
 
 ### The errors
 
@@ -467,8 +456,8 @@ database lacks is never fetched and is listed in `skipped_maps`; a hero
 the roster lacks, in `unmatched`.
 
 It stores the region and the tiers, upserted; one `meta_snapshots` row
-stamped with the capture time, the queue, the platform and input, the
-current patch and the current season; `hero_meta` per tier and `map_meta`
+stamped with the capture time, the queue, the platform and input, and
+the current patch; `hero_meta` per tier and `map_meta`
 per map, all ranks, each row under the region, with no stage, since
 Blizzard's map filter stops at whole maps. Nothing is deleted, and a stale
 page stamps no snapshot.
@@ -490,7 +479,7 @@ the structured data, article wikitext for the rest.
 | `WIKI` | the `sources` row every wiki row carries, code `wiki` |
 | `cargo_query(pull, table, fields)` | every row of a Cargo table, 500 a request, cached as one JSON file. Cargo exposes the wiki's structured data directly, far steadier than parsing article templates |
 | `fetch_wikitext(pull, title)` | one article's raw wikitext, cached |
-| `fetch_articles(pull, titles)` | every title's wikitext, as `Articles(found, missing)`: an article that raises `FetchError` is recorded as 'title: error' and logged, and the rest are read. Every per-article loop but pull_seasons' reads through this one guard: a missing era subpage fails that pull whole |
+| `fetch_articles(pull, titles)` | every title's wikitext, as `Articles(found, missing)`: an article that raises `FetchError` is recorded as 'title: error' and logged, and the rest are read. Every per-article loop reads through this one guard |
 | `Articles` | what `fetch_articles` read: {title: wikitext}, and the titles that would not fetch |
 | `WikiError` | the wiki answered, but not with what was asked for |
 | `CARGO_POLICY`, `ARTICLE_POLICY` | the two paces, above |
@@ -583,15 +572,8 @@ Each ends in `run()`, and each docstring opens "Pull + clean + store".
 - **`patches.py` - pull_patches.** The `Patches` Cargo table: each patch's
   page name and date, upserted by name. A page with no date anchors
   nothing and is skipped. Runs before pull_rates: a snapshot links to the
-  most recent patch released at capture.
-- **`seasons.py` - pull_seasons.** The Season article names one subpage
-  per era, and each lists its seasons as `=== Season N: Name ===` headings
-  with the run in parentheses beneath; a subpage that opens by naming its
-  story arc prefixes its seasons with it. A season is stored once it has
-  started; one without a full start date, or starting after today, is
-  reported as upcoming. The table is reloaded whole, and every snapshot is
-  restamped with the season live on its capture date
-  (`psql.SEASON_ON_DATE`, the one rule `current_season` shares).
+  most recent patch released at capture. The refresher runs it daily,
+  before the rates.
 - **`playstyles.py` - pull_playstyles.** The Team Composition article:
   each `=== <Name> heroes ===` section and the heroes it links. A hero
   appears under every playstyle it suits, so the lists overlap by design.
@@ -637,11 +619,9 @@ Each ends in `run()`, and each docstring opens "Pull + clean + store".
           |
   kit_store.store                   weapons: firing modes -> weapons
           |                         measurements: a value -> its rows
-          |                         modifiers: what a buff scales, whom
-          v                         it lands on
+          v
   weapons, weapon_configs, weapon_stats, abilities, ability_stats,
-  ability_modifiers, perks, perk_stats, perk_ability_effects,
-  stat_keys, kit_6v6, and each hero's pools
+  perks, perk_stats, stat_keys, kit_6v6, and each hero's pools
 ```
 
 Nothing here ends in `run()`. Outside the tests, `wiki/heroes.py` is the
@@ -702,25 +682,17 @@ one module that imports the pipeline.
   and Pilot, Recon and Assault) never merge. Each ADS config is renamed
   after its weapon, "<weapon> (ADS)". `SLOT_IDS` maps a mode to the
   `weapon_config_slots` row the migrations seed.
-- **`modifiers.py`.** What a buff scales and whom it lands on. The wiki
-  gives a buff's size as a stat (`damage_amp`) but never says in a field
-  what it scales or who takes it; the value's qualifier ("dealt", "taken",
-  "received") and the ability's keywords ("amp outgoing", "amp incoming",
-  "target ally") settle it. Where they settle nothing the answer is None:
-  nothing here guesses.
-- **`kit_store.py`.** The store. It reloads the weapon, stat, modifier and
-  6v6 tables whole, dependents first; registers every stat code in
+- **`kit_store.py`.** The store. It reloads the weapon, stat and 6v6
+  tables whole, dependents first; registers every stat code in
   `stat_keys`; and sets each profiled hero's 5v5 and 6v6 pools. Then, per
   hero: the weapons and their firing configs, with their stats; Blizzard's
   abilities classified, their kind and keywords set, and the ones Blizzard
   omits added after its positions; each ability's stats, in the default
-  unit its stat takes (`STAT_UNITS`), and its modifiers; each perk's stats,
-  and a link to every ability of the hero its text names
-  (`perk_ability_effects`); the 6v6 lines. The hero, ability and perk rows
-  pull_heroes owns are filled in, never replaced - except an announced
-  hero's, whose wiki perks get rows of their own, two a tier, until
-  Blizzard publishes the hero. A hero the roster lacks is skipped and
-  named in `unknown_heroes`.
+  unit its stat takes (`STAT_UNITS`); each perk's stats; the 6v6 lines.
+  The hero, ability and perk rows pull_heroes owns are filled in, never
+  replaced - except an announced hero's, whose wiki perks get rows of
+  their own, two a tier, until Blizzard publishes the hero. A hero the
+  roster lacks is skipped and named in `unknown_heroes`.
 
 ## The door's pull tools
 
@@ -745,11 +717,10 @@ it:
 | 3 | `pull_maps` | wiki | `wiki/maps.py` | game_modes, maps, map_modes, map_stages | the terrain and the rates link to maps |
 | 4 | `pull_terrain` | wiki | `wiki/terrain.py` | map_terrain, stage_terrain | a stage exists before its terrain |
 | 5 | `pull_patches` | wiki | `wiki/patches.py` | patches | a snapshot links to the patch live at capture |
-| 6 | `pull_seasons` | wiki | `wiki/seasons.py` | seasons, and each snapshot's season | a snapshot is stamped with the season live today |
-| 7 | `pull_rates` | blizzard | `blizzard/meta.py` | regions, competitive_tiers, meta_snapshots, hero_meta, map_meta | it needs the heroes, the maps, the patches and the seasons |
-| 8 | `pull_playstyles` | wiki | `wiki/playstyles.py` | playstyle | a style lists heroes on the roster |
-| 9 | `pull_synergies` | wiki | `wiki/synergies.py` | synergies | a synergy is a pair of released heroes |
-| 10 | `pull_counters` | wiki | `wiki/matchups.py` | counters | a counter is a pair of released heroes, read beside their stored abilities |
+| 6 | `pull_rates` | blizzard | `blizzard/meta.py` | regions, competitive_tiers, meta_snapshots, hero_meta, map_meta | it needs the heroes, the maps and the patches |
+| 7 | `pull_playstyles` | wiki | `wiki/playstyles.py` | playstyle | a style lists heroes on the roster |
+| 8 | `pull_synergies` | wiki | `wiki/synergies.py` | synergies | a synergy is a pair of released heroes |
+| 9 | `pull_counters` | wiki | `wiki/matchups.py` | counters | a counter is a pair of released heroes, read beside their stored abilities |
 
 Three tools wear a name other than their module's: pull_kits runs
 `wiki/heroes.py`, pull_rates `blizzard/meta.py` and pull_counters
@@ -765,7 +736,7 @@ from the cache by the next.
 `sync_all`; without refresh it rebuilds from the caches at almost no
 requests.
 
-The refresher ([door/refresh.py](../../door/refresh.py)) runs pull_seasons
+The refresher ([door/refresh.py](../../door/refresh.py)) runs pull_patches
 and pull_rates with refresh on each day, then `load_authored`; on a day the
 wiki cache is a week old, `sync_all` with refresh on runs in their place.
 Its setting is in [docs/db.md](../../docs/db.md#keeping-it-fresh).
@@ -786,7 +757,7 @@ but one run without a database.
 
 | file | what it holds |
 | --- | --- |
-| `test_cache.py` | the page cache and the request loop: refetch by age, the stale copy kept, a rate limit retried, an article asked for once |
+| `test_cache.py` | the page cache and the request loop: refetch before a cutoff, the stale copy kept, a rate limit retried, an article asked for once |
 | `blizzard/`, `wiki/` | one file per reader or pull |
 | `recording.py` | `RecordingCursor` and its connection: a stand-in for Postgres that records every statement a store issues, with its parameters |
 | `test_pull_stores.py` | every pull's `run()` over a recording connection and a page cache in `tmp_path`: the parameters it writes, its commits, its summary |
@@ -857,7 +828,7 @@ pull reads one of the two.
 8. The whole chain builds an empty database: an invariant test applies
    every migration to a scratch database and compares its tables with the
    built one.
-9. The schema sections of docs/db.md regenerated with `db_docs`, and the
+9. The data dictionary in docs/db.md regenerated with `db_docs`, and the
    migration applied with `db_migrate`, which keeps the data. In Docker,
    `orchestrator.py up` rebuilds the image, and the `data` container
    rebuilds the database on a migration it lacks.
@@ -894,7 +865,6 @@ pull reads one of the two.
   read a stale page stamps no snapshot.
 - It never hardcodes the rates queue's code, and never deletes a map or a
   mode.
-- It never stores a 6v6 figure it could not read, and never guesses what
-  a modifier scales or whom it lands on.
+- It never stores a 6v6 figure it could not read.
 - It never publishes a rate: the page caches are gitignored, and no doc
   quotes a figure.

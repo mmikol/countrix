@@ -6,22 +6,6 @@ from typing import NamedTuple, TypedDict
 
 # --- a hero's ------------------------------------------------------------
 
-class Modifier(NamedTuple):
-    """An ability's change to a stat, as ability_modifiers stores it: +50 percent
-    damage_dealt amplifies, -45 reduces."""
-    ability: str
-    affects: str
-    applies_to: str | None
-    magnitude: float
-    unit: str
-
-
-class PerkEffect(NamedTuple):
-    """A perk and the ability it alters."""
-    perk: str
-    ability: str
-
-
 class Rates(NamedTuple):
     """A hero's win, pick and ban rate in one population, percent; a rate the
     capture does not publish is None."""
@@ -107,13 +91,12 @@ class Synergy(NamedTuple):
 
 class Snapshot(TypedDict):
     """One source's newest capture of rates, as the meta facts word it: the
-    capture day, the patch and season it fell in, the queue and platform, and
-    the regions its rows cover."""
+    capture day, the patch it fell in, the queue and platform, and the
+    regions its rows cover."""
     source: str
     captured: str
     patch: str | None
     released: str | None
-    season: str | None
     queue: str
     platform: str
     region: str | None

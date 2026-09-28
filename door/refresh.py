@@ -5,15 +5,16 @@ time), and at once on start when the cached pages are older than
 MAX_AGE_HOURS.
 
 A refresh comes in two sizes. The DAILY one refetches what moves day to
-day - the wiki's seasons (a snapshot is stamped with the season live that
-day) and the rates - then re-mirrors the strategies. The FULL one is
-`sync_all` with refresh on: every page of every source, including the hero
-pages and the wiki articles (kits, synergies, counters) that only change
-with a patch; it runs when the wiki cache is older than FULL_DAYS. Either
-way a page that fails keeps its cached copy, so a flaky source degrades to
-yesterday's numbers rather than an empty table, and the pull's reply lists
-it under stale: its first line, which the log keeps, ends with the count,
-and sync_all's with the pulls that read one.
+day - the wiki's patch list (a snapshot is stamped with the patch live
+that day, and the board warns of one shipped since) and the rates - then
+re-mirrors the strategies. The FULL one is `sync_all` with refresh on:
+every page of every source, including the hero pages and the wiki
+articles (kits, synergies, counters) that only change with a patch; it
+runs when the wiki cache is older than FULL_DAYS. Either way a page that
+fails keeps its cached copy, so a flaky source degrades to yesterday's
+numbers rather than an empty table, and the pull's reply lists it under
+stale: its first line, which the log keeps, ends with the count, and
+sync_all's with the pulls that read one.
 """
 
 import os
@@ -30,10 +31,10 @@ from door.mcp import tools
 DEFAULT_AT = "05:00"      # the daily time when COUNTRIX_REFRESH_AT names none
 MAX_AGE_HOURS = 20.0      # a cache older than this is refreshed at once on start
 FULL_DAYS = 7.0           # a wiki cache older than this calls for a full refresh
-# What moves between patches. Seasons first: rates stamp their snapshot with
-# the season live today. No tool that reads the hero articles: refetching
+# What moves between patches. Patches first: rates stamp their snapshot with
+# the patch live today. No tool that reads the hero articles: refetching
 # them daily would keep the wiki cache young and a full refresh never due.
-DAILY = ("pull_seasons", "pull_rates")
+DAILY = ("pull_patches", "pull_rates")
 
 
 def parse_at(text: str) -> tuple[int, int]:
@@ -77,7 +78,7 @@ def cache_age_hours(cache_dirs: Iterable[str] | None = None) -> float | None:
 def full_due(cache_dirs: Iterable[str] | None = None) -> bool:
     """A full refresh is due when the slow-moving cache (the wiki's) is older
     than FULL_DAYS, or absent. Its age is the median page's: the daily
-    refresh refetches a few pages (the Season pages), a full one all of them."""
+    refresh refetches one file (the Patches table), a full one all of them."""
     ages = _page_ages(cache_dirs or [CACHE_DIRS["wiki"]])
     if not ages:
         return True
@@ -92,7 +93,7 @@ class Refreshed(NamedTuple):
 
 
 def refresh_once(ctx: tools.Context, log: tools.Log = print) -> Refreshed:
-    """One refresh -> (ok, text): daily (seasons, rates, strategies) or full
+    """One refresh -> (ok, text): daily (patches, rates, strategies) or full
     (every source), as full_due() decides - its text each tool's headline,
     joined by "; ". Never raises; a failure returns (False, the error)."""
     started = time.time()

@@ -7,7 +7,7 @@
 #               "countrix-docker")
 #   ui          the board at http://localhost:8017, with the INFERENCE ENGINE
 #               in the board's process, reading the strategy files live
-#   refresher   the door's clock: seasons and rates daily at
+#   refresher   the door's clock: patches and rates daily at
 #               COUNTRIX_REFRESH_AT (05:00 container time; set TZ), every
 #               source weekly, and on start when the caches are 20 hours old
 #   backup      the nightly pg_dump into ./backups at COUNTRIX_BACKUP_AT

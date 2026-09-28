@@ -7,17 +7,17 @@ page to table, plus what they share.
     blizzard/     the official site: heroes (roster, roles, portraits,
                   text), meta (rates as dated snapshots)
     wiki/         the MediaWiki endpoint: heroes (kits, numbers, keywords),
-                  maps, terrain, patches, seasons, playstyles, synergies,
-                  matchups (counters) - the markup reader they share, and
-                  kits/, the heroes pull's kit pipeline
+                  maps, terrain, patches, playstyles, synergies, matchups
+                  (counters) - the markup reader they share, and kits/,
+                  the heroes pull's kit pipeline
     cache         the page cache, its freshness and the request loop
     normalizer    matching hero, map and ability names across sources
 
 Each fetched source's domain module ends in a run(connection, pull) - pull
-a cache.PullContext: the page cache, the session, the log and how old a
-cached page may be - that returns a PullSummary: the tables it wrote, and
-for a pull that reads one article or page per entity, the ones that would
-not fetch (ArticlePullSummary). A run() fetches every page before its
+a cache.PullContext: the page cache, the session, the log and the moment
+before which a cached page is refetched - that returns a PullSummary: the
+tables it wrote, and for a pull that reads one article or page per entity,
+the ones that would not fetch (ArticlePullSummary). A run() fetches every page before its
 first write, so no row stays locked across a fetch.
 The MCP pull tools (door/mcp) import and call them. Nothing here is an entry
 point of its own.

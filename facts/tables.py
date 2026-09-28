@@ -3,7 +3,7 @@ the facts layer always reads what the data layer stored.
 
     world = tables.load(cx)
 
-Loading is 29 queries and a few thousand rows; cheap enough to do per
+Loading is 27 queries and a few thousand rows; cheap enough to do per
 click, and it is what lets the inference layer's solver evaluate thousands
 of candidate compositions without a query each. Each read step fills one
 part of the World from its tables, and load runs them in the order each
@@ -27,9 +27,7 @@ from facts.model import ROLES, TERRAIN_FEATURES, TERRAIN_LEAN, Hero, Map, World
 from facts.records import (
     KitLine,
     MapRate,
-    Modifier,
     Patch,
-    PerkEffect,
     Rates,
     Snapshot,
     StageTerrain,
@@ -176,7 +174,7 @@ def _read_heroes(cx: Connection, w: World) -> None:
 
 
 def _read_abilities(cx: Connection, w: World) -> None:
-    """Each hero's abilities in order, their stats and the modifiers they apply."""
+    """Each hero's abilities in order, and their stats."""
     abilities: dict[int, KitPiece] = {}
     for aid, hid, name, kind, desc, kw in _rows(cx, """
             select a.ability_id, a.hero_id, a.name, coalesce(k.code, 'ability'),
@@ -192,13 +190,6 @@ def _read_abilities(cx: Connection, w: World) -> None:
                    s.value_text
             from ability_stats s join stat_keys k using(stat_key_id)
             order by s.ability_stat_id"""))
-    for hid, name, affects, applies, magnitude, unit in _rows(cx, """
-            select a.hero_id, a.name, m.affects, m.applies_to, m.magnitude, m.unit
-            from ability_modifiers m join abilities a using(ability_id)
-            order by m.modifier_id"""):
-        w.heroes[hid].modifiers.append(Modifier(
-            ability=name, affects=affects, applies_to=applies, magnitude=float(magnitude),
-            unit=unit))
 
 
 def _read_weapons(cx: Connection, w: World) -> None:
@@ -225,7 +216,7 @@ def _read_weapons(cx: Connection, w: World) -> None:
 
 
 def _read_perks(cx: Connection, w: World) -> None:
-    """Each hero's perks by tier, their stats and the abilities they alter."""
+    """Each hero's perks by tier, and their stats."""
     perks: dict[int, KitPiece] = {}
     for pid, hid, name, tier, desc in _rows(cx, """
             select p.perk_id, p.hero_id, p.name, t.code, p.description
@@ -240,11 +231,6 @@ def _read_perks(cx: Connection, w: World) -> None:
                    s.value_text
             from perk_stats s join stat_keys k using(stat_key_id)
             order by s.perk_stat_id"""))
-    for hid, perk, ability in _rows(cx, """
-            select p.hero_id, p.name, a.name from perk_ability_effects e
-            join perks p using(perk_id) join abilities a using(ability_id)
-            order by p.hero_id, p.position, a.position"""):
-        w.heroes[hid].perk_effects.append(PerkEffect(perk=perk, ability=ability))
 
 
 def _read_kit_6v6(cx: Connection, w: World) -> None:
@@ -359,16 +345,14 @@ def _read_provenance(cx: Connection, w: World) -> None:
     w.snapshots = [
         Snapshot(
             source=src, captured=str(cap), patch=patch, released=str(rel) if rel else None,
-            season=season, queue=queue, platform=platform, region=region)
-        for src, cap, patch, rel, season, queue, platform, region in _rows(cx, """
-            select src.code, ms.captured_at::date, p.name, p.released, se.name,
-                   ms.queue, ms.platform,
+            queue=queue, platform=platform, region=region)
+        for src, cap, patch, rel, queue, platform, region in _rows(cx, """
+            select src.code, ms.captured_at::date, p.name, p.released, ms.queue, ms.platform,
                    (select string_agg(distinct r.name, ', ') from hero_meta hm
                    join regions r using(region_id)
                    where hm.snapshot_id = ms.snapshot_id)
             from meta_snapshots ms join sources src using(source_id)
             left join patches p using(patch_id)
-            left join seasons se using(season_id)
             where ms.snapshot_id in (
                 select distinct on (source_id, queue) snapshot_id from meta_snapshots
                 order by source_id, queue, captured_at desc)

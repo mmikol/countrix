@@ -235,8 +235,8 @@ def world() -> World:
         w.partners[ids[b]][ids[a]] = pair
     w.snapshots = [Snapshot(
         source="blizzard", captured="2026-09-01", patch="September 1, 2026 Patch",
-        released="2026-09-01", season="Season 1", queue="competitive_role_queue",
-        platform="pc", region="Americas")]
+        released="2026-09-01", queue="competitive_role_queue", platform="pc",
+        region="Americas")]
     w.subrole_passives = {
         "Stalwart": "Takes less knockback.", "Bruiser": "Heals a little on a kill.",
         "Sharpshooter": "Deals more damage from far away."}

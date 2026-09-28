@@ -9,6 +9,7 @@ counts it."""
 import datetime
 import html
 import json
+import time
 
 import pytest
 import requests
@@ -17,7 +18,7 @@ from db import INPUT_DEVICE, PLATFORM, REGION, psql
 from db.data import cache
 from db.data.blizzard import meta
 from db.data.cache import cache_key
-from db.data.wiki import WikiError, maps, patches, playstyles, seasons, terrain
+from db.data.wiki import maps, patches, playstyles, terrain
 from tests.db.recording import RecordingConnection
 from tests.db.test_cache import write_aged
 from tests.db.test_transforms import HYBRID_PAGE
@@ -28,7 +29,7 @@ CAO = datetime.datetime(2026, 9, 24, 5, 0, tzinfo=datetime.UTC)
 
 @pytest.fixture(autouse=True)
 def clock(monkeypatch):
-    """Every pull's one timestamp, and the day a season is judged started by."""
+    """Every pull's one timestamp."""
     monkeypatch.setattr(psql, "now", lambda: CAO)
 
 
@@ -109,7 +110,6 @@ RATES_READS = [
     ('SELECT "name", "map_id" FROM "maps"', [("King's Row", 7)]),
     ('SELECT "name", "hero_id" FROM "heroes"', [("Lúcio", 1)]),
     ("SELECT patch_id FROM patches", []),
-    ("SELECT season_id FROM seasons", []),
     ("SELECT count(*) FROM meta_snapshots", [(3,)]),
 ]
 
@@ -130,7 +130,7 @@ def test_the_rates_pull_stores_one_snapshot_of_every_tier_and_map_it_read(tmp_pa
     assert cursor.written("INSERT INTO competitive_tiers") == [
         ("all", "All Tiers", 0, source_id), ("gold", "Gold", 1, source_id)]
     assert cursor.written("INSERT INTO meta_snapshots") == [
-        (CAO, "competitive_role_queue", PLATFORM, INPUT_DEVICE, None, None, source_id)]
+        (CAO, "competitive_role_queue", PLATFORM, INPUT_DEVICE, None, source_id)]
     assert cursor.written("INSERT INTO hero_meta") == [
         (snapshot_id, 1, region_id, all_tier, 48.7, 23.0, 8.2, source_id),
         (snapshot_id, 1, region_id, gold_tier, 51.0, 20.1, 7.0, source_id)]
@@ -154,7 +154,7 @@ def test_a_rates_pull_that_read_a_stale_page_stamps_no_snapshot(tmp_path, monkey
     monkeypatch.setattr(meta, "RATES_POLICY", cache.RequestPolicy(attempts=1, backoff=0, delay=0))
     _cache(tmp_path, RATES_PAGES, hours=48)
     connection, lines = RecordingConnection(RATES_READS), []
-    pull = _pull(tmp_path, lines, max_age=0)
+    pull = _pull(tmp_path, lines, cutoff=time.time())
     summary = meta.run(connection, pull)
     [cursor] = connection.cursors
     assert cursor.written("INSERT") == [] and cursor.written("UPDATE") == []
@@ -227,55 +227,6 @@ def test_the_maps_pull_stores_the_pool_and_each_map_s_stages(tmp_path, monkeypat
     assert summary["maps_with_stages"] == {"control": 1, "hybrid": 1}
     assert summary["tables"] == ["game_modes", "maps", "map_modes", "map_stages"]
     assert connection.commits == 1 and pull.session.calls == 1   # Ilios, asked for once
-
-
-# --- the seasons: the Season article and its era subpages --------------------
-
-SEASON_PAGE = """The seasons, era by era.
-== 2016 ==
-{{main|Season/2016}}
-"""
-
-SEASON_2016 = """=== Season 1 ===
-(10 August 2016 - 10 October 2016)
-The first season.
-
-=== Season 2: Far Future ===
-(1 January 2099 - 1 March 2099)
-"""
-
-
-def test_the_seasons_pull_reloads_the_started_seasons_and_restamps_the_snapshots(tmp_path):
-    _cache(tmp_path, {
-        cache_key(seasons.SEASON_PAGE) + ".wikitext": SEASON_PAGE,
-        cache_key("Season/2016") + ".wikitext": SEASON_2016})
-    connection, lines = RecordingConnection(), []
-    pull = _pull(tmp_path, lines)
-    summary = seasons.run(connection, pull)
-    [cursor] = connection.cursors
-    source_id = 1
-    assert cursor.written("UPDATE meta_snapshots SET season_id = NULL") == [()]
-    assert cursor.written("DELETE FROM seasons") == [()]
-    # a season that has not started is reported, not stored
-    assert cursor.written("INSERT INTO seasons") == [
-        ("Season 1", datetime.date(2016, 8, 10), "Season/2016", source_id)]
-    assert len(cursor.written("UPDATE meta_snapshots ms SET season_id")) == 1
-    assert summary == {"seasons": 1, "latest": "Season 1", "latest_started": "2016-08-10",
-                       "stamped": 1, "upcoming": ["Season 2: Far Future"],
-                       "tables": ["seasons", "meta_snapshots"]}
-    assert connection.commits == 1 and pull.session.calls == 0
-
-
-def test_a_season_page_with_no_started_season_fails_the_pull_before_it_writes(tmp_path):
-    """Reloading the table from nothing would unstamp every snapshot."""
-    _cache(tmp_path, {
-        cache_key(seasons.SEASON_PAGE) + ".wikitext": SEASON_PAGE,
-        cache_key("Season/2016") + ".wikitext": SEASON_2016.split("=== Season 2")[0].replace(
-            "(10 August 2016 - 10 October 2016)", "(dates to come)")})
-    connection = RecordingConnection()
-    with pytest.raises(WikiError, match="no season with a start date"):
-        seasons.run(connection, _pull(tmp_path, []))
-    assert connection.cursors == [] and connection.commits == 0
 
 
 # --- the terrain: each map's article, counted per map and per stage ----------

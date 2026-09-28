@@ -89,12 +89,11 @@ DATE = (r"(?i:(?:(\d{1,2})\s+(%(m)s)|(%(m)s)\s+(\d{1,2}))(?:,?\s*(\d{4}))?)"
         % {"m": "|".join(MONTHS)})
 
 
-def parse_date(groups: Sequence[str | None], year: str | None) -> date | None:
-    """A date from a DATE match's first four groups - the day and the month in
-    either order, one pair matched and the other None - and a year, its own
-    or one the text gives elsewhere; None without a year, or for a day the
-    month does not have."""
-    day_first, month_first, month_second, day_second = groups[:4]
+def parse_date(groups: Sequence[str | None]) -> date | None:
+    """A date from a DATE match's five groups - the day and the month in
+    either order, one pair matched and the other None, then the year; None
+    without a year, or for a day the month does not have."""
+    day_first, month_first, month_second, day_second, year = groups[:5]
     day, month = day_first or day_second, month_first or month_second
     if day is None or month is None or year is None:
         return None

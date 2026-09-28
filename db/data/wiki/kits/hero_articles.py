@@ -87,7 +87,7 @@ def parse_announcement(text: str) -> Announcement | None:
     if role not in ROLES:
         return None
     released = RELEASE_RE.search(markup.wikitext_to_text(text))
-    release_date = markup.parse_date(released.groups(), released.group(5)) if released else None
+    release_date = markup.parse_date(released.groups()) if released else None
     return Announcement(role=role, subrole=subrole, release_date=release_date)
 
 

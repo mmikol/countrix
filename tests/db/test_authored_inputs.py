@@ -29,13 +29,13 @@ def test_load_authored_takes_strategies_and_nothing_else():
     assert schema["properties"] == {} and schema["required"] == []
 
 
-def test_seasons_and_synergies_are_pulls_in_dependency_order():
+def test_patches_and_synergies_are_pulls_in_dependency_order():
     pulls = {spec.name: spec.source for spec in tools.REGISTRY.pulls()}
     order = list(pulls)
-    assert pulls["pull_seasons"] == "wiki"
+    assert pulls["pull_patches"] == "wiki"
     assert pulls["pull_synergies"] == "wiki"
-    # a rates pull stamps its snapshot with the season live today
-    assert order.index("pull_seasons") < order.index("pull_rates")
+    # a rates pull stamps its snapshot with the patch live today
+    assert order.index("pull_patches") < order.index("pull_rates")
     # a synergy and a counter are pairs of heroes on the roster
     assert order.index("pull_heroes") < order.index("pull_synergies")
     assert order.index("pull_heroes") < order.index("pull_counters")
@@ -94,9 +94,8 @@ def test_a_pull_hands_run_its_sources_cache_and_the_context_log(monkeypatch, tmp
     assert seen["pull"].log is ctx.log
     # refresh: every page cached before the call began is stale
     assert began <= seen["pull"].cutoff <= time.time()
-    assert seen["pull"].max_age is None
     ctx.call("pull_rates")
-    assert seen["pull"].cutoff is None and seen["pull"].max_age is None   # a build keeps every page
+    assert seen["pull"].cutoff is None                  # a build keeps every page
 
 
 class Synced(Offline):
@@ -117,28 +116,27 @@ def test_a_full_refresh_holds_every_pull_to_the_moment_it_began(monkeypatch, tmp
     seen = []
 
     def run(connection, pull, **options):
-        seen.append((pull.cutoff, pull.max_age))
+        seen.append(pull.cutoff)
         return {"tables": []}
 
     def no_request(*args, **kwargs):
         raise AssertionError("a stubbed pull asks the network for nothing")
     monkeypatch.setattr(requests.Session, "get", no_request)
     for module in (pulls.blizzard_heroes, pulls.wiki_heroes, pulls.wiki_maps,
-                   pulls.wiki_terrain, pulls.wiki_patches, pulls.wiki_seasons,
-                   pulls.blizzard_meta, pulls.wiki_playstyles, pulls.wiki_synergies,
-                   pulls.wiki_matchups):
+                   pulls.wiki_terrain, pulls.wiki_patches, pulls.blizzard_meta,
+                   pulls.wiki_playstyles, pulls.wiki_synergies, pulls.wiki_matchups):
         monkeypatch.setattr(module, "run", run)
     caches = {"blizzard": str(tmp_path / "blizzard"), "wiki": str(tmp_path / "wiki")}
     ctx = Synced(dsn="postgresql://nowhere", caches=caches, log=lambda line: None)
     began = time.time()
     ctx.call("sync_all", refresh=True)
     assert len(seen) == len(tools.REGISTRY.pulls())
-    [(cutoff, max_age)] = set(seen)
-    assert began <= cutoff <= time.time() and max_age is None
+    [cutoff] = set(seen)
+    assert began <= cutoff <= time.time()
     assert ctx.cutoff is None                       # the caller's context holds none
     seen.clear()
     ctx.call("sync_all")
-    assert set(seen) == {(None, None)}              # a build keeps every cached page
+    assert set(seen) == {None}                      # a build keeps every cached page
 
 
 def test_a_stale_page_is_named_in_the_pull_reply(monkeypatch, tmp_path):
@@ -175,21 +173,22 @@ def test_a_pull_that_stores_no_table_says_nothing_stored(monkeypatch, tmp_path):
     assert data["tables"] == [] and data["snapshot_id"] is None
 
 
-def test_the_data_dictionary_says_where_seasons_and_synergies_come_from():
+def test_the_data_dictionary_says_where_patches_and_synergies_come_from():
     # 018's COMMENT ON TABLE replaces the prose 004 wrote above CREATE TABLE
-    # seasons; 005's prose above CREATE TABLE synergies is kept current itself
+    # seasons, which was patches'; 005's prose above CREATE TABLE synergies is
+    # kept current itself
     from db.psql import schema
     described = schema._migration_tables()
-    assert described["seasons"][0] == "004_meta.sql"           # the domain stays the creator's
+    assert described["patches"][0] == "004_meta.sql"           # the domain stays the creator's
     assert described["synergies"][0] == "005_playbook.sql"
-    assert "pull_seasons" in described["seasons"][1]
-    assert "wiki's Season pages" in described["seasons"][1]    # '' unescaped
+    assert "pull_patches" in described["patches"][1]
+    assert "wiki's Patches cargo table" in described["patches"][1]     # '' unescaped
+    assert "season" not in described["patches"][1]
     assert "pull_synergies" in described["synergies"][1]
     assert "hero's wiki article" in described["synergies"][1]
-    for table in ("seasons", "synergies"):
+    for table in ("patches", "synergies"):
         assert "authored" not in described[table][1].lower(), table
         assert ".csv" not in described[table][1], table
-    assert "pull_patches" in described["patches"][1] and "season" not in described["patches"][1]
 
 
 def test_the_data_dictionary_says_counters_are_the_wikis_matchups():
@@ -252,6 +251,17 @@ def test_the_migration_that_drops_the_matches_is_one_transaction():
                     "DROP TABLE IF EXISTS matches;", "COMMIT;"]
 
 
+def test_the_migration_that_drops_the_unread_data_is_one_transaction():
+    """028 drops the snapshot's season column before the seasons it
+    references, then the two kit tables nothing read."""
+    from db.psql import schema
+    [sql] = [m.sql for m in schema.read_migrations() if m.name == "028_drop_unread.sql"]
+    body = [line for line in sql.splitlines() if line and not line.startswith("--")]
+    assert body == ["BEGIN;", "ALTER TABLE meta_snapshots DROP COLUMN IF EXISTS season_id;",
+                    "DROP TABLE IF EXISTS seasons;", "DROP TABLE IF EXISTS ability_modifiers;",
+                    "DROP TABLE IF EXISTS perk_ability_effects;", "COMMIT;"]
+
+
 # --- the built database ----------------------------------------------------
 
 @pytest.mark.invariant
@@ -273,7 +283,8 @@ def test_the_dropped_tables_are_gone_and_no_table_is_empty(rows, one):
     tables = [t for (t,) in rows(
         "select tablename from pg_tables where schemaname = 'public' order by 1")]
     assert not {"map_playstyle", "comp_archetypes", "map_strategy", "matches",
-                "match_picks"} & set(tables)
+                "match_picks", "seasons", "ability_modifiers",
+                "perk_ability_effects"} & set(tables)
     empty = [t for t in tables if one("select count(*) from %s" % t) == 0]
     assert empty == [], empty
 
@@ -284,8 +295,8 @@ def test_the_sources_are_blizzard_the_wiki_and_the_playbook(rows):
 
 
 @pytest.mark.invariant
-def test_seasons_synergies_and_counters_come_from_the_wiki(rows):
-    for table in ("seasons", "synergies", "counters"):
+def test_patches_synergies_and_counters_come_from_the_wiki(rows):
+    for table in ("patches", "synergies", "counters"):
         assert {c for (c,) in rows(
             "select distinct s.code from %s t join sources s using (source_id)"
             % table)} == {"wiki"}, table
