@@ -100,15 +100,18 @@ db <- facts <- inference <- door <- ui.
   record S1.. in emission order; a solver contribution cites a fact by metric
   key (`also=` on `FactSet.add`). Adding a fact renumbers every later id.
 - **The playbook is markdown.** `inference/strategies/*.md` - the filename is
-  the id; frontmatter sets the kind (constraint, heuristic, assumption). The
-  form is derived, never written: limit (`require:`), scored
-  (`bonus:`/`penalty:`), heuristic (`metric:`), assumption, or draft (name,
-  kind and prose only). `inference/catalog.py` reads it, each file parsed
-  by `frontmatter.py` and checked by `strategy.py` (`Strategy`,
-  `CatalogError`); one bad file makes `catalog.load` raise everywhere. The
-  shipped playbook is six assumptions, one scored rule, `heal-rate`
-  (the healing floor, `matchup.heal_shortfall`, docs/inference.md), and
-  one limit, `at-most-three-supports`, while
+  the id; frontmatter sets the kind (constraint, heuristic, assumption).
+  Constraints cut the space; heuristics weigh what is left. The form is
+  derived, never written: a constraint is a limit (`require:`), which always
+  holds and is never weighted; a heuristic is on a metric (`metric:`, form
+  heuristic) or scored (`bonus:`/`penalty:` times its weight); then
+  assumption, or draft (name, kind and prose only). A key outside the
+  fields, `soft:` among them, is refused. `inference/catalog.py` reads it,
+  each file parsed by `frontmatter.py` and checked by `strategy.py`
+  (`Strategy`, `CatalogError`); one bad file makes `catalog.load` raise
+  everywhere. The shipped playbook is six assumptions, one heuristic,
+  `heal-rate`, scored (the healing floor, `matchup.heal_shortfall`,
+  docs/inference.md), and one limit, `at-most-three-supports`, while
   it is rebuilt rule by rule from the citation record in
   `inference/README.md`. Solver behaviour is tested against the 19-file
   reference playbook in `tests/fixtures/playbook/`, or its four assumptions
@@ -136,11 +139,15 @@ db <- facts <- inference <- door <- ui.
   fill is None unless one to five blue picks are locked, countered is None
   without blue picks or when the caller's `Brief` leaves it out, as the
   page's boards do. Each seat has one scale: reference sixes drawn from a
-  string seed, the map and the side, bounded against the enemy. current
-  shares blue's optimal's scale, red_current red's, so within a seat infer,
-  evaluate and current are comparable. Only `board()` uses the process pool,
-  and the pooled and sequential answers must agree bit for bit: string-seeded
-  RNGs, integer tallies, ties broken by `map_win_mean` and then sorted names.
+  string seed, the map and the side, bounded against the enemy; the lowest
+  of their scores is the seat's floor, a share's 0, as its optimal is the
+  100. current shares blue's optimal's scale, red_current red's, so within
+  a seat infer, evaluate and current are comparable. Blue's picks that break
+  a limit - a full six, or picks no fill can complete - are not allowed:
+  no score, no share, no odds; red's picks are never ruled out. Only
+  `board()` uses the process pool, and the pooled and sequential answers
+  must agree bit for bit: string-seeded RNGs, integer tallies, a least
+  floor, ties broken by `map_win_mean` and then sorted names.
 - **The board** (`ui/board.py`, its pages in `ui/pages.py`) serves
   `/api/facts` in-process and answers `/api/board`, `/api/strategies` and
   `/health` with `inference/serve.py`'s handlers, in-process - the compose

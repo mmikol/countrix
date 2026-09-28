@@ -5,8 +5,8 @@
 /* a heuristic's weight is the user's to set: a slider under its card, 0 to 10
    to the hundredth (0.25, 9.99), with a number box for the exact figure,
    starting at the weight the file infers; a setting rides with every board
-   request (weights=id:value) and never touches the file. Only heuristics have
-   weights to set - a scored constraint's stays its own. */
+   request (weights=id:value) and never touches the file. Every heuristic has
+   a weight to set, on a metric or scored; a constraint is never weighted. */
 function weightRow(h) {
   var set = st.weights.hasOwnProperty(h.id), v = set ? st.weights[h.id] : h.weight;
   return "<div class='wrow' data-id='" + esc(h.id) + "' data-inferred='" + h.weight + "'>" +
@@ -51,11 +51,13 @@ function loadPlaybook() {
     function () { renderPlaybook(null); });
 }
 /* a slider setting whose heuristic the catalog no longer holds - renamed,
-   removed, or a scored rule now - has no row to clear it from, and would ride
-   with every request: it is dropped. Only a catalog that answered prunes */
+   removed, or a draft or a constraint now - has no row to clear it from, and
+   would ride with every request: it is dropped. Only a catalog that answered
+   prunes */
+function weighs(h) { return h.form === 'heuristic' || h.form === 'scored'; }
 function pruneWeights(d) {
   var live = {};
-  d.strategies.forEach(function (h) { if (h.form === 'heuristic') live[h.id] = true; });
+  d.strategies.forEach(function (h) { if (weighs(h)) live[h.id] = true; });
   var stale = Object.keys(st.weights).filter(function (id) { return !live[id]; });
   stale.forEach(function (id) { delete st.weights[id]; });
   if (stale.length) save();
@@ -98,7 +100,7 @@ function renderPlaybook(d) {
   });
   function card(h) {
     var meta = h.form === 'heuristic' ? h.direction + ' ' + h.metric + ' · weight ' + h.weight + (h.need ? ' · need' : '') + (h.when ? ' · when ' + h.when : '')
-             : h.form === 'limit' ? 'require ' + h.require + (h.soft ? ' · soft, penalty ' + h.penalty : ' · hard') + (h.when ? ' · when ' + h.when : '')
+             : h.form === 'limit' ? 'require ' + h.require + ' · always holds'
              : h.form === 'scored' ? [h.when ? 'when ' + h.when : '', h.bonus ? 'bonus ' + h.bonus : '', h.penalty ? 'penalty ' + h.penalty : ''].filter(Boolean).join(' · ') + ' · weight ' + h.weight
              : h.form === 'draft' ? 'draft - name, kind and prose only; not scored'
              : h.form === 'assumption' ? 'assumption - taken as given, shown, not scored'
@@ -106,6 +108,6 @@ function renderPlaybook(d) {
     var params = Object.keys(h.params || {}).map(function (k) { return k + '=' + h.params[k]; }).join(', ');
     var body = h.body.replace(/^#[^\n]*\n/, '').split(/\n\s*\n/).map(function (p) { return '<p>' + esc(p.replace(/\s+/g, ' ')) + '</p>'; }).join('');
     return "<div class='hcard " + h.kind + "'><span class='kind " + h.kind + "'>" + h.kind + '</span><b>' + esc(h.name) + "</b><div class='meta'>" + esc(meta) + (params ? ' · params ' + esc(params) : '') + '</div>' + body +
-      (h.form === 'heuristic' ? weightRow(h) : '') + '</div>';
+      (weighs(h) ? weightRow(h) : '') + '</div>';
   }
 }

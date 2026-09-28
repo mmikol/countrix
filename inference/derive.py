@@ -135,13 +135,16 @@ def vocabulary() -> str:
 def prompt(draft: Strategy, catalog: Iterable[Strategy], objection: str = "") -> str:
     """What the model is asked. Three inputs from the person; the rest inferred."""
     anchors = "\n\n".join(s.raw.split("\n---")[0] + "\n---" for s in style_anchors(catalog))
+    # a scored heuristic's fields, each optional
+    scored = (
+        '"when": "<expr>", "bonus": "<expr>", "penalty": "<expr>", "weight": <1-4>,'
+        ' "params": {"NAME": <number>}}')
     fields = (
-        '{"metric": "<numeric key>", "direction": "maximize|minimize", "weight": <1-4>}'
+        '{"metric": "<numeric key>", "direction": "maximize|minimize", "weight": <1-4>} or {'
         if draft.kind == "heuristic" else
-        '{"require": "<expr>"} or {"require": "<expr>", "soft": true, "penalty": <number>}'
-        ' or {"when": "<expr>", "bonus": "<expr>", "penalty": "<expr>",'
-        ' "params": {"NAME": <number>}}'
-        ' (when/bonus/penalty/params each optional) or {"kind": "assumption"}')
+        '{"require": "<expr>", "params": {"NAME": <number>}} (params optional) or'
+        ' {"kind": "heuristic", ') + scored + (
+        ' (when/bonus/penalty/weight/params each optional) or {"kind": "assumption"}')
     text = """You complete a strategy file for countrix, a deterministic
 Overwatch 2 6v6 composition solver. A person wrote the file's name, its kind and its prose;
 you write its frontmatter. Answer with ONE JSON object and nothing else:
@@ -149,10 +152,13 @@ you write its frontmatter. Answer with ONE JSON object and nothing else:
 {"fields": %s, "reason": "<one sentence quoting the prose each field follows from>"}
 
 Rules:
-- A heuristic names ONE numeric metric to maximize or minimize, weighted 1-4 (3 is strong).
-- A constraint is a limit (require: an expression that must hold; soft: true with a numeric
-    penalty to charge instead of forbid), or scored (when: a guard; bonus and/or penalty:
-    expressions; params: NAME: number for any threshold, read as params.NAME).
+- Constraints cut the space; heuristics weigh what is left. A constraint is a limit and nothing
+    else: require, an expression every six must hold, never weighted, with no when.
+- A heuristic weighs, weight 1-4 (3 is strong): ONE numeric metric to maximize or minimize, or
+    scored - when: a guard; bonus and/or penalty: expressions, times the weight.
+- A rule that should cost rather than forbid is a heuristic: when: not (<the rule>), with its
+    penalty; a constraint draft whose prose charges or rewards answers "kind": "heuristic".
+- params: NAME: number holds any threshold, read as params.NAME.
 - When nothing measurable captures the prose - it states what to take as given rather than what
     to score - answer {"fields": {"kind": "assumption"}, "reason": "..."}.
 - Expressions use the vocabulary below (team.* is our side, enemy.* the same keys for the red
@@ -203,8 +209,9 @@ def parse(output: str) -> tuple[dict[str, object], str]:
     unknown = set(fields) - FIELDS
     if unknown:
         raise Refusal("the answer sets fields a strategy does not have: %s" % sorted(unknown))
-    if "kind" in fields and fields["kind"] != "assumption":
-        raise Refusal("a draft keeps its kind unless it turns out to be an assumption")
+    if "kind" in fields and fields["kind"] not in ("assumption", "heuristic"):
+        raise Refusal("a draft keeps its kind unless it turns out to be an assumption, or a"
+                      " constraint turns out to weigh and is a heuristic")
     return fields, str(data.get("reason") or "derived from the prose")[:500]
 
 

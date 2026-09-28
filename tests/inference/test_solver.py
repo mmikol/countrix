@@ -1,5 +1,5 @@
 """The search on a board: the enumerated maximum it must reach, shape
-limits, a soft limit that charges and never prunes, a need and its budget,
+limits, a charge for a rule broken that never prunes, a need and its budget,
 partners that only pay together, the scale a ban leaves alone, the ranking
 order and its tie-breaks, a rule scaled by the metric it names and the
 bounds its slices merge into, and the reference sample of a small roster.
@@ -136,9 +136,10 @@ def test_shape_limits_bound_the_search_and_a_stricter_one_narrows_it(synthetic_w
     assert roles == ["damage", "damage", "support", "support", "tank", "tank"]
 
 
-def test_a_soft_limit_charges_its_penalty_and_never_prunes(synthetic_world):
-    """The reference playbook's anti-air is soft: against red's flier, a six
-    with no hitscan breaks it, stays a candidate and pays its 2.5."""
+def test_a_charge_for_a_rule_broken_is_a_heuristic_and_never_prunes(synthetic_world):
+    """The reference playbook's anti-air charges rather than forbids, so it is
+    a scored heuristic, `when: <a flier> and not (<a hitscan answer>)`: against
+    red's flier, a six with no hitscan stays a candidate and pays its 2.5."""
     from inference import scoring
     w = synthetic_world
     objective = scoring.Objective(w, w.map("Harbor Gate"), red=[w.hero("Gale")],
@@ -148,7 +149,8 @@ def test_a_soft_limit_charges_its_penalty_and_never_prunes(synthetic_world):
     objective.score(objective.prepare(cand))
     assert cand.violations == []
     [term] = [c for c in cand.contributions if c["id"] == "anti-air"]
-    assert term["applies"] and term["ok"] is False and term["weighted"] == -2.5
+    assert (term["kind"], term["form"]) == ("heuristic", "scored") and "ok" not in term
+    assert term["applies"] and term["penalty"] == 2.5 and term["weighted"] == -2.5
 
 
 def test_a_rule_guarded_on_the_six_itself_is_a_need_and_a_state_has_a_budget(
@@ -439,3 +441,27 @@ def test_a_roster_with_fewer_legal_sixes_than_the_reference_is_sampled_whole(syn
     assert len(legal) < scale.REFERENCE_SIZE
     assert [c.key for c in drawn] == [c.key for c in scale.sample(objective)]
     assert sorted(sorted(c.key) for c in drawn) == sorted(sorted(six) for six in legal)
+
+
+def test_the_floor_is_the_lowest_reference_six_and_slices_fold_to_it(synthetic_world):
+    """A seat's floor, a share's 0, is the lowest score among the reference
+    sixes its scale draws. The pool scores the sample in slices, and the
+    slices fold - in any order - into the tally and the floor one process
+    draws, bit for bit."""
+    from inference import scale
+    from inference import solver as solver_module
+    world = synthetic_world
+    m, red, _, _ = world.resolve("Harbor Gate", ["Mortar", "Gale"], [], [])
+    solver = solver_module.Solver(world, m, red=red, locked=[], side="attack",
+                                  catalog=catalog.load(FIXTURE_PLAYBOOK), base=DEFAULT)
+    solver.freeze_bounds()
+    scores = [solver.score(c, detail=False).score for c in scale._prepared(solver)]
+    assert solver.floor == min(scores) < max(scores)
+    whole = scale.freeze(solver)
+    parts = [scale.reference_standing(solver, i, 3) for i in range(3)]
+    for order in (parts, parts[::-1]):
+        folded = scale.Tally()
+        for part in order:
+            folded.fold(part)
+        assert folded == whole and folded.floor == solver.floor
+    assert scale.Tally().fold(scale.Tally()).floor is None      # nothing scored, no floor

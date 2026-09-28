@@ -1,10 +1,14 @@
 """board(): both seats on opposite sides, the weights it is given, the fight
 odds, the shapes and the queue's tank limit, an empty catalog kept as the
-caller's, a limit red's reveal already breaks, the likely six, a full six on
-control, every seat of a board on the synthetic World, the page's boards
-superseding one another, and the healing floor on top of the default engine.
+caller's, a limit red's reveal already breaks and blue's picks may not, the
+share read from the seat's floor and a mirror's even odds, the likely six, a
+full six on control, every seat of a board on the synthetic World, the
+page's boards superseding one another, and the healing floor on top of the
+default engine.
 Every board is the synthetic World's but the last, King's Row on the built
 database. test_board_gate holds the lobby's limits on every door."""
+
+import os
 
 import pytest
 
@@ -181,23 +185,126 @@ def test_the_queue_caps_tanks_at_two_whatever_the_playbook_holds(synthetic_world
                         catalog=ASSUMPTIONS_ONLY)
 
 
-def test_red_may_reveal_what_a_limit_forbids_and_blue_may_not_lock_it(synthetic_world, tmp_path):
-    """A limit binds the sixes the playbook builds, not the other side's
-    revealed picks: red past it still gets its optimal and its current comp,
-    read off its picks with no fill, while blue locking past it is refused."""
+SUPPORTS = ("Balm", "Myrrh", "Sorrel", "Tansy")
+NOT_ALLOWED = "not allowed: breaks At most three supports"
+
+
+def _support_limit(directory):
+    """A playbook of one limit, at most three supports, written in `directory`."""
+    with open(os.path.join(directory, "three-supports.md"), "w", encoding="utf-8") as handle:
+        handle.write("---\nname: At most three supports\nkind: constraint\n"
+                     "require: team.supports <= 3\n---\n# At most three supports\n\n"
+                     "A six fields at most three supports.\n")
+    return catalog.load(str(directory))
+
+
+def test_red_may_reveal_what_a_limit_forbids(synthetic_world, tmp_path):
+    """A limit binds the sixes the playbook builds and blue's own picks, not
+    the other side's revealed ones: red past it still gets its optimal and
+    its current comp, read off its picks with no fill, and is never ruled
+    out."""
     from inference import engine
-    (tmp_path / "three-supports.md").write_text(
-        "---\nname: At most three supports\nkind: constraint\n"
-        "require: team.supports <= 3\n---\n# At most three supports\n\n"
-        "A six fields at most three supports.\n", encoding="utf-8")
-    cat = catalog.load(str(tmp_path))
-    world, supports = synthetic_world, ("Balm", "Myrrh", "Sorrel", "Tansy")
-    d = engine.board(world, Draft("Harbor Gate", supports), catalog=cat).to_dict()
+    world, cat = synthetic_world, _support_limit(tmp_path)
+    d = engine.board(world, Draft("Harbor Gate", SUPPORTS), catalog=cat).to_dict()
     for seat in ("blue", "red"):
         assert sum(world.hero(n).role == "support" for n in d[seat]["blue"]) <= 3, seat
-    assert sorted(d["red_current"]["blue"]) == sorted(supports)
-    with pytest.raises(Refusal, match="the limits around the locked blue picks"):
-        engine.board(world, Draft("Harbor Gate", (), supports), catalog=cat)
+    assert sorted(d["red_current"]["blue"]) == sorted(SUPPORTS)
+    assert d["red_current"]["unscored"] is None and d["red_current"]["score"] is not None
+    assert d["momentum"]["badges"]["red"]["label"] != "not allowed"
+
+
+def test_blue_picks_that_break_a_limit_are_not_allowed_and_the_board_still_renders(
+        synthetic_world, tmp_path):
+    """Constraints cut the space for blue's own picks too. Four supports under
+    a three-support limit leave no six that keeps them: the fill is not
+    solved, the board does not error, and blue's current comp is not
+    allowed - no score, no share, no odds, the limit named in its reason and
+    its badge, its breakdown the limit alone. Blue's optimal still renders.
+    A full six that breaks it reads the same, ranked against nothing, and
+    the plan describes the optimal; evaluate refuses it by the rule's name.
+    Three supports keep the limit and score."""
+    from inference import engine
+    world, cat = synthetic_world, _support_limit(tmp_path)
+    b = engine.board(world, Draft("Harbor Gate", (), SUPPORTS), catalog=cat)
+    d = b.to_dict()
+    cur = d["current"]
+    assert cur["unscored"] == NOT_ALLOWED and cur["scoring"] is False and cur["partial"]
+    assert cur["score"] is None and cur["normalized"] is None and cur["rank"] is None
+    assert [(c["id"], c["ok"]) for c in cur["contributions"]] == [("three-supports", False)]
+    assert d["fill"] is None and d["countered"] is None
+    assert len(d["blue"]["blue"]) == 6 and d["blue"]["normalized"] == 100
+    assert sum(world.hero(n).role == "support" for n in d["blue"]["blue"]) <= 3
+    mo = d["momentum"]
+    assert mo["blue"] is None and mo["odds"] is None and mo["countered"] is None
+    assert mo["badges"]["blue"] == {"label": "not allowed", "tip": NOT_ALLOWED}
+    assert mo["verdict"].startswith("blue " + NOT_ALLOWED)
+    assert "NOT ALLOWED: breaks At most three supports" in b.current.rendered()
+    six = (*SUPPORTS, "Anvil", "Rook")
+    b = engine.board(world, Draft("Harbor Gate", ("Mortar",), six), catalog=cat)
+    full = b.to_dict()
+    assert full["current"]["kind"] == "evaluate" and full["current"]["unscored"] == NOT_ALLOWED
+    assert full["current"]["score"] is None and full["current"]["alternatives"] == []
+    assert full["momentum"]["blue"] is None and full["momentum"]["odds"] is None
+    assert b.fill is None and b.countered is None
+    assert "The six is the one you picked." not in b.plan
+    with pytest.raises(Refusal, match="^%s$" % NOT_ALLOWED):
+        engine.evaluate(world, Draft("Harbor Gate", ("Mortar",), six), catalog=cat)
+    kept = engine.board(world, Draft("Harbor Gate", ("Mortar",), SUPPORTS[:3]), catalog=cat)
+    assert kept.current.barred is None and kept.fill is not None
+    assert kept.momentum["blue"] is not None and kept.momentum["odds"] is not None
+
+
+def test_a_half_drafted_seat_may_break_a_limit_its_picks_to_come_can_mend(
+        synthetic_world, tmp_path):
+    """Under Role Queue's two-two-two a single tank breaks the limit as it
+    stands, and the picks to come can mend it: the fill is solved and the
+    comp is allowed, its breach listed as one to mend."""
+    from inference import engine
+    (tmp_path / "role-queue.md").write_text(
+        "---\nname: Role queue\nkind: constraint\nrequire: team.tanks == 2 and team.damage == 2"
+        " and team.supports == 2\n---\nx\n", encoding="utf-8")
+    b = engine.board(synthetic_world, Draft("Harbor Gate", ("Mortar",), ("Anvil",)),
+                     catalog=catalog.load(str(tmp_path)))
+    assert b.current.barred is None and b.current.violations == ["role-queue"]
+    assert b.fill is not None and b.momentum["blue"] is not None
+
+
+BRAWL = ("Anvil", "Mortar", "Rook", "Needle", "Balm", "Myrrh")
+DIVE = ("Kite", "Quarry", "Gale", "Flint", "Sorrel", "Tansy")
+
+
+def test_a_share_is_read_from_the_seats_floor_so_a_six_below_zero_still_holds_one(
+        synthetic_world):
+    """Scores are signed: the default engine counts each pick's edge over 50.
+    On Harbor Gate under the engine alone the dive six scores below zero
+    against the brawl six, which scores above it, and read from zero it was 0
+    / 100 and the odds 0 to 100. Read from the seat's floor - the lowest of
+    its reference sixes - it holds a share above 0, the odds sit strictly
+    between, and the optimal is still 100."""
+    from inference import engine
+    from inference.result import _pct
+    b = engine.board(synthetic_world, Draft("Harbor Gate", BRAWL, DIVE), catalog=ASSUMPTIONS_ONLY)
+    cur = b.current
+    assert cur.score < 0 < b.red_current.score
+    assert _pct(cur.score, cur.best, 0.0) == 0                         # the old zero anchor
+    assert cur.floor is not None and cur.floor < cur.score < cur.best == b.blue.score
+    assert cur.floor == b.blue.floor
+    share = round(100.0 * (cur.score - cur.floor) / (cur.best - cur.floor))
+    mo = b.momentum
+    assert mo["blue"] == cur.share() == share and 0 < share < 100
+    assert 0 < mo["odds"]["blue"] < 100 and mo["odds"]["blue"] + mo["odds"]["red"] == 100
+    assert b.to_dict()["blue"]["normalized"] == 100
+
+
+def test_a_mirror_reads_even(synthetic_world):
+    """The same six on both sides of a map with no sides is the same board
+    from either seat: the same optimal, the same floor, the same share, and
+    even odds."""
+    from inference import engine
+    b = engine.board(synthetic_world, Draft("Ember Ruins", BRAWL, BRAWL), catalog=ASSUMPTIONS_ONLY)
+    assert b.current.floor == b.red_current.floor and b.current.best == b.red_current.best
+    assert b.momentum["blue"] == b.momentum["red"]
+    assert b.momentum["odds"] == {"blue": 50, "red": 50}
 
 
 def test_an_empty_catalog_is_the_callers_and_loads_no_playbook(synthetic_world, monkeypatch):

@@ -1,6 +1,6 @@
 ---
 name: Defenders hold ground
-kind: constraint
+kind: heuristic
 category: side
 when: map.side == 'defense'
 bonus: min(team.deployables, 2) * 0.5 + min(team.barrier_count, 2) * 0.5 + (0.5 if team.range_median >= 20 else 0)

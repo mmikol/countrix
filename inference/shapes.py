@@ -1,7 +1,7 @@
 """The legal shapes: the (tanks, damage, supports) triples the queue allows -
 at most MAX_TANKS tanks, whatever the playbook holds - and the playbook's
-shape-only hard limits allow (its own rule of form, 2-2-2 say), around
-whatever picks are locked.
+shape-only limits allow (its own rule of form, 2-2-2 say), around whatever
+picks are locked.
 """
 
 from collections.abc import Iterable, Sequence
@@ -26,8 +26,8 @@ NO_PICKS = Shape(tanks=0, damage=0, supports=0)
 
 def legal_shapes(catalog: Iterable[Strategy], locked: Shape = NO_PICKS) -> list[Shape]:
     """(tanks, damage, supports) triples the queue allows - at most MAX_TANKS
-    tanks, whatever the playbook holds - and the catalog's shape-only hard
-    limits allow (a playbook's own rule of form, 2-2-2 say), only those that
+    tanks, whatever the playbook holds - and the catalog's shape-only limits
+    allow (a playbook's own rule of form, 2-2-2 say), only those that
     can still seat the `locked` picks. The board carries the full list so the
     roster can refuse a pick no legal six could seat."""
     limits = _shape_limits(catalog)
@@ -43,22 +43,19 @@ def legal_shapes(catalog: Iterable[Strategy], locked: Shape = NO_PICKS) -> list[
 
 
 def _shape_limits(catalog: Iterable[Strategy]) -> list[tuple[Strategy, Expr]]:
-    """The catalog's hard limits that read only a six's shape, each with its
+    """The catalog's limits that read only a six's shape, each with its
     require."""
     return [(strategy, strategy.require) for strategy in catalog
-            if strategy.form == "limit" and not strategy.soft and strategy.require
-            and set(strategy.require.names) <= SHAPE_KEYS
-            and (strategy.when is None or set(strategy.when.names) <= SHAPE_KEYS)]
+            if strategy.form == "limit" and strategy.require
+            and set(strategy.require.names) <= SHAPE_KEYS]
 
 
 def _shape_allowed(t: int, d: int, s: int, limits: Sequence[tuple[Strategy, Expr]]) -> bool:
-    """Whether a (tanks, damage, supports) triple meets every shape limit whose
-    `when` holds on it."""
+    """Whether a (tanks, damage, supports) triple meets every shape limit."""
     stub = scope({"team": {"tanks": t, "damage": d, "supports": s,
                            "size": TEAM_SIZE, "open_slots": 0}})
     for strategy, require in limits:
         stub["params"] = strategy.params_section
-        when = strategy.when
-        if (when is None or bool(when.evaluate(stub))) and not bool(require.evaluate(stub)):
+        if not bool(require.evaluate(stub)):
             return False
     return True

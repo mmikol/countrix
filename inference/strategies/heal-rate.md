@@ -1,6 +1,6 @@
 ---
 name: Heal at the other side's rate
-kind: constraint
+kind: heuristic
 category: sustain
 weight: 2
 penalty: matchup.heal_shortfall

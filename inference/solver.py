@@ -80,16 +80,19 @@ class Solver(Objective):
         self.pool_size = pool_size
         self.considered = 0
         self._standing: dict[int, float] = {}   # hero id -> mean reference score, once read
+        # the lowest score among the reference sixes, once read: the zero of a
+        # share on this board, as the optimal is its 100
+        self.floor: float | None = None
 
     # --- the scale and the standing ---------------------------------------------
 
     def freeze_bounds(self) -> None:
         """Bounds per heuristic from the reference sample and the field, then
-        each hero's standing in the sample."""
+        each hero's standing in the sample and the sample's floor."""
         self.adopt_standing(scale.freeze(self))
 
     def adopt_bounds(self, bounds: Mapping[str, Interval],
-                     standing: Mapping[int, scale.Standing] | None = None) -> None:
+                     standing: scale.Tally | None = None) -> None:
         """Bounds (and standing) frozen elsewhere for this same board: another
         process's slice of the search, or an earlier solver on the same map,
         side, enemies and bans. The sample is seeded, so it draws the same
@@ -98,13 +101,14 @@ class Solver(Objective):
         if standing is not None:
             self.adopt_standing(standing)
 
-    def adopt_standing(self, tally: Mapping[int, scale.Standing]) -> None:
+    def adopt_standing(self, tally: scale.Tally) -> None:
         """A hero's standing: the mean score of the reference sixes it is in -
         how the default engine and the playbook in force rate it on this
         board, red and the map included. It ranks each role's pool, so the
         heroes searched in full are the ones the objective favours, not the
-        ones a side formula does."""
-        self._standing = {hid: s.total / s.sixes for hid, s in tally.items() if s.sixes}
+        ones a side formula does. The tally's floor is the board's floor."""
+        self._standing = {hid: s.total / s.sixes for hid, s in tally.heroes.items() if s.sixes}
+        self.floor = tally.floor
 
     # --- enumeration ---------------------------------------------------------------
 

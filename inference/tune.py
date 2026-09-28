@@ -7,7 +7,7 @@ derived something.
     tune("under-healed", "params.HEAL_MARGIN", 0.8, "two-support lines felt thin")
     tune("anti-air", "when", "enemy.flyers >= 1 and map.known == 1", "...")
 
-    add("shut-off-heals", "Shut off a heavy heal line", "constraint", prose,
+    add("shut-off-heals", "Shut off a heavy heal line", "heuristic", prose,
         {
             "when": "enemy.heal_ratio >= params.HEAL_RATIO",
             "bonus": "min(team.antiheal, 1) * 1.5", "params": {"HEAL_RATIO": 1.0}},
@@ -16,7 +16,7 @@ derived something.
                          "weight": 2}, "inferred from the prose")
 
 Fields: kind, category, metric, direction, weight, confidence, when,
-require, soft, bonus, penalty (strategy.TUNABLE) and params.NAME. Every
+require, bonus, penalty (strategy.TUNABLE) and params.NAME. Every
 value is checked by strategy.checked_value, the rule the loader reads a
 file by, before any file is touched. Each of the three takes a reason and
 writes in one order (_commit): the edited (or new) file is loaded through

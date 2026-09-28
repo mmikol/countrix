@@ -42,8 +42,8 @@ def metrics(ctx: Context) -> ToolReply:
 @tool(
     "strategies", "The inference layer's catalog - STRATEGIES = CONSTRAINTS ∪ HEURISTICS"
     " ∪ ASSUMPTIONS: every markdown strategy with its kind (constraint, heuristic or"
-    " assumption), a constraint's form (limit, scored, draft), metric, direction, weight"
-    " and expressions.")
+    " assumption), its form (a constraint's limit; a heuristic on a metric, or scored on"
+    " bonus/penalty; draft), metric, direction, weight and expressions.")
 def strategies(ctx: Context) -> ToolReply:
     cat = catalog.load()
     pending = [s.id for s in cat if s.pending]
@@ -58,9 +58,9 @@ def strategies(ctx: Context) -> ToolReply:
 
 
 # the JSON schema type the door declares for each kind of frontmatter field:
-# an expression may be a bare number, as a soft limit's penalty is
+# an expression may be a bare number, as a flat penalty is
 KIND_TYPES: dict[FieldKind, str | list[str]] = {
-    "line": "string", "choice": "string", "number": "number", "flag": "boolean",
+    "line": "string", "choice": "string", "number": "number",
     "expression": ["string", "number"], "params": "object"}
 
 
@@ -116,9 +116,10 @@ def tune_tool(      # _tool: inference.tune holds the bare name
 
 @tool(
     "add_strategy", "Store a new strategy in inference/strategies/ from its name,"
-    " kind and prose plus the frontmatter /strategy inferred - a heuristic's"
-    " metric/direction/weight, or a constraint's require or when/bonus/penalty"
-    " and params; an assumption is prose and needs nothing. The prose is three"
+    " kind and prose plus the frontmatter /strategy inferred - a constraint's"
+    " require, a limit that always holds and is never weighted; a heuristic's"
+    " metric/direction/weight, or its when/bonus/penalty and weight; params for"
+    " either. An assumption is prose and needs nothing. The prose is three"
     " sentences at most. Validated through the"
     " catalog before the file exists, mirrored into the database, logged."
     " Left with nothing inferred it lands as a draft the solver ignores.",
@@ -144,8 +145,9 @@ def add_strategy(
 
 @tool(
     "infer_strategy", "Complete a draft (or rewrite a strategy's scoring): set several"
-    " frontmatter fields at once - metric/direction/weight, when/require/bonus/"
-    "penalty, params - validated as a whole, mirrored, logged as one line.",
+    " frontmatter fields at once - a constraint's require; a heuristic's"
+    " metric/direction/weight or when/bonus/penalty/weight; params - validated as a"
+    " whole, mirrored, logged as one line.",
     {
         "id": {"type": "string"},
         "reason": {"type": "string", "description": "how the fields follow from the prose"},

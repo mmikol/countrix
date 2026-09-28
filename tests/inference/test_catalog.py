@@ -20,10 +20,11 @@ from tests.inference import FIXTURE_PLAYBOOK, HEAL_RATE
 
 def _fights(strategies: Iterable[Strategy]) -> list[str]:
     """Each unguarded heuristic against every heuristic that weighs its metric
-    the other way, worded for the failure."""
+    the other way, worded for the failure. A scored heuristic weighs no
+    metric, so it fights nothing here."""
     by_metric = {}
     for strategy in strategies:
-        if strategy.kind == "heuristic":
+        if strategy.form == "heuristic":
             by_metric.setdefault(strategy.metric, []).append(strategy)
     fights = []
     for metric, group in sorted(by_metric.items()):
@@ -45,9 +46,9 @@ def test_no_ungated_heuristic_opposes_a_gated_one_on_its_metric(directory):
     Opposed pairs are fine - they must both be guarded, into different
     situations."""
     strategies = catalog.load(directory)
-    if directory is None and not any(s.kind == "heuristic" for s in strategies):
-        pytest.skip("the playbook in force (%s) holds no heuristic: the reference case carries"
-                    " the guard" % catalog.strategies_dir())
+    if directory is None and not any(s.form == "heuristic" for s in strategies):
+        pytest.skip("the playbook in force (%s) holds no heuristic on a metric: the reference"
+                    " case carries the guard" % catalog.strategies_dir())
     fights = _fights(strategies)
     assert not fights, fights
 
@@ -80,9 +81,9 @@ def test_a_filename_that_is_not_lowercase_kebab_is_refused_before_the_folder_cou
 
 
 def test_the_docs_word_every_form_the_reference_playbook_holds(tmp_path, monkeypatch):
-    """write_docs words a hard limit, a soft limit, a scored constraint and a
-    heuristic under their headings, and drops each file's title line - the
-    heading names it."""
+    """write_docs words a limit, two scored heuristics - a charge for a rule
+    broken and a charge that grows - and a heuristic on a metric under their
+    headings, and drops each file's title line - the heading names it."""
     monkeypatch.delenv("COUNTRIX_STRATEGIES", raising=False)
     path = tmp_path / "inference.md"
     path.write_text("# The doc\n\n<!-- generated:catalog -->\n<!-- /generated:catalog -->\n",
@@ -90,9 +91,10 @@ def test_the_docs_word_every_form_the_reference_playbook_holds(tmp_path, monkeyp
     assert catalog.write_docs(catalog.load(FIXTURE_PLAYBOOK), path=str(path)) == str(path)
     text = path.read_text(encoding="utf-8")
     assert "##### At most two tanks (`open-queue-tanks`, shape, limit)\n\n" \
-        "`require team.tanks <= 2` (hard)\n" in text
-    assert "`require team.hitscan >= 1` (soft, penalty `2.5`); when `enemy.flyers >= 1`" in text
+        "`require team.tanks <= 2` - always holds\n" in text
+    assert "weight 1; when `enemy.flyers >= 1 and not (team.hitscan >= 1)`; penalty `2.5`" in text
     assert "weight 1; penalty `max(0, team.squish_count - 4) * 1.0`" in text
+    assert "1 constraints (limits), 14 heuristics (8 on a metric, 6 scored)" in text
     assert "`maximize team.pool_total` - " in text and "\n# At most two tanks" not in text
 
 
@@ -167,7 +169,7 @@ def test_frontmatter_parses_scalars_lists_and_params():
 def test_the_reference_and_the_live_playbooks_are_valid_and_reference_real_metrics():
     live = catalog.load()                       # the user's playbook: whatever it holds today
     assert live and {h.kind for h in live} <= set(KINDS)
-    assert all(h.metric in compute.registry() for h in live if h.kind == "heuristic")
+    assert all(h.metric in compute.registry() for h in live if h.form == "heuristic")
     for h in live:                              # each file keeps to the add tool's limit
         assert tune.sentence_count(h.body) <= tune.MAX_SENTENCES, h.id
     cat = catalog.load(FIXTURE_PLAYBOOK)        # the reference: every kind and every form
@@ -175,13 +177,14 @@ def test_the_reference_and_the_live_playbooks_are_valid_and_reference_real_metri
     assert kinds == set(KINDS) == {"constraint", "heuristic", "assumption"}
     forms = {h.form for h in cat}
     assert forms == {"limit", "scored", "heuristic", "assumption"}
-    assert all(h.form == "heuristic" for h in cat if h.kind == "heuristic")
+    assert {h.form for h in cat if h.kind == "heuristic"} == {"heuristic", "scored"}
+    assert {h.form for h in cat if h.kind == "constraint"} == {"limit"}
     assert all(
         h.form == "assumption" and not h.solver_reads for h in cat if h.kind == "assumption")
     assert {h.id for h in cat if h.kind == "assumption"} >= {"optimal-play", "vintage", "objective"}
     registry = compute.registry()
     for h in cat:
-        if h.kind == "heuristic":
+        if h.form == "heuristic":
             assert h.metric in registry and h.metric not in compute.TEXT_METRICS
         for e in (h.when, h.require, h.bonus, h.penalty):
             for name in (e.names if e else []):
@@ -189,15 +192,16 @@ def test_the_reference_and_the_live_playbooks_are_valid_and_reference_real_metri
     assert any(h.id == "open-queue-tanks" for h in cat)
 
 
-def test_the_shipped_healing_floor_is_a_scored_constraint_at_weight_two():
-    """inference/strategies/heal-rate.md, the shipped playbook's one scored
-    rule: a constraint that charges its weight times matchup.heal_shortfall
-    on every board, unguarded. HEAL_RATE holds the same fields, so the
-    solver tests that stand it in for the file prove this rule."""
+def test_the_shipped_healing_floor_is_a_scored_heuristic_at_weight_two():
+    """inference/strategies/heal-rate.md, the shipped playbook's one
+    heuristic: weighted, so a heuristic, and scored - it charges its weight
+    times matchup.heal_shortfall on every board, unguarded. HEAL_RATE holds
+    the same fields, so the solver tests that stand it in for the file prove
+    this rule."""
     shipped = catalog.load(catalog.SHIPPED_DIR)
     heal = next(h for h in shipped if h.id == "heal-rate")
     assert (heal.kind, heal.form, heal.category, heal.weight) == (
-        "constraint", "scored", "sustain", 2.0)
+        "heuristic", "scored", "sustain", 2.0)
     assert heal.penalty is not None and heal.penalty.source == "matchup.heal_shortfall"
     assert heal.when is None and heal.bonus is None and heal.require is None
     assert {k: heal.to_dict()[k] for k in HEAL_RATE} == HEAL_RATE
@@ -207,11 +211,11 @@ def test_the_shipped_healing_floor_is_a_scored_constraint_at_weight_two():
 
 def test_the_shipped_support_limit_is_a_hard_limit_at_three():
     """inference/strategies/at-most-three-supports.md, the owner's limit: a
-    require on the Support role's count with three as its dial, never soft,
-    and the shipped playbook's one limit."""
+    require on the Support role's count with three as its dial, never
+    weighted, and the shipped playbook's one limit."""
     shipped = catalog.load(catalog.SHIPPED_DIR)
     limit = next(s for s in shipped if s.id == "at-most-three-supports")
-    assert (limit.kind, limit.form, limit.category, limit.soft) == (
+    assert (limit.kind, limit.form, limit.category, limit.weighs) == (
         "constraint", "limit", "shape", False)
     assert limit.require is not None
     assert limit.require.source == "team.supports <= params.MAX_SUPPORTS"
@@ -226,19 +230,26 @@ def test_catalog_rejects_a_goal_on_an_unknown_metric(tmp_path):
     with pytest.raises(CatalogError, match="not a registered fact key"):
         catalog.load(str(tmp_path))
     (tmp_path / "bad.md").write_text(
-        "---\nname: bad\nkind: constraint\nwhen: team.tanks > params.T\nbonus: 1\n---\nx\n",
+        "---\nname: bad\nkind: heuristic\nwhen: team.tanks > params.T\nbonus: 1\n---\nx\n",
         "utf-8")
     with pytest.raises(CatalogError, match="params"):
         catalog.load(str(tmp_path))
 
 
-def test_a_constraint_is_a_limit_or_scored_and_an_assumption_is_prose(tmp_path):
+def test_a_constraint_is_a_limit_a_heuristic_weighs_and_an_assumption_is_prose(tmp_path):
+    """Constraints cut the space, heuristics weigh what is left: a constraint
+    is a require and nothing weighted, a heuristic weighs a metric or bonus
+    less penalty - a flat penalty included, the charge for a rule broken -
+    and never both, and soft: is refused wherever it stands."""
     def load_one(text):
         (tmp_path / "x.md").write_text(text, encoding="utf-8")
         return catalog.load(str(tmp_path))[0]
     limit = load_one("---\nname: l\nkind: constraint\nrequire: team.tanks <= 2\n---\nx\n")
-    assert limit.form == "limit"
-    assert load_one("---\nname: s\nkind: constraint\nbonus: team.tanks\n---\nx\n").form == "scored"
+    assert limit.form == "limit" and limit.solver_reads and not limit.weighs
+    assert load_one("---\nname: s\nkind: heuristic\nbonus: team.tanks\n---\nx\n").form == "scored"
+    charge = load_one("---\nname: c\nkind: heuristic\nwhen: not (team.tanks <= 1)\n"
+                      "penalty: 2\n---\nx\n")
+    assert charge.form == "scored" and charge.weighs and not charge.need
     assert load_one("---\nname: p\nkind: assumption\n---\nx\n").form == "assumption"
     # awaiting /strategy
     assert load_one("---\nname: d\nkind: constraint\n---\nx\n").form == "draft"
@@ -248,6 +259,16 @@ def test_a_constraint_is_a_limit_or_scored_and_an_assumption_is_prose(tmp_path):
                     "---\nx\n").form == "heuristic"
     for bad in ("---\nname: b\nkind: constraint\nrequire: team.tanks <= 2\nbonus: 1\n---\nx\n",
                 "---\nname: b\nkind: constraint\nmetric: team.tanks\n---\nx\n",
+                # a constraint always holds and is never weighted
+                "---\nname: b\nkind: constraint\nrequire: team.tanks <= 2\nwhen: map.known == 1\n"
+                "---\nx\n",
+                "---\nname: b\nkind: constraint\nrequire: team.tanks <= 2\nweight: 2\n---\nx\n",
+                "---\nname: b\nkind: constraint\nrequire: team.tanks <= 2\npenalty: 2\n---\nx\n",
+                "---\nname: b\nkind: constraint\nbonus: team.tanks\n---\nx\n",
+                "---\nname: b\nkind: constraint\nrequire: team.tanks <= 2\ndirection: maximize\n"
+                "---\nx\n",
+                "---\nname: b\nkind: heuristic\nwhen: team.tanks > 1\npenalty: 2\nsoft: false\n"
+                "---\nx\n",
                 "---\nname: b\nkind: heuristic\ndirection: maximize\nmetric: team.tanks\n"
                 "require: team.tanks <= 2\n---\nx\n",
                 "---\nname: b\nkind: constraint\nrequire: team.tanks <= 2\nsoft: true\n---\nx\n",
@@ -255,15 +276,31 @@ def test_a_constraint_is_a_limit_or_scored_and_an_assumption_is_prose(tmp_path):
                 "---\nname: b\nkind: assumption\nrequire: team.tanks <= 2\n---\nx\n",
                 "---\nname: b\nkind: goal\ndirection: maximize\nmetric: team.tanks\n---\nx\n",
                 "---\nname: b\nkind: strategy\n---\nx\n",
-                # a penalty belongs to a constraint, with a metric or without one
-                "---\nname: b\nkind: heuristic\npenalty: 1\n---\nx\n",
+                # a heuristic weighs a metric or an expression, not both
                 "---\nname: b\nkind: heuristic\ndirection: maximize\nmetric: team.tanks\n"
                 "penalty: 1\n---\nx\n",
                 # a dial is NAME: a finite number
-                "---\nname: b\nkind: constraint\nbonus: params.X\nparams:\n  X: inf\n---\nx\n",
-                "---\nname: b\nkind: constraint\nbonus: params.x\nparams:\n  x: 1\n---\nx\n"):
+                "---\nname: b\nkind: heuristic\nbonus: params.X\nparams:\n  X: inf\n---\nx\n",
+                "---\nname: b\nkind: heuristic\nbonus: params.x\nparams:\n  x: 1\n---\nx\n"):
         with pytest.raises(CatalogError):
             load_one(bad)
+
+
+def test_a_key_that_is_not_a_field_is_refused_by_name(tmp_path):
+    """A frontmatter key outside strategy.FIELDS - a typo, a form's leftover -
+    would read as nothing and score silently wrong: the catalog refuses it,
+    naming the key. soft: is refused by name, a limit always holding; id is
+    the filename's own, which the catalog checks against the file."""
+    path = tmp_path / "typo.md"
+    head = "---\nname: Typo\nkind: heuristic\nmetric: team.tanks\ndirection: maximize\n"
+    path.write_text(head + "wieght: 3\n---\nx\n", encoding="utf-8")
+    with pytest.raises(CatalogError, match=r"^typo: wieght is not a strategy field \(the"):
+        catalog.load(str(tmp_path))
+    path.write_text(head + "weight: 3\nsoft: true\n---\nx\n", encoding="utf-8")
+    with pytest.raises(CatalogError, match=r"^typo: soft: is refused - a limit always holds"):
+        catalog.load(str(tmp_path))
+    path.write_text(head + "weight: 3\nid: typo\n---\nx\n", encoding="utf-8")
+    assert catalog.load(str(tmp_path))[0].weight == 3
 
 
 def test_a_guard_is_settled_by_the_board_when_it_reads_only_red_the_map_the_world_and_params():
@@ -288,10 +325,12 @@ def test_weights_override_a_heuristic_for_one_board_and_never_the_file():
             catalog.parse_weights(malformed)
     cat = catalog.load(FIXTURE_PLAYBOOK)
     heuristic = next(h for h in cat if h.kind == "heuristic")
+    scored = next(h for h in cat if h.form == "scored")          # a heuristic too: it weighs
     limit = next(h for h in cat if h.form == "limit")
     before = heuristic.weight
-    over = catalog.weighted(cat, {heuristic.id: 7.5, limit.id: 9, "no-such": 1})
+    over = catalog.weighted(cat, {heuristic.id: 7.5, scored.id: 3, limit.id: 9, "no-such": 1})
     assert next(h for h in over if h.id == heuristic.id).weight == 7.5
+    assert next(h for h in over if h.id == scored.id).weight == 3
     assert heuristic.weight == before                        # the loaded one is untouched
     assert next(h for h in over if h.id == limit.id) is limit  # a constraint's stays its own
     assert catalog.weighted(cat, {}) is cat and len(over) == len(cat)

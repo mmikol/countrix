@@ -201,11 +201,12 @@ def test_every_playbook_write_mirrors_the_catalog_once(tmp_path, monkeypatch):
     assert data["derived"] == [] and len(mirrored) == 3
 
 
-def test_add_strategy_stores_a_soft_limit_with_a_numeric_penalty(tmp_path, monkeypatch):
+def test_add_strategy_stores_a_charge_with_a_numeric_penalty(tmp_path, monkeypatch):
     """The door declares its strategy fields from the rule that checks them,
-    so the numeric penalty the skill and the prompt promise a soft limit
-    passes the schema, a category sets the file's like any field, and who
-    asked reaches the log line as it does through tune."""
+    so the numeric penalty the skill and the prompt promise a charge for a
+    rule broken passes the schema, a category sets the file's like any
+    field, and who asked reaches the log line as it does through tune. soft
+    is no field, and the door refuses it before anything is written."""
     for name in catalog.strategy_files(FIXTURE_PLAYBOOK):
         shutil.copy(os.path.join(FIXTURE_PLAYBOOK, name), tmp_path / name)
     monkeypatch.setenv("COUNTRIX_STRATEGIES", str(tmp_path))
@@ -214,13 +215,19 @@ def test_add_strategy_stores_a_soft_limit_with_a_numeric_penalty(tmp_path, monke
     class Offline(tools.Context):
         def connect(self):
             return contextlib.nullcontext("cx")
-    _, added = Offline(dsn="postgresql://nowhere").call(
-        "add_strategy", id="tank-cap", name="Tank cap", kind="constraint",
-        body="At most two tanks.", reason="a test", require="team.tanks <= 2", soft=True,
+    ctx = Offline(dsn="postgresql://nowhere")
+    with pytest.raises(Refusal):
+        ctx.call("add_strategy", id="tank-cap", name="Tank cap", kind="constraint",
+                 body="At most one tank.", reason="a test", require="team.tanks <= 1", soft=True,
+                 penalty=2)
+    assert not os.path.exists(tmp_path / "tank-cap.md")
+    _, added = ctx.call(
+        "add_strategy", id="tank-cap", name="Tank cap", kind="heuristic",
+        body="At most one tank.", reason="a test", when="not (team.tanks <= 1)",
         penalty=2, category="shape", by="a headless agent")
-    assert added["form"] == "limit" and added["line"].endswith("[a headless agent]")
+    assert added["form"] == "scored" and added["line"].endswith("[a headless agent]")
     stored = next(h for h in catalog.load() if h.id == "tank-cap")
-    assert stored.soft and stored.penalty.source == "2" and stored.category == "shape"
+    assert stored.penalty.source == "2" and stored.category == "shape" and stored.weighs
 
 
 def test_the_tuning_log_tool_refuses_fewer_than_one_line(tmp_path, monkeypatch):

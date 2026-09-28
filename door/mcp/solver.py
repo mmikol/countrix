@@ -106,8 +106,9 @@ def _compact(result: Result) -> tuple[str, CompactInfer]:
 @board_tool(
     "evaluate", "Score a FULL blue six against the default engine and the"
     " strategies without searching: the breakdown per engine term and"
-    " strategy, constraint violations, and how it ranks against the"
-    " optimum.", required=["blue"])
+    " strategy, and how it ranks against the optimum. A six that breaks one"
+    " of the playbook's limits is not allowed: refused, the rules named.",
+    required=["blue"])
 def evaluate(ctx: Context, draft: Draft) -> ToolReply:
     # the schema requires blue: the engine takes a full six, so a call
     # without one never reaches the engine

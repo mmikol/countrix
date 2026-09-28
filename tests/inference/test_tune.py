@@ -105,17 +105,17 @@ def test_add_stores_a_validated_strategy_and_complete_finishes_a_draft(catalog_c
     prose = (
         "When their support line heals at or above the roster bench, one\n"
         "anti-heal pick is worth more than another damage dealer.")
-    added = tune.add("shut-off-heals", "Shut off a heavy heal line", "constraint", prose,
+    added = tune.add("shut-off-heals", "Shut off a heavy heal line", "heuristic", prose,
                      {"when": "enemy.heal_ratio >= params.HEAL_RATIO",
                       "bonus": "min(team.antiheal, 1) * 1.5", "params": {"HEAL_RATIO": 1.0}},
                      "user: one anti-heal against a heavy heal line", directory=catalog_copy)
     assert added["form"] == "scored"
     text = Path(added["path"]).read_text(encoding="utf-8")
-    assert text.startswith("---\nname: Shut off a heavy heal line\nkind: constraint\n")
+    assert text.startswith("---\nname: Shut off a heavy heal line\nkind: heuristic\n")
     assert "when: enemy.heal_ratio >= params.HEAL_RATIO" in text and "  HEAL_RATIO: 1" in text
     assert text.rstrip().endswith("another damage dealer.")
     assert "# Shut off a heavy heal line" in text
-    assert "`shut-off-heals` added as constraint/scored" in tune.log_tail(
+    assert "`shut-off-heals` added as heuristic/scored" in tune.log_tail(
         1, os.path.join(catalog_copy, "tuning-log.md"))[0]
     # a draft: name, kind, prose - then completed in one validated step
     draft = tune.add("sustain-first", "Prefer a team that can heal", "heuristic",
@@ -211,16 +211,28 @@ def test_add_refuses_a_name_or_a_category_that_closes_the_frontmatter(catalog_co
     assert Path(added["path"]).read_text(encoding="utf-8").count("category:") == 1
 
 
-def test_a_soft_limit_takes_a_numeric_penalty(catalog_copy):
-    """The number the prompt, the skill and the docs promise a soft limit's
-    penalty is the number every writer accepts."""
-    Path(catalog_copy, "tank-cap.md").write_text(
-        "---\nname: Tank cap\nkind: constraint\n---\n# Tank cap\n\nAt most two tanks.\n",
+def test_a_charge_for_a_rule_broken_takes_a_numeric_penalty_and_soft_is_refused(catalog_copy):
+    """The number the prompt, the skill and the docs promise a charge's
+    penalty is the number every writer accepts, on a heuristic: a
+    constraint is never weighted, and soft is no field - a limit always
+    holds, and nothing changes."""
+    path = Path(catalog_copy, "tank-cap.md")
+    path.write_text(
+        "---\nname: Tank cap\nkind: heuristic\n---\n# Tank cap\n\nAt most one tank.\n",
         encoding="utf-8")
-    done = tune.complete("tank-cap", {"require": "team.tanks <= 2", "soft": True, "penalty": 2},
-                         "r", directory=catalog_copy)
-    assert done["form"] == "limit" and done["set"]["penalty"] == "2"
-    assert next(h for h in catalog.load(catalog_copy) if h.id == "tank-cap").soft
+    before = path.read_text(encoding="utf-8")
+    with pytest.raises(tune.TuneError, match="field must be one of"):
+        tune.complete("tank-cap", {"require": "team.tanks <= 1", "soft": True, "penalty": 2},
+                      "r", directory=catalog_copy)
+    with pytest.raises(tune.TuneError, match="a heuristic weighs; require"):
+        tune.complete("tank-cap", {"require": "team.tanks <= 1", "penalty": 2}, "r",
+                      directory=catalog_copy)
+    assert path.read_text(encoding="utf-8") == before
+    done = tune.complete("tank-cap", {"when": "not (team.tanks <= 1)", "penalty": 2}, "r",
+                         directory=catalog_copy)
+    assert done["form"] == "scored" and done["set"]["penalty"] == "2"
+    with pytest.raises(tune.TuneError, match="a constraint is a limit that always holds"):
+        tune.tune("tank-cap", "kind", "constraint", "r", directory=catalog_copy)
 
 
 def test_a_file_whose_frontmatter_never_closes_is_refused():

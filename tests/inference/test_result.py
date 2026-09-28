@@ -20,7 +20,7 @@ def test_a_playbook_that_scores_nothing_reads_unscored(synthetic_world):
     world = synthetic_world
     reference = catalog.load(FIXTURE_PLAYBOOK)
     assert catalog.has_scoring_terms(reference)
-    limit_only = [h for h in reference if h.form == "limit" and not h.soft]
+    limit_only = [h for h in reference if h.form == "limit"]
     assert limit_only and not catalog.has_scoring_terms(limit_only)
     draft = Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm", "Anvil"))
     b = engine.board(world, draft, catalog=limit_only, brief=engine.Brief(base=OFF))
@@ -47,7 +47,7 @@ def test_the_default_engine_scores_a_playbook_that_scores_nothing(synthetic_worl
     from inference import engine
     from inference.result import LIKELIHOOD
     reference = catalog.load(FIXTURE_PLAYBOOK)
-    limit_only = [h for h in reference if h.form == "limit" and not h.soft]
+    limit_only = [h for h in reference if h.form == "limit"]
     draft = Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm", "Anvil"))
     d = engine.board(synthetic_world, draft, catalog=limit_only).to_dict()
     for key in ("blue", "red", "current", "red_current", "fill", "countered"):

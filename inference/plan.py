@@ -18,7 +18,16 @@ from facts.model import ROLES, Hero, Map, World
 from facts.team import team_metrics, text
 from facts.team_facts import counted
 from inference import base
-from inference.result import Badge, Badges, Momentum, Odds, Result, rates_queue, scores
+from inference.result import (
+    NOT_ALLOWED,
+    Badge,
+    Badges,
+    Momentum,
+    Odds,
+    Result,
+    rates_queue,
+    scores,
+)
 
 
 class Seats(NamedTuple):
@@ -90,15 +99,16 @@ def _now(current: Result, fill: Result | None) -> Result:
 
 
 def _badge(current: Result, fill: Result | None) -> Badge:
-    """The badge above a seat's picker: "unscored", with the reason, whenever
-    the seat's current comp cannot be a share of anything - picks or not;
-    before any pick the suggested six's 100, the seat's optimal by
-    definition; else the picks' share of the seat's optimal, a half-drafted
-    seat read through the best six its picks reach, as the verdict reads it.
-    The tip says what the figure is a share of."""
+    """The badge above a seat's picker: "not allowed", with the limits the
+    picks break, where the playbook rules the comp out; "unscored", with the
+    reason, whenever the seat's current comp cannot be a share of anything -
+    picks or not; before any pick the suggested six's 100, the seat's optimal
+    by definition; else the picks' share of the seat's optimal, a
+    half-drafted seat read through the best six its picks reach, as the
+    verdict reads it. The tip says what the figure is a share of."""
     why = current.unscored()
     if why is not None:
-        return Badge(label="unscored", tip=why)
+        return Badge(label=NOT_ALLOWED if current.barred else "unscored", tip=why)
     if not current.blue:
         return Badge(label="100 / 100", tip="no %s picks yet: the suggested six is this"
                                             " seat's optimal, 100" % current.seat)
@@ -139,8 +149,10 @@ def _verdict_line(
 def _one_seat_waits(cur: Result, red_cur: Result, blue_share: int | None, red_share: int | None,
                     blue_why: str | None, red_why: str | None) -> str:
     """Each seat on its own: a seat with picks has its share, unless its
-    reason for none waits."""
+    reason for none waits, or its picks are not allowed."""
     def waits(why: str | None) -> str:
+        if (why or "").startswith(NOT_ALLOWED):
+            return why or ""
         return "unscored: " + (why or "").split(": ", 1)[-1]
     sides = [
         "no blue picks yet" if not cur.blue else
@@ -496,7 +508,7 @@ def _above_all(blue_r: Result, lean: str) -> str | None:
     pocket" on a poke six); a rule on the map's style is about the map."""
     titles = {s.id: s.name for s in blue_r.catalog} | base.TITLES
     skip = {s.id for s in blue_r.catalog
-            if (s.kind == "constraint" and s.category == "shape")
+            if (s.form == "scored" and s.category == "shape")
             or (s.name.split()[0].lower() in STYLE_PLAY and s.name.split()[0].lower() != lean
                 and not (s.when and "map.style_top" in s.when.names))}
     top = sorted((c for c in blue_r.contributions

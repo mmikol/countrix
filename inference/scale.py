@@ -13,14 +13,16 @@ functions of an Objective.
                         _bounds_over
     reference_standing  each hero's summed score across one slice of the reference
                         sixes it is in: its mean is the objective's own ranking of the
-                        roster on this board, the default engine's terms included
+                        roster on this board, the default engine's terms included;
+                        and the slice's lowest score, whose least over the slices is
+                        the board's floor - the zero of every share on it
 """
 
 import itertools
 import math
 import random
 from collections.abc import Iterable, Iterator, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from facts import compute
 from facts.model import ROLES, Hero
@@ -50,7 +52,26 @@ class Standing:
     sixes: int = 0
 
 
-type Tally = dict[int, Standing]                # hero id -> its standing
+@dataclass(slots=True)
+class Tally:
+    """Reference sixes scored on one board: each hero's Standing, by hero id,
+    and the floor - the lowest score among them, a share's zero; None while
+    no legal six is scored. Whole numbers and a least value, so slices fold
+    into the same tally in any order."""
+    heroes: dict[int, Standing] = field(default_factory=dict)
+    floor: float | None = None
+
+    def fold(self, part: "Tally") -> "Tally":
+        """Add one slice's tally into this one, in place."""
+        for hid, standing in part.heroes.items():
+            seen = self.heroes.get(hid)
+            if seen is None:
+                seen = self.heroes[hid] = Standing()
+            seen.total += standing.total
+            seen.sixes += standing.sixes
+        if part.floor is not None and (self.floor is None or part.floor < self.floor):
+            self.floor = part.floor
+        return self
 
 
 def sample(objective: Objective, size: int = REFERENCE_SIZE) -> list[Candidate]:
@@ -231,27 +252,32 @@ def _field_sample(objective: Objective, index: int = 0, count: int = 1) -> list[
 def freeze(objective: Objective) -> Tally:
     """Bounds per heuristic from the reference sample and the field, adopted
     by the objective; -> the reference sixes' tally under them, each hero's
-    standing. The sample is drawn once here, and nowhere else in one
-    process."""
+    standing and the floor. The sample is drawn once here, and nowhere else
+    in one process."""
     reference = _prepared(objective)
     objective.adopt_bounds(_bounds_over(objective, reference + _field_sample(objective)))
     return _tally(objective, reference)
 
 
 def _tally(objective: Objective, prepared: Iterable[Candidate]) -> Tally:
-    """Each hero's Standing over prepared reference sixes."""
-    tally: Tally = {}
+    """Each hero's Standing over prepared reference sixes, and the lowest
+    score among them."""
+    tally = Tally()
     for cand in prepared:
-        points = round(objective.score(cand, detail=False).score * 1e6)
+        score = objective.score(cand, detail=False).score
+        if tally.floor is None or score < tally.floor:
+            tally.floor = score
+        points = round(score * 1e6)
         for h in cand.heroes:
-            seen = tally.get(h.id)
+            seen = tally.heroes.get(h.id)
             if seen is None:
-                seen = tally[h.id] = Standing()
+                seen = tally.heroes[h.id] = Standing()
             seen.total += points
             seen.sixes += 1
     return tally
 
 
 def reference_standing(objective: Objective, index: int = 0, count: int = 1) -> Tally:
-    """One slice of the sample scored under the frozen bounds -> its tally."""
+    """One slice of the sample scored under the frozen bounds -> its tally,
+    the slice's floor with it."""
     return _tally(objective, _prepared(objective, index, count))

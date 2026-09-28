@@ -1,6 +1,6 @@
 ---
 name: strategy
-description: Add a strategy to Countrix's playbook from three things a colleague gives, however roughly - a name, a kind (constraint, heuristic or assumption) and a prose description - then clean them into the playbook's standard form and grammar, derive the insight and the mathematics (a heuristic's metric, direction and weight; a constraint's limit or its when/bonus/penalty and dials; nothing for an assumption), validate and store it, and show what it changes on a board. Use when the user wants to add a rule, a constraint, a heuristic or a strategy, says "the solver should ...", "add a strategy", "make it prefer/avoid ...", pastes a note about the game, or asks to finish a draft strategy file.
+description: Add a strategy to Countrix's playbook from three things a colleague gives, however roughly - a name, a kind (constraint, heuristic or assumption) and a prose description - then clean them into the playbook's standard form and grammar, derive the insight and the mathematics (a constraint's limit; a heuristic's metric, direction and weight, or its when/bonus/penalty; the dials; nothing for an assumption), validate and store it, and show what it changes on a board. Use when the user wants to add a rule, a constraint, a heuristic or a strategy, says "the solver should ...", "add a strategy", "make it prefer/avoid ...", pastes a note about the game, or asks to finish a draft strategy file.
 ---
 
 The solver is deterministic arithmetic: `inference/scoring.py` scores
@@ -22,13 +22,15 @@ one message. Never ask for a weight, a metric key or an expression:
 inferring those is your job.
 
 1. **The name** - what the strategy is called.
-2. **The kind**: a **constraint** (something a comp must or should do: a
-   limit, a reward, a penalty), a **heuristic** (something to have more
-   or less of, measured), or an **assumption** (what to take as given: a
-   ground rule the session holds a comp to, never scored). If the kind
-   they named does not fit the prose - a "heuristic" that is really a
-   rule, a "constraint" nothing can measure - pick the one that does and
-   say why in a clause.
+2. **The kind**: a **constraint** (something every comp must do, always:
+   a limit that cuts the space, never weighted), a **heuristic** (anything
+   weighted: something to have more or less of, or a reward or a charge
+   under a condition), or an **assumption** (what to take as given: a
+   ground rule the session holds a comp to, never scored). Constraints cut
+   the space; heuristics weigh what is left. If the kind they named does
+   not fit the prose - a "constraint" that should cost rather than forbid,
+   a "heuristic" that must always hold, a "constraint" nothing can measure
+   - pick the one that does and say why in a clause.
 3. **The prose** - what it means, when it applies, why it matters, in
    their words.
 
@@ -75,7 +77,7 @@ question is allowed.
    the new one differs; if one already says it, say so and offer `/tune`
    instead of a duplicate. Match the house style: weights 1 to 4 for
    heuristics, bonuses and penalties of 0.5 to 2 per unit for scored
-   constraints, `min(x, n)` to cap a reward, `params:` for any threshold
+   heuristics, `min(x, n)` to cap a reward, `params:` for any threshold
    a person might want to turn.
 3. **Decide, from the prose, and show your working** - the insight in one
    line, then the mathematics in one line of words and one of expression:
@@ -95,12 +97,15 @@ question is allowed.
      `map.*`, `world.*`) keeps it a reward. Before
      adding a rule, read `strategies` for the ones already on its metric:
      a trait paid by several rules wants a small weight, not another 1.
-   - **constraint, limit**: a `require` that must hold ("at most two
-     tanks" is `team.tanks <= 2`); `soft: true` with a numeric `penalty`
-     when it should cost rather than forbid.
-   - **constraint, scored**: a `when` guard and a `bonus` and/or
-     `penalty` expression, with `params:` for thresholds ("one anti-heal
-     against a heavy heal line" is `when: enemy.heal_ratio >= params.HEAL_RATIO`,
+   - **constraint**: a `require` that always holds ("at most two tanks"
+     is `team.tanks <= 2`), and nothing else - no `when`, no `weight`, no
+     `penalty`. A rule that should cost rather than forbid is not a
+     constraint: it is a scored heuristic, `when: not (<the rule>)` with a
+     numeric `penalty`.
+   - **heuristic, scored**: a `when` guard and a `bonus` and/or
+     `penalty` expression, times its `weight`, with `params:` for
+     thresholds ("one anti-heal against a heavy heal line" is
+     `when: enemy.heal_ratio >= params.HEAL_RATIO`,
      `bonus: min(team.antiheal, 1) * 1.5`, `params: {HEAL_RATIO: 1.0}`).
    - **assumption**: a ground rule the session holds a comp to, nothing
      measurable ("trust the kit over stale rates"): `kind: assumption`,
@@ -108,8 +113,8 @@ question is allowed.
 4. **Check that it can act.** A heuristic whose metric does not vary
    across comps is silent: run `infer` on a representative board and look
    for the metric's `spread` in the breakdown; if it is false, say so and
-   choose again. A constraint whose `when` never holds on any board is a
-   dead line: pick the board where it does before storing.
+   choose again. A scored heuristic whose `when` never holds on any board
+   is a dead line: pick the board where it does before storing.
 
 ## Integrate it with the engine
 
@@ -138,15 +143,16 @@ question is allowed.
 
 Given: name "cc for dive", kind "heuristic", prose "if they have like 2+
 divers we need stuns and stuff or the supports just die, i think 3 is
-enough". Standardized: **Peel when they dive** (constraint, matchup):
+enough". Standardized: **Peel when they dive** (heuristic, matchup):
 "Two or more enemy picks with engage tools means the backline gets
 jumped. Crowd control - stuns, sleeps, immobilizes, knockbacks, read from
 the kits' keywords - is what turns a dive into a dead diver. Up to three
-peel tools are rewarded." The kind moved from heuristic to constraint
-because the prose is conditional on the enemy's shape. Mathematics: when
-the enemy fields two or more mobility tools, reward each crowd-control
-tool, capped at three - `when: enemy.mobility_count >= 2`,
-`bonus: min(team.cc_count, 3) * 0.75`.
+peel tools are rewarded." The kind stays heuristic: a reward is weighed,
+however conditional, and the condition on the enemy's shape makes it the
+scored form. Mathematics: when the enemy fields two or more mobility
+tools, reward each crowd-control tool, capped at three -
+`when: enemy.mobility_count >= 2`, `bonus: min(team.cc_count, 3) * 0.75`,
+weight 1.
 
 ## Drafts the engine derives itself
 

@@ -116,7 +116,7 @@ reuse the database.
 
 The reference playbook is the one the tests prove the solver against. Leave out
 the `echo` line and the board runs the shipped playbook while its rules are
-rebuilt: six assumptions in prose, one scored rule, a healing floor set by the
+rebuilt: six assumptions in prose, one heuristic, a healing floor set by the
 kit, and one limit, at most three supports, on top of the default engine,
 which scores the sixes on their win rates, synergies and counters.
 

@@ -27,7 +27,7 @@ def test_the_derive_prompt_anchors_its_style_on_one_file_per_form(catalog_copy):
     _draft(catalog_copy)
     cat = catalog.load(catalog_copy)
     anchors = derive.style_anchors(cat)
-    assert [h.id for h in anchors] == ["anti-air", "anti-heal-answer", "cohesion", "locked-picks"]
+    assert [h.id for h in anchors] == ["anti-air", "cohesion", "locked-picks", "open-queue-tanks"]
     assert {h.form for h in anchors} == {h.form for h in cat} - {"draft"}
 
 
@@ -44,22 +44,26 @@ def test_the_derive_prompt_asks_only_for_fields_a_strategy_has(catalog_copy):
 
 
 def test_derive_completes_a_draft_from_the_models_answer(catalog_copy):
+    """A constraint draft whose prose rewards a pick weighs it, so the answer
+    makes it a heuristic, scored; the catalog refuses it as a constraint."""
     _draft(catalog_copy)
     asked = []
     def runner(text):
         asked.append(text)
-        return ('Sure. {"fields": {"when": "enemy.heal_ratio >= params.HEAL_RATIO", '
+        return ('Sure. {"fields": {"kind": "heuristic", '
+                '"when": "enemy.heal_ratio >= params.HEAL_RATIO", '
                 '"bonus": "min(team.antiheal, 1) * 1.5", "params": {"HEAL_RATIO": 1.0}}, '
                 '"reason": "one anti-heal pick is worth more than another damage dealer"}')
     result = derive.derive(directory=catalog_copy, runner=runner, log=lambda m: None)
     assert result["derived"] == [{"id": "heal-line", "form": "scored", "set": {
-        "when": "enemy.heal_ratio >= params.HEAL_RATIO", "bonus": "min(team.antiheal, 1) * 1.5",
-        "params.HEAL_RATIO": "1"}}] and not result["failed"]
+        "kind": "heuristic", "when": "enemy.heal_ratio >= params.HEAL_RATIO",
+        "bonus": "min(team.antiheal, 1) * 1.5", "params.HEAL_RATIO": "1"}}] and not result["failed"]
     assert len(asked) == 1
     text = asked[0]
     assert "name: Shut off a heavy heal line" in text and "kind: constraint" in text
     assert "team.antiheal - " in text and "map.side" in text and "(text)" in text
-    assert "kind: constraint\ncategory: matchup\nwhen: enemy.heal_ratio" in text   # a style anchor
+    assert "kind: heuristic\ncategory: matchup\nwhen: enemy.flyers" in text     # a style anchor
+    assert "A constraint is a limit and nothing" in text
     cat = catalog.load(catalog_copy)
     assert next(h for h in cat if h.id == "heal-line").solver_reads
     assert "inferred -> scored" in tune.log_tail(1, os.path.join(catalog_copy, "tuning-log.md"))[0]
@@ -158,12 +162,17 @@ def test_derive_counts_drafts_past_the_cap_apart_from_why_it_stopped(catalog_cop
 
 
 def test_the_deriver_accepts_only_a_strategys_fields():
-    with pytest.raises(Refusal, match="fields a strategy does not have"):
-        derive.parse('{"fields": {"prose": true, "weight": 2}, "reason": "r"}')
+    """soft is no field: a limit always holds. A draft may turn out an
+    assumption, or a heuristic where the prose weighs; never a constraint."""
+    for unknown in ('{"prose": true, "weight": 2}', '{"require": "team.tanks <= 2", "soft": true}'):
+        with pytest.raises(Refusal, match="fields a strategy does not have"):
+            derive.parse('{"fields": %s, "reason": "r"}' % unknown)
     with pytest.raises(Refusal, match="keeps its kind"):
         derive.parse('{"fields": {"kind": "constraint"}, "reason": "r"}')
     parsed = derive.parse('{"fields": {"kind": "assumption"}, "reason": "r"}')
     assert parsed[0] == {"kind": "assumption"}
+    assert derive.parse('{"fields": {"kind": "heuristic", "penalty": 2}, "reason": "r"}')[0] == {
+        "kind": "heuristic", "penalty": 2}
     fields, reason = derive.parse('{"fields": {"weight": 2, "params": {"A": 1.5}}, "reason": "r"}')
     assert fields == {"weight": 2, "params": {"A": 1.5}} and reason == "r"
     with pytest.raises(Refusal, match="does not parse"):     # an objection, not a crash
@@ -174,7 +183,7 @@ def test_a_dial_that_is_no_finite_number_is_sent_back_as_the_objection(catalog_c
     """JSON reads Infinity and NaN as numbers. tune.complete checks every
     params.NAME by the rule the loader keeps, so the answer is refused, the
     refusal goes back once, and the second answer is stored."""
-    _draft(catalog_copy)
+    _draft(catalog_copy, "heal-line", "heuristic")
     answers = iter(['{"fields": {"bonus": "min(team.antiheal, 1) * params.A",'
                     ' "params": {"A": Infinity}}, "reason": "r"}',
                     '{"fields": {"bonus": "min(team.antiheal, 1) * params.A",'

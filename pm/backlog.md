@@ -93,7 +93,7 @@ keeps it current.
 - **Off-shapes never win.** 2-1-3 and 2-3-1 land within 2-8 percent of the
   best 2-2-2 and the benchmark endorses three-support holds and
   three-damage attacks (57-79 percent of the optimal today). The shape
-  rules are scored constraints, which the fit does not touch. Cost: a day
+  rules are scored heuristics, which the fit does not touch. Cost: a day
   to fit their dials to the benchmark's off-shape entries.
 - **One hero on most boards.** D.Mon is in most optimal sixes on the
   strength of the roster's highest win rate. A win rate on a low pick

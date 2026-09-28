@@ -44,7 +44,7 @@ def test_infer_honours_a_hitscan_answer_to_a_flier(synthetic_world):
                      catalog=catalog.load(FIXTURE_PLAYBOOK))
     assert any(world.hero(n).hitscan for n in r.blue)
     anti = next(c for c in r.contributions if c["id"] == "anti-air")
-    assert anti["applies"] and anti["ok"]
+    assert not anti["applies"] and anti["weighted"] == 0.0      # answered: nothing to charge
 
 
 def test_evaluate_ranks_a_full_six_against_the_field(synthetic_world):
@@ -61,9 +61,10 @@ def test_evaluate_ranks_a_full_six_against_the_field(synthetic_world):
 
 def test_a_board_no_six_satisfies_is_refused_by_infer_and_evaluate_alike(
         synthetic_world, tmp_path):
-    """A hard limit no six can meet leaves no legal shape, so the field is
-    empty: infer refuses the board, and evaluate refuses it the same way
-    instead of ranking a six first among nothing."""
+    """A limit no six can meet leaves no legal shape, so the field is empty:
+    infer refuses the board, and evaluate refuses the six it is given, which
+    breaks the limit too, naming it - instead of ranking it first among
+    nothing."""
     from inference import engine
     world = synthetic_world
     (tmp_path / "seven-tanks.md").write_text(
@@ -71,7 +72,7 @@ def test_a_board_no_six_satisfies_is_refused_by_infer_and_evaluate_alike(
     scratch = catalog.load(str(tmp_path))
     with pytest.raises(Refusal, match="relax a constraint"):
         engine.infer(world, Draft("Harbor Gate", ("Mortar",)), catalog=scratch)
-    with pytest.raises(Refusal, match="relax a constraint"):
+    with pytest.raises(Refusal, match=r"^not allowed: breaks seven tanks$"):
         engine.evaluate(world, Draft("Harbor Gate", ("Mortar",),
                                      ("Anvil", "Kite", "Rook", "Needle", "Balm", "Tansy")),
                         catalog=scratch)
@@ -139,7 +140,7 @@ def test_an_announced_hero_is_described_but_never_picked(synthetic_world):
     assert not any(h.name in a["blue"] for a in r.alternatives)   # nor does the field hold it
     # and under a playbook that ties most sixes, where the local search swaps freely:
     # the announced hero reached the alternatives through refine once
-    limit_only = [s for s in fix if s.form == "limit" and not s.soft]
+    limit_only = [s for s in fix if s.form == "limit"]
     r = engine.infer(world, Draft(), catalog=limit_only)
     assert h.name not in r.blue and not any(h.name in a["blue"] for a in r.alternatives)
 

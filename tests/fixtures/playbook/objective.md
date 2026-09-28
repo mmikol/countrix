@@ -8,10 +8,10 @@ category: assumptions
 For every candidate six, the solver computes the same team, enemy and
 matchup metrics the board shows as facts, then sums: each heuristic's weight
 times its metric normalised to [0, 1] against a fixed reference sample of
-comps for the board (flipped for minimize), plus each scored constraint's
-weight times its bonus minus penalty while its condition holds, minus soft
-limits' penalties. Hard limits prune before any of that. An assumption is
-prose alone - the session reads it, the board shows it, nothing is scored.
+comps for the board (flipped for minimize), plus each scored heuristic's
+weight times its bonus minus penalty while its condition holds. Limits
+prune before any of that, and are never weighted. An assumption is prose
+alone - the session reads it, the board shows it, nothing is scored.
 STRATEGIES = CONSTRAINTS ∪ HEURISTICS ∪ ASSUMPTIONS; the score is
 STRATEGIES( FACTS ), and 100 on the board is the best six the solver found.
 

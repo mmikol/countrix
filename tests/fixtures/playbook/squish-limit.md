@@ -1,6 +1,6 @@
 ---
 name: Do not field a whole team of dive bait
-kind: constraint
+kind: heuristic
 category: durability
 penalty: max(0, team.squish_count - 4) * 1.0
 ---

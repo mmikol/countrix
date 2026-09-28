@@ -9,7 +9,7 @@ render as JSON-ready data (to_dict) and as text (rendered).
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from typing import Literal, NotRequired, TypedDict
+from typing import Literal, NamedTuple, NotRequired, TypedDict
 
 from facts.draft import TEAM_SIZE, Seat
 from facts.factset import Fact, FactSet
@@ -89,14 +89,29 @@ class Momentum(TypedDict):
     badges: Badges
 
 
-def _pct(score: float, best: float) -> int:
-    """A score as a share of the board's best, 0-100: the optimal six is 100,
-    the current comp its percentage of blue's optimal, an alternative its
-    share of the winner. A best at or below zero makes the scale meaningless,
-    so only the best itself scores 100 there."""
-    if best <= 0:
+class Span(NamedTuple):
+    """What a seat's shares are read on: its optimal six's score, the 100,
+    and its floor, the 0 - the lowest score among the reference sixes the
+    seat's scale drew (Solver.floor); None where none was legal, and zero
+    stands in."""
+    best: float
+    floor: float | None
+
+
+def _pct(score: float, best: float, floor: float) -> int:
+    """A score's place between the floor, 0, and the best, 100: the optimal
+    six is 100, the current comp its place on blue's optimal's span, an
+    alternative its place below the winner. A score is signed - the default
+    engine counts each pick's edge over a coin flip - so the 0 is the seat's
+    floor, not a score of zero. A best at or below the floor leaves nothing
+    to divide, so only the best itself scores 100 there."""
+    if best <= floor:
         return 100 if score >= best else 0
-    return max(0, min(100, round(100.0 * score / best)))
+    return max(0, min(100, round(100.0 * (score - floor) / (best - floor))))
+
+
+# what a comp its own picks rule out reads, before the rules it breaks
+NOT_ALLOWED = "not allowed"
 
 
 # what each kind of result is, as its rendered heading names it
@@ -105,8 +120,8 @@ HEADINGS: dict[ResultKind, str] = {
     "countered": "if countered optimally", "fill": "your picks, the rest filled",
     "expected": "their likely starting comp"}
 # the reason while the default engine is off and the playbook scores nothing
-UNSCORED = ("unscored - the playbook in force holds no heuristic, scored constraint or soft"
-            " limit, so every legal six ties at zero; add one and the board scores")
+UNSCORED = ("unscored - the playbook in force holds no heuristic, so every legal six ties at"
+            " zero; add one and the board scores")
 # the reason red's likely six carries no share while the default engine is on:
 # it is drawn, never scored
 LIKELIHOOD = (
@@ -125,10 +140,11 @@ class Result:
     """One seat's six on one board: who is in it and why, what it scores and
     how that breaks down per strategy, the runners-up, and the facts it
     cites. Built empty around the board's names; record_candidate() writes
-    the six onto it and scale_to() sets what 100 means. A Result reads from
-    its own seat, as the Draft and the FactSet under it do: `blue` is the
-    seat's six (its picks so far on a partial current comp), `red` the other
-    seat's picks or likely six, and `seat` names which seat that is."""
+    the six onto it, scale_to() sets what 100 and 0 mean, and bar() rules it
+    out. A Result reads from its own seat, as the Draft and the FactSet under
+    it do: `blue` is the seat's six (its picks so far on a partial current
+    comp), `red` the other seat's picks or likely six, and `seat` names which
+    seat that is."""
     kind: ResultKind
     map_name: str | None
     red: list[str]
@@ -151,6 +167,9 @@ class Result:
     rank: int | None = None
     playstyle: str = ""
     best: float | None = None          # the board's best score: what 100 means here
+    floor: float | None = None         # the seat's floor: what 0 means here, else zero
+    # why the comp is not allowed - the limits its own picks break - or None
+    barred: str | None = None
     # the assumptions - nothing to score: what the agent reconciles the facts
     # against beyond the arithmetic
     considerations: list[Consideration] = field(init=False)
@@ -162,35 +181,53 @@ class Result:
                                for s in self.catalog if s.kind == "assumption"]
         self.pending = [s.id for s in self.catalog if s.pending]
 
-    def scale_to(self, best: float) -> None:
-        """Set what 100 means here - the board's best score - and write each
-        alternative's share of it, None while the result reads unscored. An
-        unscored field ties at zero, where no six ranks above another, so the
-        rank goes too: every six would read first."""
-        self.best = best
+    def scale_to(self, span: Span) -> None:
+        """Set what 100 and 0 mean here - the seat's best score and its floor -
+        and write each alternative's share of the span, None while the result
+        reads unscored. An unscored field ties, where no six ranks above
+        another, so the rank goes too: every six would read first."""
+        self.best, self.floor = span
         scoring = self.unscored() is None
         for alt in self.alternatives:
-            alt["normalized"] = _pct(alt["score"], best) if scoring else None
+            alt["normalized"] = _pct(alt["score"], self.best, self._zero()) if scoring else None
         if not scoring:
             self.rank = None
 
     def share(self) -> int:
-        """The score as a share of what 100 means here, 0-100."""
-        return _pct(self.score, self._hundred())
+        """The score's place between what 0 and 100 mean here, 0-100."""
+        return _pct(self.score, self._hundred(), self._zero())
 
     def _hundred(self) -> float:
         """What 100 means for the result: the board's best score, else its own."""
         return self.best if self.best is not None else self.score
 
+    def _zero(self) -> float:
+        """What 0 means for the result: the seat's floor, else zero."""
+        return self.floor if self.floor is not None else 0.0
+
+    def bar(self, rules: list[str]) -> None:
+        """Rule the comp out: its own picks break these limits, named, or - an
+        empty list - no six that keeps them meets the limits. It carries no
+        score, no share and no rank, and says why; its breakdown keeps the
+        limits alone, each saying whether the picks keep it."""
+        self.barred = ("%s: breaks %s" % (NOT_ALLOWED, ", ".join(rules)) if rules else
+                       "%s: no six that keeps these picks meets the playbook's limits"
+                       % NOT_ALLOWED)
+        self.contributions = [c for c in self.contributions if c["form"] == "limit"]
+        self.alternatives, self.rank, self.considered = [], None, 0
+
     def unscored(self) -> str | None:
         """Why the result carries no share of a best, or None when it does.
-        The optimal six is 100 by definition - it is the reference, and scored
-        always; red's likely six is a likelihood, never scored, and says so
-        while the default engine is on; any other comp reads unscored when
-        nothing can be a share of anything: the default engine is off and the
-        playbook holds no term that scores, or none of its terms applies to
-        this board (a heuristic waiting on its `when`), so the best six itself
-        sums to zero, or the best six scores at or below zero."""
+        A comp its own picks rule out says so first (bar). The optimal six is
+        100 by definition - it is the reference, and scored always; red's
+        likely six is a likelihood, never scored, and says so while the
+        default engine is on; any other comp reads unscored when nothing can
+        be a share of anything: the default engine is off and the playbook
+        holds no term that scores, or none of its terms applies to this board
+        (a heuristic waiting on its `when`), so the best six itself sums to
+        zero, or the best six scores no higher than the seat's floor."""
+        if self.barred is not None:
+            return self.barred
         if self.kind == "infer":
             return None
         if self.kind == "expected" and self.base.on:
@@ -203,11 +240,11 @@ class Result:
         it from)."""
         if not scores(self.catalog, self.base):
             return UNSCORED
-        best = self._hundred()
-        if best > 0:
+        best, floor = self._hundred(), self._zero()
+        if best > floor:
             return None
-        below = ("unscored on this board - the optimal six scores %.2f, not above zero,"
-                 " so no comp is a share of it" % best)
+        below = ("unscored on this board - the optimal six scores %.2f, not above the floor"
+                 " of %.2f, so no comp is a share of it" % (best, floor))
         if self.base.on:                             # the engine's terms always apply
             return below
         by_id = {s.id: s for s in self.catalog}
@@ -216,7 +253,7 @@ class Result:
             s = by_id.get(c["id"])
             if s is None:
                 continue
-            if c["applies"] and s.form != "limit":   # terms apply: the best is just not above zero
+            if c["applies"] and s.form != "limit":   # terms apply: the best is just low
                 return below
             if not c["applies"]:
                 waiting.append("%s waits for %s" % (s.name, s.when.source) if s.when else s.name)
@@ -279,7 +316,9 @@ class Result:
         return {"kind": self.kind, "seat": self.seat, "map": self.map_name,
                 "red": self.red, "blue": self.blue, "locked": self.locked,
                 "bans": self.bans, "side": self.side, "partial": self.partial,
-                "score": round(self.score, 3), "scoring": scoring, "unscored": unscored,
+                # a comp its own picks rule out carries no score at all
+                "score": None if self.barred else round(self.score, 3),
+                "scoring": scoring, "unscored": unscored,
                 "weights": {s.id: s.weight for s in self.catalog if s.kind == "heuristic"},
                 # a partial team has no share to report: the sum runs over the picks
                 # it has, so a perfectly played draft reads 16 after one pick and can
@@ -298,14 +337,18 @@ class Result:
         each for the picks, the breakdown and the alternatives."""
         counts = catalog_module.counts(self.catalog)
         unscored = self.unscored()
-        lines = [self._headline(), "  %s%s - score %.2f %s%s, %d candidates considered in %.1fs"
-                 " under %d constraints, %d heuristics and %d assumptions"
-                 % (", ".join(self.blue), " (%s)" % self.playstyle if self.playstyle else "",
-                    self.score, self._share_label(unscored),
-                    " (rank %d among the feasible field)" % self.rank
-                    if self.rank else "", self.considered, self.seconds,
-                    counts["constraint"], counts["heuristic"], counts["assumption"])]
-        if unscored:
+        under = (" under %d constraints, %d heuristics and %d assumptions"
+                 % (counts["constraint"], counts["heuristic"], counts["assumption"]))
+        six = "%s%s" % (", ".join(self.blue), " (%s)" % self.playstyle if self.playstyle else "")
+        if self.barred:
+            lines = [self._headline(), "  %s - %s" % (six, NOT_ALLOWED),
+                     "  NOT ALLOWED: " + self.barred.split(": ", 1)[-1]]
+        else:
+            lines = [self._headline(), "  %s - score %.2f %s%s, %d candidates considered in"
+                     " %.1fs%s" % (six, self.score, self._share_label(unscored),
+                                   " (rank %d among the feasible field)" % self.rank
+                                   if self.rank else "", self.considered, self.seconds, under)]
+        if unscored and not self.barred:
             lines.append("  UNSCORED: " + unscored.split(" - ", 1)[-1])
         if self.partial:
             lines.append("  PARTIAL: %d of %d picked - sums read low until the team is full"

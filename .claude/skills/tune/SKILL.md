@@ -5,8 +5,9 @@ description: Change how Countrix's inference engine scores compositions - a stra
 
 You are editing the brain: the playbook in `inference/strategies/`,
 STRATEGIES = CONSTRAINTS ∪ HEURISTICS ∪ ASSUMPTIONS - a constraint is a
-limit (`require`) or a scored adjustment (`bonus`/`penalty`), a heuristic
-a weighted metric, an assumption prose. Every change goes through the
+limit (`require`) that always holds and is never weighted, a heuristic a
+weighted metric or a scored adjustment (`bonus`/`penalty` times its
+weight), an assumption prose. Every change goes through the
 `tune` tool on the `countrix` (or
 `countrix-docker`) MCP server, which validates it against
 the catalog, writes the file, re-mirrors the table, and logs it with your
@@ -17,15 +18,16 @@ reason in `inference/strategies/tuning-log.md`. Nothing is edited by hand.
 1. Read the catalog: the `strategies` tool lists every strategy with its
    kind, metric, direction, weight, expressions and params. Find the one
    the user means by the id it lists: a heuristic on a `team.*` metric, a
-   scored constraint's bonus or penalty, or a `params.NAME` dial. When
+   scored heuristic's bonus or penalty, or a `params.NAME` dial. When
    `strategies` lists no heuristic and no constraint - only assumptions,
    which nothing scores - there is nothing to tune: say so and offer
    `/strategy` to add the rule.
 2. Decide the smallest change that does what they asked: a weight
-   (heuristics and scored constraints; keep it within 0.25..5 unless they
-   insist), a `params.NAME` dial, or an expression (the vocabulary is
-   every `team.*`, `enemy.*`, `matchup.*`, `map.*`, `world.*` key - the
-   `metrics` tool, or the vocabulary in docs/inference.md).
+   (heuristics alone - a constraint is never weighted; keep it within
+   0.25..5 unless they insist), a `params.NAME` dial, or an expression (the
+   vocabulary is every `team.*`, `enemy.*`, `matchup.*`, `map.*`,
+   `world.*` key - the `metrics` tool, or the vocabulary in
+   docs/inference.md).
 3. Call `tune`: `{"id": "<the id strategies lists>", "field": "weight",
    "value": 2, "reason": "user: the solver keeps ignoring the
    counters"}`. A metric that does not exist or an expression that does not

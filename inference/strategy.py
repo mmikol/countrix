@@ -17,21 +17,30 @@ A strategy file, in the frontmatter dialect (inference.frontmatter):
     ---
     prose: what it means and why
 
-The kind is constraint, heuristic or assumption, and either of the first
-two takes an optional `when` guard. A HEURISTIC names a numeric fact key
-(`metric`), min-max normalised against the board's scale (inference.scale:
-a seeded reference sample of legal sixes and the board's field) and
-weighted; `direction`, maximize or minimize, says which end is good, and
-an optional `confidence` metric scales the weight by how strongly the
-premise holds. Guarded on the six's own state it is a need: weight x
-(norm - 1). A CONSTRAINT takes one of two forms, read off its frontmatter
+Constraints cut the space; heuristics weigh what is left. The kind is
+constraint, heuristic or assumption, and the form is read off the fields
 (`form`):
 
-    limit   `require: <expr>` must hold. Hard by default - a comp that
-            fails is discarded; `soft: true` with `penalty: <number>`
-            subtracts instead.
-    scored  `bonus: <expr>` and/or `penalty: <expr>`: the solver adds
-            `weight x (bonus - penalty)` while `when` holds.
+    limit       a CONSTRAINT: `require: <expr>` must hold, always - a six
+                that fails is never a candidate. A constraint is never
+                weighted: it carries no when, bonus, penalty, metric,
+                direction, weight or confidence.
+    heuristic   a HEURISTIC on a metric: a numeric fact key (`metric`),
+                min-max normalised against the board's scale
+                (inference.scale: a seeded reference sample of legal sixes
+                and the board's field) and weighted; `direction`, maximize
+                or minimize, says which end is good, and an optional
+                `confidence` metric scales the weight by how strongly the
+                premise holds. Guarded on the six's own state it is a need:
+                weight x (norm - 1).
+    scored      a HEURISTIC on an expression: `bonus: <expr>` and/or
+                `penalty: <expr>`, and the solver adds
+                `weight x (bonus - penalty)` while `when` holds.
+
+A heuristic takes an optional `when` guard, and weighs a metric or an
+expression, never both. A charge for breaking a rule is a heuristic:
+`when: not (<rule>)` with its `penalty`. `soft:` is refused: a limit
+always holds.
 
 An ASSUMPTION is prose: what the solver takes as given and the /comp
 session holds a comp to (players play optimally, say). It carries nothing
@@ -39,9 +48,9 @@ to score and is never a draft.
 
 A constraint or heuristic with only a name, a kind and prose - no metric,
 no expression - is a DRAFT: it loads, it is shown and served, the solver
-ignores it, and the `/strategy` skill infers the rest (a heuristic's
-metric, direction and weight; a constraint's limit or bonus/penalty and
-params) from the prose and writes it through `infer_strategy` - or turns
+ignores it, and the `/strategy` skill infers the rest (a constraint's
+limit; a heuristic's metric, direction and weight, or its when/bonus/
+penalty) from the prose and writes it through `infer_strategy` - or turns
 it into an assumption when nothing measurable captures it.
 
 `params:` (an indented block of NAME: number) are the dials an expression
@@ -50,10 +59,11 @@ reads as params.NAME - tuning is editing the file.
 Each field keeps one rule, which FIELDS names and checked_value applies: a
 line of text or an expression is one line as the loader splits lines,
 within its length cap; a choice is one of its choices; the weight is a
-finite number within 0..10; soft is true or false; a param is NAME: a
-finite number. The loader reads every file through these checks, every
-writer (inference.tune) checks a value by them before a file changes, and
-the door declares its strategy arguments from FIELDS.
+finite number within 0..10; a param is NAME: a finite number. A key
+outside FIELDS (and `id`, the filename's) is refused. The loader reads
+every file through these checks, every writer (inference.tune) checks a
+value by them before a file changes, and the door declares its strategy
+arguments from FIELDS.
 """
 
 import math
@@ -67,11 +77,12 @@ from inference.frontmatter import Frontmatter, Scalar
 
 # a strategy's kind, as its frontmatter names it, and its form, as its fields make it
 type Kind = Literal["constraint", "heuristic", "assumption"]
-type Form = Literal["limit", "scored", "heuristic", "assumption", "draft"]
+type Form = Literal["limit", "heuristic", "scored", "assumption", "draft"]
 KINDS: tuple[Kind, ...] = ("constraint", "heuristic", "assumption")
-# load() sorts by this index within a kind, so draft sits last for a
-# heuristic draft as well as a constraint one
-FORMS: tuple[Form, ...] = ("limit", "scored", "heuristic", "assumption", "draft")
+# load() sorts by this index within a kind: a heuristic on a metric before one
+# on an expression, and draft last for either kind
+FORMS: tuple[Form, ...] = ("limit", "heuristic", "scored", "assumption", "draft")
+WEIGHED: tuple[Form, ...] = ("heuristic", "scored")     # the forms a weight scales: a heuristic's
 DIRECTIONS = ("maximize", "minimize")      # which end of a heuristic's metric is good
 
 # the namespaces one board settles for every candidate six
@@ -91,10 +102,10 @@ MAX_TEXT = 500             # characters in any other line or expression
 PARAM_RE = re.compile(r"[A-Z][A-Z0-9_]*\Z")
 
 # how a field's value is checked: one line of text, one of a few choices, a
-# number within WEIGHT_RANGE, true or false, an expression, or the params block
-type FieldKind = Literal["line", "choice", "number", "flag", "expression", "params"]
+# number within WEIGHT_RANGE, an expression, or the params block
+type FieldKind = Literal["line", "choice", "number", "expression", "params"]
 # what one frontmatter line holds once checked, and what any field holds
-type LineValue = str | float | bool
+type LineValue = str | float
 type FieldValue = LineValue | dict[str, float]
 
 
@@ -116,18 +127,21 @@ FIELDS: dict[str, Field] = {
         "line", "the group the catalog files it under (default general)", limit=MAX_NAME),
     "metric": Field("line", "heuristics: a numeric key from `metrics`"),
     "direction": Field("choice", "heuristics: which end of the metric is good", DIRECTIONS),
-    "weight": Field("number", "0..10; 1-4 is the working range"),
+    "weight": Field("number", "heuristics: 0..10; 1-4 is the working range"),
     "confidence": Field(
         "line", "heuristics: a numeric metric that scales the term by how strongly its"
         " premise holds"),
-    "when": Field("expression", "a guard expression; optional"),
-    "require": Field("expression", "constraints: a limit expression"),
-    "soft": Field("flag", "with require: charge `penalty` instead of discarding"),
-    "bonus": Field("expression", "constraints: an expression added while `when` holds"),
+    "when": Field("expression", "heuristics: a guard expression; optional"),
+    "require": Field("expression", "constraints: the limit, an expression that always holds"),
+    "bonus": Field(
+        "expression", "heuristics: an expression added, times the weight, while `when` holds"),
     "penalty": Field(
-        "expression", "constraints: an expression, or with soft a number, subtracted"),
+        "expression", "heuristics: an expression or a number subtracted, times the weight,"
+        " while `when` holds"),
     "params": Field("params", "NAME: number dials the expressions read as params.NAME"),
 }
+# what a constraint never carries: it is a limit that always holds, never weighted
+NOT_A_LIMIT = ("when", "bonus", "penalty", "metric", "direction", "weight", "confidence")
 # the fields a writer sets one at a time; a dial is params.NAME
 TUNABLE = tuple(field for field in FIELDS if field not in ("name", "params"))
 FIELD_RULE = "field must be one of %s or params.NAME" % ", ".join(TUNABLE)
@@ -153,10 +167,8 @@ def finite_number(value: object) -> float | None:
 
 
 def field_text(value: LineValue) -> str:
-    """A value as a frontmatter line writes it: true or false, a whole float
-    without its point, anything else as str() gives it."""
-    if isinstance(value, bool):
-        return "true" if value else "false"
+    """A value as a frontmatter line writes it: a whole float without its
+    point, anything else as str() gives it."""
     if isinstance(value, float) and value.is_integer():
         return str(int(value))
     return str(value)
@@ -196,13 +208,6 @@ def _number(field: str, value: object) -> float:
     return number
 
 
-def _flag(field: str, value: object) -> bool:
-    """A bool: 1 and the text 'true' are refused."""
-    if not isinstance(value, bool):
-        raise CatalogError("%s must be true or false" % field)
-    return value
-
-
 def _param(name: str, value: object) -> float:
     """One dial: NAME in capitals, and a finite number. An int stays an int,
     so the file, the mirror and the docs read it as written."""
@@ -234,8 +239,6 @@ def checked_value(field: str, value: object) -> FieldValue:
         return _choice(field, value, spec.choices)
     if spec.kind == "number":
         return _number(field, value)
-    if spec.kind == "flag":
-        return _flag(field, value)
     if spec.kind == "params":
         return _params(value)
     return _line(field, value, spec.limit)
@@ -254,6 +257,19 @@ def _text(meta: Frontmatter, field: str) -> str | None:
     return None if value is None else _line(field, value, FIELDS[field].limit)
 
 
+def _check_keys(meta: Frontmatter) -> None:
+    """Every key the frontmatter sets is a field, or the id the filename
+    holds. soft: is refused by name: a limit always holds, and a charge is a
+    heuristic's penalty."""
+    if "soft" in meta:
+        raise CatalogError("soft: is refused - a limit always holds; charge a penalty from a"
+                           " heuristic, when: not (<the rule>)")
+    unknown = sorted(str(key) for key in meta if key not in FIELDS and key != "id")
+    if unknown:
+        raise CatalogError("%s is not a strategy field (the fields: %s)"
+                           % (", ".join(unknown), ", ".join(FIELDS)))
+
+
 # --- the strategy -----------------------------------------------------------------
 
 class StrategyRecord(TypedDict):
@@ -268,7 +284,6 @@ class StrategyRecord(TypedDict):
     direction: str | None
     metric: str | None
     weight: float
-    soft: bool
     confidence: str | None
     when: str | None
     require: str | None
@@ -285,6 +300,7 @@ class Strategy:
     def __init__(self, strategy_id: str, meta: Frontmatter, body: str, raw: str, path: str) -> None:
         self.id, self.body, self.raw, self.path = strategy_id, body, raw, path
         try:
+            _check_keys(meta)
             self.name = _text(meta, "name") or strategy_id.replace("-", " ")
             self.kind: Kind = _choice("kind", meta.get("kind"), KINDS)
             self.category = _text(meta, "category") or "general"
@@ -301,8 +317,6 @@ class Strategy:
             self.confidence = _text(meta, "confidence")
             self.when = compile_expr(_text(meta, "when"))
             self.require = compile_expr(_text(meta, "require"))
-            soft = _given(meta, "soft")
-            self.soft = soft is not None and _flag("soft", soft)
             self.bonus = compile_expr(_text(meta, "bonus"))
             self.penalty = compile_expr(_text(meta, "penalty"))
             params = _given(meta, "params")
@@ -310,16 +324,15 @@ class Strategy:
         except (CatalogError, ExprError) as error:
             raise CatalogError("%s: %s" % (strategy_id, error)) from error
         self.params_section = Section(dict(self.params))
-        self._check()
+        self._check(meta)
 
-    def _check(self) -> None:
+    def _check(self, meta: Frontmatter) -> None:
         """Every rule a file must keep, in order, so its first error is the one
         reported."""
         known = compute.registry()
         self._check_heuristic(known)
         self._check_confidence(known)
-        self._check_kind()
-        self._check_limit()
+        self._check_kind(meta)
         self._check_names(known)
 
     def _check_heuristic(self, known: Mapping[str, str]) -> None:
@@ -344,27 +357,25 @@ class Strategy:
         if self.form != "heuristic":
             raise CatalogError("%s: only a heuristic scales by a confidence" % self.id)
 
-    def _check_kind(self) -> None:
-        """What each kind may not carry."""
+    def _check_kind(self, meta: Frontmatter) -> None:
+        """What each kind may not carry: an assumption anything to score, a
+        constraint anything but its limit, a heuristic a limit, or a metric
+        and an expression at once."""
         if self.kind == "assumption" and (self.metric or self.expressions):
             raise CatalogError("%s: an assumption carries nothing to score" % self.id)
-        if self.kind == "heuristic" and any(
-                expr is not None for expr in (self.require, self.bonus, self.penalty)):
-            raise CatalogError("%s: a heuristic weighs a metric;"
-                               " require/bonus/penalty belong to a constraint"
+        if self.kind == "constraint":
+            weighed = [f for f in NOT_A_LIMIT if _given(meta, f) is not None]
+            if weighed:
+                raise CatalogError(
+                    "%s: a constraint is a limit that always holds (require:) and is never"
+                    " weighted; %s belong to a heuristic" % (self.id, ", ".join(weighed)))
+        if self.kind == "heuristic" and self.require is not None:
+            raise CatalogError("%s: a heuristic weighs; require: is a constraint's limit"
                                % self.id)
-        if self.kind == "constraint" and self.metric:
-            raise CatalogError("%s: a constraint has no metric; that is a heuristic" % self.id)
-
-    def _check_limit(self) -> None:
-        """A limit or scored, never both; soft only on a limit, with a penalty."""
-        if self.require is not None and self.bonus is not None:
-            raise CatalogError("%s: a constraint is a limit (require) or scored (bonus/penalty),"
-                               " not both" % self.id)
-        if self.require is not None and self.soft and self.penalty is None:
-            raise CatalogError("%s: a soft limit needs penalty:" % self.id)
-        if self.require is None and self.soft:
-            raise CatalogError("%s: soft: needs require:" % self.id)
+        if self.kind == "heuristic" and self.metric and (
+                self.bonus is not None or self.penalty is not None):
+            raise CatalogError("%s: a heuristic weighs a metric or bonus/penalty, not both"
+                               % self.id)
 
     def _check_names(self, known: Mapping[str, str]) -> None:
         """Every name an expression reads is a registered key or a declared param."""
@@ -382,22 +393,29 @@ class Strategy:
 
     @property
     def form(self) -> Form:
-        """heuristic, a constraint's form (limit, scored), assumption, or draft
-        (name, kind and prose only - awaiting /strategy)."""
+        """A constraint's limit; a heuristic on a metric (heuristic) or on an
+        expression (scored); assumption; or draft (name, kind and prose only -
+        awaiting /strategy)."""
         if self.kind == "assumption":
             return "assumption"
-        if self.kind == "heuristic" and self.metric:
+        if self.kind == "constraint":
+            return "limit" if self.require is not None else "draft"
+        if self.metric:
             return "heuristic"
-        if self.require is not None:
-            return "limit"
         if self.bonus is not None or self.penalty is not None:
             return "scored"
         return "draft"
 
     @property
+    def weighs(self) -> bool:
+        """Whether the strategy is a heuristic the solver weighs: on a metric or
+        on an expression, never a draft."""
+        return self.form in WEIGHED
+
+    @property
     def solver_reads(self) -> bool:
         """Whether the solver reads this strategy at all (assumptions and drafts it does not)."""
-        return self.form in ("heuristic", "limit", "scored")
+        return self.form == "limit" or self.weighs
 
     @property
     def pending(self) -> bool:
@@ -427,7 +445,7 @@ class Strategy:
         return {"id": self.id, "name": self.name, "kind": self.kind, "form": self.form,
                 "pending": self.pending, "need": self.need,
                 "category": self.category, "direction": self.direction,
-                "metric": self.metric, "weight": self.weight, "soft": self.soft,
+                "metric": self.metric, "weight": self.weight,
                 "confidence": self.confidence,
                 "when": self.when.source if self.when else None,
                 "require": self.require.source if self.require else None,

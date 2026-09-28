@@ -191,10 +191,10 @@ def test_the_plan_says_nothing_the_board_contradicts(synthetic_world):
     m.styles = {"brawl": 1.0, "dive": -0.5, "poke": 0.0}     # a brawl map
     rules = [
         Ns(
-            id="two-supports-hold", name="Two supports hold a six", kind="constraint",
+            id="two-supports-hold", name="Two supports hold a six", kind="heuristic",
             form="scored", category="shape", when=None, pending=False),
         Ns(
-            id="dive-the-pocket", name="Dive the pocket", kind="constraint", form="scored",
+            id="dive-the-pocket", name="Dive the pocket", kind="heuristic", form="scored",
             category="matchup", when=Expr("enemy.dmg_amp >= 2"), pending=False),
         Ns(
             id="brawl-maps", name="Brawl maps reward durability", kind="heuristic",
@@ -209,8 +209,8 @@ def test_the_plan_says_nothing_the_board_contradicts(synthetic_world):
             category="general", when=None, pending=False)]
     terms: list[Contribution] = [
         {
-            "id": r.id, "kind": r.kind, "form": "scored" if r.kind == "constraint" else "heuristic",
-            "applies": True, "weighted": 2.0, "metric": None}
+            "id": r.id, "kind": r.kind, "form": r.form, "applies": True, "weighted": 2.0,
+            "metric": None}
         for r in rules[:4]]
     terms.append({"id": "unmet", "kind": "heuristic", "form": "heuristic", "applies": True,
                   "weighted": -0.5, "metric": None, "need": True})

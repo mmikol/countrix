@@ -10,10 +10,13 @@ strategy's, and the alternatives. board() does it for both seats - blue's
 absolute optimal, red around its revealed ones, on opposite sides of a
 sided map - and scores the current blue picks as they stand. All three
 refuse a team past the queue's tanks, on either seat, and score under the
-default engine unless the caller passes base.OFF. The records are
-result.py's, the prose plan.py's and the process pool parallel.py's.
+default engine unless the caller passes base.OFF. The limits bind blue's
+own picks: evaluate refuses a six that breaks one, and the board reads such
+picks as not allowed. The records are result.py's, the prose plan.py's and
+the process pool parallel.py's.
 """
 
+import contextlib
 import dataclasses
 import sys
 import time
@@ -37,10 +40,10 @@ from facts.factset import FactSet
 from facts.model import ROLES, Hero, Map, World
 from inference import catalog as catalog_module
 from inference import parallel, supersede
-from inference.base import DEFAULT, BaseWeights
+from inference.base import DEFAULT, OFF, BaseWeights
 from inference.plan import Seats, momentum, plan
-from inference.result import Alternative, Board, Pick, Result, ResultKind
-from inference.scoring import Candidate
+from inference.result import NOT_ALLOWED, Alternative, Board, Pick, Result, ResultKind, Span
+from inference.scoring import Candidate, Objective
 from inference.shapes import legal_shapes
 from inference.solver import Infeasible, Solved, Solver, Swept, evaluate_comp
 from inference.strategy import Strategy
@@ -148,19 +151,34 @@ def evaluate(
         world: World, draft: Draft, *, catalog: list[Strategy] | None = None,
         pool_size: int = POOL_DEFAULT, base: BaseWeights = DEFAULT) -> Result:
     """Blue's full six (`draft.blue`), scored and ranked against the field the
-    solver would have searched. No catalog is the playbook in force; the
-    default engine scores under `base`."""
+    solver would have searched. A six that breaks one of the playbook's
+    limits is refused, the rules named: it is not allowed, so it has no
+    score. No catalog is the playbook in force; the default engine scores
+    under `base`."""
     return _evaluated(world, draft,
                       catalog=catalog_module.load() if catalog is None else catalog,
                       base=base, pool_size=pool_size, seat="blue", kind="evaluate",
-                      swept=None)
+                      swept=None, limited=True)
 
 
 class _Optimal(NamedTuple):
     """A seat's optimal six and the Solver that found it: the seat's current
-    comp is scored under the bounds that search froze."""
+    comp is scored under the bounds that search froze, on its span."""
     result: Result
     solver: Solver
+
+    @property
+    def span(self) -> Span:
+        """The seat's span: its optimal's score, the 100, and the floor its
+        reference sixes set, the 0."""
+        return Span(best=self.result.score, floor=self.solver.floor)
+
+
+def _broken(objective: Objective, heroes: Sequence[Hero]) -> list[str]:
+    """The names of the playbook's limits `heroes` break as they stand, in
+    catalog order: the check the search prunes by."""
+    names = {s.id: s.name for s in objective.catalog}
+    return [names[sid] for sid in objective.prepare(Candidate(heroes)).violations]
 
 
 def _optimal(
@@ -195,17 +213,20 @@ def _optimal(
     result.alternatives = [Alternative(blue=_order(c.heroes), score=round(c.score, 3),
                                        normalized=None)
                            for c in solved.ranked[1:top + 1]]
-    result.scale_to(result.score)
+    optimal = _Optimal(result, solved.solver)
+    result.scale_to(optimal.span)
     result.seconds = time.time() - started
-    return _Optimal(result, solved.solver)
+    return optimal
 
 
 def _evaluated(
         world: World, draft: Draft, *, catalog: list[Strategy], base: BaseWeights,
-        pool_size: int, seat: Seat, kind: ResultKind, swept: Swept | None) -> Result:
+        pool_size: int, seat: Seat, kind: ResultKind, swept: Swept | None,
+        limited: bool = False) -> Result:
     """`seat`'s full six (`draft.blue`), scored and ranked against the field
     the solver would have searched, labelled `kind`. `swept` takes that field
-    from a search the caller already ran on this board."""
+    from a search the caller already ran on this board. `limited`: a six that
+    breaks a limit is refused, the rules named, before any search."""
     started = time.time()
     m, red_h, blue_h, bans_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
     side = board_side(m, draft.side)
@@ -213,6 +234,12 @@ def _evaluated(
     if len(blue_h) != TEAM_SIZE:
         raise Refusal("evaluate needs exactly %d %s picks (got %d)"
                          % (TEAM_SIZE, seat, len(blue_h)))
+    if limited:
+        # the limits read no scale and no engine term, so no search is drawn to check them
+        broken = _broken(Objective(world, m, red=red_h, banned=bans_h, side=side,
+                                   catalog=catalog, base=OFF), blue_h)
+        if broken:
+            raise Refusal("%s: breaks %s" % (NOT_ALLOWED, ", ".join(broken)))
     result = Result(kind=kind, map_name=m.name if m else None, red=[h.name for h in red_h],
                     blue=[h.name for h in blue_h], locked=[], catalog=catalog, base=base,
                     bans=[h.name for h in bans_h], side=side, seat=seat)
@@ -227,41 +254,63 @@ def _evaluated(
     result.seconds = time.time() - started
     # the board's best known six is the 100, not this comp's own best rival: a
     # beaten six must not read 100 because nothing it was compared against beat it
-    result.scale_to(max([result.score] + [a["score"] for a in result.alternatives]))
+    result.scale_to(Span(best=max([result.score] + [a["score"] for a in result.alternatives]),
+                         floor=evaluated.solver.floor))
     return result
 
 
 def _current(
-        world: World, draft: Draft, *, solver: Solver, best: float,
-        catalog: list[Strategy], base: BaseWeights, pool_size: int, seat: Seat,
-        kind: ResultKind, swept: Swept | None) -> Result:
+        world: World, draft: Draft, *, optimal: _Optimal, catalog: list[Strategy],
+        base: BaseWeights, pool_size: int, seat: Seat, kind: ResultKind,
+        swept: Swept | None, barred: list[str] | None = None) -> Result:
     """`seat`'s picks (`draft.blue`, from that seat's perspective) as they
-    stand against the other seat's (`draft.red`), on the scale of the seat's
-    optimal: `solver` is the Solver its search ran and `best` its score, the
-    100. A full six is evaluated against the field - `swept`, when the caller
-    already has it - and reads "evaluate" where `kind` is "current", any other
-    kind staying as given; a partial team is scored under the bounds `solver`
-    froze, and says so."""
-    if len(draft.blue) == TEAM_SIZE:
+    stand against the other seat's (`draft.red`), on the span of the seat's
+    `optimal`: its Solver's bounds and floor, and its score, the 100. A full
+    six is evaluated against the field - `swept`, when the caller already has
+    it - and reads "evaluate" where `kind` is "current", any other kind
+    staying as given; a partial team is scored under the bounds the optimal's
+    search froze, and says so. `barred` is the limits the picks break when
+    their comp is not allowed (_barred): it is scored nowhere and ranked
+    against nothing, and says why."""
+    full = len(draft.blue) == TEAM_SIZE
+    if full and barred is None:
         result = _evaluated(world, draft, catalog=catalog, base=base, pool_size=pool_size,
                             seat=seat, kind="evaluate" if kind == "current" else kind,
                             swept=swept)
-        result.scale_to(best)
+        result.scale_to(optimal.span)
         return result
     started = time.time()
     m, red_h, blue_h, bans_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
     side = board_side(m, draft.side)
-    result = Result(kind=kind, map_name=m.name if m else None, red=[h.name for h in red_h],
-                    blue=[h.name for h in blue_h], locked=[h.name for h in blue_h],
+    result = Result(kind="evaluate" if full and kind == "current" else kind,
+                    map_name=m.name if m else None, red=[h.name for h in red_h],
+                    blue=[h.name for h in blue_h], locked=[] if full else [h.name for h in blue_h],
                     catalog=catalog, base=base, bans=[h.name for h in bans_h], side=side,
-                    seat=seat, partial=True)
+                    seat=seat, partial=not full)
+    solver = optimal.solver
     if blue_h:
         cand = solver.prepare(Candidate(blue_h))
         solver.score(cand)
         result.record_candidate(cand, _board_facts(world, result, side), solver.considered)
-    result.scale_to(best)
+    result.scale_to(optimal.span)
+    if barred is not None:
+        result.bar(barred)
     result.seconds = time.time() - started
     return result
+
+
+def _barred(world: World, draft: Draft, optimal: _Optimal, stuck: bool) -> list[str] | None:
+    """The limits a seat's own picks (`draft.blue`) break when its comp is not
+    allowed, or None where it is: a full six that breaks one, or picks no six
+    that keeps them meets the limits with (`stuck`: its fill was infeasible),
+    named by the limits they break as they stand - none where they break none
+    alone. A half-drafted seat that breaks a limit it can still meet (one tank
+    under a two-tank rule) is allowed: the picks to come can mend it."""
+    blue_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)[2]
+    broken = _broken(optimal.solver, blue_h)
+    if stuck or (len(blue_h) == TEAM_SIZE and broken):
+        return broken
+    return None
 
 
 def board(
@@ -279,17 +328,23 @@ def board(
                      selection, on the other side - the scale red's current
                      comp is measured on
         current      blue's picks as they stand, scored against red's
-                     selection on blue's optimal's scale
+                     selection on blue's optimal's scale - or not allowed, with
+                     no score, where they break one of the playbook's limits:
+                     a full six that breaks one, or picks no six that keeps
+                     them can meet the limits with
         red_current  red's picks as they stand, scored against blue's
-                     selection on red's optimal's scale
+                     selection on red's optimal's scale; red's picks are the
+                     other side's facts, never ruled out
         countered    blue's picks against red's optimal six - how you hold
                      if they answer you perfectly: a full six as it stands, a
                      half-drafted one filled, on the scale of blue's best
-                     counter to that six (None without blue picks, or when
-                     the brief does not ask for it)
+                     counter to that six (None without blue picks, when the
+                     brief does not ask for it, when blue's picks are not
+                     allowed, or when no six answers)
         fill         blue's locked picks with the empty slots filled by the
                      solver - the best six that keeps what you hold, on
-                     blue's optimal's scale (None unless one to five are locked)
+                     blue's optimal's scale (None unless one to five are
+                     locked, or when no six that keeps them meets the limits)
         momentum     the verdict from the two current comps, each
                      half-drafted seat read through its fill; red's fill is
                      solved for the verdict and not kept
@@ -380,22 +435,34 @@ def _board_once(
     against_split, answer_split = solve.sweep_countered(countered_seat)
     for split in (fill_split, red_fill_split, against_split, answer_split):
         split.merge()
-    # a full six is ranked against the field its seat's search just swept;
-    # 100 is the seat's optimal, whatever it holds
-    cur = solve.current(ours, blue, blue_split, seat="blue")
-    red_cur = solve.current(theirs, red, red_split, seat="red")
-    fill = solve.filled(ours, fill_split, seat="blue", best=blue.result.score)
     try:
-        red_fill = solve.filled(theirs, red_fill_split, seat="red", best=red.result.score)
+        fill = solve.filled(ours, fill_split, seat="blue", span=blue.span)
+        stuck = False
+    except Infeasible:
+        # no six that keeps blue's picks meets the limits: the fill is not
+        # solved, and blue's current comp says which limit the picks break
+        fill, stuck = None, True
+    # a full six is ranked against the field its seat's search just swept;
+    # 100 is the seat's optimal, whatever it holds. The limits bind blue's picks
+    cur = solve.current(ours, blue, blue_split, seat="blue", stuck=stuck)
+    red_cur = solve.current(theirs, red, red_split, seat="red")
+    try:
+        red_fill = solve.filled(theirs, red_fill_split, seat="red", span=red.span)
     except Infeasible:
         # red's revealed picks are the other side's facts, not ours to limit: past
         # a limit they already break no fill exists, and red is read off its picks
         red_fill = None
-    countered = solve.countered(countered_seat, against_split, answer_split)
+    countered = None
+    if cur.barred is None:
+        # a what-if: where no six answers red's six around blue's picks, it is not solved
+        with contextlib.suppress(Infeasible):
+            countered = solve.countered(countered_seat, against_split, answer_split)
     seats = Seats(current=cur, red_current=red_cur, blue=blue.result, red=red.result,
                   fill=fill, red_fill=red_fill, countered=countered)
-    # the six the comps tab shows for blue, which the plan describes
-    shown = fill if fill is not None else cur if len(draft.blue) == TEAM_SIZE else blue.result
+    # the six the comps tab shows for blue, which the plan describes: a comp
+    # that is not allowed is described by the optimal instead
+    held = len(draft.blue) == TEAM_SIZE and cur.barred is None
+    shown = fill if fill is not None else cur if held else blue.result
     return Board(map_name=expected.map_name, side=draft.side, bans=list(draft.bans),
                  blue=blue.result, red=red.result, current=cur, red_current=red_cur,
                  fill=fill, countered=countered, momentum=momentum(seats),
@@ -454,24 +521,30 @@ class _Pass:
                         top=BOARD_TOP, seat=seat, kind=kind, solved=search.solved(),
                         began=search.started)
 
-    def current(self, draft: Draft, optimal: _Optimal, search: Searching, *, seat: Seat) -> Result:
+    def current(
+            self, draft: Draft, optimal: _Optimal, search: Searching, *, seat: Seat,
+            stuck: bool | None = None) -> Result:
         """`seat`'s picks as they stand, on its optimal's scale; a full six is
-        ranked against the field `search` swept."""
-        swept = search.swept() if len(draft.blue) == TEAM_SIZE else None
-        return _current(self.world, draft, solver=optimal.solver, best=optimal.result.score,
-                        catalog=self.catalog, base=self.brief.base,
-                        pool_size=self.brief.pool_size, seat=seat, kind="current", swept=swept)
+        ranked against the field `search` swept. With `stuck` - blue's seat,
+        True where no six that keeps the picks met the limits - the limits
+        bind the picks, and a comp they rule out is not allowed; None leaves
+        the picks as the other side's facts."""
+        barred = None if stuck is None else _barred(self.world, draft, optimal, stuck)
+        swept = search.swept() if len(draft.blue) == TEAM_SIZE and barred is None else None
+        return _current(self.world, draft, optimal=optimal, catalog=self.catalog,
+                        base=self.brief.base, pool_size=self.brief.pool_size, seat=seat,
+                        kind="current", swept=swept, barred=barred)
 
     def filled(
-            self, draft: Draft, search: Searching, *, seat: Seat, best: float,
+            self, draft: Draft, search: Searching, *, seat: Seat, span: Span,
             kind: ResultKind = "fill", pool_size: int | None = None) -> Result | None:
         """`seat`'s picks (`draft.blue`) with the empty slots filled by the
-        solver, on the scale whose 100 is `best`: how close the best
-        completion comes. None unless the seat is half-drafted."""
+        solver, on the seat's `span`: how close the best completion comes.
+        None unless the seat is half-drafted."""
         if not _drafting(draft):
             return None
         fill = self.optimal(draft, search, seat=seat, kind=kind, pool_size=pool_size).result
-        fill.scale_to(best)
+        fill.scale_to(span)
         return fill
 
     def _wants_countered(self, draft: Draft) -> bool:
@@ -504,12 +577,11 @@ class _Pass:
         top = self.optimal(dataclasses.replace(draft, blue=()), against, seat="blue",
                            pool_size=self.countered_pool)
         if _drafting(draft):
-            return self.filled(draft, answer, seat="blue", best=top.result.score,
+            return self.filled(draft, answer, seat="blue", span=top.span,
                                kind="countered", pool_size=self.countered_pool)
-        return _current(self.world, draft, solver=top.solver, best=top.result.score,
-                        catalog=self.catalog, base=self.brief.base,
-                        pool_size=self.countered_pool, seat="blue", kind="countered",
-                        swept=against.swept())
+        return _current(self.world, draft, optimal=top, catalog=self.catalog,
+                        base=self.brief.base, pool_size=self.countered_pool, seat="blue",
+                        kind="countered", swept=against.swept())
 
 
 def _check_teams(red_h: Sequence[Hero], blue_h: Sequence[Hero], seat: Seat) -> None:

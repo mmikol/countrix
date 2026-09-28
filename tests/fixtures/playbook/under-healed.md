@@ -1,6 +1,6 @@
 ---
 name: Two supports must actually heal
-kind: constraint
+kind: heuristic
 category: sustain
 when: team.supports >= 2 and team.heal_ratio < params.HEAL_MARGIN
 penalty: 2
@@ -12,4 +12,4 @@ params:
 The support line's summed peak single heal against the roster's
 two-support bench (twice the median support's peak). Below the margin
 the line is complete and still light - two Zenyattas is a choice, and
-this constraint makes the solver pay for it rather than stumble into it.
+this rule makes the solver pay for it rather than stumble into it.

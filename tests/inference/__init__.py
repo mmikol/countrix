@@ -29,7 +29,7 @@ DIGEST_RE = re.compile(r"[0-9a-f]{64}\Z")
 # the frontmatter of inference/strategies/heal-rate.md, which test_catalog holds
 # the shipped file to
 HEAL_RATE = {
-    "kind": "constraint", "category": "sustain", "weight": 2.0,
+    "kind": "heuristic", "category": "sustain", "weight": 2.0,
     "penalty": "matchup.heal_shortfall"}
 
 

@@ -24,8 +24,8 @@ function why(c) {
   var n = function (x) { return typeof x === 'number' ? +x.toFixed(2) : x; };
   if (c.form === 'base') return 'The default engine reads ' + c.metric + ': ' + n(c.raw) +
     ' at weight ' + n(c.weight) + '. Worth ' + n(c.weighted) + '.';
-  if (c.form === 'limit') return c.ok ? 'A hard limit. This six keeps it.'
-                                      : 'A hard limit. This six breaks it.';
+  if (c.form === 'limit') return c.ok ? 'A limit. This six keeps it.'
+                                      : 'A limit. This six breaks it.';
   if (!c.applies) {
     return c.when ? 'Never read. Its guard (' + c.when + ') does not hold here.'
                   : 'Never read. Nothing on this board gives it a number.';
@@ -152,12 +152,13 @@ function renderInf() {
   /* the strip is two bars, blue's and red's. With both seats scored the bars
      are the odds - each share over the two shares' sum, a split of 100 - and
      the tooltip keeps the share; with one seat scored its bar is its share
-     alone; a seat that cannot be scored reads the word, picks or not, its
-     reason in the tooltip. While neither bar has a figure the engine's
-     verdict says why under them */
+     alone; a seat that cannot be scored reads its badge's word - unscored,
+     or not allowed where its picks break a limit - picks or not, its reason
+     in the tooltip. While neither bar has a figure the engine's verdict says
+     why under them */
   var bar = function (side, value, res) {
     var odds = mo.odds ? mo.odds[side] : null, unscored = !!res && res.scoring === false;
-    var word = unscored ? 'unscored'
+    var word = unscored ? mo.badges[side].label
              : odds !== null ? odds + '%'
              : typeof value === 'number' ? value + ' / 100' : '';
     var tip = unscored ? res.unscored || ''

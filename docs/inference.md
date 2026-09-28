@@ -22,8 +22,8 @@ Two things infer:
 
 One input is written by hand: the playbook, which the solver reads. A pull
 tool fills every other table. The shipped playbook is six assumptions, one
-scored rule, `heal-rate` ([The healing floor](#the-healing-floor)), and
-one limit, `at-most-three-supports`, while it is rebuilt from the
+heuristic, `heal-rate`, scored ([The healing floor](#the-healing-floor)),
+and one limit, `at-most-three-supports`, while it is rebuilt from the
 citations in [inference/README.md](../inference/README.md); the default
 engine scores every board beneath it ([The objective](#the-objective)).
 The solver tests run on the reference playbook in
@@ -53,8 +53,8 @@ three terms favour, scored and explained:
   matches, so its edge is pulled toward a coin flip; `RATE_PICK_HALF` is set
   so that only the rarest heroes lose more than half their edge. The term is centred on 50
   and not on the reference sample's mean: the zero is the same on every
-  board and needs no sample, and a comp's share of the optimal is its
-  share of the optimal's edge over a coin flip.
+  board and needs no sample. A score is therefore signed, and a share is
+  read from the seat's floor, not from zero ([The share](#the-share)).
 - **synergy**: `team.synergy_score`, the wiki's synergy scores among the
   six.
 - **counters**: the counter graph between the six and the other side,
@@ -89,6 +89,34 @@ engine had a base. The board, the MCP tools and the inference service run
 With the engine off and a playbook that scores nothing, every six ties at
 zero and a board reads *unscored*.
 
+## The share
+
+Each seat's optimal six is its 100, and its 0 is the seat's floor: the
+lowest score among the reference sixes its scale drew (`Solver.floor`,
+the least of the tally `inference/scale.py` keeps over the sample, which
+the pool's slices fold in any order to the same number). A comp's share
+is its place on that span:
+
+```
+share = clamp((score - floor) / (best - floor), 0, 1) x 100
+odds  = each seat's share over the two shares' sum
+```
+
+A score is signed, since the rate term counts each pick's edge over 50,
+so a share read from zero put every six below zero at 0, and against a
+six above zero the odds read 100 to 0. The floor puts both seats on a
+real scale; a mirror still reads 50 to 50. A best no higher than the
+floor leaves nothing to divide, and every comp but the optimal reads
+*unscored*.
+
+A comp whose own picks break a limit is not allowed: blue's full six that
+breaks one, or picks no six that keeps them meets the limits with, whose
+fill is then not solved. It carries no score, no share and no odds, reads
+`not allowed: breaks <the limit's name>` in the badge and the strip, and
+its breakdown keeps the limits alone; blue's optimal and red's seat still
+render. Red's revealed picks are the other side's facts and are never
+ruled out. `evaluate` refuses such a six, the limit named.
+
 ## How a strategy file works
 
 Drop a markdown file into `strategies/` and it is live: the solver reads
@@ -117,17 +145,24 @@ value.
 
 | kind | form | frontmatter | what the solver does |
 | --- | --- | --- | --- |
-| heuristic | | `metric`, `direction` (`maximize` or `minimize`), `weight`, optionally `confidence` | normalises the metric to [0, 1] on the board's scale (flipped for minimize) and adds `weight x norm` |
-| constraint | limit | `require: <expr>`, optionally `soft: true` and `penalty: <number>` | discards a candidate that fails; a soft one subtracts the penalty |
-| constraint | scored | `bonus: <expr>` and/or `penalty: <expr>` | adds `weight x (bonus - penalty)` |
+| constraint | limit | `require: <expr>`, and nothing weighted | discards a candidate that fails; never scores |
+| heuristic | heuristic | `metric`, `direction` (`maximize` or `minimize`), `weight`, optionally `confidence` | normalises the metric to [0, 1] on the board's scale (flipped for minimize) and adds `weight x norm` |
+| heuristic | scored | `bonus: <expr>` and/or `penalty: <expr>`, `weight` | adds `weight x (bonus - penalty)` |
 | assumption | | nothing: prose by definition | nothing: the solver takes it as given and the agent holds a comp to it |
 | constraint or heuristic | draft | name, kind and prose only | nothing yet: shown and served until `/strategy` infers the rest or turns it into an assumption |
 
-A constraint or a heuristic takes an optional `when` guard and applies
-only where it holds. A heuristic guarded on the six's own state
-(`team.*` or `matchup.*`) is a need: it adds `weight x (norm - 1)`, so
-met it costs nothing and unmet it costs its weight, and the needs on one
-guard cost `NEED_BUDGET` (2) together at most. The scale is a seeded
+Constraints cut the space; heuristics weigh what is left. A constraint
+always holds and is never weighted: it carries no `when`, `bonus`,
+`penalty`, `metric`, `direction`, `weight` or `confidence`, and anything
+weighted is a heuristic. A rule that should cost rather than forbid is a
+scored heuristic, `when: not (<the rule>)` with its `penalty`; `soft:`
+is refused, and so is any key that is not a field. A heuristic weighs a
+metric or an expression, never both, and takes an optional `when` guard,
+applying only where it holds. A heuristic on a metric guarded on the
+six's own state (`team.*` or `matchup.*`) is a need: it adds
+`weight x (norm - 1)`, so met it costs nothing and unmet it costs its
+weight, and the needs on one guard cost `NEED_BUDGET` (2) together at
+most. The scale is a seeded
 sample of 1200 legal sixes plus the field of each role's top six by the
 board's prior (`inference/scale.py`), and `confidence` names a second
 metric that scales the weight by how strongly the premise holds.
@@ -262,7 +297,7 @@ the median support, is 139.87: Illari and Mizuki.
 
 ## The healing floor
 
-`heal-rate`, the shipped playbook's one scored rule, holds a six to a
+`heal-rate`, the shipped playbook's one heuristic, scored, holds a six to a
 healing threshold set by the kit. It reads `matchup.heal_shortfall`;
 `facts/compute.py` computes it and `matchup.heal_need` (`heal_read`,
 `heal_need`, `heal_shortfall`), and the board words both in one fact.
@@ -354,16 +389,18 @@ with three 7%.
 ## The catalog
 
 <!-- generated:catalog -->
-8 files in `inference/strategies/`: 2 constraints (1 limits, 1 scored), 0 heuristics and 6 assumptions. Regenerated by `.venv/bin/python -m door.mcp call db_docs`.
+8 files in `inference/strategies/`: 1 constraints (limits), 1 heuristics (0 on a metric, 1 scored) and 6 assumptions. Regenerated by `.venv/bin/python -m door.mcp call db_docs`.
 
 #### Constraints
 
 ##### Never more than three supports (`at-most-three-supports`, shape, limit)
 
-`require team.supports <= params.MAX_SUPPORTS` (hard)
+`require team.supports <= params.MAX_SUPPORTS` - always holds
 params: MAX_SUPPORTS=3
 
 A six fields at most three supports, on every board. Open Queue sets no cap on supports, so this rule sets one: a six with a fourth support is never chosen. Measured as the six's support count.
+
+#### Heuristics
 
 ##### Heal at the other side's rate (`heal-rate`, sustain, scored)
 

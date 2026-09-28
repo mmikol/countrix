@@ -4,11 +4,11 @@ The playbook, which imports nothing from the search:
 
     strategies/   the playbook - STRATEGIES = CONSTRAINTS ∪ HEURISTICS ∪ ASSUMPTIONS:
                   one markdown file per strategy, and tuning-log.md, a line
-                  per change. A constraint is a limit
-                  (require: must hold) or a scored adjustment (bonus/penalty
-                  while a condition holds); a heuristic maximises or
-                  minimises a metric; an assumption is prose the agent holds
-                  a comp to
+                  per change. A constraint is a limit (require: always
+                  holds, never weighted); a heuristic weighs what is left,
+                  a metric maximised or minimised or a bonus/penalty while a
+                  condition holds; an assumption is prose the agent holds a
+                  comp to
     README.md     the citation record the playbook is rebuilt from: a line
                   per strategy id, shipped or removed, with the threads a
                   rule was drawn from or the user's word for an assumption

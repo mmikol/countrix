@@ -217,8 +217,8 @@ def test_the_scripts_read_payload_keys_the_server_writes(synthetic_world, monkey
     read("blue red odds verdict badges", Momentum.__annotations__)
     read("label tip", Badge.__annotations__)
     read(
-        "id name kind form weight direction metric need when require soft penalty bonus params"
-        " body", StrategyRecord.__annotations__)
+        "id name kind form weight direction metric need when require penalty bonus params body",
+        StrategyRecord.__annotations__)
     fact = board_facts.generate(synthetic_world, Draft()).to_dict()["facts"][0]
     read("id key subject text scope team source", fact)
     monkeypatch.setattr(board.tables, "load", lambda cx: synthetic_world)

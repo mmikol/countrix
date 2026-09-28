@@ -1,6 +1,6 @@
 ---
 name: Shut off a heavy heal line
-kind: constraint
+kind: heuristic
 category: matchup
 when: enemy.heal_ratio >= params.HEAL_RATIO
 bonus: min(team.antiheal, 1) * 1.5

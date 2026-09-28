@@ -4,12 +4,13 @@
     STRATEGIES = CONSTRAINTS ∪ HEURISTICS ∪ ASSUMPTIONS
 
 The default engine's three terms come first (inference.base), unless the
-board's BaseWeights are OFF; then the playbook's: limits prune (soft ones
-charge), heuristics normalise and weigh, scored constraints add;
-assumptions are the agent's. A `when` reading only the enemy, the map and
-the world is settled once per board, not once per candidate. A heuristic
-guarded on the six's own state is a need: see Objective.score(). The legal
-shapes live in inference.shapes.
+board's BaseWeights are OFF; then the playbook's: limits prune and never
+score, heuristics on a metric normalise and weigh, scored heuristics add
+their weight times bonus less penalty; assumptions are the agent's. A
+`when` reading only the enemy, the map and the world is settled once per
+board, not once per candidate. A heuristic guarded on the six's own state
+is a need: see Objective.score(). The legal shapes live in
+inference.shapes.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
@@ -146,12 +147,12 @@ class Contribution(TypedDict):
     exposures: NotRequired[int]
     derived: NotRequired[list[str]]    # each derived edge in it, worded
     norm: NotRequired[float]
-    when: NotRequired[str | None]      # a heuristic, and a scored constraint
+    when: NotRequired[str | None]      # a heuristic, on a metric or scored
     spread: NotRequired[bool]          # an applying heuristic
     need: NotRequired[bool]
     confidence: NotRequired[str | None]
     confidence_raw: NotRequired[float | None]
-    bonus: NotRequired[float]          # a scored constraint
+    bonus: NotRequired[float]          # a scored heuristic
     penalty: NotRequired[float]
     fact: NotRequired[str]             # the board fact that states the metric, if any
     text: NotRequired[str]
@@ -239,7 +240,7 @@ class Objective:
         self.base = Base(world, m, red=self.red, banned=banned, weights=base) if base.on else None
         self.limits = [s for s in catalog if s.form == "limit"]
         self.heuristics = [s for s in catalog if s.form == "heuristic"]
-        self.scored_constraints = [s for s in catalog if s.form == "scored"]
+        self.scored = [s for s in catalog if s.form == "scored"]
         # the red side's metrics do not change across candidates
         self.red_t = team_metrics(world, self.red, m, ())
         self.static: Namespace = {
@@ -248,18 +249,14 @@ class Objective:
             "world": compute.world_metrics(world)}
         self.bounds: Bounds = {}             # heuristic id -> (min, max)
         self._norms: list[Norm] = []
-        # each strategy paired with its gate - True or False where `when` is
+        # each heuristic paired with its gate - True or False where `when` is
         # settled for the whole board, None where the candidate decides it -
         # and with the slot it shares with every strategy guarded the same way;
-        # a limit with its require:, which every limit has
+        # a limit with its require:, which every limit has and which always holds
         gates, slots, self.gate_slots = self._gates()
-        self._limits: list[tuple[Strategy, Expr, bool | None, int]] = [
-            (s, s.require, gates[s.id], slots.get(s.id, 0)) for s in self.limits
-            if s.require is not None]
-        # the limits prepare() prunes by: a soft one only charges, in score()
-        self._hard_limits = [limit for limit in self._limits if not limit[0].soft]
-        self._scored = [(r, gates[r.id], slots.get(r.id, 0))
-                        for r in self.scored_constraints]
+        self._limits: list[tuple[Strategy, Expr]] = [
+            (s, s.require) for s in self.limits if s.require is not None]
+        self._scored = [(r, gates[r.id], slots.get(r.id, 0)) for r in self.scored]
         self._heuristics = [(g, gates[g.id], slots.get(g.id, 0), *_split_key(g.metric))
                             for g in self.heuristics]
         # the same, for whatever metric a rule scales itself by; None where none
@@ -316,19 +313,15 @@ class Objective:
         return ns
 
     def prepare(self, cand: Candidate) -> Candidate:
-        """Namespace, hard-limit check, raw heuristic values. A soft limit
-        never prunes, so neither its gate nor its require is read here."""
+        """Namespace, the limits' check, raw heuristic values."""
         ns = cand.ns = self.namespace(cand.heroes)
         sc = cand.scope = scope(ns)
         held: list[bool | None] = [None] * self.gate_slots
         violations = []
-        for s, require, gate, slot in self._hard_limits:
-            if gate is None:
-                gate = _slot_gate(held, slot, s, sc)
-            if gate:
-                sc["params"] = s.params_section
-                if not require.evaluate(sc):
-                    violations.append(s.id)
+        for s, require in self._limits:
+            sc["params"] = s.params_section
+            if not require.evaluate(sc):
+                violations.append(s.id)
         cand.violations = violations
         raw: list[float | None] = []
         keep = raw.append
@@ -422,7 +415,8 @@ class Objective:
         contributions: list[Contribution] = []
         out = contributions if detail else None
         total = 0.0 if self.base is None else _score_base(self.base, cand, out)
-        total = self._score_limits(sc, held, total, out)
+        if out is not None:
+            self._limit_terms(sc, out)
         total = self._score_heuristics(cand, total, out)
         total = self._score_scored(sc, held, total, out)
         cand.score = total
@@ -432,25 +426,15 @@ class Objective:
     # Each form's terms take the running total and return it: subtotals summed
     # at the end would reassociate the additions and move a score in its last bit.
 
-    def _score_limits(self, sc: Scope, held: list[bool | None], total: float,
-                      out: list[Contribution] | None) -> float:
-        """The limits' terms: a hard limit costs nothing here (prepare() has
-        pruned what breaks it), a soft one charges its penalty where it fails."""
-        for s, require, applies, slot in self._limits:
-            if applies is None:
-                applies = _slot_gate(held, slot, s, sc)
-            ok, penalty = True, 0.0
-            if applies:
-                sc["params"] = s.params_section
-                ok = bool(require.evaluate(sc))
-                if s.soft and not ok and s.penalty is not None:     # a soft limit has one
-                    penalty = _amount(s.penalty.evaluate(sc))
-            total -= penalty
-            if out is not None:
-                out.append({"id": s.id, "kind": "constraint", "form": "limit",
-                            "applies": applies, "ok": ok, "weighted": -penalty,
-                            "metric": require.source})
-        return total
+    def _limit_terms(self, sc: Scope, out: list[Contribution]) -> None:
+        """The limits' lines in the breakdown: a limit is never weighted, so
+        each costs nothing - prepare() has pruned what breaks it - and says
+        whether this six keeps it."""
+        for s, require in self._limits:
+            sc["params"] = s.params_section
+            out.append({"id": s.id, "kind": "constraint", "form": "limit",
+                        "applies": True, "ok": bool(require.evaluate(sc)), "weighted": 0.0,
+                        "metric": require.source})
 
     def _score_heuristics(self, cand: Candidate, total: float,
                           out: list[Contribution] | None) -> float:
@@ -481,7 +465,7 @@ class Objective:
 
     def _score_scored(self, sc: Scope, held: list[bool | None], total: float,
                       out: list[Contribution] | None) -> float:
-        """The scored constraints' terms: weight x (bonus - penalty) while
+        """The scored heuristics' terms: weight x (bonus - penalty) while
         `when` holds."""
         for r, applies, slot in self._scored:
             if applies is None:
@@ -496,7 +480,7 @@ class Objective:
             weighted = r.weight * (bonus - penalty)
             total += weighted
             if out is not None:
-                out.append({"id": r.id, "kind": "constraint", "form": "scored",
+                out.append({"id": r.id, "kind": "heuristic", "form": "scored",
                             "applies": applies, "bonus": bonus, "penalty": penalty,
                             "weighted": weighted, "metric": r.expressions,
                             "when": r.when.source if r.when else None})

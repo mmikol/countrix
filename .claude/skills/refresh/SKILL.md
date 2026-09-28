@@ -36,9 +36,9 @@ is left half-done: a step that fails is reported, not hidden.
    count.
 3. **Complete the drafts.** For each pending strategy: read its prose,
    read `metrics` for the vocabulary, decide the frontmatter exactly as
-   the `/strategy` skill does (a heuristic's metric, direction and
-   weight; a constraint's require, or when/bonus/penalty and params; or
-   `kind: assumption`), and write it with `infer_strategy` - an
+   the `/strategy` skill does (a constraint's require; a heuristic's
+   metric, direction and weight, or when/bonus/penalty and weight; params
+   for either; or `kind: assumption`), and write it with `infer_strategy` - an
    assumption with `tune`, field `kind` - the reason quoting the prose. A refused answer is fixed and sent again, once; a
    draft you cannot complete is reported with why.
 4. **Re-infer what the data changed.** Look at the catalog against the

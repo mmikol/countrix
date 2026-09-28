@@ -116,10 +116,14 @@ alternatives. The bars share one scale.
 
 **The badges** above the pickers are each seat's comp as a share of its
 own optimal: blue's picks against blue's optimal, red's against red's best
-counter to your picks (solved for that scale, not shown). A seat still
+counter to your picks (solved for that scale, not shown), each read from
+the seat's floor, the lowest of its reference sixes, up to its optimal
+([The share](inference.md#the-share)). A seat still
 drafting reads the share the best six from its picks reaches, in the badge
 and the strip alike, and the tooltip says so; before any pick the badge
-shows the suggested six's 100. The engine words each badge
+shows the suggested six's 100. Where blue's own picks break one of the
+playbook's limits the badge reads *not allowed*, the limit named in the
+tip, and the comp has no score, share or odds. The engine words each badge
 (`momentum.badges`, a label and a tip); the page only shows it.
 
 **The fight odds** strip is two bars stacked on one track, blue's over
@@ -129,9 +133,9 @@ scored, its share alone; with neither, the engine's verdict sits under
 them. Not a fitted probability. The default engine scores every seat, so
 the page's boards always carry a share; a seat reads *unscored*, picks or
 not, the engine's reason in the tooltips, only where a caller turns the
-engine off and the playbook holds no heuristic, scored constraint or soft
-limit, or none applies to this board yet, or where the optimal scores at
-or below zero.
+engine off and the playbook holds no heuristic, or none applies to this
+board yet, or where the optimal scores no higher than the seat's floor. A
+seat whose picks are not allowed reads its badge's *not allowed*.
 
 **The suggestions.** Blue's empty slots carry the fill - the best six that
 keeps your locked picks, the optimal six before any pick - each a click

@@ -1,7 +1,7 @@
 # The playbook's sources
 
 **The playbook was emptied on purpose.** `strategies/` now holds six
-assumptions, one scored rule, `heal-rate`, and one limit,
+assumptions, one heuristic, `heal-rate`, and one limit,
 `at-most-three-supports`. This file is the record of the 245 entries it held
 and the two rules added since, with the citation behind
 each, and it is the source the playbook is being rebuilt from by hand - so it

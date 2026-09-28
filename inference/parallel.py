@@ -6,10 +6,11 @@ this are threaded, and forking a threaded process is unsafe. A worker exits
 within a second of its parent, a kill included. Each search runs in four
 rounds, a slice per worker: the reference sample, for the low and high each
 heuristic takes on this board; the sample again, scored under those bounds,
-for each hero's standing, which ranks the pools; the enumeration, prepared
-and scored; then one worker ranks and refines the merged field. Only
-verdicts cross - hero ids, score, tie-break - and slices partition their
-round, so nothing depends on how the work was split.
+for each hero's standing, which ranks the pools, and the board's floor, the
+lowest score among those sixes; the enumeration, prepared and scored; then
+one worker ranks and refines the merged field. Only verdicts cross - hero
+ids, score, tie-break - and slices partition their round, so nothing
+depends on how the work was split.
 
 A board runs up to six searches. Blue's and red's go first. A seat's fill
 is that seat's board (same map, side, enemies and bans), so it takes the
@@ -46,7 +47,7 @@ from facts.draft import Draft
 from facts.model import World
 from inference import catalog as catalog_module
 from inference.base import BaseWeights
-from inference.scale import Standing, Tally, reference_bounds, reference_standing
+from inference.scale import Tally, reference_bounds, reference_standing
 from inference.scoring import Bounds, Candidate, Interval
 from inference.solver import Solved, Solver, Swept
 from inference.strategy import CatalogError, Strategy
@@ -291,20 +292,9 @@ def _standing(
         weights: Mapping[str, float] | None, bounds: Bounds, index: int,
         count: int) -> Tally:
     """One slice of the reference sample scored under the merged bounds, in a
-    worker: each hero's tally in it."""
+    worker: each hero's tally in it, and the slice's floor."""
     solver = _worker_solver(token, data, playbook, spec, weights, bounds)
     return reference_standing(solver, index, count)
-
-
-def _merge_tallies(tally: Tally, part: Mapping[int, Standing]) -> Tally:
-    """Add one slice's per-hero standing into the running tally, in place."""
-    for hid, standing in part.items():
-        seen = tally.get(hid)
-        if seen is None:
-            seen = tally[hid] = Standing()
-        seen.total += standing.total
-        seen.sixes += standing.sixes
-    return tally
 
 
 def _widen(bounds: Bounds, part: Mapping[str, Interval]) -> Bounds:
@@ -404,12 +394,12 @@ class Split:
                 for i in range(self.slices)]
 
     def sweep(self) -> None:
-        """Take the standing, and send the enumeration out."""
+        """Take the standing and the floor, and send the enumeration out."""
         self.rank_roster()
         if self.tallies is not None:
-            self.standing = {}
+            self.standing = Tally()
             for future in self.tallies:
-                _merge_tallies(self.standing, future.result())
+                self.standing.fold(future.result())
             self.tallies = None
         self.sweeping = [
             self.run.submit(_sweep, self.spec, self._frozen_bounds(), self.standing, i, self.slices)

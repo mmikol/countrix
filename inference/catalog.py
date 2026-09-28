@@ -20,7 +20,15 @@ from db import ROOT, Refusal, Source, embed
 from db.psql import now, register_source
 from facts import compute
 from inference.frontmatter import FrontmatterError, parse_frontmatter
-from inference.strategy import FORMS, KINDS, WEIGHT_RANGE, CatalogError, Strategy, finite_number
+from inference.strategy import (
+    FORMS,
+    KINDS,
+    WEIGHED,
+    WEIGHT_RANGE,
+    CatalogError,
+    Strategy,
+    finite_number,
+)
 
 SHIPPED_DIR = os.path.join(ROOT, "inference", "strategies")
 # The sources row of the one input a user writes: the strategies, mirrored
@@ -81,8 +89,9 @@ def strategy_files(directory: str) -> list[str]:
 
 
 def load(directory: str | None = None) -> list[Strategy]:
-    """Every strategy file, validated, ordered constraints (limits, scored) then
-    heuristics, then assumptions; drafts sit last within their kind."""
+    """Every strategy file, validated, ordered constraints (limits), then
+    heuristics (on a metric, then scored), then assumptions; drafts sit last
+    within their kind."""
     directory = directory or strategies_dir()
     out: list[Strategy] = []
     ids: set[str] = set()
@@ -128,8 +137,9 @@ def _weight_entry(item: object) -> tuple[str, object]:
 def weighted(catalog: list[Strategy], weights: Mapping[str, float] | None) -> list[Strategy]:
     """The catalog with the heuristics named in `weights` carrying those
     weights instead of their files' - shallow copies, so the files and the
-    loaded catalog stay as they are. Only a heuristic has a weight to set:
-    a scored constraint's stays its own, and an unknown id is ignored."""
+    loaded catalog stay as they are. Only a heuristic has a weight to set -
+    on a metric or scored alike; a constraint has none, and an unknown id is
+    ignored."""
     if not weights:
         return catalog
     out = []
@@ -142,13 +152,10 @@ def weighted(catalog: list[Strategy], weights: Mapping[str, float] | None) -> li
 
 
 def has_scoring_terms(catalog: Iterable[Strategy]) -> bool:
-    """Whether the playbook has any term that scores: a heuristic, a scored
-    constraint or a soft limit. A playbook of hard limits and prose alone
-    ties every legal six at zero - the board then says "unscored" rather
-    than 100 / 100."""
-    return any(
-        s.kind == "heuristic" or s.form == "scored" or (s.form == "limit" and s.soft)
-        for s in catalog)
+    """Whether the playbook has any term that scores: a heuristic, on a
+    metric or scored. A playbook of limits and prose alone ties every legal
+    six at zero - the board then says "unscored" rather than 100 / 100."""
+    return any(s.form in WEIGHED for s in catalog)
 
 
 class KindCounts(TypedDict):
@@ -208,7 +215,7 @@ def mirror(
             " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
             (
                 s.id, s.name, s.kind, s.category, s.direction, s.metric,
-                s.weight if s.solver_reads else None, s.expressions or None,
+                s.weight if s.weighs else None, s.expressions or None,
                 _params_line(s) or None, s.body, playbook_name(directory), source_id))
     cx.commit()
     return MirrorSummary(**counts(catalog), total=len(catalog), tables=["strategies"])
@@ -221,14 +228,14 @@ def _params_line(s: Strategy) -> str:
 
 def catalog_rendered(catalog: Iterable[Strategy]) -> str:
     """The catalog as text, one line per strategy: kind, form, id, category and
-    what it weighs - the `strategies` tool's reply."""
+    what it holds or weighs - the `strategies` tool's reply."""
     lines = []
     for s in catalog:
         head = "%-10s %-10s %-28s %-9s" % (s.kind, s.form, s.id, s.category)
         if s.form == "heuristic":
             head += " %s %s x%g%s" % (s.direction, s.metric, s.weight, " need" if s.need else "")
         elif s.form == "limit":
-            head += " %s%s" % (s.expressions, " (soft)" if s.soft else "")
+            head += " %s" % s.expressions
         elif s.form == "scored":
             head += " %s x%g" % (s.expressions, s.weight)
         elif s.form == "draft":
@@ -245,11 +252,8 @@ def _form_line(s: Strategy, reg: Mapping[str, str]) -> str:
             s.direction, s.metric, reg.get(s.metric or "", ""), s.weight,
             ", a need" if s.need else "", when)
     if s.form == "limit":
-        # a limit has require:, and a soft one a penalty: (_check_limit)
-        return "`require %s`%s%s" % (
-            s.require.source if s.require else "",
-            " (soft, penalty `%s`)" % s.penalty.source if s.soft and s.penalty else " (hard)",
-            when)
+        # a limit has require: and nothing else (Strategy._check_kind)
+        return "`require %s` - always holds" % (s.require.source if s.require else "")
     if s.form == "draft":
         return "*draft* - name, kind and prose only; `/strategy` infers the rest"
     if s.form == "assumption":
@@ -277,12 +281,12 @@ def write_docs(catalog: Sequence[Strategy], path: str = DOCS_PATH) -> str | None
     forms = {f: sum(1 for s in catalog if s.form == f) for f in FORMS}
     reg = compute.registry()
     out = [
-        "%d files in `inference/strategies/`: %d constraints (%d limits, %d scored),"
-        " %d heuristics and %d assumptions%s. Regenerated by"
+        "%d files in `inference/strategies/`: %d constraints (limits), %d heuristics"
+        " (%d on a metric, %d scored) and %d assumptions%s. Regenerated by"
         " `.venv/bin/python -m door.mcp call db_docs`."
         % (
-            len(catalog), kinds["constraint"], forms["limit"], forms["scored"],
-            kinds["heuristic"], kinds["assumption"],
+            len(catalog), kinds["constraint"], kinds["heuristic"], forms["heuristic"],
+            forms["scored"], kinds["assumption"],
             "; %d draft(s) awaiting /strategy" % forms["draft"] if forms["draft"] else ""),
         ""]
     for kind in KINDS:
