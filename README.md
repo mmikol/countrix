@@ -86,10 +86,10 @@ frontmatter, and the solver reads nothing else.
   cross a module boundary are dataclasses, NamedTuples or TypedDicts.
 - **One door for writes.** 36 MCP tools over stdio, HTTP or in-process, each
   schema-checked; the query tool runs as a read-only database login.
-- **Hardened containers.** Three services share one image and run unprivileged
-  on a read-only root with every capability dropped; PostgreSQL keeps the five
-  it needs to start. Every port binds to loopback, and every HTTP server refuses
-  a foreign Host or Origin.
+- **Hardened containers.** Three services share one image and, with the
+  nightly `pg_dump`, run unprivileged on a read-only root with every capability
+  dropped; PostgreSQL keeps the five it needs to start. Every port binds to
+  loopback, and every HTTP server refuses a foreign Host or Origin.
 - **Tested documentation.** Relative links resolve, every setting is documented,
   and the generated schema, tool and catalog references match a fresh render.
 
@@ -132,6 +132,10 @@ which scores the sixes on their win rates, synergies and counters.
 .venv/bin/python orchestrator.py test      # the test suite inside the image
 .venv/bin/python orchestrator.py down      # stop everything; the database volume stays
 ```
+
+The stack dumps its database into `backups/` every night, the newest 14 kept:
+the dated rates history, which a rebuild drops and no source gives back.
+[docs/db.md](docs/db.md#the-nightly-dump) has the restore.
 
 Without Docker, an embedded PostgreSQL (`pgserver`, macOS and Linux x86_64)
 holds the database:

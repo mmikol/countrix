@@ -151,10 +151,13 @@ db <- facts <- inference <- door <- ui.
   the door.
   All three HTTP servers stand on `db/web.py`: a request whose Host or Origin
   is not a local name or one given with `--allow-host` is refused with 403.
-- **Docker** runs one image as three roles plus postgres (`compose.yaml`,
+- **Docker** runs one image as three roles, plus postgres and `backup`, the
+  nightly `pg_dump` into `backups/` on postgres's image (`compose.yaml`,
   `docker-entrypoint.sh`). Migrations ship in the image, not a mount: once
   `orchestrator.py up` rebuilds it, any new migration file makes the `data`
-  container `db_rebuild` on start, which drops the dated rates history.
+  container `db_rebuild` on start, which drops the dated rates history; a
+  dump from before it gives the history back (docs/db.md, The nightly
+  dump).
 
 ## What the tests hold you to
 

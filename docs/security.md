@@ -99,6 +99,9 @@ unprivileged user on a read-only root, with every capability dropped, no
 new privileges and process and memory limits. `db` keeps the five
 capabilities its image needs to start as root and drop to `postgres`,
 takes no new privileges, and has a writable root and no limits.
+`backup` runs postgres's image under the same box as the app containers:
+the checkout's owner, 256 MB and 64 processes, a tmpfs over the image's
+data volume, and one bind mount it writes, `backups/`.
 
 **The board holds its memory.** The ui container runs the solver's pool
 beside the page. A board waits for room while the boards in flight hold
@@ -106,10 +109,10 @@ one `FIELD_BUDGET`'s worth of sixes, and answers 429 after a minute
 (`serve.Admission` in `inference/serve.py`), so a burst of boards queues
 instead of running the container out of memory and the page with it.
 
-**Two containers reach out.** All four share one network: Docker
+**Two containers reach out.** All five share one network: Docker
 publishes a port only for a container on a routable network. What keeps
-`ui` and `db` off the internet is that their code opens no connection
-out. `data` and
+`ui`, `db` and `backup` off the internet is that their code opens no
+connection out; `backup` connects to `db` alone. `data` and
 `refresher` fetch from two fixed hosts, Blizzard's site and the wiki. The
 page the board serves takes its code, styles and font from `ui/static`;
 the browser loads hero portraits and role icons from Blizzard's CDNs.
@@ -133,6 +136,11 @@ the browser loads hero portraits and role icons from Blizzard's CDNs.
 - A board published anyway goes out alone: its line in
   `docker-entrypoint.sh` gains `--allow-host <public name>`, or every
   request answers 403, and `COUNTRIX_READ_ONLY` stays at `1`.
+- `backups/` holds the nightly dumps: the whole database, Blizzard's
+  rates among it, which are licensed for personal use only. Each is
+  `0600` under the loop's umask 077, ignored by git and left out of the
+  image (`.dockerignore`). Keep them private: never commit, attach or
+  publish one.
 - `.env` holds the secrets, `COUNTRIX_MCP_TOKEN` and `POSTGRES_PASSWORD`.
   Keep it out of the repository (it is ignored) and out of the image (it
   is not copied).

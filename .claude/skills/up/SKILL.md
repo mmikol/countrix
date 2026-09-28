@@ -1,6 +1,6 @@
 ---
 name: up
-description: Bring the whole countrix stack up and current - database, the door (MCP), the board with its inference engine, refresher - and report the URLs and the data's vintage. Use when the user says to start, run, launch or check the app, or wants everything "good to go" before a game.
+description: Bring the whole countrix stack up and current - database, the door (MCP), the board with its inference engine, refresher, the nightly backup - and report the URLs and the data's vintage. Use when the user says to start, run, launch or check the app, or wants everything "good to go" before a game.
 ---
 
 Bring everything up and prove it is ready. Run, from the repo root:
@@ -8,8 +8,8 @@ Bring everything up and prove it is ready. Run, from the repo root:
     .venv/bin/python orchestrator.py up    # or without `up`, to also run the agents
 
 It builds the one image, starts the containers (`db`, `data`, `ui`,
-`refresher`), waits for the data layer and the board to answer, and
-prints a verdict. A first build scrapes the sources once
+`refresher`, `backup`), waits for the data layer and the board to
+answer, and prints a verdict. A first build scrapes the sources once
 (minutes); later starts take seconds. Then:
 
 1. Read the verdict. `READY` means: the data layer answers with no pending
@@ -36,7 +36,8 @@ prints a verdict. A first build scrapes the sources once
    refresher container refreshes daily on its own and on start when the
    caches are a day old, so this is rarely needed.
 4. Never run `docker compose down -v`: that deletes the database volume
-   (the rebuild costs a scrape).
+   (the rebuild costs a scrape, and the rates history comes back only from
+   a dump in `backups/`).
 
 `.venv/bin/python orchestrator.py status` answers "is it up?" without
 touching anything; `.venv/bin/python orchestrator.py test` runs the suite

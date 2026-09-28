@@ -10,19 +10,21 @@
 #   refresher   the door's clock: seasons and rates daily at
 #               COUNTRIX_REFRESH_AT (05:00 container time; set TZ), every
 #               source weekly, and on start when the caches are 20 hours old
+#   backup      the nightly pg_dump into ./backups at COUNTRIX_BACKUP_AT
+#               (04:30 container time), the newest 14 kept: the dated rates
+#               history a rebuild drops and no source gives back
 #
 # Every container but db runs as an unprivileged user on a read-only root
 # filesystem, with every capability dropped, no new privileges and process
 # and memory limits. db takes no new privileges and keeps only the five
 # capabilities its image needs to start as root and drop to postgres (below).
-# All four share one network. Only data and refresher open a connection out,
+# All five share one network. Only data and refresher open a connection out,
 # to two fixed hosts. Every published port binds to 127.0.0.1. No keys, no
 # accounts.
 # COUNTRIX_MCP_TOKEN (in .env) requires a bearer token on the MCP server.
-# One image, built once by `data`, shared by every container but db, which
-# runs postgres's own; each container mounts only what it reads, read-only
-# unless it writes there.
-
+# One image, built once by `data`, shared by every container but db and
+# backup, which run postgres's own; each container mounts only what it reads,
+# read-only unless it writes there.
 name: countrix
 
 x-app: &app
@@ -163,6 +165,82 @@ services:
     depends_on:
       data:
         condition: service_healthy
+
+  backup:
+    # postgres's own image, for its pg_dump; no port, and the one host it
+    # reaches is db
+    image: postgres:16-alpine
+    user: "${COUNTRIX_UID:-1000}:${COUNTRIX_GID:-1000}"
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/lib/postgresql/data    # the image's VOLUME: a tmpfs here, so no anonymous volume
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          pids: 64
+    networks: [stack]
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-overwatch}
+      TZ: ${TZ:-UTC}
+      COUNTRIX_BACKUP_AT: ${COUNTRIX_BACKUP_AT:-04:30}
+    volumes:                      # made by orchestrator.py up, so the checkout's owner owns it
+      - ./backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    # A dump on start when today's is missing, then one a night at
+    # COUNTRIX_BACKUP_AT: pg_dump's custom format into a hidden .part file,
+    # renamed once whole, 0600 under umask 077, the newest 14 kept. The sleep
+    # runs as `sleep N & wait` so TERM and INT end it at once, exit 0. The
+    # block folds its lines together, so every statement ends in `;` and none
+    # is a shell comment; `$$` is compose's escape for the shell's `$`.
+    command:
+      - >
+        umask 077;
+        case "$$COUNTRIX_BACKUP_AT" in
+            [01][0-9]:[0-5][0-9] | 2[0-3]:[0-5][0-9]) ;;
+            *) echo "backup: COUNTRIX_BACKUP_AT must be HH:MM, got '$$COUNTRIX_BACKUP_AT'" >&2; exit 1 ;;
+        esac;
+        trap 'exit 0' TERM INT;
+        dump() {
+            day=$$(date +%Y-%m-%d);
+            file=/backups/countrix-$$day.dump;
+            part=/backups/.countrix-$$day.dump.part;
+            if pg_dump -h db -U overwatch -d overwatch -Fc -f "$$part"; then
+                mv "$$part" "$$file";
+                ls -1 /backups/countrix-*.dump | sort -r | tail -n +15 | xargs -r rm -f;
+                echo "backup: $$file, $$(du -k "$$file" | cut -f1) KB";
+            else
+                rm -f "$$part";
+                echo "backup: pg_dump failed, $$file not written" >&2;
+            fi;
+        };
+        echo "backup: daily at $$COUNTRIX_BACKUP_AT ($$TZ), the newest 14 kept";
+        rm -f /backups/.countrix-*.dump.part;
+        [ -e "/backups/countrix-$$(date +%Y-%m-%d).dump" ] || dump;
+        while :; do
+            now=$$(date +%s);
+            next=$$(date -d "$$COUNTRIX_BACKUP_AT" +%s) || exit 1;
+            [ "$$next" -gt "$$now" ] || next=$$((next + 86400));
+            sleep $$((next - now)) & wait;
+            dump;
+        done
+    healthcheck:
+      # healthy while the newest dump is under 26 hours old, so a missed
+      # night shows. Nothing waits on it; `docker compose ps` reads it
+      test: ["CMD-SHELL", "find /backups -name 'countrix-*.dump' -mmin -1560 | grep -q ."]
+      interval: 5m
+      timeout: 10s
+      retries: 3
+      start_period: 10m
 
 volumes:
   pgdata:

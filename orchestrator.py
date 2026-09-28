@@ -41,6 +41,8 @@ BOARD = "http://localhost:8017"
 # the inference layer's health is the board's: the ui container runs the engine
 URLS = {"data": DATA + "/health", "inference": BOARD + "/health", "ui": BOARD + "/api/roster"}
 MCP_URL = DATA + "/mcp"
+# the nightly dumps, bind-mounted into the backup service (compose.yaml)
+BACKUPS = "backups"
 # one board solved on the board before the stack is called ready: only the
 # container (its memory limit in compose.yaml, a read-only root) shows
 # whether this playbook fits its memory and time
@@ -286,15 +288,18 @@ def playbook_problem() -> str | None:
 
 
 def up() -> int:
-    """Check the playbook, build the image, start the containers, wait for
-    each container, complete pending drafts on the host -> the verdict's
-    exit code."""
+    """Check the playbook, build the image, make backups/, start the
+    containers, wait for each container, complete pending drafts on the
+    host -> the verdict's exit code."""
     problem = playbook_problem()
     if problem:
         return report(False, ["playbook: %s - the stack would not start on it: the user"
                               " fixes or removes that file" % problem])
     print("building the image and starting the containers...")
     sh("docker", "compose", "build", "data", timeout=30 * MINUTE)
+    # the backup service's bind mount, made here by the checkout's owner:
+    # left to Docker, a Linux host makes it root's and the dump cannot write it
+    os.makedirs(os.path.join(ROOT, BACKUPS), exist_ok=True)
     sh("docker", "compose", "up", "-d", "--remove-orphans", timeout=10 * MINUTE)
     print("waiting for the containers (a first build scrapes the sources: minutes)...")
     wait_for(URLS["data"], 30 * MINUTE, "the data layer")

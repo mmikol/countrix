@@ -35,9 +35,11 @@ def test_sh_gives_up_on_a_command_past_its_timeout(monkeypatch):
 # --- the verbs, with docker and the network stubbed out --------------------------------
 
 @pytest.fixture()
-def stubbed(monkeypatch):
-    """Every side effect of the orchestrator recorded instead of run."""
+def stubbed(monkeypatch, tmp_path):
+    """Every side effect of the orchestrator recorded instead of run, in a
+    checkout of its own: up() makes backups/ there, not in the repo."""
     calls = []
+    monkeypatch.setattr(orchestrator, "ROOT", str(tmp_path))
     healthy = {
         "data": {"status": "ok", "state": "current", "table_count": 36, "heroes": 54,
                  "announced": 1, "pending_migrations": [],
@@ -62,6 +64,20 @@ def test_up_builds_starts_waits_and_reports(stubbed, capsys):
     assert ("sh", "docker", "compose", "build", "data") in calls
     assert ("wait", "the board") in calls
     assert "READY" in capsys.readouterr().out
+
+
+def test_up_makes_the_backups_folder_before_the_containers_start(stubbed, monkeypatch, tmp_path):
+    """Left to Docker, a Linux host makes the bind mount root's and the
+    nightly dump cannot write it; a second up keeps what the folder holds."""
+    folder = tmp_path / orchestrator.BACKUPS
+    seen = []
+    monkeypatch.setattr(orchestrator, "sh", lambda *a, timeout, env=None: seen.append(
+        (a[:3], folder.is_dir())))
+    assert orchestrator.up() == 0
+    assert (("docker", "compose", "up"), True) in seen
+    (folder / "countrix-2026-09-27.dump").write_text("kept")
+    assert orchestrator.up() == 0
+    assert (folder / "countrix-2026-09-27.dump").read_text() == "kept"
 
 
 def test_up_recreates_the_containers_when_a_bind_mount_went_stale(stubbed, capsys):

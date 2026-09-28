@@ -18,6 +18,9 @@ __pycache__/
 # any table copied out as CSV: it holds the rates
 *.csv
 
+# the backup service's nightly dumps: the whole database, the rates included
+/backups/
+
 # scratch: a throwaway script at the root is never part of the project, and
 # `git add -A` has committed two of them
 /_*.py

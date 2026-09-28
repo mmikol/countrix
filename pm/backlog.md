@@ -188,6 +188,11 @@ few match-ups the wiki rates (the counters table is a list).
 
 ## Done
 
+- **The rates history is dumped nightly.** The `backup` service, on
+  postgres's image and boxed like the app containers, writes a
+  `pg_dump` into `backups/` every night and keeps fourteen: the dated
+  snapshots a rebuild drops and no source gives back. docs/db.md has
+  the restore.
 - **Nothing is written to `db/raw`.** The CSV mirror and `export_csv`
   and the door's audit log are deleted.
 - **The stack is four containers.** The sentry is gone: its quarantine

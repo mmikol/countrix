@@ -121,6 +121,52 @@ a rates pull that read one stamps no snapshot and replies
 | `COUNTRIX_REFRESH_AT` | `05:00` | daily time, in the container's `TZ` (UTC unless set) |
 | `COUNTRIX_REFRESH_MAX_AGE_HOURS` | `20` | refresh on start when the cache is older than this |
 | `COUNTRIX_REFRESH_FULL_DAYS` | `7` | refetch every source (not just the daily set) when the wiki cache is older than this |
+| `COUNTRIX_BACKUP_AT` | `04:30` | the nightly dump's time, in the backup container's `TZ` (UTC unless set) - [The nightly dump](#the-nightly-dump) |
+
+## The nightly dump
+
+A rebuild drops every table, and the dated rates history goes with it:
+the `meta_snapshots` rows and the `hero_meta` and `map_meta` rates tied
+to them. No source gives it back - Blizzard's page publishes today's
+rates only, and the page cache holds the last fetch alone - so the
+trend facts start over. Everything else a rebuild pulls again from the
+caches. The stack's `backup` service keeps the
+history: postgres's own image, running a POSIX sh loop (`compose.yaml`)
+that writes `pg_dump -Fc` of the database into `backups/` at the repo
+root:
+
+- on start when today's dump is missing, then nightly at
+  `COUNTRIX_BACKUP_AT`, by default half an hour before the refresh;
+- into `.countrix-YYYY-MM-DD.dump.part`, renamed to
+  `countrix-YYYY-MM-DD.dump` once `pg_dump` succeeds; a failure logs a
+  line and leaves no file;
+- the newest 14 kept, each `0600` (umask 077), one log line a run;
+- a time that is not HH:MM stops the container at start; TERM ends it at
+  once, with exit 0;
+- unhealthy once the newest dump is older than 26 hours, so a missed
+  night shows in `docker compose ps`.
+
+`orchestrator.py up` makes `backups/` before the containers start, as
+the checkout's owner: left to Docker, a Linux host makes it root's and
+the dump cannot write it. A dump taken after a rebuild holds the short
+history since; restore one taken before it, within 14 nights. The restore
+replaces the database whole, so the snapshots taken since the dump go,
+and the next daily refresh appends today's.
+
+The restore, from the repo root with the stack up:
+
+```bash
+docker compose stop data ui refresher
+docker compose exec -T db sh -c 'dropdb -U overwatch --if-exists overwatch && createdb -U overwatch overwatch'
+docker compose exec -T db pg_restore -U overwatch -d overwatch --no-owner < backups/<file>.dump
+docker compose run --rm data python -m door.mcp call db_migrate
+docker compose start data ui refresher
+```
+
+`db_migrate` runs before `data` starts: the data container's entrypoint
+rebuilds a stale schema, which would drop what was just restored.
+`db_migrate` brings a dump taken under older migrations up to the
+image's and keeps its rows.
 
 ## Widening the meta's granularity
 
@@ -135,7 +181,7 @@ Every dimension below has its column, so widening one is an edit to
 `pull_rates` and a refetch; a new dimension is a new migration, never an
 edit to `psql/migrations/004_meta.sql`. The rows already stored are data:
 `pull_rates` appends a dated snapshot and deletes nothing, so `db_migrate`
-keeps the series and `db_rebuild` drops it.
+keeps the series and `db_rebuild` drops it; the nightly dump gives it back.
 
 | dimension | column exists? | populated today | to widen it |
 | --- | --- | --- | --- |

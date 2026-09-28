@@ -48,6 +48,7 @@ Code on your subscription, and the board never calls a model.
 | `pm/` | `backlog.md`: what is worth doing next, why and at what cost, in payoff order; the maintainer skill keeps it current | |
 | `.github/workflows/` | `ci.yml`: lint, the types (mypy) and the tests that need no built database, held to 78% coverage, on pushes to `main` and on pull requests | |
 | `.cache-blizzard/` `.cache-wiki/` | the page caches (gitignored): every build after the first costs almost no requests | |
+| `backups/` | the `backup` service's nightly dumps of the stack's database (gitignored, each `0600`), the newest 14 `countrix-YYYY-MM-DD.dump`: the dated rates history a rebuild drops and no source gives back. `orchestrator.py up` makes the folder | [db.md](db.md#the-nightly-dump) |
 
 How they fit:
 
@@ -102,7 +103,7 @@ read Postgres directly ([mcp.md](mcp.md)).
 | file | purpose |
 | --- | --- |
 | `orchestrator.py` | the end-to-end run. `.venv/bin/python orchestrator.py` brings the stack up (the data container pulls and ingests when the database is empty or stale), runs the agents headless on the `/refresh` skill, and leaves the app running. Verbs: `run` (default) · `up` · `agents` · `status` · `refresh` · `test` · `down` |
-| `compose.yaml` | one container per role from one image: `db` (PostgreSQL 16), `data` (the door: builds the database, then serves every MCP tool over HTTP), `ui` (the board, with the inference engine in the board's process and the solver's worker pool beside it), `refresher` (the door's clock). The three app containers run unprivileged on a read-only root with every capability dropped and memory and process limits; `db` keeps the five capabilities the postgres image needs to start as root, with no read-only root and no limits. Every port is published on 127.0.0.1 only. Bind mounts keep the caches, `inference/strategies` and `docs` on the host, so tuning, authoring and regenerating need no rebuild |
+| `compose.yaml` | one container per role: `db` (PostgreSQL 16), `data` (the door: builds the database, then serves every MCP tool over HTTP), `ui` (the board, with the inference engine in the board's process and the solver's worker pool beside it), `refresher` (the door's clock) and `backup` (the nightly `pg_dump` into `backups/`). The three app containers share one image; `db` and `backup` run postgres's. Every container but `db` runs unprivileged on a read-only root with every capability dropped and memory and process limits; `db` keeps the five capabilities the postgres image needs to start as root, with no read-only root and no limits. Every port is published on 127.0.0.1 only. Bind mounts keep the caches, `inference/strategies`, `docs` and `backups` on the host, so tuning, authoring and regenerating need no rebuild |
 | `Dockerfile` | the one image, run as an unprivileged user (uid 1000, or `COUNTRIX_UID`/`GID` from `.env` on a Linux host whose checkout is owned by someone else); `docker-entrypoint.sh` takes the role as its argument and, for `data`, builds the database when it is empty, unfilled or behind the migrations |
 | `docker-db` | run any host command against the compose database: `./docker-db .venv/bin/python -m door.mcp call infer '{"map": "Ilios"}'`; `orchestrator.py up` derives the stack's pending drafts through it |
 | `.mcp.json` | registers the two MCP servers a Claude Code session sees: `countrix` (stdio, the local cluster) and `countrix-docker` (HTTP, the stack's database) - [mcp.md](mcp.md) |
@@ -112,7 +113,7 @@ read Postgres directly ([mcp.md](mcp.md)).
 | `CLAUDE.md` | what a Claude Code session reads before it changes code: the commands, the layers in brief, what the tests hold a change to, the house rules and style |
 | `SECURITY.md` | the terms - you run it at your own risk, no security commitment from the author - and how to report a vulnerability privately; the measures themselves are in [security.md](security.md) |
 | `LICENSE` | PolyForm Strict 1.0.0: noncommercial use only, no redistribution, no changes or new works; anything else needs a separate license from the author |
-| `.gitignore` `.dockerignore` | the caches, the cluster, the venv, `.env` |
+| `.gitignore` `.dockerignore` | the caches, the cluster, the venv, `.env`, `backups/` |
 
 ## Deployment
 
@@ -123,11 +124,12 @@ flowchart LR
         BROWSER["browser"]
         SHELL["./docker-db<br/>DATABASE_URL -> :5433"]
     end
-    subgraph DOCKER["docker compose (one image, three containers, plus postgres)"]
+    subgraph DOCKER["docker compose (one image, three containers, plus postgres and its nightly dump)"]
         DATA["data - the door<br/>builds when empty or stale,<br/>then MCP over HTTP :8020/mcp"]
         UI["ui - the board and the<br/>INFERENCE ENGINE :8017<br/>facts and comps in-process,<br/>the solver's worker pool"]
         DBC["db - postgres:16<br/>volume pgdata"]
         REF["refresher - the door's clock<br/>seasons + rates daily,<br/>every source weekly,<br/>and on start when stale"]
+        BAK["backup - postgres:16<br/>pg_dump nightly at 04:30,<br/>the newest 14 in ./backups"]
     end
     SESSION -->|".mcp.json: countrix-docker"| DATA
     BROWSER --> UI
@@ -136,11 +138,13 @@ flowchart LR
     DATA --> DBC
     SHELL --> DBC
     REF --> DBC
+    BAK --> DBC
 ```
 
 The containers share one network; only `data` and `refresher` ever open a
 connection out. `docker-entrypoint.sh` takes the role as its argument
-(`data`, `ui`, `refresh`). Readiness has one
+(`data`, `ui`, `refresh`); `backup` runs its own sh loop on postgres's
+image, and nothing waits on it. Readiness has one
 definition, `db.psql.schema.state`: empty, stale (a migration the ledger
 lacks), unfilled (no heroes) or current. The entrypoint asks it through
 `python -m db.psql.schema`; `ui` and `refresh` wait for current, up to the
@@ -155,7 +159,7 @@ container's 2 GiB. `orchestrator.py` waits only for a first reply and
 reports the state in its verdict. [security.md](security.md) has
 the rest of the measures.
 
-Settings, from the environment or `.env` (the refresh times are in [db.md](db.md)).
+Settings, from the environment or `.env` (the refresh and backup times are in [db.md](db.md)).
 Each is read where it is used, so a change takes effect on the next call -
 except where a server listens (the UI and inference host and port), the MCP
 server's token, `COUNTRIX_WORKERS` (read when the pool starts) and the
