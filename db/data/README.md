@@ -858,8 +858,7 @@ pull reads one of the two.
    catches this one.
 6. The table named in `facts/tables.py`: a test greps its source for
    every table.
-7. A pull fills it. After `sync_all`, only `matches` and `match_picks` may
-   be empty.
+7. A pull fills it. After `sync_all`, no table is empty.
 8. The whole chain builds an empty database: an invariant test applies
    every migration to a scratch database and compares its tables with the
    built one.
@@ -889,9 +888,8 @@ pull reads one of the two.
   pull.
 - It never runs on its own and never writes outside a door tool: no
   `__main__`, no command line.
-- It never writes the `user` source. The strategies and the recorded
-  matches are written by hand, through the door's playbook and match
-  tools.
+- It never writes the `user` source. The strategies are written by hand,
+  through the door's playbook tools.
 - It never imports a layer above `db/`, and never reads the environment.
 - It never prints. Over stdio, stdout is the MCP wire; progress goes
   through `pull.log`.

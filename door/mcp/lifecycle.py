@@ -2,10 +2,9 @@
 is, creating, migrating and rebuilding it, the generated docs, and
 read-only SQL against it.
 
-db_rebuild drops every table, the owner's recorded matches with the rest.
-A playbook that does not load refuses the rebuild before anything is
-dropped: sync_all mirrors it only after every pull, when the tables are
-long gone.
+db_rebuild drops every table. A playbook that does not load refuses the
+rebuild before anything is dropped: sync_all mirrors it only after every
+pull, when the tables are long gone.
 
 query is the one tool that runs a caller's SQL. It is guarded twice: the
 statement is checked before any connection opens (one read-only statement,
@@ -56,8 +55,7 @@ class DbStatus(TypedDict):
 
 # the tables db_status counts, where they exist
 COUNTED = (
-    "heroes", "abilities", "maps", "hero_meta", "map_meta", "counters", "synergies", "strategies",
-    "matches")
+    "heroes", "abilities", "maps", "hero_meta", "map_meta", "counters", "synergies", "strategies")
 
 
 def read_status(ctx: Context) -> DbStatus:
@@ -146,10 +144,10 @@ def db_migrate(ctx: Context) -> ToolReply:
 
 
 @tool(
-    "db_rebuild", "Drop everything, the owner's recorded matches included,"
-    " reapply the migrations and run sync_all. A playbook that does not load"
-    " refuses it before anything is dropped. Creates the embedded cluster first"
-    " when DATABASE_URL is unset and none is built.", REFRESH)
+    "db_rebuild", "Drop everything, reapply the migrations and run sync_all. A"
+    " playbook that does not load refuses it before anything is dropped."
+    " Creates the embedded cluster first when DATABASE_URL is unset and none is"
+    " built.", REFRESH)
 def db_rebuild(ctx: Context, refresh: bool = False) -> ToolReply:
     try:
         catalog.load()

@@ -15,10 +15,10 @@
 playbook allows</b> &mdash; the argmax of the function the <a href='/math'>math page</a>
 sets out, over every legal team.</p>
 <p>That is a claim about the search, not about the game. Whether a higher score wins more
-matches is a separate question, and one this app cannot currently answer: no outcomes are
-recorded anywhere, so nothing here is fitted or validated against a match being won. The
-checks below establish that the solver optimises its own objective. They establish nothing
-about whether that objective is right.</p>
+games is a separate question, and one this app does not answer: it holds no game results, so
+nothing here is fitted to a game being won. The checks below establish that the solver
+optimises its own objective. They establish nothing about whether that objective is
+right.</p>
 
 <h2 id='three'>Three kinds of check</h2>
 <p>There are about <b>9.6 &times; 10<sup>21</sup></b> distinct boards &mdash; a map, a side,
@@ -103,8 +103,8 @@ a playbook holding that one rule, where the right answer can be worked out witho
 <h2 id='open'>What is not proven</h2>
 <ul>
 <li><b>That the objective is right.</b> The checks show the solver maximises its own score.
-Nothing shows a higher score wins more games, because no outcomes are recorded. The weights
-are a judgement, not a fit.</li>
+Nothing shows a higher score wins more games: the app holds no game results. The weights are
+a judgement, not a fit.</li>
 <li><b>That the answer is optimal against every red.</b> It is a best reply to the red you can
 see, and it changes as red reveals. The hedge is the <i>if countered optimally</i> case the
 <code>board</code> tool reports.</li>

@@ -46,10 +46,9 @@ its likely six, the side the term reads until one is revealed. The synergy
 score's median range is 21 and the counter graph's 42.5 - the wiki's edges
 at 2 and the kit's fill at 1 - so each term spreads a typical board's sixes
 about 2.1 points. The rate term's own range reads Blizzard's rates, which
-are licensed for personal use, so its figures stay out of the repo. These
-are defaults, which recorded match outcomes will refit. OFF zeroes all
-three, and a board scored under it is the playbook's alone, exactly as
-before the engine had a base.
+are licensed for personal use, so its figures stay out of the repo. OFF
+zeroes all three, and a board scored under it is the playbook's alone,
+exactly as before the engine had a base.
 """
 
 import math

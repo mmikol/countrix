@@ -26,12 +26,8 @@ edges against the other side, so a playbook of assumptions alone still
 gets scored sixes. The playbook's terms sit on top and adjust that
 answer ([inference.md](inference.md#the-objective)).
 
-Two inputs are the user's, and every other table is pulled from Blizzard
-or the wiki: the strategies, which the solver reads, and the matches the
-owner records - one row a map played, with both sixes, the bans, blue's
-side and blue's result, blue always the owner's team. A match comes in by
-hand through the door's `record_match`, from the board's record tab or the
-`/record` skill, and carries the `user` source the strategies carry.
+One input is the user's, the strategies, which the solver reads; every
+other table is pulled from Blizzard or the wiki.
 
 No accounts, no keys, no API billing. The board is a local page and the
 solver is deterministic; the model work (comps in chat, strategies
@@ -42,12 +38,12 @@ Code on your subscription, and the board never calls a model.
 
 | folder | what it is | read |
 | --- | --- | --- |
-| `db/` | **DATA LAYER** - `data/` and `psql/` pull every source, clean it and store it, with the schema, its migrations and the embedded cluster; `web.py` is what the three HTTP servers share, from the Host-and-Origin guard to the one JSON reader; `matches.py` is the one writer of the recorded matches. The bottom of the import graph: it imports nothing above it, and the layers over it read Postgres directly, over `db.psql.default_dsn()` | [db.md](db.md) |
+| `db/` | **DATA LAYER** - `data/` and `psql/` pull every source, clean it and store it, with the schema, its migrations and the embedded cluster; `web.py` is what the three HTTP servers share, from the Host-and-Origin guard to the one JSON reader. The bottom of the import graph: it imports nothing above it, and the layers over it read Postgres directly, over `db.psql.default_dsn()` | [db.md](db.md) |
 | `facts/` | **FACTS LAYER** - everything the database knows about a board: the World (the database in memory), the metrics registry, the FactSet. It imports only `db`; the solver, the deriver, the door and the board read the same numbers through it | [`facts/__init__.py`](../facts/__init__.py) |
 | `inference/` | **INFERENCE LAYER** - the playbook of constraints, heuristics and assumptions in markdown, the solver, the tuning loop, the deriver | [inference.md](inference.md) |
 | `door/` | **THE DOOR** over all three layers - `mcp/`, the MCP server and its tools, under which every write runs; `refresh.py`, the clock that runs the tools daily and weekly | [mcp.md](mcp.md) |
-| `ui/` | **THE BOARD** - the page (map, sides, bans, red and blue rosters) over the facts layer's facts and the inference layer's answer: `board.py`, `pages.py` and `static/`, and `validation.py` with `charts.py`, the playbook against the recorded matches as text and, with `--out`, a page of charts - the only presentation code | [ui.md](ui.md) |
-| `tests/` | one folder per layer beside the root files' tests, with `synthetic.py`, a World of twelve released heroes, one announced hero and three maps built by hand, so a test works out its expected values with no database, `matches.py`, recorded matches on that World with an effect planted on the heroes or the playbook score, `scratch.py`, a scratch database on the test server holding that World's roster, where the recorded-match tests write instead of the built database, and `tests/fixtures/playbook/`, the reference playbook of every kind and form of strategy that the solver tests run on in place of `inference/strategies/` | |
+| `ui/` | **THE BOARD** - the page (map, sides, bans, red and blue rosters) over the facts layer's facts and the inference layer's answer: `board.py`, `pages.py` and `static/` - the only presentation code | [ui.md](ui.md) |
+| `tests/` | one folder per layer beside the root files' tests, with `synthetic.py`, a World of twelve released heroes, one announced hero and three maps built by hand, so a test works out its expected values with no database, and `tests/fixtures/playbook/`, the reference playbook of every kind and form of strategy that the solver tests run on in place of `inference/strategies/` | |
 | `.claude/skills/` | the skills a Claude Code session runs here, one `SKILL.md` each | [The skills](#the-skills) |
 | `pm/` | `backlog.md`: what is worth doing next, why and at what cost, in payoff order; the maintainer skill keeps it current | |
 | `scripts/` | the recorder of the tests' recorded fixture, run from the repo root as `.venv/bin/python -m scripts.reach`: it writes `tests/fixtures/reach.json`, a board per released hero | |
@@ -66,7 +62,6 @@ flowchart LR
     subgraph DATA["the door - door/mcp/ (an MCP server over all three layers)"]
         PULL["pull_* tools<br/>fetch (cached) -> clean -> store"]
         PLAY["load_authored<br/>the strategies mirror"]
-        REC["record_match<br/>list_matches · delete_match"]
         DBT["db_* · query"]
     end
 
@@ -76,7 +71,6 @@ flowchart LR
         META["META<br/>dated snapshots"]
         PLAYBOOK["PLAYBOOK<br/>counters, synergies,<br/>styles"]
         INF["INFERENCE<br/>the strategies mirror"]
-        MATCHES["MATCHES<br/>the owner's games,<br/>one row a map"]
     end
 
     subgraph USER["FACTS LAYER - facts/, and the board - ui/board.py"]
@@ -94,13 +88,11 @@ flowchart LR
     HEUR --> PLAY
     PLAY --> INF
     PULL & PLAY --> PG
-    REC --> MATCHES
-    BOARD -->|"record tab"| REC
     PG --> WORLD --> FACTS --> BOARD
     WORLD --> SOLVER
     HEUR --> SOLVER
     SOLVER --> BOARD
-    CHAT["Claude Code session<br/>/comp and /record skills"] <-->|"MCP tools:<br/>pull_*, facts, infer, board,<br/>record_match"| DATA
+    CHAT["Claude Code session<br/>/comp skill"] <-->|"MCP tools:<br/>pull_*, facts, infer, board"| DATA
 ```
 
 The door gates every write to Postgres or the playbook, and the layers
@@ -140,7 +132,7 @@ flowchart LR
     end
     SESSION -->|".mcp.json: countrix-docker"| DATA
     BROWSER --> UI
-    UI -->|"COUNTRIX_MCP_URL:<br/>its writes, a tune<br/>and a recorded match"| DATA
+    UI -->|"COUNTRIX_MCP_URL:<br/>its write, a tune"| DATA
     UI --> DBC
     DATA --> DBC
     SHELL --> DBC
@@ -176,12 +168,12 @@ refresh clock, which are read once at start:
 | `COUNTRIX_WORKERS` | `max(6, min(cores, 12))` | the solver's worker processes |
 | `COUNTRIX_PARALLEL` | `1` | `0`: every board in one process |
 | `COUNTRIX_UI_HOST`, `COUNTRIX_UI_PORT` | `127.0.0.1`, `8017` | where the board listens |
-| `COUNTRIX_READ_ONLY` | `1` | the board writes nothing: a slider's weight is the session's own, and the record tab says how to record; `0` brings back *store* and the record tab's result buttons |
+| `COUNTRIX_READ_ONLY` | `1` | the board writes nothing: a slider's weight is the session's own; `0` brings back *store* |
 | `COUNTRIX_INFERENCE_HOST`, `COUNTRIX_INFERENCE_PORT` | `127.0.0.1`, `8019` | where the inference service listens, run on its own (`python -m inference.serve`); the stack runs none |
 | `COUNTRIX_INFERENCE_URL` | unset | the inference service the board delegates to; its handlers run in the board's process when unset, as in the stack. http or https: any other scheme stops the board at launch |
 | `COUNTRIX_MCP_TOKEN` | unset | bearer token the MCP server requires over HTTP |
 | `COUNTRIX_CLAUDE` | `claude` on `PATH`, else `~/.local/bin/claude` | the CLI the agents and `derive` run |
-| `COUNTRIX_MCP_URL` | unset | the MCP server the board's writes go to, a `tune` and a `record_match`; in-process through the same registry when unset. http or https, like the inference URL |
+| `COUNTRIX_MCP_URL` | unset | the MCP server the board's write goes to, a `tune`; in-process through the same registry when unset. http or https, like the inference URL |
 | `COUNTRIX_REPO_URL` | `https://github.com/mmikol/countrix` | the repository the board's header links to |
 | `DATABASE_URL` | unset | the PostgreSQL to use. Unset, the embedded pgserver cluster at `db/psql/cluster`, which `db_init` or `db_rebuild` builds: the local run, on the same tools, facts and strategies as the stack. With neither, `NoDatabaseError` |
 
@@ -201,7 +193,6 @@ holds the whole playbook; [mcp.md](mcp.md) has the servers and every tool.
 | `/patches` | pulls the patch list and, when a patch shipped since the capture, refetches what it changes: rates, kits, Blizzard's text | when a patch drops |
 | `/heroes` | adds or refreshes heroes: Blizzard's roster, the wiki's kits, styles and synergies, the announced heroes ahead of release, counters | when the roster moves |
 | `/maps` | adds or refreshes maps: the pool, modes and stages, their terrain, the per-map rates, the style each map rewards | when the pool moves |
-| `/record` | "we won King's Row on attack, they ran dive": reads the map, the side, the result, both sixes and the bans back against the roster, then stores the map through `record_match`; `list_matches` and `delete_match` fix one entered wrong | after each map |
 | `/refresh` | the agents' run: refresh, complete drafts, re-infer with restraint, regenerate, report | when `orchestrator.py agents` runs; the refresher container refreshes the data daily without it |
 | `/maintain` | the repo's maintainer: lint, types and tests three ways, docs current, stale names, dead code, layout, security posture, a report | after changes |
 | `/desloppify` | the desloppify harness's own skill, as `update-skill` writes it (CLAUDE.md): scores the code and drives the cleanup loop | when you ask for a score |
@@ -221,11 +212,8 @@ every snapshot fact says so. Rates carry the patch and season they were captured
 the board warns when patches shipped since. Judgements (counters,
 synergies, playstyles) are tier- and region-agnostic by design, and a
 table is a table: every row carries its source, and that is the only
-distinction drawn between measured, judged and hand-written data. Two
-inputs are hand-written: the strategies and the recorded matches. The
-owner plays on console, so a match is entered by hand, never logged by
-the game; each is one map of the owner's own games, and the matches judge
-the playbook ([inference.md](inference.md#how-the-playbook-is-judged))
-and never change it. Players are assumed to play optimally
+distinction drawn between measured, judged and hand-written data. One
+input is hand-written: the strategies. Players are assumed to play
+optimally
 ([players-play-optimally.md](../inference/strategies/players-play-optimally.md)),
 so a strategy encodes the game, never a lobby's habits.

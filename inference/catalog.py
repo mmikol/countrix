@@ -23,13 +23,10 @@ from inference.frontmatter import FrontmatterError, parse_frontmatter
 from inference.strategy import FORMS, KINDS, WEIGHT_RANGE, CatalogError, Strategy, finite_number
 
 SHIPPED_DIR = os.path.join(ROOT, "inference", "strategies")
-# The sources row of the two inputs a user writes: the strategies, mirrored
-# here, and the matches the owner records through the door's record_match.
-# Nothing is downloaded: the "url" is the playbook's folder, and a match
-# comes in by hand. No other table may carry this source.
-AUTHORED = Source(
-    code="user", name="The user: the playbook and the recorded matches",
-    url="inference/strategies/")
+# The sources row of the one input a user writes: the strategies, mirrored
+# here. Nothing is downloaded: the "url" is the playbook's folder. No other
+# table may carry this source.
+AUTHORED = Source(code="user", name="The user: the playbook", url="inference/strategies/")
 
 # the id is the filename, so no id may name a path (docs/security.md)
 ID_RE = re.compile(r"[a-z0-9][a-z0-9-]*\Z")
@@ -42,20 +39,6 @@ def strategies_dir() -> str:
     what it says and no module can freeze it before another reads it."""
     chosen = os.environ.get("COUNTRIX_STRATEGIES", "").strip()
     return os.path.abspath(os.path.join(ROOT, chosen)) if chosen else SHIPPED_DIR
-
-
-def named_dir(name: str | None) -> str:
-    """A playbook folder a caller names: relative to the repo root or
-    absolute, and inside the repo; None or blank is the playbook in force. A
-    folder outside the repo, or none there, is a Refusal."""
-    if not (name or "").strip():
-        return strategies_dir()
-    path = os.path.abspath(os.path.join(ROOT, (name or "").strip()))
-    if os.path.commonpath([path, ROOT]) != ROOT:
-        raise Refusal("a playbook folder lies inside the repo, got %r" % name)
-    if not os.path.isdir(path):
-        raise Refusal("no playbook folder at %s" % os.path.relpath(path, ROOT))
-    return path
 
 
 DOCS_PATH = os.path.join(ROOT, "docs", "inference.md")

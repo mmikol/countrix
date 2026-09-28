@@ -4,8 +4,8 @@
 -- weights toward the metrics that separated wins from losses.
 --
 -- Superseded: 014 dropped both tables - nothing learns from played matches
--- now (the backlog's "weights that learn" is the way back). The file stays
--- as the sequence's record.
+-- now (the backlog's "Recorded matches, playbook validation and learned
+-- weights" is the way back). The file stays as the sequence's record.
 
 BEGIN;
 

@@ -45,9 +45,9 @@ DOC_DOMAIN = {
     "008_schema_migrations.sql": "foundation",
     "010_constraints_and_heuristics.sql": "INFERENCE",
     "020_map_terrain.sql": "MAPS", "021_stage_terrain.sql": "MAPS",
-    "024_matches.sql": "MATCHES", "025_kit_6v6.sql": "HEROES"}
+    "025_kit_6v6.sql": "HEROES"}
 # The domains in the order the diagrams and the dictionary list them.
-DOMAINS = ("HEROES", "MAPS", "META", "PLAYBOOK", "INFERENCE", "MATCHES")
+DOMAINS = ("HEROES", "MAPS", "META", "PLAYBOOK", "INFERENCE")
 
 
 class SchemaError(Exception):
@@ -270,7 +270,7 @@ def _edges(fks: list[ForeignKey], keep: Callable[[str], bool]) -> list[str]:
 def _erd(tables: list[str], fks: list[ForeignKey], domain: dict[str, str]) -> str:
     """The ER diagrams: one per domain, then the whole database."""
     erd = [
-        "Six domains. Three hold the data the sources are pulled for: which",
+        "Five domains. Three hold the data the sources are pulled for: which",
         "hero (HEROES), on which map (MAPS), performing how well (META).",
         "Every domain",
         "yields independent facts (a selection's own row) and dependent ones",
@@ -278,12 +278,11 @@ def _erd(tables: list[str], fks: list[ForeignKey], domain: dict[str, str]) -> st
         "counters and synergies are heroes ⋈ heroes), and a join belongs to",
         "every domain it touches. Two are the playbook's record: the",
         "judgements pulled from the wiki (PLAYBOOK) and the mirror of the",
-        "strategies that the inference layer solves with (INFERENCE). The last",
-        "is the owner's record of the games played, one row a map (MATCHES).",
-        "The strategies and the recorded matches are the two inputs a user",
-        "writes; every other table is pulled. The composition is the argmax of",
-        "the strategies - the constraints, heuristics and assumptions in",
-        "inference/strategies/ - over the facts.",
+        "strategies that the inference layer solves with (INFERENCE). The",
+        "strategies are the one input a user writes; every other table is",
+        "pulled. The composition is the argmax of the strategies - the",
+        "constraints, heuristics and assumptions in inference/strategies/ -",
+        "over the facts.",
         "",
         "```",
         "DATA        = HEROES ∪ MAPS ∪ META",

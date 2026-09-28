@@ -15,14 +15,14 @@ call lands in.
                      another through (call)
     REFRESH          the refresh argument of every pull and of the rebuild
 
-A family module - pulls, lifecycle, facts, solver, playbook, matches -
-declares its tools with @tool and imports no other family. A tool's family
-is the module its function is defined in, so the registry lists the same
-order whichever family imports first; a decorator that registers a wrapper
-gives it its function's module with functools.update_wrapper. tools.py
-imports every family. A tool declares its arguments in schema.py's JSON Schema vocabulary
-(Properties), the one every call is checked against, and answers a
-schema.ToolReply.
+A family module - pulls, lifecycle, facts, solver, playbook - declares
+its tools with @tool and imports no other family. A tool's family is the
+module its function is defined in, so the registry lists the same order
+whichever family imports first; a decorator that registers a wrapper gives
+it its function's module with functools.update_wrapper. tools.py imports
+every family. A tool declares its arguments in schema.py's JSON Schema
+vocabulary (Properties), the one every call is checked against, and
+answers a schema.ToolReply.
 """
 
 import copy
@@ -195,7 +195,7 @@ def _argument(name: str, prop: Property, required: bool) -> str:
 
 # The family modules, in the order the server lists their tools.
 FAMILIES = ("door.mcp.pulls", "door.mcp.lifecycle", "door.mcp.facts", "door.mcp.solver",
-            "door.mcp.playbook", "door.mcp.matches")
+            "door.mcp.playbook")
 
 REGISTRY = Registry(FAMILIES)
 tool = REGISTRY.tool

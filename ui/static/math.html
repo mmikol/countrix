@@ -103,11 +103,10 @@ s_n       = min( 1, %(NEED_BUDGET)g / &Sigma; w over the needs on n's guard ): o
 <p id='base-weights'><b>The base's weights.</b> The rate term is in win-rate points and
 weighs %(W_RATE)g. The synergy and counter weights are set so that, on the median board, each
 term spreads the reference sixes about half as far as the rate term does; the calibration is
-in <code>inference/base.py</code>, and recorded matches are to refit it. A heuristic moves a six
-by its weight at most, since its norm is 0..1, and a base term has no such bound. On the
-median board a heuristic at weight 1 moves a six less than any base term spreads the sixes, at
-3 about as far as the synergy or counter term, and at the slider's 10 further than the three
-together.</p>
+in <code>inference/base.py</code>. A heuristic moves a six by its weight at most, since its
+norm is 0..1, and a base term has no such bound. On the median board a heuristic at weight 1
+moves a six less than any base term spreads the sixes, at 3 about as far as the synergy or
+counter term, and at the slider's 10 further than the three together.</p>
 <p id='sustained-healing'><b>Sustained healing.</b> A hero's <code>hps</code> is what it lands
 on teammates a second, summed over every piece that runs beside its weapon and over every
 teammate each piece reaches; its own healing is out. A beam that spends energy counts what the

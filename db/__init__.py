@@ -16,8 +16,6 @@ the tables over db.psql.default_dsn().
                   guard, the handler that sends and logs, the reply to a
                   request that raised (a Refusal 400, anything else 500 with
                   its traceback on stderr) and the one JSON reader
-    matches       the one writer of the owner's recorded matches, by id:
-                  the door's record_match and delete_match call it
 
 This file holds what the whole layer must agree on: where things live (ROOT
 and the paths under it), the shape of a `sources` row (Source), the roles
@@ -33,8 +31,8 @@ docs/db.md walks the tree.
 
 Every row carries a source_id, and that is the only distinction drawn
 between what was measured, what was judged and what was written by hand.
-Two inputs are written by hand, the strategies and the matches the owner
-records: no other table carries the `user` source.
+One input is written by hand, the strategies: no other table carries the
+`user` source.
 """
 
 import os

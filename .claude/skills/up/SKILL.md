@@ -35,8 +35,8 @@ prints a verdict. A first build scrapes the sources once
    with `refresh: true` on the `countrix-docker` MCP server). The
    refresher container refreshes daily on its own and on start when the
    caches are a day old, so this is rarely needed.
-4. Never run `docker compose down -v`: that deletes the database volume,
-   the recorded matches with it (the rebuild costs a scrape).
+4. Never run `docker compose down -v`: that deletes the database volume
+   (the rebuild costs a scrape).
 
 `.venv/bin/python orchestrator.py status` answers "is it up?" without
 touching anything; `.venv/bin/python orchestrator.py test` runs the suite

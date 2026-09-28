@@ -4,8 +4,7 @@
 #   data        the door: builds the database from the bind-mounted page
 #               caches when it is empty or stale, then serves every MCP tool
 #               at http://localhost:8020/mcp (.mcp.json, server
-#               "countrix-docker"). A rebuild drops the recorded matches
-#               with every other table
+#               "countrix-docker")
 #   ui          the board at http://localhost:8017, with the INFERENCE ENGINE
 #               in the board's process, reading the strategy files live
 #   refresher   the door's clock: seasons and rates daily at
@@ -129,7 +128,7 @@ services:
       <<: *env
       COUNTRIX_UI_HOST: 0.0.0.0
       # the board writes nothing unless COUNTRIX_READ_ONLY=0; the two below
-      # are the channel its writes would use (a tune, a record_match, through the door)
+      # are the channel its write would use (a tune, through the door)
       COUNTRIX_READ_ONLY: ${COUNTRIX_READ_ONLY:-}
       COUNTRIX_MCP_URL: http://data:8020/mcp
       COUNTRIX_MCP_TOKEN: ${COUNTRIX_MCP_TOKEN:-}

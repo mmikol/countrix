@@ -54,20 +54,27 @@ keeps it current.
   fight odds split 100 exactly; the local search never lowers the score.
   Cost: (a) three to four days, the kit model most of it; (b) a day for
   the tests, a day for the page.
-- **Weights that learn on their own.** The user wants them to, with the
-  sliders as the manual override. The weights were fitted once to a
-  benchmark of community comps; nothing refits them. The owner's played
-  maps are recorded now (`record_match`, migration 024), each stamped with
-  the playbook's digest, and `validate_playbook` judges the playbook
-  against them without moving a weight. A fit from them waits on the
-  guard's sample - 191 decided maps for an even map won 60% of the time -
-  and a refitted playbook is a new digest, judged only on the maps played
-  after it. Until then the signal the data holds: fit the weights so that
-  the solver's per-hero contribution ranks agree with each hero's
-  published win rate on the map, capped per step, every change a
-  tuning-log line with "fit" as its reason. The default engine's three
-  weights (`inference/base.py`) are calibrated defaults, not a fit: the
-  same recorded maps are to refit them. Cost: a day.
+- **Recorded matches, playbook validation and learned weights.** The
+  owner's, for later; the commit that follows 0ad5577 removed all three.
+  A played map is recorded by hand - the map, blue's side, blue's result,
+  both sixes as they stood longest on the field and the bans, blue always
+  the owner's team - from a record tab on the board, a `/record` skill or
+  a `record_match` tool, checked as the board checks a board (six a team,
+  at most two tanks, a side on a sided map), stamped with the playbook's
+  digest and stored under the `user` source. The playbook is judged
+  against the recorded maps: each rescored from both seats, then models
+  from a coin flip to the heroes plus the playbook score, fitted and
+  scored out of sample on a time and a sessions split by log loss and
+  Brier with intervals over sessions, each strategy family ablated, a
+  playbook judged only on the maps from the first one played under its
+  digest, and no verdict below (5.6 / b)^2 decided maps. Once about 191
+  decided maps exist - enough to tell an even map from one won 60% of the
+  time - the weights learn from them, the default engine's three
+  included, the sliders the manual override and every change a
+  tuning-log line. Cost: a day to restore the removed code from the tree
+  before that commit - about 2,400 lines and 980 of tests - with a new
+  migration for the two tables and the changes since; a day more for the
+  learned weights once the maps exist.
 - **Memoize the per-hero parts of the metrics.** `team.team_metrics`
   rebuilds each hero's pool, kit sums and keyword sets for every
   candidate and is ~41% of a sequential board. A per-world term table
@@ -181,11 +188,8 @@ few match-ups the wiki rates (the counters table is a list).
 
 ## Done
 
-- **Nothing is written to `db/raw`.** The CSV mirror and `export_csv`,
-  the door's audit log and the file that carried the recorded matches
-  across a rebuild are deleted. `db_rebuild` drops the matches with every
-  other table; the owner records none for now. The validation page is
-  written only where `--out` names, and a path inside the repo is refused.
+- **Nothing is written to `db/raw`.** The CSV mirror and `export_csv`
+  and the door's audit log are deleted.
 - **The stack is four containers.** The sentry is gone: its quarantine
   hid the failure the catalog makes loud, its patterns matched ordinary
   prose and missed real injections, and nothing read its flags; every
@@ -195,21 +199,6 @@ few match-ups the wiki rates (the counters table is a list).
   enumerate (`serve.Admission`, a 429 past a minute). `db_rebuild`
   refuses a playbook that does not load before it drops anything, which
   the sentry had been hiding by winning the race.
-- **The playbook is judged against the recorded matches** - `match-level`
-  branch. `validate_playbook` and `python -m ui.validation` rescore each
-  map with evaluate from both seats, score five models out of sample on a
-  time and a sessions split with bootstrap intervals over sessions, ablate
-  each strategy family, judge a playbook only from its digest's first map,
-  and withhold the verdict below (5.6 / b)^2 decided maps. Pure Python;
-  the page is personal use, written only where `--out` names.
-- **The owner's matches are the second user input** - `match-level`
-  branch. Migration 024 adds `matches` and `match_picks`, one row a map
-  with both sixes, the bans, blue's side and blue's result, under the
-  `user` source. The door's `record_match` checks a map as the board
-  checks a board and as only a played map can be, and stamps the
-  playbook's digest; `list_matches` and `delete_match` read and fix the
-  record; the board's record tab and the `/record` skill call it;
-  `facts/matches.py` reads it back as `Match` records.
 - **The strategies are the one user input** - `data-only-inputs` branch.
   `seasons` and `synergies` are pulled from the wiki (`pull_seasons`,
   `pull_synergies`); `map_playstyle` and `comp_archetypes` are dropped
