@@ -270,8 +270,9 @@ db <- facts <- inference <- door <- ui.
 ## House rules
 
 - A session never hand-edits the playbook. Changes go through `tune`
-  (`meta.md`'s weights and prose too, and it seeds a folder's missing
-  `meta.md` from the shipped one), `add_strategy` or `infer_strategy`.
+  (a strategy's prose as `body`, `meta.md`'s weights and prose too, and it
+  seeds a folder's missing `meta.md` from the shipped one), `add_strategy`
+  or `infer_strategy`.
   They validate, rewrite the docs catalog for the shipped playbook and
   append a reasoned line to `tuning-log.md` beside the playbook in force.
   A draft the user drops in by hand (name, kind, prose) is input;

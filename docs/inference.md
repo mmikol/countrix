@@ -840,7 +840,7 @@ Two sixes that score the same are equally good, so the choice between them says 
 
 *assumption* - prose the solver takes as given and the session holds a comp to
 
-The owner plays on console, and the playbook is built for console play. The rates are the console pull, the recorded maps are console maps entered by hand, and no PC-only feature such as the Workshop Inspector log is assumed. Nothing is measured.
+The owner plays on console, and the playbook is built for console play. The rates are the console pull, and no PC-only feature such as the Workshop Inspector log is assumed. Nothing is measured.
 
 ##### The rates are a console pull (`console-pull`, uncertainty)
 

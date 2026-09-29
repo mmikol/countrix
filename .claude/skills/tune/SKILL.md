@@ -65,7 +65,10 @@ for too little"}`. It is validated, written, documented and logged like a
 strategy's change. `meta.md`'s prose, which the playbook tab shows on the
 Meta card, changes the same way, rewritten whole: `{"id": "meta",
 "field": "body", "value": "<the prose>", "reason": "..."}`; keep it saying
-what each dial weighs when a dial's meaning moves. The playbook tab's
+what each dial weighs when a dial's meaning moves. A strategy's prose
+changes the same way under its own id, three sentences at most under the
+file's title: `{"id": "console-only", "field": "body", "value": "<the
+prose>", "reason": "..."}`. The playbook tab's
 Meta slider sets the meta for one browser session without touching the
 file; `tune` is the lasting change.
 

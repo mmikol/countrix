@@ -322,6 +322,31 @@ def test_tune_rewrites_meta_prose_and_keeps_its_weights_and_title(catalog_copy):
     assert catalog.read_meta(catalog_copy).body == "# Weights\n\nOne line."
 
 
+def test_tune_rewrites_a_strategys_prose_under_its_title(catalog_copy):
+    """body rewrites a strategy's prose whole under the file's title: the
+    frontmatter stays, the catalog reads the new prose, the log names the
+    rewrite, and prose past three sentences or not text is refused with
+    the file untouched."""
+    sid = next(s.id for s in catalog.load(catalog_copy) if s.kind == "assumption")
+    path = Path(catalog_copy, sid + ".md")
+    before = path.read_text(encoding="utf-8")
+    header = before[:before.index("\n---", 3) + len("\n---")]
+    title = next(line for line in before.splitlines() if line.startswith("# "))
+    change = tune.tune(sid, "body", "One claim. Why it holds.", "a stale clause goes",
+                       directory=catalog_copy)
+    after = path.read_text(encoding="utf-8")
+    assert after == "%s\n%s\n\nOne claim. Why it holds.\n" % (header, title)
+    assert change["new"] == next(s for s in catalog.load(catalog_copy) if s.id == sid).body
+    assert title in change["old"]
+    [line] = tune.log_tail(5, os.path.join(catalog_copy, "tuning-log.md"))
+    assert line.endswith("`%s` body: rewritten (a stale clause goes) [claude-code-session]" % sid)
+    for value, message in (("One. Two. Three. Four.", "at most 3 sentences"), (3, "prose"),
+                           ("", "prose")):
+        with pytest.raises(tune.TuneError, match=message):
+            tune.tune(sid, "body", value, "r", directory=catalog_copy)
+    assert path.read_text(encoding="utf-8") == after
+
+
 def test_a_folder_with_no_meta_is_seeded_from_the_shipped_one(catalog_copy, monkeypatch, tmp_path):
     """A playbook folder with no meta.md takes the shipped playbook's on its
     first meta change, and the log says so; the shipped folder with none

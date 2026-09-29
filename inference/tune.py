@@ -15,7 +15,8 @@ tools mirror it into the database.
                          "weight": 2}, "inferred from the prose")
 
 Fields: kind, category, metric, direction, weight, when, require,
-bonus, penalty (strategy.TUNABLE) and params.NAME. Every
+bonus, penalty (strategy.TUNABLE), params.NAME, and body, the prose
+rewritten whole within three sentences under the file's title. Every
 value is checked by strategy.checked_value, the rule the loader reads a
 file by, before any file is touched. Each of the three takes a reason and
 writes in one order (_commit): the edited (or new) file is loaded through
@@ -62,7 +63,7 @@ from inference.strategy import (
 )
 
 MAX_PROSE = 20000          # characters in a strategy's prose, or meta.md's
-META_PROSE = "body"        # meta.md's prose, as tune names it beside the dials
+META_PROSE = "body"        # the prose, a strategy's or meta.md's, as tune names it
 MAX_SENTENCES = 3          # a strategy's prose is three sentences at most
 MAX_BY = 40                # characters of who asked, in a log line
 BY_SESSION = "claude-code-session"    # who asked, when the caller does not say
@@ -297,6 +298,13 @@ def tune(
     if strategy_id == META:
         return _tune_meta(directory, field, value, reason, by)
     path = _existing(directory, strategy_id)
+    if field == META_PROSE:
+        with open(path, encoding="utf-8") as handle:
+            rewritten, prose = _strategy_prose(strategy_id, handle.read(), value)
+        strategy, line = _commit(directory, strategy_id, rewritten,
+                                 lambda _: "%s: rewritten" % META_PROSE, reason, by)
+        return {"id": strategy_id, "field": field, "old": prose, "new": strategy.body,
+                "line": line}
     checked = _coerce(field, value)
     new = field_text(checked)
     with open(path, encoding="utf-8") as handle:
@@ -325,22 +333,42 @@ def _meta_text(directory: str) -> tuple[str, str]:
                     " there" % name)
 
 
-def _meta_prose(text: str, value: object) -> tuple[str, str]:
-    """meta.md's text with its prose rewritten whole -> (the new text, the
-    old prose). The prose is text within MAX_PROSE characters; one that
-    opens with no title keeps the file's."""
+def _prose(text: str, value: object, owner: str, old: str, title: str) -> str:
+    """A file's text with its prose, `old`, rewritten whole as `value`: text
+    within MAX_PROSE characters, which keeps the file's title - else
+    `title` - where it opens with none. `owner` names the file in a
+    refusal."""
     if not isinstance(value, str) or not value.strip():
-        raise TuneError("%s's %s is its prose, as text" % (catalog_module.META_FILE, META_PROSE))
+        raise TuneError("%s's %s is its prose, as text" % (owner, META_PROSE))
     if len(value) > MAX_PROSE:
-        raise TuneError("%s's prose is under %d characters"
-                        % (catalog_module.META_FILE, MAX_PROSE))
-    old = catalog_module.parse_meta(text).body         # the frontmatter is whole
+        raise TuneError("%s's prose is under %d characters" % (owner, MAX_PROSE))
     prose = value.strip("\n")
     if not prose.startswith("#"):
-        title = next((line for line in old.splitlines() if line.startswith("#")), "# The meta")
+        title = next((line for line in old.splitlines() if line.startswith("#")), title)
         prose = "%s\n\n%s" % (title, prose)
     close = text.find("\n---", 3) + len("\n---")
-    return text[:close] + "\n" + prose + "\n", old
+    return text[:close] + "\n" + prose + "\n"
+
+
+def _meta_prose(text: str, value: object) -> tuple[str, str]:
+    """meta.md's text with its prose rewritten whole -> (the new text, the
+    old prose)."""
+    old = catalog_module.parse_meta(text).body         # the frontmatter is whole
+    return _prose(text, value, catalog_module.META_FILE, old, "# The meta"), old
+
+
+def _strategy_prose(sid: str, text: str, value: object) -> tuple[str, str]:
+    """A strategy's text with its prose rewritten whole -> (the new text,
+    the old prose): three sentences at most, as a new strategy's are
+    (_check_new), under the file's own title where the prose opens with
+    none."""
+    if not text.startswith("---") or text.find("\n---", 3) < 0:
+        raise TuneError("no frontmatter")
+    old = text[text.find("\n---", 3) + len("\n---"):].strip("\n")
+    if isinstance(value, str) and sentence_count(value) > MAX_SENTENCES:
+        raise TuneError("a strategy's prose is at most %d sentences; this has %d"
+                        % (MAX_SENTENCES, sentence_count(value)))
+    return _prose(text, value, "%s.md" % sid, old, "# %s" % sid), old
 
 
 def _tune_meta(directory: str, field: str, value: object, reason: str, by: str) -> Change:

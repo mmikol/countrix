@@ -98,7 +98,8 @@ def _remirror(ctx: Context) -> None:
 
 @tool(
     "tune", "Change one strategy's frontmatter - its weight, a params dial, or"
-    " a when/require/bonus/penalty expression - or, with id meta, meta.md: one"
+    " a when/require/bonus/penalty expression - or its prose, body, rewritten"
+    " whole within three sentences under its title - or, with id meta, meta.md: one"
     " of the default engine's weights - meta, which scales the whole engine"
     " (0 turns it off), or its rate, synergy or counter dial - or its prose,"
     " body, rewritten whole. A playbook folder with no meta.md is seeded from"
@@ -113,7 +114,7 @@ def _remirror(ctx: Context) -> None:
         "field": {
             "type": "string",
             "description": "%s; for id %s: %s" % (
-                " | ".join((*TUNABLE, "params.NAME")), META,
+                " | ".join((*TUNABLE, "params.NAME", tune.META_PROSE)), META,
                 " | ".join((*DIALS, tune.META_PROSE)))},
         "value": {"description": "the new value: a number, a word (kind, category, metric,"
                                  " direction) or an expression; meta.md's weights are"

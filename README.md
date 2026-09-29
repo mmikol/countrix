@@ -83,7 +83,7 @@ the solver reads nothing else.
 
 ## Engineering
 
-- **846 tests.** CI runs ruff, mypy and the 727 that need no database on
+- **847 tests.** CI runs ruff, mypy and the 728 that need no database on
   every push to main and every pull request; they cover 93% of the lines,
   held to 78%. With the database built, all of them run against a 75% floor.
 - **The search is held to brute force.** A CI gate enumerates every legal six
