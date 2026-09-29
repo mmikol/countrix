@@ -1,10 +1,10 @@
 # The playbook's sources
 
-**The playbook was emptied on purpose.** `strategies/` now holds six
+**The playbook was emptied on purpose.** `strategies/` now holds eight
 assumptions, one heuristic, `heal-rate`, and one limit,
 `at-most-three-supports`, beside `meta.md`, the default engine's weights,
 which is no strategy and cites nothing. This file is the record of the 245 entries it held
-and the two rules added since, with the citation behind
+and the four added since, with the citation behind
 each, and it is the source the playbook is being rebuilt from by hand - so it
 describes more than the folder does, and is meant to. `docs/inference.md` is
 generated from the folder and says what is in force today.
@@ -297,6 +297,7 @@ the catalog is `docs/inference.md`.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w9epk0/has_2_tanks_4_supports_ever_been_a_viable_6v6_comp/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1vxqniw/genuinely_how_do_you_fight_anran/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1wdivt5/how_to_counter_bastion_torbjorn_mauga_in_low_elo/
+- `deterministic-not-probabilistic` - Deterministic, not probabilistic (assumption). The owner's assumption of 2026-09-28: the same board, playbook and weights give the same answer, and a score, a share and the fight odds are arithmetic over the facts, not win probabilities.
 - `discord-the-armored-tank` - Discord the armored tank (heuristic). applies on 5/6 boards, spreads on 5.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1ulsogp/i_havent_won_a_match_in_3_days/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1uweo7e/mauga_counter/
@@ -717,6 +718,7 @@ the catalog is `docs/inference.md`.
 - `three-supports-three-flavours` - Three supports, three flavours (heuristic). applies on 2/6 boards, spreads on 2.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1v8u51x/when_i_offangle_on_support_my_teammates_just_die/
   - https://www.reddit.com/r/Competitiveoverwatch/comments/1wck8j1/who_are_the_heroes_in_each_role_that_are_the_most/
+- `ties-are-drawn` - Tied sixes are equally good (assumption). The owner's assumption of 2026-09-28: with the meta and every weight at zero they expect random selections, so a tie is settled by a per-board draw blind to rates and names, and the board says how many sixes tie.
 - `two-answers-each` - Answer their key picks twice (heuristic). applies on 6/6 boards, spreads on 6.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1uweo7e/mauga_counter/
   - https://www.reddit.com/r/OverwatchUniversity/comments/9oo9zv/3_dps_exists_because_dps_are_largely_easy_to/

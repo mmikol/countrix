@@ -116,7 +116,8 @@ def test_the_page_is_a_shell_over_static_files():
     toc = page[page.index("<nav class='toc'>"):page.index("</nav>")]
     targets = re.findall(r"href='#([^']+)'", toc)
     assert targets and all(("id='%s'" % t) in page for t in targets), targets
-    for name in ("chosen", "likely-comp", "counter", "weights", "what-100-means", "argmax"):
+    for name in ("chosen", "likely-comp", "counter", "weights", "what-100-means", "argmax",
+                 "deterministic"):
         assert name in targets
     assert "<h2 id='equation'>The Counter Utility Matrix</h2>" in page  # the name is the equation
     # and the page says what the short name stands for
@@ -207,7 +208,7 @@ def test_the_scripts_read_payload_keys_the_server_writes(synthetic_world, monkey
     read("plan momentum shapes current red_current fill expected blue map side", solved)
     read(
         "picks contributions alternatives considered seconds playstyle cited scoring unscored"
-        " blue", solved["current"])
+        " tie blue", solved["current"])
     read("hero role why evidence portrait", Pick.__annotations__)
     read(
         "id kind applies ok weighted form when bonus penalty norm spread need metric raw"

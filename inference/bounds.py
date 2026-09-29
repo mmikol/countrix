@@ -622,11 +622,13 @@ class Space:
         """Every hero an open slot can take, by dense index."""
         return [i for role in self.roles for i in role]
 
-    def order(self, potential: Sequence[float]) -> None:
+    def order(self, potential: Sequence[float], draws: Sequence[float]) -> None:
         """Each role's candidates in walk order: the highest potential first,
-        then by hero id. The order speeds the search and moves no answer."""
+        then the highest tie-break draw, then by hero id. The order speeds
+        the search - on a plateau the draws lead it to the six the tie-break
+        keeps - and moves no answer."""
         for role in self.roles:
-            role.sort(key=lambda i: (-potential[i], self.heroes[i].id))
+            role.sort(key=lambda i: (-potential[i], -draws[i], self.heroes[i].id))
 
     def pairs(self) -> list[list[float]]:
         """Every pair's synergy score (facts.team.pair_score), by dense index."""
@@ -1543,8 +1545,10 @@ class Bound:
                          for x in range(len(heroes))]
         else:
             potential = [0.0] * len(heroes)
-        space.order(potential)
+        self.draws = [objective.draws[h.id] for h in heroes]
+        space.order(potential, self.draws)
         self._own_tops = space.extremes(self.own)[0] if self.own is not None else None
+        self._draw_tops = space.extremes(self.draws)[0]
         self._terms(objective)
 
     def _terms(self, objective: Objective) -> None:
@@ -1585,7 +1589,6 @@ class Bound:
             reads |= _six_names(r.bonus) | _six_names(r.penalty)
             self.scored.append(_Scored(r.weight, gate, *compiled))
         self.steps = plan(self.space, sorted(reads))
-        self.tiebreak_steps = plan(self.space, ["team.map_win_mean"])
 
     # --- the walk's state ---------------------------------------------------
 
@@ -1682,10 +1685,13 @@ class Bound:
         return max(0.0, top) if gate is None else top
 
     def tiebreak(self, frame: Frame, open_roles: tuple[tuple[int, int, int], ...]) -> float:
-        """The highest mean map win rate any completion of the branch holds."""
-        env = evaluate(self.tiebreak_steps, Branch(frame.picks, open_roles))
-        value = env["team.map_win_mean"]
-        return value.hi if isinstance(value, Iv) else INF
+        """The highest tie-break any completion of the branch holds: the
+        picks' draws, then each open role's largest from its start on - exact,
+        as the draws are whole numbers far below 2**53."""
+        total = sum(self.draws[x] for x in frame.picks)
+        for r, start, n in open_roles:
+            total += self._draw_tops[r][start][n]
+        return total
 
 
 def roster(world: World, locked: Sequence[Hero], banned: set[int]) -> list[list[Hero]]:

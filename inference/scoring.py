@@ -16,10 +16,16 @@ A six is scored in one seat order, whatever order it arrives in: tanks,
 then damage, then supports, each by hero id (Candidate). The score is then a
 function of the hero set, down to its last bit, which the exact search and
 its proofs need. Sixes rank by rank_key: the score to SCORE_PLACES decimal
-places, then the tie-break (the six's mean map win rate), then the names;
-two scores closer than that tie, and the tie-break decides.
+places, then the tie-break, then the names; two scores closer than that
+tie, and the tie-break decides. The tie-break is the sum of the six's
+draws: each hero's draw is a whole number hashed from the board's seed
+(the map and the side) and the hero's id, so it favours no hero for its
+rates or its name, every hero of a role has the same chance of winning a
+tie across boards, and the same board draws the same numbers in every
+process. The names settle only two sixes whose draws sum the same.
 """
 
+import hashlib
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Literal, NamedTuple, NotRequired, TypedDict
 
@@ -32,6 +38,7 @@ from inference.strategy import Strategy, settled_by_board
 
 NEED_BUDGET = 2.0                 # what one guarded state costs at most, or its largest need
 SCORE_PLACES = 9                  # the decimal places a six's score ranks by
+DRAW_BYTES = 5                    # a hero's tie-break draw: a whole number below 2**40
 
 
 class Interval(NamedTuple):
@@ -207,9 +214,25 @@ def quantized(score: float) -> float:
 
 def rank_key(c: Candidate) -> tuple[float, float, list[str]]:
     """The order sixes rank in, best first: the quantized score, then the
-    tie-break, then the names sorted - a property of the hero set, so the
-    order is total and a function of the compositions alone."""
+    tie-break, then the names sorted - a property of the hero set on the
+    board, so the order is total and a function of the compositions alone."""
     return (-quantized(c.score), -c.tiebreak, sorted(c.names))
+
+
+def board_seed(m: Map | None, side: str) -> str:
+    """The seed a board's tie-break draws from: its map and its side. Red's
+    picks, the bans and the locks leave it alone, so the six a tie settles
+    holds still as the draft fills in."""
+    return "tiebreak|%s|%s" % (m.name if m is not None else "", side)
+
+
+def draw(seed: str, hero_id: int) -> float:
+    """A hero's tie-break draw on a board: a whole number below 2**40 read
+    from a hash of the board's seed and the hero's id - the same in every
+    process, and blind to the hero's rates and name. Six of them sum exactly
+    in any order, so the bound on a branch's draws is exact too."""
+    digest = hashlib.blake2b(("%s|%d" % (seed, hero_id)).encode(), digest_size=DRAW_BYTES)
+    return float(int.from_bytes(digest.digest(), "big"))
 
 
 def _score_base(base: Base, cand: Candidate, out: list[Contribution] | None) -> float:
@@ -248,6 +271,9 @@ class Objective:
         self.catalog = catalog
         # the default engine on this board; None while it is off
         self.base = Base(world, m, red=self.red, banned=banned, weights=base) if base.on else None
+        # each hero's tie-break draw on this board (draw)
+        seed = board_seed(m, side)
+        self.draws = {h.id: draw(seed, h.id) for h in world.heroes.values()}
         self.limits = [s for s in catalog if s.form == "limit"]
         self.heuristics = [s for s in catalog if s.form == "heuristic"]
         self.scored = [s for s in catalog if s.form == "scored"]
@@ -345,7 +371,7 @@ class Objective:
         cand.raw = raw
         if self.base is not None:
             cand.terms = self.base.terms(cand.heroes, number(ns["team"]["synergy_score"]))
-        cand.tiebreak = number(ns["team"]["map_win_mean"])
+        cand.tiebreak = sum(self.draws[h.id] for h in cand.heroes)
         return cand
 
     @staticmethod

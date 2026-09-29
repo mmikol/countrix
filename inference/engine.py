@@ -182,6 +182,7 @@ def _optimal(
     result.blue = _order(best.heroes)
     fs = _board_facts(world, result, side)
     result.record_candidate(best, fs, solver.considered)
+    result.tied = solver.ties(solved)
     result.alternatives = [Alternative(blue=_order(c.heroes), score=round(c.score, 3),
                                        normalized=None)
                            for c in solved.ranked[1:top + 1]]

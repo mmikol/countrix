@@ -214,6 +214,8 @@ function resultHTML(d, title) {
   var meta = [d.considered ? commas(d.considered) + ' candidates' : '', d.seconds ? d.seconds + 's' : '',
               d.playstyle ? 'leans ' + d.playstyle : ''].filter(Boolean).join(' · ');
   if (meta) out += "<div class='legend meta'>" + meta + '</div>';
+  /* the server's words where other sixes share this one's score: the draw picked it */
+  if (d.tie) out += "<div class='legend meta'>" + esc(d.tie) + '</div>';
   out += d.contributions && d.contributions.length ? bars(d.contributions) : '';
   if (d.alternatives && d.alternatives.length) {
     out += "<div class='alts'><b>alternatives</b><ol>" +

@@ -11,6 +11,7 @@
 <a class='sub' href='#argmax'>the argmax</a>
 <a class='sub' href='#searched'>what is searched</a>
 <a class='sub' href='#against-red'>what it is optimal against</a>
+<a class='sub' href='#deterministic'>deterministic, not probabilistic</a>
 <a href='#board'>the board</a>
 <a class='sub' href='#likely-comp'>red's likely starting comp</a>
 <a class='sub' href='#counter'>blue's optimal counter</a>
@@ -208,7 +209,7 @@ default engine's terms are bounded together - each open pick's own rate and coun
 synergy with the picks already made, and half its best synergies among the rest - and each of
 the playbook's terms apart, from the range each metric it reads can take over the branch. A
 limit that fails on every six of a branch drops the branch too. Sixes rank by their score to
-%(SCORE_PLACES)d decimal places, then by mean map win rate, then by name. A full six's rank
+%(SCORE_PLACES)d decimal places, then by the board's tie-break draw, then by name. A full six's rank
 is its place in that order - one that ties the best six's score and loses the tie-break is
 not first - counted exactly up to %(RANK_CAP)d.</p>
 <p id='searched'><b>What is searched.</b> Every legal six: <b>17,217,564</b> on an open
@@ -236,9 +237,22 @@ Freja, Kiriko and Sojourn; a roster, a playbook or a weight that moves re-record
 evidence that no such board exists, only that a search over every map but a few reds did not
 find one. No rule forbids any of them; the engine does not value what they do on the boards it
 tried, and the playbook's rules are what can answer that.</p>
-<p><b>When nothing scores</b> - the default engine off, as a caller can turn it, and no term
-of the playbook scoring - every legal six ties at zero, the board reads <i>unscored</i>, and
-the optimal is the tie-break alone.</p>
+<p><b>When nothing scores</b> - the meta at 0 and no term of the playbook scoring - every legal
+six ties at zero, the board reads <i>unscored</i>, and the optimal is the draw's pick among
+them, marked as one of the sixes tied at the best score.</p>
+<p id='deterministic'><b>Deterministic, not probabilistic.</b> The engine computes; it does not
+sample. The same board, playbook and weights give the same six, the same score and the same
+alternatives in any process, and on any day the data holds still: nothing is drawn at random
+when a board is solved. The weights are inputs like the picks: move the Meta slider or a rule's
+and the objective moves, so the six may too; move it back and the same six returns. The scale's reference sixes and the tie-break's draws come from string
+seeds, the board's map and side. What reads like chance is a tie or a share. A tie is several
+sixes the function scores the same, none of them better; the board's draw - a hash of the map,
+the side and the hero, blind to the rates and the names - picks the one shown, and the board
+says how many tie. With the meta at 0 and every weight at 0, every legal six ties: each hero of
+a role has the same chance of being the one drawn across boards, and one board draws the same
+six every time. A share and the fight odds are ratios of scores, not probabilities of winning:
+nothing here is fitted to match results. The playbook holds both as assumptions, <i>Tied
+sixes are equally good</i> and <i>Deterministic, not probabilistic</i>.</p>
 <h2 id='board'>The board</h2>
 <p id='likely-comp'><b>Red's most likely starting comp</b>: a two-two-two, filled slot by slot
 with the likeliest hero from the map's pick rates and the synergy table, past the bans. No

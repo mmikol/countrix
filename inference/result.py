@@ -20,7 +20,7 @@ from inference import base as base_module
 from inference import catalog as catalog_module
 from inference.base import BaseWeights
 from inference.scoring import Candidate, Contribution
-from inference.solver import RANK_CAP
+from inference.solver import RANK_CAP, Tied
 from inference.strategy import Strategy
 
 # A result or a board as to_dict() serves it: a JSON object, read by the shells.
@@ -113,6 +113,8 @@ def _pct(score: float, best: float, floor: float) -> int:
 
 # what a comp its own picks rule out reads, before the rules it breaks
 NOT_ALLOWED = "not allowed"
+# a result no other six ties: the optimal alone at its score, or no optimal
+UNTIED = Tied(1, False)
 
 
 def not_allowed(rules: list[str]) -> str:
@@ -167,6 +169,8 @@ class Result:
     seconds: float = 0.0
     rank: int | None = None
     outranked: bool = False            # a full six RANK_CAP sixes outrank: no rank given
+    # an optimal six: how many legal sixes share its score, itself among them
+    tied: Tied = UNTIED
     playstyle: str = ""
     best: float | None = None          # the board's best score: what 100 means here
     floor: float | None = None         # the seat's floor: what 0 means here, else zero
@@ -215,7 +219,7 @@ class Result:
         self.barred = not_allowed(rules)
         self.contributions = [c for c in self.contributions if c["form"] == "limit"]
         self.alternatives, self.rank, self.considered = [], None, 0
-        self.outranked = False
+        self.outranked, self.tied = False, UNTIED
 
     def unscored(self) -> str | None:
         """Why the result carries no share of a best, or None when it does.
@@ -316,6 +320,8 @@ class Result:
                 "contributions": self.contributions, "violations": self.violations,
                 "alternatives": self.alternatives, "rank": self.rank,
                 "outranked": self.outranked,
+                # the sixes that share an optimal's score, and the words for it
+                "tied": self.tied.sixes, "tie": self.tie_label(),
                 "considered": self.considered, "seconds": round(self.seconds, 2),
                 "strategies": catalog_module.counts(self.catalog), "cited": cited,
                 "considerations": self.considerations, "pending": self.pending}
@@ -338,6 +344,9 @@ class Result:
                                    self._rank_label(), self.considered, self.seconds, under)]
         if unscored and not self.barred:
             lines.append("  UNSCORED: " + unscored.split(" - ", 1)[-1])
+        tie = self.tie_label()
+        if tie:
+            lines.append("  TIED: " + tie)
         if self.partial:
             lines.append("  PARTIAL: %d of %d picked - sums read low until the team is full"
                          % (len(self.blue), TEAM_SIZE))
@@ -366,6 +375,15 @@ class Result:
             ", ".join(self.red) or "an unknown enemy",
             " (locked: %s)" % ", ".join(self.locked) if self.locked else "",
             " (banned: %s)" % ", ".join(self.bans) if self.bans else "")
+
+    def tie_label(self) -> str | None:
+        """How many sixes share the optimal's score, where more than one
+        does: the tie-break's draw chose among them, and none is better."""
+        count, at_least = self.tied
+        if count < 2:
+            return None
+        return ("one of %s%d sixes tied at the best score - the board's draw picked it, and"
+                " none of them is better" % ("at least " if at_least else "", count))
 
     def _rank_label(self) -> str:
         """Where a full six ranks among the legal sixes, if it is ranked."""

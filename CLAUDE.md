@@ -106,7 +106,7 @@ db <- facts <- inference <- door <- ui.
   (`Strategy`, `CatalogError`); one bad file makes `catalog.load` raise
   everywhere. `meta.md` beside the strategy files is no strategy and no
   strategy may take its name: it holds the default engine's weights
-  (below). The shipped playbook is six assumptions, one heuristic,
+  (below). The shipped playbook is eight assumptions, one heuristic,
   `heal-rate`, scored (the healing floor, `matchup.heal_shortfall`,
   docs/inference.md), and one limit, `at-most-three-supports`, while
   it is rebuilt rule by rule from the citation record in
@@ -158,7 +158,12 @@ db <- facts <- inference <- door <- ui.
   (`inference/solver.py`, its bounds in `inference/bounds.py`): every
   legal six of the released, unbanned roster, each once, by branch and
   bound, in one total order - the score to `SCORE_PLACES` decimals, then
-  `map_win_mean`, then sorted names - each six scored in one seat order.
+  the six's tie-break draws, then sorted names - each six scored in one
+  seat order. A draw is a hash of the board's map and side and the hero's
+  id (`scoring.draw`), never a rate or a name, so with nothing scoring
+  every legal six ties and the draw alone picks; the optimal reports how
+  many sixes share its score (`Solver.ties`), and the `ties-are-drawn`
+  assumption says so in the playbook.
   A new metric or expression construct needs a bound rule, and
   `tests/inference/test_bounds.py` fails without one. Blue's picks the
   limits rule out - a full six that breaks one, or picks the fill's search

@@ -83,7 +83,7 @@ the solver reads nothing else.
 
 ## Engineering
 
-- **829 tests.** CI runs ruff, mypy and the 710 that need no database on
+- **846 tests.** CI runs ruff, mypy and the 727 that need no database on
   every push to main and every pull request; they cover 93% of the lines,
   held to 78%. With the database built, all of them run against a 75% floor.
 - **The search is held to brute force.** A CI gate enumerates every legal six
@@ -128,7 +128,7 @@ reuse the database.
 
 The reference playbook is the one the tests prove the solver against. Leave out
 the `echo` line and the board runs the shipped playbook while its rules are
-rebuilt: six assumptions in prose, one heuristic, a healing floor set by the
+rebuilt: eight assumptions in prose, one heuristic, a healing floor set by the
 kit, and one limit, at most three supports, on top of the default engine,
 which scores the sixes on their win rates, synergies and counters.
 

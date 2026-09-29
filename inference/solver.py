@@ -17,6 +17,10 @@ A Solver is the board's Objective (inference.scoring) on the board's scale
                 order, ties on the quantized score settled as the search
                 settles them: the same walk, dropping every branch whose
                 bound cannot reach it, exact up to RANK_CAP
+    ties        how many legal sixes share the best six's quantized score,
+                read off the search's best K where a lower six closes it,
+                else counted by the same walk, exact up to RANK_CAP within
+                TIE_BUDGET sixes scored, and "at least" past either
 
 A search refuses rather than guesses: past NODE_BUDGET branches or
 SCORE_BUDGET sixes scored in full it raises Unbounded, and a search that
@@ -41,6 +45,7 @@ RANK_CAP = 100                    # the ranks outranking() counts exactly; past 
 NODE_BUDGET = 2_000_000           # branches one search walks before it refuses
 SCORE_BUDGET = 200_000            # sixes one search scores in full before it refuses
 CHECK_EVERY = 4096                # branches between two asks whether the board is superseded
+TIE_BUDGET = 5_000                # sixes a tie count scores before it answers "at least"
 
 
 class Infeasible(Refusal):
@@ -61,6 +66,14 @@ class Solved(NamedTuple):
     solver: "Solver"
     ranked: list[Candidate]
     size: int
+
+
+class Tied(NamedTuple):
+    """How many legal sixes share the best six's quantized score, itself
+    among them, and whether the count stopped at RANK_CAP or a budget, so
+    that at least that many do."""
+    sixes: int
+    at_least: bool
 
 
 class Evaluated(NamedTuple):
@@ -142,7 +155,26 @@ class _Count:
             self.done = self.count >= self.cap
 
 
-type Goal = _Best | _Count
+class _Ties:
+    """The legal sixes whose quantized score reaches a best six's, counted
+    up to a cap, among at most TIE_BUDGET sixes scored; a branch whose bound
+    rounds below it is dropped."""
+
+    def __init__(self, best: Candidate, cap: int) -> None:
+        self.score = quantized(best.score)
+        self.cap, self.count, self.seen, self.done = cap, 0, 0, False
+
+    def prunes(self, bound: float, walk: Bound, frame: Frame, open_roles: Open) -> bool:
+        return quantized(bound) < self.score
+
+    def offer(self, cand: Candidate) -> None:
+        self.seen += 1
+        if quantized(cand.score) >= self.score:
+            self.count += 1
+        self.done = self.count >= self.cap or self.seen >= TIE_BUDGET
+
+
+type Goal = _Best | _Count | _Ties
 
 
 class Solver(Objective):
@@ -227,6 +259,24 @@ class Solver(Objective):
         goal = _Count(target, RANK_CAP if cap is None else cap)
         self._search(goal)
         return None if goal.done else goal.count
+
+    def ties(self, solved: Solved) -> Tied:
+        """How many legal sixes share the quantized score of `solved`'s best
+        six, itself among them: read off the search's own best K where a
+        six of a lower score closes it, else counted by a walk of its own -
+        exactly up to RANK_CAP, and at least as many as it counted where the
+        walk scores TIE_BUDGET sixes or passes the search's budget first."""
+        ranked = solved.ranked
+        best = quantized(ranked[0].score)
+        tied = sum(1 for c in ranked if quantized(c.score) == best)
+        if tied < len(ranked) or len(ranked) < solved.size:
+            return Tied(tied, False)
+        goal = _Ties(ranked[0], RANK_CAP)
+        try:
+            self._search(goal)
+        except Unbounded:
+            return Tied(max(goal.count, tied), True)
+        return Tied(goal.count, goal.done)
 
     def _search(self, goal: Goal) -> None:
         """Walk every legal shape, strongest root bound first, into `goal`."""

@@ -199,6 +199,15 @@ few match-ups the wiki rates (the counters table is a list).
 
 ## Done
 
+- **A tie is a draw, and the engine is verified in stages.** Tied sixes
+  break by a per-board draw per hero (`scoring.draw`, seeded by the map
+  and the side) in place of the mean map win rate, so a tie leaks no rate
+  and favours no name; an optimal six says how many sixes share its score
+  (`Solver.ties`). `tests/inference/test_stages.py` holds the null
+  objective, the meta alone and dummy heuristics to enumeration on the
+  synthetic World, and `tests/inference/verify_engine.py` checks the same
+  stages on the built database. Two assumptions state it in the playbook:
+  `ties-are-drawn` and `deterministic-not-probabilistic`.
 - **The search is exact.** Branch and bound over every legal six of the
   released roster replaces the per-role pool, its sweep and the local
   search (`inference/bounds.py`, `inference/solver.py`); the process pool,
