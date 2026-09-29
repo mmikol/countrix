@@ -1,10 +1,11 @@
 """The search's bounds, held to what they bound. Every team and matchup
 metric has a rule and every node type and operator the expression
-whitelist admits has one; and on random branches of random boards, pairs
-no article writes among them, under the reference playbook and scratch
-strategies of every form - a need, text
-gates, and/or/not, a chained comparison, a clamped division, len, in, if,
-powers and remainders - every metric's range holds its value on every
+whitelist admits has one; and on random branches of random boards, synergy
+cells no article writes among them, under the reference playbook and
+scratch strategies of every form - a need, text gates, and/or/not, a
+chained comparison, a clamped division, len, in, if, powers and
+remainders, the synergy graph's isolated picks and largest group -
+every metric's range holds its value on every
 completion, every expression's holds its value, the bound holds every
 completion's score and tie-break, and a branch the limits rule out holds
 no six that keeps them. Every board is the synthetic World's: no
@@ -57,6 +58,8 @@ SCRATCH = {
     "shared": "metric: team.armor_share\ndirection: minimize\nweight: 0.5",
     "costly": "metric: team.ult_cost_mean\ndirection: minimize\nweight: 0.5",
     "tempo": "metric: matchup.tempo_diff\ndirection: maximize\nweight: 0.5",
+    "lonely": "metric: team.isolated_count\ndirection: maximize\nweight: 0.5",
+    "tight-core": "metric: team.core_size\ndirection: minimize\nweight: 0.5",
 }
 LIMITS = {
     "ranged": "require: team.range_known >= 2 or team.hitscan >= 1",
@@ -146,17 +149,23 @@ PAIRS_HEAVY = dataclasses.replace(DEFAULT, synergy=2.0)
 
 
 def imputing(world):
-    """A copy of the world whose articles write a cell for every pair but
-    two - Rook with Balm, and Needle with Sorrel - so those two read at the
-    written pairs' mean, 1.25 here, as an unwritten pair does."""
+    """A copy of the world whose articles write both cells of every pair
+    but four: neither writes Rook with Balm or Needle with Sorrel, so each
+    of their cells reads the claim share, 0.625 here, and one article
+    leaves Anvil with Kite blank, and Sorrel's leaves Gale, whom Gale's
+    claims, so each of those reads the share once more."""
     world = copy.copy(world)
     released = [h for h in world.heroes.values() if h.released]
-    unwritten = {frozenset((world.hero(a).id, world.hero(b).id))
-                 for a, b in (("Rook", "Balm"), ("Needle", "Sorrel"))}
-    world.synergy_written = {frozenset((a.id, b.id)) for a, b in itertools.combinations(
-        released, 2)} - unwritten
-    world.synergy_prior = 1.25
-    assert all(world.synergy_unwritten(*pair) for pair in unwritten)
+    ids = {h.name: h.id for h in released}
+    blank = {(ids[a], ids[b]) for a, b in (
+        ("Rook", "Balm"), ("Balm", "Rook"), ("Needle", "Sorrel"), ("Sorrel", "Needle"),
+        ("Anvil", "Kite"), ("Sorrel", "Gale"))}
+    world.synergy_written = {(a.id, b.id) for a, b in itertools.permutations(
+        released, 2)} - blank
+    world.synergy_cell = 0.625
+    assert [world.unwritten_cells(ids[a], ids[b]) for a, b in (
+        ("Rook", "Balm"), ("Needle", "Sorrel"), ("Anvil", "Kite"), ("Gale", "Sorrel"))] == [
+            2, 2, 1, 1]
     return world
 
 

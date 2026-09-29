@@ -107,20 +107,25 @@ def test_every_team_fact_carries_the_number_the_solver_scores(synthetic_world):
 
 
 def test_the_cohesion_fact_names_each_pair_neither_article_writes(synthetic_world):
-    """A pair neither article writes is scored at the written pairs' mean,
-    and the fact the synergy term cites names it apart from the wiki's, so
-    no reason passes it off as a documented pair."""
+    """A cell no article writes is scored at the written cells' claim share,
+    and the fact the synergy term cites counts those cells and names the
+    pairs neither article writes apart from the wiki's, so no reason passes
+    one off as documented. Both articles claim Anvil+Balm and one
+    Mortar+Myrrh; Anvil's writes Mortar off; eight cells are blank."""
     w = synthetic_world
-    anvil, mortar = w.hero("Anvil"), w.hero("Mortar")
-    w.synergy_written = set(w.synergies) | {frozenset((anvil.id, mortar.id))}
-    w.synergy_prior = 1.0618
+    ids = {h.name: h.id for h in w.heroes.values()}
+    w.synergy_written = {(ids[a], ids[b]) for a, b in (
+        ("Anvil", "Balm"), ("Balm", "Anvil"), ("Mortar", "Myrrh"), ("Anvil", "Mortar"))}
+    w.synergy_cell = 0.86
     fs = _facts(w, "Harbor Gate", (), ("Anvil", "Balm", "Mortar", "Myrrh"))
     [fact] = [f for f in fs.facts if f.key == "team.synergy_edges" and f.team == "blue"]
     assert fact.text == (
-        "blue team cohesion: 2 of 6 possible synergy edges (density 0.33, score sum 6.19)"
-        " - Anvil+Balm; Mortar+Myrrh; 3 pairs neither article writes, each read at the"
-        " written pairs' mean 1.06: Anvil+Myrrh, Balm+Mortar, Balm+Myrrh")
+        "blue team cohesion: 2 of 6 possible synergy edges (density 0.33, score sum 9.88)"
+        " - Anvil+Balm; Mortar+Myrrh; 8 cells no article writes, each read at 0.86, the"
+        " written cells' claim share - neither article writes Anvil+Myrrh, Balm+Mortar,"
+        " Balm+Myrrh")
     assert fs.find("team.unwritten_pairs")[-1] is fact
+    assert fs.find("team.unwritten_cells")[-1] is fact
 
 
 def test_the_healing_and_the_saves_read_against_the_rosters_bench(synthetic_world):

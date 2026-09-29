@@ -301,35 +301,38 @@ def test_a_derived_edge_counts_half_a_wiki_edge_and_the_fact_names_it(synthetic_
 def test_the_stamp_holds_a_derived_edges_weight_and_what_an_unwritten_pair_reads():
     stamped = base.stamp(DEFAULT)
     assert stamped is not None and stamped["derived"] == 0.5
-    assert stamped["unwritten"] == base.UNWRITTEN_SYNERGY == "the written pairs' mean"
+    assert stamped["unwritten"] == base.UNWRITTEN_SYNERGY == "the written cells' claim share a cell"
     assert (stamped["meta"], stamped["counter"]) == (DEFAULT.meta, DEFAULT.counter)
     assert base.stamp(OFF) is None
 
 
-def test_the_synergy_term_reads_a_pair_neither_article_writes_at_the_prior(synthetic_world):
+def test_the_synergy_term_reads_a_cell_no_article_writes_at_half_the_prior(synthetic_world):
     """SIX holds two claimed pairs (Anvil+Balm, Needle+Tansy, 4 in all) and
-    thirteen pairs no article claims. Written off, each reads 0; written by
-    neither, each reads the written pairs' mean, and the term and its fact
-    say so."""
+    thirteen pairs no article claims. A cell written off reads 0, and one
+    no article writes the written cells' claim share: ten pairs written off
+    in both articles, two in one article and one in neither leave four
+    blank cells, and the term and its fact say so."""
     w = synthetic_world
     six = heroes(w, SIX)
     others = [
-        frozenset((a.id, b.id)) for a, b in itertools.combinations(six, 2)
-        if w.synergy(a.id, b.id) is None]
+        (a.id, b.id) for a, b in itertools.combinations(six, 2) if w.synergy(a.id, b.id) is None]
     assert len(others) == 13
-    w.synergy_written = set(w.synergies) | set(others[:10])
-    w.synergy_prior = 0.5
+    w.synergy_written = {(a, b) for a, b in others[:12]} | {(b, a) for a, b in others[:10]}
+    w.synergy_cell = 0.25
     _, cand = prepared(w, "Harbor Gate", ("Mortar", "Gale"), SIX)
-    assert cand.terms.synergy == cand.ns["team"]["synergy_score"] == 4 + 3 * 0.5
+    assert cand.ns["team"]["unwritten_cells"] == 4
+    assert cand.terms.synergy == cand.ns["team"]["synergy_score"] == 4 + 4 * 0.25
     [c] = [c for c in cand.contributions if c["id"] == base.SYNERGY]
-    assert c["raw"] == 5.5 and c["weighted"] == pytest.approx(DEFAULT.synergy * 5.5)
-    assert "neither article writes at the written pairs' mean" in c["metric"]
+    assert c["raw"] == 5.0 and c["weighted"] == pytest.approx(DEFAULT.synergy * 5.0)
+    assert "a cell no article writes at the written cells' claim share" in c["metric"]
 
 
 def test_the_reference_weights_are_the_calibrated_engine_and_off_is_meta_zero():
     """The reference playbook's meta.md holds the weights the engine was
-    calibrated at - the rate term in win-rate points, synergy and counter at
-    half its median spread each - under a meta of 1; OFF is the meta at 0,
+    first calibrated at, while an unwritten synergy pair read 0 - the rate
+    term in win-rate points, synergy and counter at half its median spread
+    each - under a meta of 1, whatever the live file moves to; OFF is the
+    meta at 0,
     and a meta of 0 over any dials scores nothing, as OFF does."""
     assert DEFAULT.record() == {"meta": 1.0, "rate": 1.0, "synergy": 0.1, "counter": 0.05}
     assert DEFAULT.on and OFF.meta == 0 and not OFF.on

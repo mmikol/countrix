@@ -26,7 +26,13 @@ Bring the roster and the kits up to date. Work through the
    wiki's dive, brawl and poke lists, the tags a map's style is derived
    from. `pull_synergies` with `refresh: true`: the Team Synergy advice in
    every released hero's article, a pair stored once, score 2 when both
-   articles claim it. The summary's `unpaired` line names heroes the wiki
+   articles claim it. Every written cell, a claim or not, goes to
+   `synergy_cells`: the summary's `cells` counts them, its
+   `unwritten_pairs` the pairs neither article writes, and its `unwritten`
+   line names heroes whose article writes no cell. The engine reads a cell
+   no article writes at half the written pairs' mean, not zero, so a new
+   hero with a near-blank article is not charged for it - do not report
+   it as having no synergy. The `unpaired` line names heroes the wiki
    pairs with no one yet. Nothing here is written by hand:
    `load_authored` mirrors the strategy files and nothing else.
 5. **Counters and rates.** `pull_counters`, no refresh: the Match-Up

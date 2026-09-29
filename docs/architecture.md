@@ -23,8 +23,8 @@ The argmax runs over every legal six - each set of heroes once, at most
 two tanks - less the sixes the playbook's limits rule out, which weigh
 nothing. The function it takes is two layers. The default engine
 (`inference/base.py`) scores a six on its win rates on the map, the
-wiki's synergy pairs among its picks - a pair neither article writes at
-the mean of the written ones - and the counter graph against the other
+wiki's synergy pairs among its picks - a cell no article writes at the
+written cells' claim share - and the counter graph against the other
 side, the wiki's edges and answers derived from the kits where the wiki
 has none, so a playbook of assumptions alone still gets scored sixes.
 Its weights are the playbook's - `meta.md` beside the strategy files,
@@ -173,7 +173,7 @@ at start:
 
 | setting | default | meaning |
 | --- | --- | --- |
-| `COUNTRIX_STRATEGIES` | empty | a playbook folder other than `inference/strategies/`, relative to the repo root or absolute |
+| `COUNTRIX_STRATEGIES` | empty | a playbook folder other than `inference/strategies/`, relative to the repo root or absolute; it must hold a `meta.md` (the default engine's weights), or every board is a `CatalogError` - `tune` with id `meta` seeds one from the shipped file |
 | `COUNTRIX_MCP_TOKEN` | unset | bearer token the MCP server requires over HTTP |
 | `DATABASE_URL` | unset | the PostgreSQL to use. Unset, the embedded pgserver cluster at `db/psql/cluster`, which `db_rebuild` builds: the local run, on the same tools, facts and strategies as the stack. With neither, `NoDatabaseError` |
 

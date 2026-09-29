@@ -46,8 +46,8 @@ variable: it has no cluster and no pgserver.
 
 The solver searches exactly, in the process that calls it: a board is a
 few searches of tens of milliseconds each, one after another, and spawns
-no worker. `python -m tests.inference.prove_exact` checks it by hand
-against a brute force of every legal six on a board of the built
+no worker. `.venv/bin/python -m tests.inference.prove_exact` checks it
+by hand against a brute force of every legal six on a board of the built
 database, in slices under five minutes each (its docstring says how).
 
 Without the database, two generated sections regenerate on their own:
@@ -112,22 +112,29 @@ db <- facts <- inference <- door <- ui.
   it is rebuilt rule by rule from the citation record in
   `inference/README.md`. Solver behaviour is tested against the 19-file
   reference playbook in `tests/fixtures/playbook/` and its own `meta.md`
-  (`DEFAULT` and `BRIEF` in tests/inference/__init__.py), or its four assumptions
-  alone (`ASSUMPTIONS_ONLY` in tests/inference/__init__.py) where a test
-  needs a playbook that scores nothing; no solver test reads
+  (`DEFAULT` and `BRIEF` in tests/inference/__init__.py), or its four
+  assumptions alone (`ASSUMPTIONS_ONLY` there) where a test needs a
+  playbook that scores nothing; no solver test reads
   `inference/strategies/`.
 - **The default engine scores first.** `inference/base.py` scores every six
   on its win rates on the map (each pick's edge over 50, trusted by its pick
-  rate), the wiki's synergy scores and the counter graph against the other
-  side - its locked picks, else its likely six: a wiki edge 2, and on a
-  pair the wiki leaves out a kit-derived one 1 (`facts/counters.py`, which
-  the team.* counter metrics never read) - and the playbook's terms
+  rate), the wiki's synergy scores - read cell by cell, one cell in each
+  hero's article: a claim 1, a write-off 0, and a cell no article writes
+  (no `synergy_cells` row) at the written cells' claim share
+  (`facts.tables.impute_synergy`), never 0 (docs/inference.md, Why an
+  unwritten synergy pair is not zero) - and the counter graph against the
+  other side - its locked picks, else its likely six: a wiki edge 2, and
+  on a pair the wiki leaves out a kit-derived one 1 (`facts/counters.py`,
+  which the team.* counter metrics never read) - and the playbook's terms
   sit on top, so the shipped playbook's boards are scored, never
   *unscored*. Its weights are the playbook's, in `meta.md`: `meta`, which
   scales the whole engine, over the `rate`, `synergy` and `counter` dials
-  (1, 1, 0.1, 0.05 shipped); `tune` with id `meta` changes them, and the
-  playbook tab's Meta slider (`weights=meta:<v>`) sets the meta for a
-  session. No weight lives in code. A `BaseWeights` rides the `Brief`
+  (1, 1, 0.26, 0.05 shipped); `tune` with id `meta` changes them and the
+  file's prose (`body`), and the playbook tab's Meta slider
+  (`weights=meta:<v>`) sets the meta for a session. No term's weight
+  lives in code; what a term counts inside - `WIKI_WEIGHT` and
+  `DERIVED_WEIGHT`, `RATE_PICK_HALF`, `NEED_BUDGET` - is its definition,
+  and a fixture's stamp records it. A `BaseWeights` rides the `Brief`
   (`base=` on `infer`, `Objective` and `Solver`); left
   unset it is the playbook in force's `meta.md` (`engine.weights_in_force`),
   and every result and `base.stamp` record it. A test that runs the engine
@@ -162,8 +169,9 @@ db <- facts <- inference <- door <- ui.
   `/api/facts` and answers `/api/board`, `/api/strategies` and `/health`
   with `inference/serve.py`'s handlers, all in its own process - the
   compose stack's `ui` container runs the engine.
-  `serve.Admission` solves `BOARDS_AT_ONCE` board at a time. It answers GET alone and writes nothing: a slider's weight
-  rides with the session's requests. Both HTTP servers, the board and the
+  `serve.Admission` solves `BOARDS_AT_ONCE` (one) board at a time. The
+  board answers GET alone and writes nothing: a slider's weight rides
+  with the session's requests. Both HTTP servers, the board and the
   MCP door, stand on `db/web.py`: a request whose Host or Origin is not a
   local name or one given with `--allow-host` is refused with 403.
 - **Docker** runs one image as three roles, plus postgres and `backup`, the
@@ -229,7 +237,10 @@ db <- facts <- inference <- door <- ui.
   `WORLD_METRICS` and the key its function computes (the namespace must
   equal the registry), and in `TEXT_METRICS` when its value is a name or a
   list - `tests/facts/test_metrics.py` checks every registry key's kind
-  against it - then regenerate the catalog vocabulary in docs/inference.md.
+  against it - and a bound rule in `inference/bounds.py` (its aggregate: a
+  sum, a mean, a count, fixed by the shape), which
+  `tests/inference/test_bounds.py` fails a key without; then regenerate
+  the catalog vocabulary in docs/inference.md.
 - `tests/ui/test_pages.py` pins the scripts at their seams (routes, query
   keys, element ids, the payload keys they read against what the server
   writes) and holds that every `board.css` class is used; a decision worth
@@ -254,11 +265,12 @@ db <- facts <- inference <- door <- ui.
 ## House rules
 
 - A session never hand-edits the playbook. Changes go through `tune`
-  (`meta.md`'s weights too), `add_strategy` or `infer_strategy`. They validate, rewrite the docs
-  catalog for the shipped playbook and append a reasoned line to
-  `tuning-log.md` beside the playbook in force. A draft the user drops in
-  by hand (name, kind, prose) is input; `/strategy` fills its frontmatter
-  through `infer_strategy`.
+  (`meta.md`'s weights and prose too, and it seeds a folder's missing
+  `meta.md` from the shipped one), `add_strategy` or `infer_strategy`.
+  They validate, rewrite the docs catalog for the shipped playbook and
+  append a reasoned line to `tuning-log.md` beside the playbook in force.
+  A draft the user drops in by hand (name, kind, prose) is input;
+  `/strategy` fills its frontmatter through `infer_strategy`.
   Called without `directory=`, `tune`/`add`/`complete` rewrite the live
   playbook, so tests pass a temporary copy.
 - Migrations are `db/psql/migrations/NNN_name.sql`; new ones wrap in

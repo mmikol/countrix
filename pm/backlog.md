@@ -20,14 +20,16 @@ keeps it current.
   scored under. Cost: two days - a migration, the tool's `map` argument,
   the layering, the tab, the facts line that names the set - and a test
   that the same six scores differently under two maps' sets.
-- **The synergy weight's calibration.** Reading an unwritten synergy
-  pair at the written pairs' mean narrowed the synergy score's median
-  range from 21 to 12.8, so meta.md's synergy of 0.1 now spreads a
-  typical board's sixes about 1.3 points, not the 2.1 the calibration
-  aimed at (half the rate term's spread, as counter still does). The
-  rule gives 0.16; whether to move it is the owner's, through `tune`
-  (id `meta`, field `synergy`), measured on the 30 maps first. Cost: an
-  hour.
+- **The engine's inner constants as dials.** The owner turns every
+  term's weight in `meta.md`; what a term counts inside still sits in
+  code, stamped but not tunable: a derived counter edge against a wiki
+  edge (`WIKI_WEIGHT` 2, `DERIVED_WEIGHT` 1 in `facts/counters.py`), the
+  pick rate that halves a rate edge's trust (`RATE_PICK_HALF`, 3) and
+  the needs' shared budget (`NEED_BUDGET`, 2, never below a need's own
+  weight). Making them `meta.md` dials is the owner's call: the derived
+  edge's would split the counter tally into two whole-number tallies,
+  each weighted, so the search's integer tallies and its joint bound hold;
+  `pick_half` needs a floor above 0. Cost: a day, with the bound's fuzz.
 - **What the healing figures leave out.** `Hero.hps` now sums every
   piece over the teammates it reaches and holds a beam to its resource
   (docs/inference.md, Sustained healing). Three limits stand: the bench
@@ -204,10 +206,19 @@ few match-ups the wiki rates (the counters table is a list).
   process. The search is held to enumeration in the suite and to a brute
   force of every legal six on real boards (`tests/inference/prove_exact.py`),
   and docs/inference.md says why (Why the search is exact).
+- **A synergy cell no article writes reads the claim share, and
+  synergy weighs 0.26.** The load keeps each written cell's article and
+  reads a blank cell at the share of the written cells that claim, 0.86,
+  so a pair one article claims no longer reads below a pair nobody wrote
+  about; `team.unwritten_cells` counts the blanks. The owner's
+  recalibration then measured the synergy score's median range at 8.1
+  and set synergy from 0.1 to 0.26 through `tune`, and `meta.md`'s prose
+  says both (docs/inference.md, Why an unwritten synergy pair is not
+  zero; Why the weights are the playbook's).
 - **An unwritten synergy pair is unknown, not zero.** `pull_synergies`
   keeps every written Team Synergy cell in `synergy_cells` (migration
   029) and keeps a rating GOOD or better that has no advice text; the
-  load reads a pair neither article writes at the written pairs' mean,
+  load read a pair neither article writes at the written pairs' mean,
   1.06, which `team.synergy_score` and the default engine's synergy term
   read, and `team.unwritten_pairs` and the cohesion fact name
   (docs/inference.md, Why an unwritten synergy pair is not zero).

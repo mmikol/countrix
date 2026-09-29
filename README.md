@@ -34,15 +34,15 @@ hide the rate figures: Blizzard licenses those for personal use only.*
   most two tanks, and the playbook's constraints prune it, weighing
   nothing: about 17.2 million legal sixes today, fewer with bans or
   locks. A default engine, the meta, scores every six left on its win
-  rates on the map trusted by pick rate, the wiki's synergies (a pair no
-  article writes read at the written pairs' mean, not zero) and its
+  rates on the map trusted by pick rate, the wiki's synergies (a cell no
+  article writes read at the written cells' claim share, not zero) and its
   counters to the other side - the wiki's, and answers derived from the
   kits where the wiki says nothing - and one meta weight scales it. The
   heuristics add or subtract from the same facts, each times its weight.
   A branch-and-bound search proves the best six, scoring a few dozen in
   full, and returns the next best in order; every reason cites a fact.
   No weight is learned: a rule's starts from its prose, the engine's
-  from a calibration, and every one is yours to turn.
+  from a calibration, and each one is yours to turn.
 - **Serves it two ways.** A web board and an MCP (Model Context Protocol)
   server, the tool interface a Claude Code session uses to draft comps and
   tune the playbook. The solver is arithmetic; the board
@@ -83,7 +83,7 @@ the solver reads nothing else.
 
 ## Engineering
 
-- **823 tests.** CI runs ruff, mypy and the 705 that need no database on
+- **829 tests.** CI runs ruff, mypy and the 710 that need no database on
   every push to main and every pull request; they cover 93% of the lines,
   held to 78%. With the database built, all of them run against a 75% floor.
 - **The search is held to brute force.** A CI gate enumerates every legal six

@@ -98,11 +98,14 @@ def _remirror(ctx: Context) -> None:
 
 @tool(
     "tune", "Change one strategy's frontmatter - its weight, a params dial, or"
-    " a when/require/bonus/penalty expression - or, with id meta, one of"
-    " meta.md's default engine weights: meta, which scales the whole engine"
-    " (0 turns it off), or its rate, synergy or counter dial. Validated"
-    " through the catalog before it is written, mirrored into the database,"
-    " and logged with the reason in inference/strategies/tuning-log.md.",
+    " a when/require/bonus/penalty expression - or, with id meta, meta.md: one"
+    " of the default engine's weights - meta, which scales the whole engine"
+    " (0 turns it off), or its rate, synergy or counter dial - or its prose,"
+    " body, rewritten whole. A playbook folder with no meta.md is seeded from"
+    " the shipped one's. Validated through the catalog before it is written,"
+    " the strategies re-mirrored into the database (meta.md's weights live in"
+    " the file alone), and logged with the reason in the tuning-log.md beside"
+    " the playbook.",
     {
         "id": {
             "type": "string",
@@ -110,10 +113,11 @@ def _remirror(ctx: Context) -> None:
         "field": {
             "type": "string",
             "description": "%s; for id %s: %s" % (
-                " | ".join((*TUNABLE, "params.NAME")), META, " | ".join(DIALS))},
+                " | ".join((*TUNABLE, "params.NAME")), META,
+                " | ".join((*DIALS, tune.META_PROSE)))},
         "value": {"description": "the new value: a number, a word (kind, category, metric,"
                                  " direction) or an expression; meta.md's weights are"
-                                 " numbers within 0..10"},
+                                 " numbers within 0..10, its body the prose in markdown"},
         "reason": {"type": "string", "description": "why, in a sentence"},
         **BY},
     ["id", "field", "value", "reason"])

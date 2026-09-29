@@ -30,7 +30,7 @@ from inference.base import COUNTERS, RATES, READS, SYNERGY, Base, BaseWeights, T
 from inference.expr import Expr, Scope, Value, scope
 from inference.strategy import Strategy, settled_by_board
 
-NEED_BUDGET = 2.0                 # the most one guarded state can cost
+NEED_BUDGET = 2.0                 # what one guarded state costs at most, or its largest need
 SCORE_PLACES = 9                  # the decimal places a six's score ranks by
 
 
@@ -272,15 +272,20 @@ class Objective:
         self._heuristics = [(g, gates[g.id], slots.get(g.id, 0), *_split_key(g.metric))
                             for g in self.heuristics]
         # a heuristic guarded on the six's own state is a need: see score().
-        # Needs that share a guard share NEED_BUDGET: the state costs at most
-        # that much however many rules the playbook writes about it
+        # Needs that share a guard share a budget - NEED_BUDGET, or the
+        # largest of their weights where one is more - so the state costs
+        # that much at most however many rules the playbook writes about it,
+        # and no need weighs less than its own weight on a guard of its own
         guards = {g.id: g.when.source for g in self.heuristics
                   if g.need and g.when is not None}
         written: dict[str, float] = {}
+        largest: dict[str, float] = {}
         for g in self.heuristics:
             if g.id in guards:
-                written[guards[g.id]] = written.get(guards[g.id], 0.0) + g.weight
-        self._needs = {sid: min(1.0, NEED_BUDGET / written[source])
+                source = guards[g.id]
+                written[source] = written.get(source, 0.0) + g.weight
+                largest[source] = max(largest.get(source, 0.0), g.weight)
+        self._needs = {sid: min(1.0, max(NEED_BUDGET, largest[source]) / written[source])
                        if written[source] else 1.0 for sid, source in guards.items()}
         self._freeze_norms()
 
@@ -397,7 +402,9 @@ class Objective:
         matchup.*) is a need - "a solo healer needs an escape" - and adds
         weight x (norm - 1): met in full it costs nothing, unmet it costs the
         weight, and entering the guarded state never pays. Needs written on
-        one guard are scaled to sum to NEED_BUDGET at most.
+        one guard are scaled to sum to NEED_BUDGET at most, or to the
+        largest of their weights where it is more, so a need alone on its
+        guard weighs its own weight.
 
         With `detail`, every term is a Contribution: its optional keys belong
         to the form that has them, so a reader asks for those with .get()."""

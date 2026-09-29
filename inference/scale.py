@@ -30,9 +30,8 @@ def sample(objective: Objective, size: int = REFERENCE_SIZE) -> list[Candidate]:
     """A seeded sample of `size` random legal sixes for this board,
     unprepared; every legal six, in the seeded order, on a roster that holds
     fewer. Deterministic for a given map and side, and independent of the
-    locked picks, the pool, the enemies and the bans, so every call on one
-    board shares a scale - and any process draws the same list and can take
-    a slice.
+    locked picks, the enemies and the bans, so every call on one board
+    shares a scale - and any process draws the same list.
 
     It must not depend on red or the bans. The sample fixes every
     heuristic's [lo, hi], so drawing it differently rescales the whole
@@ -119,8 +118,9 @@ def _board_pool(objective: Objective, role: str) -> list[Hero]:
 
 
 def _board_field(objective: Objective) -> Iterator[list[Hero]]:
-    """The field this board would search with nothing locked: each role's
-    top SCALE_POOL by the board's own prior, over every legal shape.
+    """The field that fixes this board's scale beside the sample, with
+    nothing locked: each role's top SCALE_POOL by the board's own prior,
+    over every legal shape.
 
     It must not read the locked picks. The bounds it feeds are the board's
     one scale: `infer`, the fill and `current` run with different locks on

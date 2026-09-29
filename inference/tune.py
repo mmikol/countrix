@@ -27,12 +27,16 @@ change made through a container lands on the host and in git with the file
 it changed.
 
     tune("meta", "synergy", 0.2, "the wiki's pairs should count for more")
+    tune("meta", "body", prose, "the synergy clause names the imputed cells")
 
 The id `meta` names meta.md, the default engine's weights beside the
 strategy files: its fields are meta, rate, synergy and counter
-(base.DIALS), each checked by catalog.meta_dial and the file read back by
-catalog.parse_meta before it is written, then documented and logged like
-any other change (_tune_meta). No strategy may take the name.
+(base.DIALS), each checked by catalog.meta_dial, and `body`, the prose the
+playbook tab and the docs catalog show, rewritten whole; the file is read
+back by catalog.parse_meta before it is written, then documented and
+logged like any other change (_tune_meta). A playbook folder with no
+meta.md is seeded from the shipped one's by its first such change, and the
+log line says so. No strategy may take the name.
 """
 
 import os
@@ -45,7 +49,7 @@ from typing import TypedDict
 
 from db import Refusal
 from inference import catalog as catalog_module
-from inference.base import META
+from inference.base import DIALS, META
 from inference.strategy import (
     FIELD_RULE,
     TUNABLE,
@@ -57,7 +61,8 @@ from inference.strategy import (
     field_text,
 )
 
-MAX_PROSE = 20000          # characters in a strategy's prose
+MAX_PROSE = 20000          # characters in a strategy's prose, or meta.md's
+META_PROSE = "body"        # meta.md's prose, as tune names it beside the dials
 MAX_SENTENCES = 3          # a strategy's prose is three sentences at most
 MAX_BY = 40                # characters of who asked, in a log line
 BY_SESSION = "claude-code-session"    # who asked, when the caller does not say
@@ -301,29 +306,75 @@ def tune(
     return {"id": strategy_id, "field": field, "old": old, "new": new, "line": line}
 
 
+def _meta_text(directory: str) -> tuple[str, str]:
+    """meta.md's text in `directory` -> (the text, what the log line says
+    of where it came from): the folder's own, or, where it has none, the
+    shipped playbook's, which seeds it. The shipped folder without one is
+    a TuneError: nothing is left to seed from."""
+    name = catalog_module.META_FILE
+    sources = [(directory, "")]
+    if os.path.abspath(directory) != os.path.abspath(catalog_module.SHIPPED_DIR):
+        sources.append((catalog_module.SHIPPED_DIR, "seeded from the shipped %s; " % name))
+    for source, seeded in sources:
+        try:
+            with open(os.path.join(source, name), encoding="utf-8") as handle:
+                return handle.read(), seeded
+        except FileNotFoundError:
+            continue
+    raise TuneError("%s: missing - the playbook's folder holds the default engine's weights"
+                    " there" % name)
+
+
+def _meta_prose(text: str, value: object) -> tuple[str, str]:
+    """meta.md's text with its prose rewritten whole -> (the new text, the
+    old prose). The prose is text within MAX_PROSE characters; one that
+    opens with no title keeps the file's."""
+    if not isinstance(value, str) or not value.strip():
+        raise TuneError("%s's %s is its prose, as text" % (catalog_module.META_FILE, META_PROSE))
+    if len(value) > MAX_PROSE:
+        raise TuneError("%s's prose is under %d characters"
+                        % (catalog_module.META_FILE, MAX_PROSE))
+    old = catalog_module.parse_meta(text).body         # the frontmatter is whole
+    prose = value.strip("\n")
+    if not prose.startswith("#"):
+        title = next((line for line in old.splitlines() if line.startswith("#")), "# The meta")
+        prose = "%s\n\n%s" % (title, prose)
+    close = text.find("\n---", 3) + len("\n---")
+    return text[:close] + "\n" + prose + "\n", old
+
+
 def _tune_meta(directory: str, field: str, value: object, reason: str, by: str) -> Change:
-    """One of meta.md's weights set -> the change: the value checked by the
-    rule the reader keeps (catalog.meta_dial), the new text read back
-    through catalog.parse_meta and the strategies loaded before anything is
-    written, then the file written, the docs regenerated and one line
-    logged."""
+    """One of meta.md's weights set, or its prose rewritten -> the change:
+    a weight checked by the rule the reader keeps (catalog.meta_dial), the
+    new text read back through catalog.parse_meta and the strategies loaded
+    before anything is written, then the file written - seeded from the
+    shipped playbook's where the folder has none (_meta_text) - the docs
+    regenerated and one line logged, which names a rewritten prose and
+    does not quote it."""
     path = os.path.join(directory, catalog_module.META_FILE)
+    if field != META_PROSE and field not in DIALS:
+        raise TuneError("%s's fields are %s" % (catalog_module.META_FILE,
+                                                ", ".join((*DIALS, META_PROSE))))
+    text, seeded = _meta_text(directory)
+    old: str | None
     try:
-        checked = catalog_module.meta_dial(field, value)
-        with open(path, encoding="utf-8") as handle:
-            text, old = _edited(handle.read(), lambda lines: _set_scalar(lines, field, checked))
-        catalog_module.parse_meta(text)
+        if field == META_PROSE:
+            text, old = _meta_prose(text, value)
+            new = catalog_module.parse_meta(text).body
+            what = "%s: rewritten" % META_PROSE
+        else:
+            checked = catalog_module.meta_dial(field, value)
+            text, old = _edited(text, lambda lines: _set_scalar(lines, field, checked))
+            catalog_module.parse_meta(text)
+            new = field_text(checked)
+            what = "%s: %s -> %s" % (field, old or "unset", new)
         loaded = catalog_module.load(directory)
-    except FileNotFoundError as error:
-        raise TuneError("%s: missing - the playbook's folder holds the default engine's weights"
-                        " there" % catalog_module.META_FILE) from error
     except CatalogError as error:
         raise TuneError(str(error)) from error
     with open(path, "w", encoding="utf-8") as handle:
         handle.write(text)
     _document(directory, loaded)
-    new = field_text(checked)
-    line = _logged(directory, META, "%s: %s -> %s" % (field, old or "unset", new), reason, by)
+    line = _logged(directory, META, seeded + what, reason, by)
     return {"id": META, "field": field, "old": old, "new": new, "line": line}
 
 

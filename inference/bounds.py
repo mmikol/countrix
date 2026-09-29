@@ -19,7 +19,9 @@ tests/inference/test_bounds.py holds each to it on random branches.
                           completions, by the aggregate it is: a sum over the
                           picks, a mean or median of the known values, a max or
                           a min, a product, a sum over pairs, the enemies
-                          answered, the distinct subroles, or fixed by the shape
+                          answered, the distinct subroles, the claimed synergy
+                          graph's isolated picks and largest group, or fixed by
+                          the shape
     Space                 one search's heroes - the locked picks, then each
                           role's candidates in walk order - by dense index, and
                           the suffix tables the rules read
@@ -1039,6 +1041,103 @@ def _distinct_subroles() -> Spec:
     return Spec(build)
 
 
+def _partners(space: Space) -> tuple[list[int], list[bool], Suffix[int]]:
+    """The synergy graph the wiki claims, by dense index: each hero's
+    partners in the space, a bit per hero; whether it has a partner
+    anywhere, which isolated counts; and each open role's candidates from
+    each start on, a bit per hero."""
+    index = {h.id: i for i, h in enumerate(space.heroes)}
+    partners = [space.world.partners.get(h.id) or {} for h in space.heroes]
+    masks = [sum(1 << index[p] for p in pair if p in index) for pair in partners]
+    return masks, [bool(pair) for pair in partners], space.suffixes(
+        lambda rest: sum(1 << i for i in rest))
+
+
+def _bits(mask: int) -> list[int]:
+    """The dense indices a mask holds."""
+    out = []
+    while mask:
+        low = mask & -mask
+        out.append(low.bit_length() - 1)
+        mask ^= low
+    return out
+
+
+def _component(seed: int, allowed: int, masks: Sequence[int]) -> int:
+    """The heroes of `allowed` the claimed pairs join to `seed`, a bit each."""
+    group = frontier = 1 << seed
+    while frontier:
+        grown = 0
+        for i in _bits(frontier):
+            grown |= masks[i]
+        frontier = grown & allowed & ~group
+        group |= frontier
+    return group
+
+
+def _isolated() -> Spec:
+    """team.isolated_count: the picks with a documented partner somewhere
+    and none among the six. A pick is isolated on no completion where one
+    of its partners is picked, and on every one where none is picked or
+    left to an open role. An open candidate can be isolated only where it
+    has a partner somewhere and none among the picks, so each open role
+    adds at most its slots of those; and it adds at least its slots less
+    the candidates that can be partnered - with no partner anywhere, or one
+    among the picks or the open roles' candidates."""
+    def build(space: Space) -> Rule:
+        masks, partnered, unions = _partners(space)
+
+        def read(branch: Branch, env: Env) -> Abstract:
+            picked = sum(1 << i for i in branch.picks)
+            reach = picked
+            for r, start, _ in branch.open:
+                reach |= unions[r][start]
+            lo = hi = 0
+            for i in branch.picks:
+                if partnered[i] and not masks[i] & picked:
+                    hi += 1
+                    if not masks[i] & reach:
+                        lo += 1
+            for r, start, n in branch.open:
+                rest = space.roles[r][start:]
+                hi += min(n, sum(1 for x in rest if partnered[x] and not masks[x] & picked))
+                lo += max(0, n - sum(1 for x in rest if not partnered[x] or masks[x] & reach))
+            return Iv(float(lo), float(hi))
+        return Rule(read)
+    return Spec(build)
+
+
+def _core() -> Spec:
+    """team.core_size: the largest group the claimed pairs join among the
+    six. A hero added only joins groups, so it is at least the picks'
+    largest; and a group of the six lies within one group of the graph
+    over the picks and every candidate the open roles have left, so it is
+    at most, over those groups, the picks in one plus what each open role
+    can seat there, its slots at most."""
+    def build(space: Space) -> Rule:
+        masks, _, unions = _partners(space)
+
+        def largest(allowed: int, weigh: Callable[[int], int]) -> int:
+            best, left = 0, allowed
+            while left:
+                group = _component((left & -left).bit_length() - 1, allowed, masks)
+                best = max(best, weigh(group))
+                left &= ~group
+            return best
+
+        def read(branch: Branch, env: Env) -> Abstract:
+            picked = sum(1 << i for i in branch.picks)
+            reach = picked
+            for r, start, _ in branch.open:
+                reach |= unions[r][start]
+            lo = max(1, largest(picked, int.bit_count))
+            hi = largest(reach, lambda group: (group & picked).bit_count() + sum(
+                min(n, (unions[r][start] & group).bit_count()) for r, start, n in branch.open))
+            return Iv(float(lo), float(max(lo, hi)))
+        return Rule(read)
+    return Spec(build)
+
+
 def _banproof() -> Spec:
     """team.banproof_coverage: red's picks answered once the six's most
     banned pick is gone - never more than the coverage, and 0 while red
@@ -1170,11 +1269,14 @@ TEAM_RULES: dict[str, Spec] = {
     "synergy_score": _pairwise(Space.pairs),
     "synergy_density": _scaled("team.synergy_edges",
                                lambda s: TEAM_SIZE * (TEAM_SIZE - 1) // 2),
-    "isolated_count": _fixed(Iv(0.0, TEAM_SIZE)),
+    "isolated_count": _isolated(),
     "isolated": _fixed(Top(TEAM_SIZE)),
-    "core_size": _fixed(Iv(1.0, TEAM_SIZE)),
+    "core_size": _core(),
     "pairs": _fixed(Top(TEAM_SIZE * (TEAM_SIZE - 1) // 2)),
     "unwritten_pairs": _fixed(Top(TEAM_SIZE * (TEAM_SIZE - 1) // 2)),
+    "unwritten_cells": _pairwise(lambda s: [[float(s.world.unwritten_cells(a.id, b.id))
+                                             if a is not b else 0.0 for b in s.heroes]
+                                            for a in s.heroes]),
     "win_mean": _mean(lambda h, s: h.win),
     "pick_mass": _sum(lambda h, s: h.pick or 0),
     "availability": _product(lambda h, s: 1.0 - (h.ban or 0) / 100.0),

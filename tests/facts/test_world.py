@@ -3,6 +3,7 @@ map resolves by, one hero to a seat, and the model's own lookups and
 derivations on the synthetic World. The kits the load reads are
 tests/facts/test_world_kits.py's, the maps test_world_maps.py's."""
 
+import itertools
 import pathlib
 import re
 
@@ -12,6 +13,7 @@ from db import Refusal
 from facts import tables
 from facts.model import Hero, Map
 from facts.records import Rates
+from facts.team import pair_score
 
 
 @pytest.mark.invariant
@@ -25,6 +27,31 @@ def test_every_data_table_is_read_by_the_load(world, rows):
     assert unread == [], unread
     perks = sum(len(h.perks) for h in world.heroes.values())
     assert perks == rows("select count(*) from perks")[0][0]
+
+
+@pytest.mark.invariant
+def test_a_synergy_pair_reads_higher_with_every_cell_an_article_claims(world):
+    """A pair's two cells read 1 claimed, 0 written off and the written
+    cells' claim share where no article writes one, so the reading rises
+    with every cell claimed and falls with every cell written off: a pair
+    one article claims and the other leaves blank reads above a pair
+    neither writes, and that pair reads the mean of the written pairs as
+    they read, so a hero no article writes about is charged nothing."""
+    released = sorted(h.id for h in world.heroes.values() if h.released)
+    read: dict[tuple[int, int], set[float]] = {}
+    written = []
+    for a, b in itertools.combinations(released, 2):
+        edge = world.synergy(a, b)
+        kind = ((edge.score or 0) if edge else 0, world.unwritten_cells(a, b))
+        read.setdefault(kind, set()).add(pair_score(world, a, b))
+        if kind[1] < 2 or edge:
+            written.append(pair_score(world, a, b))
+    cell = world.synergy_cell
+    assert 0.5 < cell < 1
+    assert all(scores == {claims + blank * cell} for (claims, blank), scores in read.items())
+    assert read[(0, 2)] == {2 * cell} and sum(written) / len(written) == pytest.approx(2 * cell)
+    assert 2 > 1 + cell > 2 * cell > 1 > cell > 0
+    assert {(1, 1), (0, 2), (0, 1)} <= set(read)
 
 
 @pytest.mark.invariant

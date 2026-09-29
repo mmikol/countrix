@@ -67,9 +67,10 @@ COMP   = the legal six of highest score, exactly; the next best after it, in ord
 3. **The meta scores.** The default engine reads three things off the
    facts and scores every legal six: each pick's win-rate edge over 50
    on the map, trusted by its pick rate, so a rarely picked hero's edge
-   counts for less; the wiki's synergy scores among the six, a pair
-   neither article writes read at the written pairs' mean, as unknown
-   and not as zero; and the counter graph against the other side's
+   counts for less; the wiki's synergy scores among the six, cell by
+   cell, a cell no article writes read at the written cells' claim
+   share, as unknown and not as zero; and the counter graph against the
+   other side's
    locked picks, else its likely six - the wiki's edges and, where the
    wiki has none, answers derived from the kits. `meta.md`'s `meta`
    weight scales the three together: 1 is the engine as calibrated, and
@@ -96,12 +97,18 @@ COMP   = the legal six of highest score, exactly; the next best after it, in ord
 heuristic's starting weight is derived from its prose on the house
 scale, 0.25 a whisper, 1 the default, 2.5 strong and 4 dominant, when
 `/strategy` stores it. The engine's rate weight is 1, so its term reads
-in win-rate points, and its synergy and counter weights were set so that
+in win-rate points, and its synergy and counter weights are set so that
 each term spreads a typical board's sixes about half as far as the rate
-term does ([The objective](#the-objective)). Every weight can be
-changed: `/tune` changes a file's for good and logs why, a heuristic's
-slider on the playbook tab changes it for a session, and the Meta slider
-scales the whole engine ([How the weights move](#how-the-weights-move)).
+term does ([The objective](#the-objective)). Every rule's weight and
+each of the engine's four can be changed: `/tune` changes a file's for
+good and logs why, a heuristic's slider on the playbook tab changes it
+for a session, and the Meta slider scales the whole engine ([How the
+weights move](#how-the-weights-move)). What a term counts inside is its
+definition and stays in code, recorded in a fixture's stamp: a derived
+counter edge at half a wiki edge (`WIKI_WEIGHT` 2, `DERIVED_WEIGHT` 1),
+the pick rate that halves a rate edge's trust (`RATE_PICK_HALF`), and
+the budget the needs on one guard share (`NEED_BUDGET`), which no single
+need's weight is ever cut below.
 
 **A score is not a probability.** A score is a sum of weighted terms in
 the objective's own units, and signed, since the rate term counts each
@@ -122,10 +129,10 @@ line, is the plain case. The kit is read in 6v6
 each rule's reasons are below. Constraints prune and never weigh, so a
 rule either forbids a six or prices it, and a price is always a
 heuristic's ([How a strategy file works](#how-a-strategy-file-works)).
-Every weight is the playbook's and one meta scales the engine, so no
-weight hides in code ([Why the weights are the
+Every term's weight is the playbook's and one meta scales the engine,
+so no term's weight hides in code ([Why the weights are the
 playbook's](#why-the-weights-are-the-playbooks)). An unwritten synergy
-pair is unknown, not zero, so a new hero is not charged for being new
+cell is unknown, not zero, so a new hero is not charged for being new
 ([Why an unwritten synergy pair is not
 zero](#why-an-unwritten-synergy-pair-is-not-zero)). The search is exact
 over every legal six, with no per-role shortlist deciding who can
@@ -158,10 +165,12 @@ the sixes its three terms favour, scored and explained:
   board and needs no sample. A score is therefore signed, and a share is
   read from the seat's floor, not from zero ([The share](#the-share)).
 - **synergy**: `team.synergy_score`, the wiki's synergy scores among the
-  six: 2 for a pair both heroes' articles claim, 1 for a pair one claims,
-  0 for a pair an article writes off, and for a pair neither article
-  writes a cell for, the mean score of the pairs one does, computed at
-  load ([Why an unwritten synergy pair is not
+  six, read cell by cell: a pair has two cells, one in each hero's
+  article, and each reads 1 where the article claims the pair, 0 where
+  it writes the pair off, and where no article writes it, the share of
+  the written cells that claim, computed at load. A pair both articles
+  claim reads 2, and one neither writes the written pairs' mean ([Why an
+  unwritten synergy pair is not
   zero](#why-an-unwritten-synergy-pair-is-not-zero)).
 - **counters**: the counter graph between the six and the other side,
   the weight of its answers less the weight of its exposures. A wiki
@@ -183,18 +192,16 @@ the sixes its three terms favour, scored and explained:
 The weights are the playbook's. `meta.md`, beside the strategy files,
 holds four numbers, each within 0..10: `meta`, which scales the whole
 engine, and under it `rate`, `synergy` and `counter`, each term's points
-per unit. The shipped file sets 1, 1, 0.1 and 0.05. `rate` is 1, so the
-rate term is in win-rate points; `synergy` and `counter` were set so that
+per unit. The shipped file sets 1, 1, 0.26 and 0.05. `rate` is 1, so the
+rate term is in win-rate points; `synergy` and `counter` are set so that
 each term's median spread across a board's reference sample is about
 half the rate term's, about 2.1 points on a typical board; the module
-docstring holds the calibration. Reading an unwritten synergy pair at the
-mean narrowed the synergy score's median range from 21 to 12.8, so at 0.1
-the synergy term now spreads about 1.3 points; the calibration's rule
-would set it near 0.16, a change for the `tune` tool. A heuristic still
-moves a six by its weight at most; the math page says how that compares
-with the base's spread. Each term is a bar of the breakdown, with the
-fact it read and its weight with the meta applied: the counter bar's fact
-names the six it read.
+docstring holds the calibration, and [Why the weights are the
+playbook's](#why-the-weights-are-the-playbooks) why synergy moved from
+0.1. A heuristic still moves a six by its weight at most; the math page
+says how that compares with the base's spread. Each term is a bar of the
+breakdown, with the fact it read and its weight with the meta applied:
+the counter bar's fact names the six it read.
 
 A `BaseWeights` rides the `Brief`, and `infer`'s `base`, into every
 `Objective`. Left unset it is the playbook in
@@ -228,7 +235,33 @@ the whole engine can be leaned on or silenced at once, from the file for
 good or from the Meta slider for a session. The shipped file holds the
 calibrated values under a meta of 1, and 1.0 x w is w in floating point,
 so no score moved: the pinned boards and the reach fixture's boards stand
-as they were.
+as they were. That first `meta.md` was written by hand, with the code
+that reads it, since no tool could yet write one; `tune` with id `meta`
+now seeds a playbook folder that has none from the shipped file, and its
+log line says so. What a term counts inside - a derived counter edge
+against a wiki edge, the pick rate that halves a rate edge's trust, the
+needs' shared budget - stays in code as the term's definition: the
+counter tallies stay whole numbers, which the search's exactness leans
+on, and making those dials is on the backlog, the owner's call.
+
+The synergy weight moved from 0.1 to 0.26 on the owner's word, by the
+calibration's own rule. At 0.1 the synergy score's median range over a
+board's reference sample was 21 while an unwritten pair read 0, so the
+term spread a typical board about 2.1 points, as the counter term does at
+0.05. Reading what no article writes as unknown moved that range: to
+12.8 when an unwritten pair read the written pairs' mean, where the rule
+gave 0.16, and to 8.1 once each unwritten cell reads the written cells'
+claim share ([Why an unwritten synergy pair is not
+zero](#why-an-unwritten-synergy-pair-is-not-zero)). A blank cell now
+reads close to a claim, so sixes differ less in synergy, and at 0.1 the
+term would have spread them about 0.8 points - two fifths of what the
+calibration aimed at, and short of what a heuristic at weight 1 moves.
+The rule, measured on the 30 maps with red's likely six against the
+seat, gives 2.1 / 8.1, 0.26, and the tune tool set it
+(`tuning-log.md`, which also records the 0.18 the half-mean reading
+briefly gave). The weight restores the term's say, not the zero's
+verdicts: a hero no article writes about still reads as the written
+heroes do on average.
 
 ### Why an unwritten synergy pair is not zero
 
@@ -247,41 +280,77 @@ a six holding one of them read "these heroes do not work together" where
 the truth was "nobody has written it down yet". The synergy term charged
 the newest heroes for being new, and nothing on the board said so.
 
-A pair neither article writes is unknown, and reads the neutral prior:
-the mean score of the pairs an article does write, 1.06 at that pull (670
-points of claim over 631 written pairs). `pull_synergies` records every
-written cell, a claim or not, in `synergy_cells`, and the load computes
-the mean from it (`facts.tables.impute_synergy`). A written "no synergy"
-stays 0, and a claim stays 1 or 2. The mean is over the written pairs
-alone: over all 1,378 it would be 0.49, deflated by the very zeros it
-stands in for. Nor does the choice of what gets written inflate it: of
-the pairs the three articles that write a cell for 40 or more teammates
-write, 90% are claims, and they score 1.17 on average, above the prior.
+A pair has two cells, one in each hero's article, and a cell no article
+writes is unknown. It reads the share of the written cells that claim
+their pair: 0.86 at that pull, 670 claims among 779 written cells.
+`pull_synergies` records every written cell, a claim or not, in
+`synergy_cells`, with the article it is in, and the load computes the
+share from it (`facts.tables.impute_synergy`). A cell that writes the
+pair off stays 0 and a claim stays 1, so a pair reads 2 where both
+articles claim it, 1.86 where one claims it and the other is blank, 1.72
+where neither writes it, 1 where one claims it and the other writes it
+off, 0.86 where one writes it off and the other is blank, and 0 where
+both write it off: every claim raises it and every write-off lowers it.
+The share is over the written cells alone. Counted over every cell of
+the written pairs, a blank as 0, it would be 0.53, and over every cell
+of all 1,378 pairs 0.24, each deflated by the very blanks it stands in
+for. It is also the one value at which a pair neither article writes
+reads what the written pairs read on average, their blank cells read the
+same way - 1.72 - so a hero no article writes about is charged nothing
+and credited nothing against the heroes it does. Nor does the choice of
+what gets written inflate it: the three articles that write a cell for
+40 or more teammates, close to every one, claim 90% of the pairs they
+write.
 
 `team.synergy_score` reads it, and with it the default engine's synergy
-term and any heuristic on the score. `team.unwritten_pairs` names the
-pairs, and the cohesion fact the synergy term cites names them apart
-from the wiki's, with the mean they read at, so a reason never passes an
-unwritten pair off as a documented one. The graph metrics -
-`team.synergy_edges`, `synergy_density`, `core_size`, `isolated` and
-`pairs` - count the pairs the wiki claims, and describe what is
-documented; so does the other side's likely six, which adds
-`SYNERGY_PULL` for each documented partner. A fixture's stamp (`base.stamp`) names the reading, so one
-recorded while an unwritten pair read 0 reads as another objective.
+term and any heuristic on the score. `team.unwritten_cells` counts the
+blank cells among the picks and `team.unwritten_pairs` names the pairs
+neither article writes, and the cohesion fact the synergy term cites
+states both apart from the wiki's pairs, with the share a blank cell
+reads at, so a reason never passes an unwritten cell off as a
+documented one. The graph metrics - `team.synergy_edges`,
+`synergy_density`, `core_size`, `isolated` and `pairs` - count the pairs
+the wiki claims, and describe what is documented; so does the other
+side's likely six, which adds `SYNERGY_PULL` for each documented partner.
+A fixture's stamp (`base.stamp`) names the reading, so one recorded
+under an earlier reading reads as another objective.
 
-What it moved, on the shipped playbook at the shipped weights, blue's
-optimal six per map with red unrevealed: all 30 boards changed. D.Mon,
-whose every pair is unwritten, gains 5 x 1.06 x 0.1 = 0.53 points on
-every six he is in, and is seated on 28 maps where he was on 15; Juno,
-35 of whose 52 pairs are unwritten, on 21 where she was on 1; Vendetta on
-10 where he was on 2; Baptiste, 36 of whose pairs are written, on 6 where
-he was on 22. Of the eleven heroes the reach fixture names unseated, ten
-come closer to a seat on their two best maps with red unrevealed - all
-but Zarya - and none takes one there; 34 of the fixture's 42 boards still
-seat their hero. The synergy term was honest about the documented pairs
-and silent about the rest; the prior makes it neutral about the rest, and
-the rates and the counter graph decide between heroes the wiki has not
-compared.
+**Why a cell and not a pair.** The first reading, of 2026-09-28, was by
+the pair: a pair neither article wrote read the written pairs' mean,
+1.06 (670 claims over 631 written pairs), and a written pair read its
+claims. But 483 of the 631 written pairs have one cell written and the
+other blank, and the pair reading counted the blank as 0. A pair an
+article claims then read below a pair nobody wrote about: Ana's article
+claims Cassidy and Ashe and theirs are silent, so each pair read 1,
+while Ana with Tracer, which neither article writes, read 1.06. 405
+pairs read that way, and 78 that one article writes off and the other
+leaves blank read 0, though half of each is unknown. The mean itself
+counted those blanks as 0. A review proposed reading each blank cell at
+half that mean, 0.53, which keeps 1.06 for a pair neither article
+writes; but the written pairs would then read 1.47 on average against
+that 1.06, and the heroes no article writes about would be charged
+again, less than a zero charged them. Read at the claim share, Ana with
+Cassidy or Ashe reads 1.86 and Ana with Tracer 1.72.
+
+What each reading moved, on the shipped playbook, blue's optimal six per
+map with red unrevealed. The pair reading, at synergy 0.1, changed all
+30 boards: D.Mon, whose every pair is unwritten, gained 5 x 1.06 x 0.1 =
+0.53 points on every six he was in, and was seated on 28 maps where he
+had been on 15; Juno, 35 of whose 52 pairs are unwritten, on 21 where she
+had been on 1; Vendetta on 10 where he had been on 2; Baptiste, 36 of
+whose pairs are written, on 6 where he had been on 22. Of the eleven
+heroes the reach fixture then named unseated, ten came closer to a seat
+on their two best maps, and 34 of the fixture's 42 boards then still
+seated their hero. The cell reading with synergy at 0.26 changed 19 of
+the 30 boards from the pair reading's: Juno is seated on 11 maps where she
+was on 21, Baptiste on 12 where he was on 6, Reinhardt on 16 where he
+was on 11, D.Va on 1 where she was on 6, and D.Mon on 27 where he was
+on 28. The reach fixture, recorded again, seats 49 of
+the 53 released heroes, as before, and the same four stay unseated;
+under the half-mean reading at 0.18 it would have seated 47, Kiriko in
+and Cassidy, Hazard and Shion out. The synergy term is honest about the
+documented pairs and neutral about the rest; the rates and the counter
+graph decide between heroes the wiki has not compared.
 
 ## The share
 
@@ -341,7 +410,8 @@ The bound (`inference/bounds.py`) adds up, in the score's own order:
 
 A metric's range comes from the aggregate it is - a sum over the picks, a
 mean or a median of the known values, a max or a min, a product, a sum
-over pairs, the enemies answered, the distinct subroles, or fixed by the
+over pairs, the enemies answered, the distinct subroles, the isolated
+picks and the largest group of the claimed synergy graph, or fixed by the
 shape - and every team and matchup key has its rule. An expression's
 range comes from its tree: an operator takes its operands' ends, a
 comparison is true, false or either, and `and`, `or` and `if` join the
@@ -359,10 +429,13 @@ them lead. Each six is scored in one seat order - tanks, then damage, then
 supports, each by hero id - so its score is a function of its heroes to
 the last bit, and a board is the same payload under any hash seed.
 
-A full six's rank counts the legal sixes whose rounded score beats its
-own: read off the seat's search where the six reaches its best K, counted
-by a search of its own where it does not, exact up to `RANK_CAP` (100);
-past it the six reads outside the top 100. A search past `NODE_BUDGET`
+A full six's rank is its place in that order, one more than the legal
+sixes that rank above it - a six that ties the optimal's rounded score
+and loses the tie-break is not first, and ranks where the alternatives
+list it: read off the seat's search where the six reaches its best K,
+counted by a search of its own where it does not, which drops a branch
+as the best-K search does, exact up to `RANK_CAP` (100); past it the six
+reads outside the top 100. A search past `NODE_BUDGET`
 branches or `SCORE_BUDGET` sixes scored in full raises `Unbounded`, a
 refusal: the answer is exact or refused, never a guess. A search that ends
 with no six proves that none exists, so blue's picks a fill finds nothing
@@ -377,8 +450,8 @@ and the ranks with a full enumeration's on synthetic boards - both seats,
 the fill, the countered case, bans, locks and plateaus - and
 `tests/inference/test_bounds.py` holds every rule and the whole bound to
 every completion of random branches. On the built database,
-`python -m tests.inference.prove_exact` brute-forces every legal six of a
-real board, in slices, against the search.
+`.venv/bin/python -m tests.inference.prove_exact` brute-forces every
+legal six of a real board, in slices, against the search.
 
 ### Why the search is exact
 
@@ -390,14 +463,14 @@ swept the 13,101 sixes they allow, then climbed from the best of them by
 local search over the whole roster. It scored about 14,500 of 17 million
 sixes, and its answer was the best it met, not the best there is. On Samoa
 against D.Va, Roadhog, Sombra, Lúcio and Brigitte the investigation that
-led here found it returning a two-one-three at 3.8673 where a two-two-two
-scored 3.8885: the shape it needed was never searched from a good start,
-and no pool size could promise it would be.
+led here found it returning a two-one-three where a two-two-two scored
+higher: the shape it needed was never searched from a good start, and no
+pool size could promise it would be.
 
 Replayed on that data, the old search still answers the two-one-three
-and the exact one the two-two-two at 3.8885, the same float a brute force
-of all 17,217,564 legal sixes found. On today's data, where an unwritten
-synergy pair reads the written pairs' mean, the old search happened to
+and the exact one the two-two-two, the same float a brute force of all
+17,217,564 legal sixes found. On the data of that day, where an unwritten
+synergy pair read the written pairs' mean, the old search happened to
 find the best six on each of 126 boards tried - every map against red's
 likely six, 90 seeded boards of random reds and bans, and six boards
 brute-forced in full - so its misses were rare, and nothing said when one
@@ -460,7 +533,9 @@ applying only where it holds. A heuristic on a metric guarded on the
 six's own state (`team.*` or `matchup.*`) is a need: it adds
 `weight x (norm - 1)`, so met it costs nothing and unmet it costs its
 weight, and the needs on one guard cost `NEED_BUDGET` (2) together at
-most. The scale is a seeded
+most, or the largest of their weights where that is more, so a need alone
+on its guard weighs its own weight, a slider's past 2 too. The scale is
+a seeded
 sample of 1200 legal sixes plus the field of each role's top six by the
 board's prior (`inference/scale.py`).
 
@@ -490,7 +565,10 @@ completes it through `infer_strategy`. No API key anywhere.
 
 The default engine's weights are `meta.md`'s, and the `tune` tool moves
 them: `{"id": "meta", "field": "synergy", "value": 0.2, "reason": ...}`,
-the field one of `meta`, `rate`, `synergy` and `counter`. The board's
+the field one of `meta`, `rate`, `synergy` and `counter`, or `body`, the
+file's prose rewritten whole, which the playbook tab shows on the Meta
+card; a playbook folder with no `meta.md` is seeded from the shipped
+one's, and the log line says so. The board's
 sliders override a weight for one board - `weights=<id>:<0..10>` on
 `/api/board`, `weights` on the `board` tool - the Meta slider among them
 as `meta:<0..10>`, and every result names the weights it was scored
@@ -691,9 +769,9 @@ with three 7%.
 
 #### The meta
 
-`meta.md`: meta 1 x (rate 1, synergy 0.1, counter 0.05) - the default engine's weights, which the tune tool changes (id `meta`)
+`meta.md`: meta 1 x (rate 1, synergy 0.26, counter 0.05) - the default engine's weights, which the tune tool changes (id `meta`)
 
-The default engine scores every six before the playbook's rules do: each pick's win rate on the map, trusted by its pick rate (rate), the wiki's synergy scores among the six (synergy), and the counter graph against the other side (counter). The meta scales the three together - 0 is the playbook alone, 1 the engine as calibrated - and the board's Meta slider sets it for a session without touching this file. Rate is 1, so its term is in win-rate points, and synergy and counter are set so that each term spreads a typical board's sixes about half as far as the rates do.
+The default engine scores every six before the playbook's rules do: each pick's win rate on the map, trusted by its pick rate (rate), the wiki's synergy scores among the six, a cell no article writes at the written cells' claim share (synergy), and the counter graph against the other side (counter). The meta scales the three together - 0 is the playbook alone, 1 the engine as calibrated - and the board's Meta slider sets it for a session without touching this file. Rate is 1, so its term is in win-rate points, and synergy and counter are set so that each term spreads a typical board's sixes about half as far as the rates do; synergy was set again once a blank cell read at the written cells' claim share, which narrowed its range.
 
 #### Constraints
 
@@ -827,13 +905,14 @@ the `team.*` metrics computed for the red side.
 | `team.pierce_dps` | summed damage of the picks whose kit ignores barriers |
 | `team.deployables` | picks with deployables |
 | `team.synergy_edges` | the wiki's synergy pairs among the picks |
-| `team.synergy_score` | summed synergy scores among the picks, a pair neither article writes at the written pairs' mean |
+| `team.synergy_score` | summed synergy scores among the picks: a pair's claimed cells, and each cell no article writes at the written cells' claim share |
 | `team.synergy_density` | synergy edges / possible pairs |
 | `team.isolated_count` | picks with a documented partner somewhere and none on the team |
 | `team.isolated` (text) | the isolated picks |
 | `team.core_size` | largest connected group in the team's synergy graph |
 | `team.pairs` (text) | the synergy pairs present |
 | `team.unwritten_pairs` (text) | the pairs among the picks neither article writes a synergy cell for, read in synergy_score at the written pairs' mean |
+| `team.unwritten_cells` | the synergy cells among the picks no article writes, two a pair, each read in synergy_score at the written cells' claim share |
 | `team.win_mean` | mean all-ranks win rate |
 | `team.pick_mass` | summed all-ranks pick rate |
 | `team.availability` | chance every pick survives the ban screen: product of (1 - ban) |

@@ -6,8 +6,9 @@
 -- unwritten, and the newest heroes' articles are near blank, so reading
 -- every pair synergies lacks as zero read "these two do not work
 -- together" where the truth was "nobody wrote it down". The facts layer
--- reads a pair neither article writes at the mean score of the written
--- pairs (facts/tables.py), and this table is how it tells the two apart.
+-- reads each cell no article writes at the share of the written cells that
+-- claim (facts/tables.py), and this table, which names the article each
+-- written cell is in, is how it tells the two apart.
 -- Run pull_synergies after this migration to fill it.
 BEGIN;
 
@@ -15,9 +16,10 @@ BEGIN;
 -- cell for, one row per cell (pull_synergies, from the cells synergies is
 -- read from): hero_id's article writes a cell about other_id. A written
 -- cell is any that is not a placeholder - a claim, a rating below GOOD, an
--- unrated "no synergy" - so a pair of released heroes with no row either
--- way is one neither article writes, and facts/tables.py reads it at the
--- mean score of the pairs that have one. Reloaded whole with synergies.
+-- unrated "no synergy" - so a cell with no row is one no article writes,
+-- and facts/tables.py reads it at the share of the written cells that
+-- claim; a pair with no row either way reads twice that, the written
+-- pairs' mean as they read. Reloaded whole with synergies.
 CREATE TABLE synergy_cells (
     hero_id   integer NOT NULL REFERENCES heroes(hero_id) ON DELETE CASCADE,
     other_id  integer NOT NULL REFERENCES heroes(hero_id) ON DELETE CASCADE,

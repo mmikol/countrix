@@ -41,16 +41,20 @@ reason in `inference/strategies/tuning-log.md`. Nothing is edited by hand.
 
 Before any strategy scores, the default engine scores every six on three
 terms: each pick's win rate on the map, trusted by its pick rate; the
-wiki's synergy scores among the six; and the counter graph against the
-other side. Its weights live in `inference/strategies/meta.md`, and
-`strategies` lists them on its first line:
+wiki's synergy scores among the six, a cell no article writes at half the
+written pairs' mean; and the counter graph against the other side. Its
+weights live in `inference/strategies/meta.md`, and `strategies` lists
+them on its first line:
 
 - **meta** scales the whole engine: 0 is the playbook alone, 1 the
   engine as calibrated, 2 twice as loud against the playbook's rules.
 - **rate**, **synergy** and **counter** weigh the three terms under it:
-  rate 1 puts its term in win-rate points, and synergy and counter were
-  calibrated so that each term spreads a typical board's sixes about half
-  as far as the rates do.
+  rate 1 puts its term in win-rate points, and synergy and counter are
+  set so that each term spreads a typical board's sixes about half as far
+  as the rates do. The rule was measured again when a blank synergy cell
+  came to read half the written pairs' mean, which narrowed that term's
+  range, and synergy went from 0.1 to 0.18 (docs/inference.md, Why the
+  weights are the playbook's); measure again before quoting the rule.
 
 Each is a number within 0..10. When the user names one term ("the synergy
 pairs count for too little"), turn its dial; when they mean the engine as
@@ -58,8 +62,12 @@ a whole against their rules ("it ignores my rules", "trust the meta
 less"), turn the meta. Call `tune` with the id `meta`: `{"id": "meta",
 "field": "synergy", "value": 0.2, "reason": "user: the synergy pairs count
 for too little"}`. It is validated, written, documented and logged like a
-strategy's change. The playbook tab's Meta slider sets the meta for one
-browser session without touching the file; `tune` is the lasting change.
+strategy's change. `meta.md`'s prose, which the playbook tab shows on the
+Meta card, changes the same way, rewritten whole: `{"id": "meta",
+"field": "body", "value": "<the prose>", "reason": "..."}`; keep it saying
+what each dial weighs when a dial's meaning moves. The playbook tab's
+Meta slider sets the meta for one browser session without touching the
+file; `tune` is the lasting change.
 
 ## Ground rules
 

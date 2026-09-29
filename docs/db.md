@@ -585,7 +585,7 @@ Which heroes work WITH which. Pulled from the Team Synergy column of the "Match-
 
 *PLAYBOOK · `029_synergy_cells.sql`*
 
-Which teammates each released hero's wiki article writes a Team Synergy cell for, one row per cell (pull_synergies, from the cells synergies is read from): hero_id's article writes a cell about other_id. A written cell is any that is not a placeholder - a claim, a rating below GOOD, an unrated "no synergy" - so a pair of released heroes with no row either way is one neither article writes, and facts/tables.py reads it at the mean score of the pairs that have one. Reloaded whole with synergies.
+Which teammates each released hero's wiki article writes a Team Synergy cell for, one row per cell (pull_synergies, from the cells synergies is read from): hero_id's article writes a cell about other_id. A written cell is any that is not a placeholder - a claim, a rating below GOOD, an unrated "no synergy" - so a cell with no row is one no article writes, and facts/tables.py reads it at the share of the written cells that claim; a pair with no row either way reads twice that, the written pairs' mean as they read. Reloaded whole with synergies.
 
 | column | type | null | references |
 | --- | --- | --- | --- |

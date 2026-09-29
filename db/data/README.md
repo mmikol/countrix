@@ -599,10 +599,14 @@ Each ends in `run()`, and each docstring opens "Pull + clean + store".
   Orisa's and Tracer's among them. Read as zero, every missing pair said
   "these two do not work together" where the truth was "nobody wrote it
   down", and the synergy term charged the newest heroes for being new.
-  The facts layer now reads a pair neither article writes at the mean
-  score of the written pairs, 1.06 at that pull, the neutral prior, and
-  a written "no synergy" stays 0 ([Why an unwritten synergy pair is not
+  The facts layer now reads each cell no article writes - a pair has one
+  in each hero's article - at the share of the written cells that claim,
+  0.86 at that pull (670 of 779), the neutral prior, so a pair neither
+  article writes reads 1.72, the written pairs' mean as they read, and a
+  written "no synergy" stays 0 ([Why an unwritten synergy pair is not
   zero](../../docs/inference.md#why-an-unwritten-synergy-pair-is-not-zero)).
+  It read by the pair at first, a pair neither writes at 1.06, which put a
+  pair one article claims and the other leaves blank below it.
   The same rerun kept eleven cells that are a rating GOOD or better with
   no advice written - seven in Wuyang's article, two in Jetpack Cat's,
   one each in Pharah's and Sierra's - which the pull had dropped as

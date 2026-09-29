@@ -120,7 +120,7 @@ def _verdict(c: Candidate) -> list[object]:
 def slice_(out: str, name: str, index: int, count: int) -> None:
     """Every `count`-th legal six from `index`, prepared, scored and ranked:
     its best K, how many it holds, how many keep the limits, and how many
-    outscore the board's full six."""
+    rank above the board's full six."""
     started = time.time()
     world = _world(out)
     solver = _solver(world, name)
@@ -128,7 +128,7 @@ def slice_(out: str, name: str, index: int, count: int) -> None:
     bar = None
     if target:
         six = solver.prepare(Candidate(world.resolve(None, (), target).blue))
-        bar = quantized(solver.score(six, detail=False).score)
+        bar = rank_key(solver.score(six, detail=False))
     best: list[Candidate] = []
     size = feasible = above = 0
     for position, heroes in enumerate(_sixes(solver)):
@@ -140,7 +140,7 @@ def slice_(out: str, name: str, index: int, count: int) -> None:
             continue
         feasible += 1
         solver.slim(solver.score(cand, detail=False))
-        if bar is not None and quantized(cand.score) > bar:
+        if bar is not None and rank_key(cand) < bar:
             above += 1
         best.append(cand)
         if len(best) > 4 * K:

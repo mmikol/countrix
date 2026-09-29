@@ -8,8 +8,10 @@
                 RATE_PICK_HALF), the map's pick rate on a map - and averaged
                 over the six
     synergy     team.synergy_score: the wiki's synergy scores among the six,
-                a pair neither hero's article writes a cell for at the mean
-                score of the pairs one does (facts.tables.impute_synergy)
+                cell by cell - a claim 1, a write-off 0, and a cell no
+                article writes the written cells' claim share, so a pair
+                neither article writes reads the written pairs' mean
+                (facts.tables.impute_synergy)
     counters    the counter graph between the six and the other side
                 (facts.counters): the weight of the edges by which its picks
                 answer that side less the weight of those by which that side
@@ -48,22 +50,25 @@ the whole engine - 0 turns it off, 1 is the engine as calibrated - and
 own `meta` (the playbook tab's Meta slider, a weights query's meta:value)
 stands in for the file's on that board alone. The owner's rule is that the
 heuristics and the meta carry every weight and each one is his to turn, so
-none is left in code, where only a commit could move it.
+no term's weight is left in code, where only a commit could move it. What
+a term counts inside is its definition and stays here, recorded in the
+stamp: RATE_PICK_HALF, and a derived counter edge at DERIVED_WEIGHT
+against a wiki edge's WIKI_WEIGHT, which keeps the tallies whole.
 
 The shipped values, and why. rate is 1: the rate term is in win-rate
 points. The other two are set so that each term's median range within one
-board is about half the rate term's, measured over the reference sample
-(inference.scale.sample, 1,200 legal sixes a board) on each of the 30 maps,
-each board's other side its likely six, the side the term reads until one
-is revealed. The synergy score's median range was 21 and the counter
-graph's 42.5 - the wiki's edges at 2 and the kit's fill at 1 - so synergy
-0.1 and counter 0.05 spread a typical board's sixes about 2.1 points each.
-The 21 was measured while a pair neither article writes read 0; read at
-the written pairs' mean, as it now is, the range is 12.8, and at 0.1 the
-synergy term spreads about 1.3 points. The rule would put synergy near
-0.16; meta.md keeps 0.1 until the tune tool moves it. The rate term's own
-range reads Blizzard's rates, which are licensed for personal use, so its
-figures stay out of the repo. At meta 1 each term's weight is
+board is about half the rate term's, about 2.1 points, measured over the
+reference sample (inference.scale.sample, 1,200 legal sixes a board) on
+each of the 30 maps, each board's other side its likely six, the side the
+term reads until one is revealed. The counter graph's median range is 41 -
+the wiki's edges at 2 and the kit's fill at 1 - so counter 0.05 spreads a
+typical board's sixes about 2.1 points. The synergy score's was 21 while
+an unwritten pair read 0, which set synergy at 0.1; read cell by cell, a
+cell no article writes at the written cells' claim share, it is 8.1, and
+the same rule sets synergy at 0.26 (docs/inference.md, Why the weights
+are the playbook's). The rate term's own range reads Blizzard's rates,
+which are licensed for personal use, so its figures stay out of the repo.
+At meta 1 each term's weight is
 the file's exactly (1.0 x w is w in floating point), so moving the numbers
 out of code moved no score. OFF is meta 0 with every dial at 0, and a board
 scored under it is the playbook's alone, exactly as before the engine had a
@@ -95,8 +100,8 @@ RATES, SYNERGY, COUNTERS = "base.rates", "base.synergy", "base.counters"
 # what each term reads, as the breakdown words it, and its name in the game plan
 READS = {
     RATES: "the six's win rates on the map, each trusted by its pick rate",
-    SYNERGY: "team.synergy_score, the wiki's synergy scores among the six, a pair"
-                " neither article writes at the written pairs' mean",
+    SYNERGY: "team.synergy_score, the wiki's synergy scores among the six, a cell"
+                " no article writes at the written cells' claim share",
     COUNTERS: "the counter graph between the six and the other side: a wiki edge 2, a derived"
                 " one 1"}
 TITLES = {
@@ -167,10 +172,11 @@ class BaseWeights:
 
 OFF = BaseWeights(meta=0.0, rate=0.0, synergy=0.0, counter=0.0)
 
-# what the synergy term reads a pair neither article writes a cell for at
+# what the synergy term reads a cell no article writes at
 # (facts.tables.impute_synergy), as a fixture's stamp names it: one recorded
-# while such a pair read 0 names none, and reads as another objective
-UNWRITTEN_SYNERGY = "the written pairs' mean"
+# while such a pair read 0 names none, and one recorded while a pair was read
+# whole names the written pairs' mean, and each reads as another objective
+UNWRITTEN_SYNERGY = "the written cells' claim share a cell"
 
 
 class BaseStamp(BaseRecord):

@@ -22,7 +22,7 @@ from facts.records import Synergy
 from facts.team import team_metrics
 from inference import catalog
 from inference.base import OFF
-from inference.scoring import Candidate, quantized, rank_key
+from inference.scoring import Candidate, rank_key
 from inference.shapes import legal_shapes
 from tests.inference import ASSUMPTIONS_ONLY, DEFAULT, FIXTURE_PLAYBOOK, evaluated, heal_rate
 
@@ -221,11 +221,27 @@ def test_a_plateau_is_ranked_by_its_tie_break_and_then_its_names(
         assert solver.leaves < len(full)
 
 
+def test_a_six_that_ties_the_optimal_ranks_where_the_tie_break_puts_it(synthetic_world):
+    """On a plateau every six scores the same, and a six's rank is its
+    place in the order the alternatives are listed in - the tie-break, then
+    the names - never first for tying the optimal's score. Read off the
+    search's top K, or counted by a search of its own past it."""
+    from inference import solver as solver_module
+    solver = seated(synthetic_world, Draft("Harbor Gate", side="attack"), ASSUMPTIONS_ONLY, OFF)
+    solved = solver.solve(top=K)
+    full = enumerated(solver)
+    assert full[0].score == full[K + 5].score == 0.0
+    for place in (0, 1, K - 1, K, K + 5):
+        evaluation = solver_module.evaluate_comp(solved, full[place].heroes)
+        assert evaluation.rank == place + 1 and not evaluation.outranked, place
+
+
 def test_a_full_six_is_ranked_against_every_legal_six(synthetic_world, monkeypatch):
-    """A full six's rank is one more than the legal sixes whose quantized
-    score beats its own: read off the seat's search where the six reaches
-    its top K, counted by a search of its own where it does not, and none
-    past RANK_CAP, where the six reads as outranked."""
+    """A full six's rank is its place in the enumeration's rank order, one
+    more than the legal sixes that rank above it: read off the seat's
+    search where the six reaches its top K, counted by a search of its own
+    where it does not, and none past RANK_CAP, where the six reads as
+    outranked."""
     from inference import solver as solver_module
     playbook = catalog.load(FIXTURE_PLAYBOOK)
     draft = Draft("Harbor Gate", ("Mortar", "Gale"), side="attack")
@@ -235,7 +251,8 @@ def test_a_full_six_is_ranked_against_every_legal_six(synthetic_world, monkeypat
     for place in (0, 3, K + 4, 60):
         six = full[place]
         evaluation = solver_module.evaluate_comp(solved, six.heroes)
-        above = sum(1 for c in full if quantized(c.score) > quantized(six.score))
+        above = sum(1 for c in full if rank_key(c) < rank_key(six))
+        assert above == place
         assert evaluation.rank == 1 + above and not evaluation.outranked, place
         result = evaluated(synthetic_world, dataclasses.replace(
             draft, blue=tuple(six.names)), catalog=playbook)
@@ -355,6 +372,31 @@ def test_a_rule_guarded_on_the_six_itself_is_a_need_and_a_state_has_a_budget(
     assert all(
         not c["applies"] and c["weighted"] == 0
         for c in pair["contributions"] if c["id"].startswith("solo-"))
+
+
+def test_a_need_alone_on_its_guard_weighs_its_own_weight(synthetic_world, tmp_path):
+    """The budget the needs on one guard share is NEED_BUDGET or their
+    largest weight, whichever is more, so no slider is capped: a need alone
+    on its guard weighs what its file or its slider says, past the budget
+    too, and two needs on one guard cost the larger weight together."""
+    from inference import scoring
+    world = synthetic_world
+    rule = ("---\nname: %s\nkind: heuristic\ndirection: maximize\nmetric: %s\nweight: %s\n"
+            "when: team.supports <= 1\n---\nx\n")
+    (tmp_path / "solo.md").write_text(rule % ("Solo", "team.mobility_count", 1), "utf-8")
+    alone = catalog.load(str(tmp_path))
+    m = world.map("Harbor Gate")
+
+    def weights(playbook):
+        objective = scoring.Objective(world, m, red=[], catalog=playbook, base=OFF)
+        return {n.strategy.id: n.weight for n in objective.norms}
+    assert weights(alone) == {"solo": 1.0}
+    for slider in (2.0, 5.0, 10.0):
+        assert weights(catalog.weighted(alone, {"solo": slider})) == {"solo": slider}
+    (tmp_path / "solo-cc.md").write_text(rule % ("Solo cc", "team.cc_count", 1), "utf-8")
+    both = catalog.weighted(catalog.load(str(tmp_path)), {"solo": 3.0})
+    assert weights(both) == {"solo": 2.25, "solo-cc": 0.75}
+    assert weights(catalog.weighted(both, {"solo": 0.5})) == {"solo": 0.5, "solo-cc": 1.0}
 
 
 def test_partners_that_only_pay_together_are_brought_in_together(synthetic_world, tmp_path):

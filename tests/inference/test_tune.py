@@ -2,6 +2,7 @@
 the catalog before it is written, and logged with a reason."""
 
 import os
+import shutil
 from pathlib import Path
 
 import pytest
@@ -281,7 +282,7 @@ def test_a_meta_weight_the_reader_would_refuse_is_never_written(catalog_copy):
     written or logged; meta is no strategy to add or complete."""
     path = Path(catalog_copy, catalog.META_FILE)
     before = path.read_text(encoding="utf-8")
-    for field, value, message in (("weight", 1, "fields are meta, rate, synergy, counter"),
+    for field, value, message in (("weight", 1, "fields are meta, rate, synergy, counter, body"),
                                   ("rate", 11, r"within 0\.\.10"),
                                   ("counter", -0.1, r"within 0\.\.10"),
                                   ("synergy", "much", "a number"),
@@ -294,7 +295,50 @@ def test_a_meta_weight_the_reader_would_refuse_is_never_written(catalog_copy):
     with pytest.raises(tune.TuneError, match="beside the playbook"):
         tune.complete("meta", {"category": "general"}, "r", directory=catalog_copy)
     assert path.read_text(encoding="utf-8") == before
+    for value in ("", "  \n", 3, "x" * (tune.MAX_PROSE + 1)):
+        with pytest.raises(tune.TuneError, match="prose"):
+            tune.tune("meta", "body", value, "r", directory=catalog_copy)
+    assert path.read_text(encoding="utf-8") == before
     assert not Path(catalog_copy, "tuning-log.md").exists()
-    path.unlink()
+
+
+def test_tune_rewrites_meta_prose_and_keeps_its_weights_and_title(catalog_copy):
+    """body rewrites meta.md's prose whole - what the playbook tab and the
+    docs catalog show - read back by the engine's reader; the weights, the
+    title and the strategies stay, and the log line names the rewrite
+    without quoting it."""
+    before = catalog.read_meta(catalog_copy)
+    prose = "The meta scales the engine.\n\nA second paragraph."
+    change = tune.tune("meta", "body", prose, "the prose names the imputed cells",
+                       directory=catalog_copy)
+    after = catalog.read_meta(catalog_copy)
+    assert after.weights == before.weights and change["old"] == before.body
+    title = before.body.splitlines()[0]
+    assert title.startswith("# ") and after.body == change["new"] == title + "\n\n" + prose
+    [line] = tune.log_tail(5, os.path.join(catalog_copy, "tuning-log.md"))
+    assert line.endswith("`meta` body: rewritten (the prose names the imputed cells)"
+                         " [claude-code-session]")
+    tune.tune("meta", "body", "# Weights\n\nOne line.", "a new title", directory=catalog_copy)
+    assert catalog.read_meta(catalog_copy).body == "# Weights\n\nOne line."
+
+
+def test_a_folder_with_no_meta_is_seeded_from_the_shipped_one(catalog_copy, monkeypatch, tmp_path):
+    """A playbook folder with no meta.md takes the shipped playbook's on its
+    first meta change, and the log says so; the shipped folder with none
+    has nothing to seed from, and is refused with nothing written."""
+    Path(catalog_copy, catalog.META_FILE).unlink()
+    change = tune.tune("meta", "counter", 0.07, "r", directory=catalog_copy)
+    shipped = catalog.read_meta(catalog.SHIPPED_DIR).weights
+    assert catalog.engine_weights(catalog_copy).record() == {
+        **shipped.record(), "counter": 0.07}
+    assert change["old"] == str(shipped.counter)
+    [line] = tune.log_tail(5, os.path.join(catalog_copy, "tuning-log.md"))
+    assert "`meta` seeded from the shipped meta.md; counter: %s -> 0.07 (r)" % (
+        shipped.counter) in line
+    empty = tmp_path / "shipped"
+    empty.mkdir()
+    shutil.copy(Path(catalog_copy, "open-queue-tanks.md"), empty)
+    monkeypatch.setattr(catalog, "SHIPPED_DIR", str(empty))
     with pytest.raises(tune.TuneError, match=r"meta\.md: missing"):
-        tune.tune("meta", "rate", 1, "r", directory=catalog_copy)
+        tune.tune("meta", "rate", 1, "r", directory=str(empty))
+    assert sorted(os.listdir(empty)) == ["open-queue-tanks.md"]

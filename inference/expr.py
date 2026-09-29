@@ -127,8 +127,8 @@ class Expr:
         self._check(tree)
         self._guard(tree, 0)
         # the code object is what a candidate is evaluated against, each
-        # division in it zero-safe; the tree is dropped, so a playbook keeps
-        # no syntax trees in any worker
+        # division in it zero-safe; the tree is dropped, so a loaded playbook
+        # keeps no syntax trees (the bound reparses the source it keeps)
         self.code: CodeType = compile(
             ast.fix_missing_locations(ast.Expression(body=_ZeroDivisor().visit(tree))),
             "<strategy>", "eval")

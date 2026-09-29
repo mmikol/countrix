@@ -295,7 +295,7 @@ def test_the_math_page_quotes_each_weight_from_the_playbooks_meta_file(
     (base, "RATE_PICK_HALF", "t_p = pick_p / ( pick_p + %s )"),
     (compute, "SYNERGY_PULL", "likelihood(h) = pick(h, map) + %s &times; partners"),
     (scale, "REFERENCE_SIZE", "against %s random legal sixes"),
-    (scoring, "NEED_BUDGET", "min( 1, %s / &Sigma; w over the needs"),
+    (scoring, "NEED_BUDGET", "min( 1, max( %s, the largest w on n's guard ) / &Sigma; w"),
     (scoring, "NEED_BUDGET", "one state costs %s at most"),
     (scoring, "SCORE_PLACES", "by their score to %s decimal places"),
     (solver, "RANK_CAP", "exactly up to %s"),

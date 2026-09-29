@@ -3,9 +3,12 @@ World: the terrain's z-scores and lean, the rates' lift, the styles they sum
 to, the stages' z-scores and each hero's best maps, every expected value
 worked by hand from tests/synthetic.py. No database."""
 
+import pytest
+
 from facts import tables
 from facts.model import TERRAIN_FEATURES, Map
 from facts.records import MapRate
+from facts.team import pair_score
 
 
 def _maps(w):
@@ -103,22 +106,40 @@ def test_a_heros_best_maps_are_its_largest_positive_lifts_ties_by_name(synthetic
         "Anchor Bay", "Ember Ruins", "Harbor Gate"]
 
 
-def test_a_pair_neither_article_writes_reads_the_written_pairs_mean(synthetic_world):
-    """The prior is the mean score of the written pairs, a pair written off
-    counting 0: the five claims sum to 8, and with three pairs written off
-    the eight written pairs mean 1. A claim is a written cell whether or not
-    the cells name it. With no cell on record the prior is 0 and no pair is
-    unwritten, as a database migrated and not pulled again reads."""
+def test_a_cell_no_article_writes_reads_the_written_cells_claim_share(synthetic_world):
+    """The five claims hold eight cells, and with two cells written off ten
+    are written: a cell no article writes reads 0.8, the share that claim,
+    whether or not the cells name the claims. A pair has two cells, one in
+    each hero's article: Anvil+Rook, written by neither, reads 1.6, the
+    mean of the seven written pairs as they read; Gale+Sorrel, which
+    Gale's claims, 1.8; Anvil+Mortar, which Anvil's writes off, 0.8. A
+    second cell written off moves both. With no cell on record the share
+    is 0 and no cell is unwritten, as a database migrated and not pulled
+    again reads."""
     w = synthetic_world
-    anvil, balm, mortar, rook = (w.hero(n) for n in ("Anvil", "Balm", "Mortar", "Rook"))
+    ids = {h.name: h.id for h in w.heroes.values()}
     tables.impute_synergy(w)
-    assert w.synergy_prior == 0.0 and not w.synergy_unwritten(anvil.id, rook.id)
-    off = {frozenset((w.hero(a).id, w.hero(b).id)) for a, b in (
-        ("Anvil", "Mortar"), ("Kite", "Rook"), ("Balm", "Tansy"))}
-    for written in (off, off | set(w.synergies)):
+    assert w.synergy_cell == 0.0 and w.unwritten_cells(ids["Anvil"], ids["Rook"]) == 0
+    off = {(ids["Anvil"], ids["Mortar"]), (ids["Kite"], ids["Rook"])}
+    claims = {(ids[a], ids[b]) for a, b in (
+        ("Anvil", "Balm"), ("Balm", "Anvil"), ("Kite", "Gale"), ("Gale", "Kite"),
+        ("Gale", "Sorrel"), ("Needle", "Tansy"), ("Tansy", "Needle"), ("Mortar", "Myrrh"))}
+    for written in (off, off | claims):
         w.synergy_written = written
         tables.impute_synergy(w)
-        assert w.synergy_prior == 1.0
-    assert w.synergy_unwritten(anvil.id, rook.id)
-    assert not w.synergy_unwritten(anvil.id, mortar.id)         # written off
-    assert not w.synergy_unwritten(balm.id, anvil.id)           # claimed
+        assert w.synergy_cell == 0.8
+    cells = {pair: w.unwritten_cells(ids[pair[0]], ids[pair[1]]) for pair in (
+        ("Anvil", "Rook"), ("Rook", "Anvil"), ("Gale", "Sorrel"), ("Anvil", "Mortar"),
+        ("Anvil", "Balm"))}
+    assert cells == {("Anvil", "Rook"): 2, ("Rook", "Anvil"): 2, ("Gale", "Sorrel"): 1,
+                     ("Anvil", "Mortar"): 1, ("Anvil", "Balm"): 0}
+    scores = [pair_score(w, ids[a], ids[b]) for a, b in (
+        ("Anvil", "Mortar"), ("Anvil", "Rook"), ("Gale", "Sorrel"), ("Anvil", "Balm"))]
+    assert scores == [0.8, 1.6, 1.8, 2]
+    written_pairs = {frozenset(cell) for cell in off | claims}
+    assert len(written_pairs) == 7 and sum(
+        pair_score(w, *pair) for pair in written_pairs) / 7 == pytest.approx(1.6)
+    # Mortar's article writes Anvil off too: the pair reads 0, and eight of eleven claim
+    w.synergy_written = off | claims | {(ids["Mortar"], ids["Anvil"])}
+    tables.impute_synergy(w)
+    assert pair_score(w, ids["Anvil"], ids["Mortar"]) == 0 and w.synergy_cell == 8 / 11

@@ -117,8 +117,8 @@ TEAM_METRICS = OrderedDict([
     ("deployables", "picks with deployables"),
     # cohesion
     ("synergy_edges", "the wiki's synergy pairs among the picks"),
-    ("synergy_score", "summed synergy scores among the picks, a pair neither article writes"
-                      " at the written pairs' mean"),
+    ("synergy_score", "summed synergy scores among the picks: a pair's claimed cells, and"
+                      " each cell no article writes at the written cells' claim share"),
     ("synergy_density", "synergy edges / possible pairs"),
     ("isolated_count", "picks with a documented partner somewhere and none on the team"),
     ("isolated", "the isolated picks"),
@@ -126,6 +126,8 @@ TEAM_METRICS = OrderedDict([
     ("pairs", "the synergy pairs present"),
     ("unwritten_pairs", "the pairs among the picks neither article writes a synergy cell for,"
                         " read in synergy_score at the written pairs' mean"),
+    ("unwritten_cells", "the synergy cells among the picks no article writes, two a pair,"
+                        " each read in synergy_score at the written cells' claim share"),
     # meta
     ("win_mean", "mean all-ranks win rate"),
     ("pick_mass", "summed all-ranks pick rate"),
@@ -371,45 +373,50 @@ def _tools(heroes: list[Hero]) -> MetricBag:
 
 
 def pair_score(world: World, a: int, b: int) -> float:
-    """One pair's part of team.synergy_score: the wiki's score where an
-    article claims the pair, the written pairs' mean where neither article
-    writes a cell for it, else 0. _cohesion sums the same parts, counted
-    apart; the search's bound (inference.bounds) reads each pair here."""
+    """One pair's part of team.synergy_score: its two cells, one in each
+    hero's article - 1 for a claim, 0 for a cell that writes the pair off,
+    and World.synergy_cell, the written cells' claim share, for a cell no
+    article writes. A pair neither article writes reads the written pairs'
+    mean, and a cell reads more claimed than blank and more blank than
+    written off. _cohesion sums the same parts, counted apart; the search's
+    bound (inference.bounds) reads each pair here."""
     edge = world.synergy(a, b)
-    if edge:
-        return edge.score or 0
-    return world.synergy_prior if world.synergy_unwritten(a, b) else 0.0
+    claimed = (edge.score or 0) if edge else 0
+    return claimed + world.unwritten_cells(a, b) * world.synergy_cell
 
 
 def _cohesion(world: World, heroes: list[Hero]) -> MetricBag:
     """The wiki's synergy pairs among the picks, and the graph they make. A
-    pair neither article writes a cell for is unknown, not zero: the score
-    reads it at the written pairs' mean (World.synergy_prior), counted apart
-    so the sum is exact in any pick order, and names it. The graph is the
-    pairs the wiki claims."""
+    cell no article writes is unknown, not zero: the score reads it at the
+    written cells' claim share (World.synergy_cell), the cells counted
+    apart so the sum is exact in any pick order, and the pairs neither
+    article writes are named. The graph is the pairs the wiki claims."""
     n = len(heroes)
     pairs: list[SynergyPair] = []
     unwritten: list[str] = []
+    cells = 0
     adjacency: dict[int, set[int]] = {h.id: set() for h in heroes}
     for i, a in enumerate(heroes):
         for b in heroes[i + 1:]:
             edge = world.synergy(a.id, b.id)
+            blank = world.unwritten_cells(a.id, b.id)
+            cells += blank
             if edge:
                 pairs.append(SynergyPair(first=a.name, second=b.name, score=edge.score or 0))
                 adjacency[a.id].add(b.id)
                 adjacency[b.id].add(a.id)
-            elif world.synergy_unwritten(a.id, b.id):
+            elif blank == 2:
                 unwritten.append("%s+%s" % (a.name, b.name))
     possible = n * (n - 1) // 2
     # a hero the wiki pairs with no one at all is unknown, not alone: unknown is not a number
     isolated = [h.name for h in heroes
                 if n >= 2 and not adjacency[h.id] and world.partners.get(h.id)]
-    score = sum(p.score for p in pairs) + len(unwritten) * world.synergy_prior
+    score = sum(p.score for p in pairs) + cells * world.synergy_cell
     return {"synergy_edges": len(pairs), "synergy_score": score,
             "synergy_density": len(pairs) / possible if possible else 0.0,
             "isolated_count": len(isolated), "isolated": isolated,
             "core_size": _largest_component(adjacency), "pairs": pairs,
-            "unwritten_pairs": unwritten}
+            "unwritten_pairs": unwritten, "unwritten_cells": cells}
 
 
 def _meta(heroes: list[Hero], m: Map | None, top_ban: Hero | None) -> MetricBag:

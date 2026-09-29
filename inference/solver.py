@@ -13,9 +13,10 @@ A Solver is the board's Objective (inference.scoring) on the board's scale
                 (inference.bounds) proves that no six in it can enter the
                 top K. The answer is the enumeration's own, whatever order
                 the walk takes; no hero is left out of any role
-    outranking  how many legal sixes a six's quantized score is beaten by:
-                the same walk, dropping every branch whose bound cannot beat
-                it, exact up to RANK_CAP
+    outranking  how many legal sixes rank above a six in the full rank
+                order, ties on the quantized score settled as the search
+                settles them: the same walk, dropping every branch whose
+                bound cannot reach it, exact up to RANK_CAP
 
 A search refuses rather than guesses: past NODE_BUDGET branches or
 SCORE_BUDGET sixes scored in full it raises Unbounded, and a search that
@@ -120,17 +121,23 @@ class _Best:
 
 
 class _Count:
-    """The legal sixes whose quantized score beats a target's, counted up
-    to a cap; a branch whose bound cannot beat it is dropped."""
+    """The legal sixes that rank above a target in the full rank order - a
+    higher quantized score, the same with a higher tie-break, or both the
+    same and the names first - counted up to a cap; a branch whose bound
+    cannot reach the target is dropped, as _Best drops one."""
 
-    def __init__(self, target: float, cap: int) -> None:
-        self.target, self.cap, self.count, self.done = target, cap, 0, False
+    def __init__(self, target: Candidate, cap: int) -> None:
+        self.key = rank_key(target)
+        self.cap, self.count, self.done = cap, 0, False
 
     def prunes(self, bound: float, walk: Bound, frame: Frame, open_roles: Open) -> bool:
-        return quantized(bound) <= self.target
+        score = quantized(bound)
+        if score != -self.key[0]:
+            return score < -self.key[0]
+        return walk.tiebreak(frame, open_roles) < -self.key[1]
 
     def offer(self, cand: Candidate) -> None:
-        if quantized(cand.score) > self.target:
+        if rank_key(cand) < self.key:
             self.count += 1
             self.done = self.count >= self.cap
 
@@ -213,10 +220,11 @@ class Solver(Objective):
         return Solved(self, [self.hydrate(c) for _, c in goal.items], goal.k)
 
     def outranking(self, target: Candidate, cap: int | None = None) -> int | None:
-        """How many legal sixes score above `target` once scores are
-        quantized: exactly, or None once `cap` do - RANK_CAP where none is
-        named."""
-        goal = _Count(quantized(target.score), RANK_CAP if cap is None else cap)
+        """How many legal sixes rank above `target` (scoring.rank_key), a six
+        that ties its quantized score counted where the tie-break or the
+        names put it first, as the alternatives are listed: exactly, or None
+        once `cap` do - RANK_CAP where none is named."""
+        goal = _Count(target, RANK_CAP if cap is None else cap)
         self._search(goal)
         return None if goal.done else goal.count
 
@@ -293,18 +301,20 @@ class Solver(Objective):
 
 def evaluate_comp(solved: Solved, heroes: Sequence[Hero]) -> Evaluated:
     """Score one full six on a seat's search and rank it against every legal
-    six: from the search's own top K where the six's score reaches it,
-    else by outranking(); a count past its budget leaves it unranked. A
-    board with no feasible six is Infeasible, as infer refuses it."""
+    six in the order the search lists them (scoring.rank_key): from the
+    search's own top K where the six reaches it, else by outranking(); a
+    count past its budget leaves it unranked. A six that ties the optimal's
+    score but loses the tie-break is not first. A board with no feasible
+    six is Infeasible, as infer refuses it."""
     solver = solved.solver
     if not solved.ranked:
         raise Infeasible("no composition satisfies the limits on this board - relax a"
                          " constraint in inference/strategies/")
     target = solver.score(solver.prepare(Candidate(heroes)))
-    score = quantized(target.score)
+    key = rank_key(target)
     ranked = solved.ranked
-    if len(ranked) < solved.size or score >= quantized(ranked[-1].score):
-        above: int | None = sum(1 for c in ranked if quantized(c.score) > score)
+    if len(ranked) < solved.size or key <= rank_key(ranked[-1]):
+        above: int | None = sum(1 for c in ranked if rank_key(c) < key)
     else:
         try:
             above = solver.outranking(target)
