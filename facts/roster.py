@@ -23,11 +23,14 @@ class RosterHero(TypedDict):
 
 class RosterMap(TypedDict):
     """A map as the roster lists it: its mode, the style it rewards most
-    (Map.style_top) and whether it has an attacking and a defending side."""
+    (Map.style_top), whether it has an attacking and a defending side, and
+    its stages in play order - what a board's stage may name; none on a map
+    played as a whole."""
     name: str
     mode: str | None
     style: str | None
     sided: bool
+    stages: list[str]
 
 
 class Roster(TypedDict):
@@ -44,6 +47,7 @@ def roster_of(world: World) -> Roster:
                    portrait=h.portrait, status=h.status,
                    release_date=str(h.release_date) if h.release_date else None)
         for h in world.heroes_by_role()]
-    maps = [RosterMap(name=m.name, mode=m.mode, style=m.style_top, sided=is_sided(m))
+    maps = [RosterMap(name=m.name, mode=m.mode, style=m.style_top, sided=is_sided(m),
+                      stages=list(m.stages))
             for m in world.maps_sorted()]
     return Roster(heroes=heroes, maps=maps)

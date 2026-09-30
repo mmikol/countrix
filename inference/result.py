@@ -13,7 +13,7 @@ from typing import Literal, NotRequired, TypedDict
 
 from facts.draft import TEAM_SIZE, Seat
 from facts.factset import Fact, FactSet
-from facts.model import ROLES
+from facts.model import ROLES, TERRAIN_FEATURES
 from facts.records import Snapshot
 from facts.team import SPECIALIST_DELTA, text
 from inference import base as base_module
@@ -157,6 +157,7 @@ class Result:
     base: BaseWeights                  # the default engine's weights it was scored under
     bans: list[str] = field(default_factory=list)
     side: str = ""
+    stage: str = ""                    # the stage in play; empty for the whole map
     seat: Seat = "blue"
     partial: bool = False
     score: float = 0.0
@@ -304,7 +305,8 @@ class Result:
         scoring = unscored is None
         return {"kind": self.kind, "seat": self.seat, "map": self.map_name,
                 "red": self.red, "blue": self.blue, "locked": self.locked,
-                "bans": self.bans, "side": self.side, "partial": self.partial,
+                "bans": self.bans, "side": self.side, "stage": self.stage,
+                "partial": self.partial,
                 # a comp its own picks rule out carries no score at all
                 "score": None if self.barred else round(self.score, 3),
                 "scoring": scoring, "unscored": unscored,
@@ -367,11 +369,12 @@ class Result:
 
     def _headline(self) -> str:
         """What the result is, for which seat, where and against whom."""
-        return "%s for %s%s%s vs %s%s%s" % (
+        return "%s for %s%s%s%s vs %s%s%s" % (
             HEADINGS[self.kind],
             "red" if self.seat == "red" else "blue",
             " on %s" % self.side if self.side else "",
             " on %s" % self.map_name if self.map_name else "",
+            " - %s" % self.stage if self.stage else "",
             ", ".join(self.red) or "an unknown enemy",
             " (locked: %s)" % ", ".join(self.locked) if self.locked else "",
             " (banned: %s)" % ", ".join(self.bans) if self.bans else "")
@@ -419,6 +422,7 @@ class Board:
     board to the caller the way they hand a single seat."""
     map_name: str | None
     side: str
+    stage: str
     bans: list[str]
     blue: Result
     red: Result
@@ -433,7 +437,8 @@ class Board:
 
     def to_dict(self) -> Payload:
         """The board as JSON-ready data."""
-        return {"map": self.map_name, "side": self.side, "bans": self.bans, "plan": self.plan,
+        return {"map": self.map_name, "side": self.side, "stage": self.stage, "bans": self.bans,
+                "plan": self.plan,
                 "blue": self.blue.to_dict(), "red": self.red.to_dict(),
                 "current": self.current.to_dict(), "red_current": self.red_current.to_dict(),
                 "countered": self.countered.to_dict() if self.countered else None,
@@ -508,15 +513,21 @@ def _reasons(fs: FactSet, hero_name: str, locked: bool) -> tuple[str, list[str]]
     return "; ".join(why), evidence
 
 
+# the map's terrain metrics, which the ground in play's fact states (map.ground)
+GROUND_KEYS = frozenset("map.%s" % f for f in TERRAIN_FEATURES)
+
+
 def _metric_keys(strategy: Strategy | None) -> list[str]:
     """The metrics a contribution's fact can state: a heuristic's own, then
-    every team, enemy and matchup key its expressions read."""
+    every team, enemy and matchup key its expressions read, and the terrain
+    of the ground in play."""
     if strategy is None:
         return []
     keys = [strategy.metric] if strategy.kind == "heuristic" and strategy.metric else []
     for e in (strategy.require, strategy.bonus, strategy.penalty, strategy.when):
         if e is not None:
-            keys += [n for n in e.names if n.startswith(("team.", "enemy.", "matchup."))]
+            keys += [n for n in e.names
+                     if n.startswith(("team.", "enemy.", "matchup.")) or n in GROUND_KEYS]
     return keys
 
 
@@ -526,9 +537,12 @@ def _cited_fact(fs: FactSet, keys: Iterable[str]) -> Fact | None:
     carries (FactSet.add's `also`), so the lookup is the metric itself. A team
     metric is stated about blue; a matchup metric about the two sides, and one
     team metric is only ever stated in a matchup sentence. Red's numbers that
-    threaten blue ride their matchup sentence under their enemy.* keys."""
+    threaten blue ride their matchup sentence under their enemy.* keys. A map
+    metric is stated about the map."""
     for key in keys:
-        for subject in ("blue", "blue vs red"):
+        subjects = ((fs.draft.map_name or "",) if key.startswith("map.")
+                    else ("blue", "blue vs red"))
+        for subject in subjects:
             found = fs.find(key, subject)
             if found:
                 return found[0]

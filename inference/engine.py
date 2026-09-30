@@ -9,9 +9,11 @@ six), the score broken down into the default engine's terms and each
 strategy's, and the alternatives. board() does it for both seats - blue's
 absolute optimal, red around its revealed ones, on opposite sides of a
 sided map - and scores the current blue picks as they stand. Both refuse
-a team past the queue's tanks, on either seat, and score under the
-default engine at the playbook's weights (its meta.md) unless the caller
-names others; base.OFF, the meta at 0, is the playbook alone. The limits
+a team past the queue's tanks, on either seat, and a stage the map does
+not list, and score under the default engine at the playbook's weights
+(its meta.md) unless the caller names others; base.OFF, the meta at 0, is
+the playbook alone. Every seat of a board is solved on its stage - the
+ground in play, the whole map where the draft names none. The limits
 bind blue's own picks: the board reads a six that breaks one as not
 allowed, and infer refuses locked picks no six completes. The records are
 result.py's and the prose plan.py's. Every search is exact
@@ -31,6 +33,7 @@ from facts.draft import (
     Draft,
     Seat,
     board_side,
+    board_stage,
     check_tanks,
     opposite,
 )
@@ -103,11 +106,11 @@ def _order(heroes: Iterable[Hero]) -> list[str]:
 
 
 def _board_facts(world: World, result: Result, side: str) -> FactSet:
-    """The facts of the board a result stands on: its map, both sides as it
-    names them, its bans, and the side."""
+    """The facts of the board a result stands on: its map and stage, both
+    sides as it names them, its bans, and the side."""
     return board_facts.generate(world, Draft(
         map_name=result.map_name, red=tuple(result.red), blue=tuple(result.blue),
-        bans=tuple(result.bans), side=side))
+        bans=tuple(result.bans), side=side, stage=result.stage))
 
 
 def infer(
@@ -164,12 +167,12 @@ def _optimal(
     as the search runs whether the board was superseded."""
     started = time.time()
     m, red_h, blue_h, bans_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
-    side = board_side(m, draft.side)
+    side, stage = board_side(m, draft.side), board_stage(m, draft.stage)
     _check_teams(red_h, blue_h, seat)
     result = Result(kind=kind, map_name=m.name if m else None, red=[h.name for h in red_h],
                     blue=[], locked=[h.name for h in blue_h], catalog=catalog, base=base,
-                    bans=[h.name for h in bans_h], side=side, seat=seat)
-    solver = Solver(world, m, red=red_h, locked=blue_h, banned=bans_h, side=side,
+                    bans=[h.name for h in bans_h], side=side, stage=stage, seat=seat)
+    solver = Solver(world, m, red=red_h, locked=blue_h, banned=bans_h, side=side, stage=stage,
                     catalog=catalog, base=base, check=check)
     if scale_of is not None:
         solver.adopt_scale(scale_of)
@@ -202,16 +205,16 @@ def _evaluated(
     blue's before it gets here, and ranks red's."""
     started = time.time()
     m, red_h, blue_h, bans_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
-    side = board_side(m, draft.side)
+    side, stage = board_side(m, draft.side), board_stage(m, draft.stage)
     _check_teams(red_h, blue_h, seat)
     if len(blue_h) != TEAM_SIZE:
         raise Refusal("evaluate needs exactly %d %s picks (got %d)"
                          % (TEAM_SIZE, seat, len(blue_h)))
     result = Result(kind=kind, map_name=m.name if m else None, red=[h.name for h in red_h],
                     blue=[h.name for h in blue_h], locked=[], catalog=catalog, base=base,
-                    bans=[h.name for h in bans_h], side=side, seat=seat)
+                    bans=[h.name for h in bans_h], side=side, stage=stage, seat=seat)
     if solved is None:
-        solved = Solver(world, m, red=red_h, locked=[], banned=bans_h, side=side,
+        solved = Solver(world, m, red=red_h, locked=[], banned=bans_h, side=side, stage=stage,
                         catalog=catalog, base=base).solve(top=BOARD_TOP + 1)
     evaluated = evaluate_comp(solved, blue_h)
     fs = _board_facts(world, result, side)
@@ -255,7 +258,7 @@ def _current(
                     map_name=m.name if m else None, red=[h.name for h in red_h],
                     blue=[h.name for h in blue_h], locked=[] if full else [h.name for h in blue_h],
                     catalog=catalog, base=base, bans=[h.name for h in bans_h], side=side,
-                    seat=seat, partial=not full)
+                    stage=board_stage(m, draft.stage), seat=seat, partial=not full)
     solver = optimal.solver
     if blue_h:
         cand = solver.prepare(Candidate(blue_h))
@@ -287,15 +290,16 @@ def _ruled_out(world: World, draft: Draft, catalog: list[Strategy]) -> list[str]
     the whole roster that keeps them meets the limits."""
     m, red_h, blue_h, bans_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
     return _broken(Objective(world, m, red=red_h, banned=bans_h, side=board_side(m, draft.side),
-                             catalog=catalog, base=OFF), blue_h)
+                             stage=board_stage(m, draft.stage), catalog=catalog, base=OFF),
+                   blue_h)
 
 
 def board(
         world: World, draft: Draft, *, catalog: list[Strategy] | None = None,
         brief: Brief | None = None) -> Board:
-    """The whole board in one pass, at whatever stage the draft is - no map
-    (the meta's best six), a map, a map and a side, bans, red's picks as
-    they reveal:
+    """The whole board in one pass, at whatever step the draft is at - no map
+    (the meta's best six), a map, a map and a side, the stage in play, bans,
+    red's picks as they reveal:
 
         blue         blue's optimal six: the best counter to red's selection
                      as revealed - or, before they reveal a pick, to their
@@ -359,17 +363,19 @@ def board(
     base = weights_in_force(brief.base, brief.weights)
     watch = supersede.Watch(brief.superseded)
     m, red_h, blue_h, bans_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
-    draft = dataclasses.replace(draft, side=board_side(m, draft.side))
+    draft = dataclasses.replace(draft, side=board_side(m, draft.side),
+                                stage=board_stage(m, draft.stage))
     _check_teams(red_h, blue_h, "blue")
     expected = _expected(world, m, bans_h, draft, catalog, base)
     enemy = draft.red or tuple(expected.blue)
     # each seat's draft, from that seat's perspective: its own picks are `blue`
     blue_seat = dataclasses.replace(draft, red=enemy, blue=())
+    # and every seat on the draft's stage: both sides fight on the same ground
     red_seat = Draft(map_name=draft.map_name, red=draft.blue, blue=(), bans=draft.bans,
-                     side=opposite(draft.side))
+                     side=opposite(draft.side), stage=draft.stage)
     ours = dataclasses.replace(draft, red=enemy)       # blue's current comp and fill
     theirs = Draft(map_name=draft.map_name, red=draft.blue, blue=draft.red, bans=draft.bans,
-                   side=opposite(draft.side))
+                   side=opposite(draft.side), stage=draft.stage)
     solve = _Pass(world, catalog, base, watch)
     blue = solve.optimal(blue_seat, seat="blue")
     red = solve.optimal(red_seat, seat="red")
@@ -403,7 +409,8 @@ def board(
     # that is not allowed is described by the optimal instead
     held = len(draft.blue) == TEAM_SIZE and cur.barred is None
     shown = fill if fill is not None else cur if held else blue.result
-    return Board(map_name=expected.map_name, side=draft.side, bans=list(draft.bans),
+    return Board(map_name=expected.map_name, side=draft.side, stage=draft.stage,
+                 bans=list(draft.bans),
                  blue=blue.result, red=red.result, current=cur, red_current=red_cur,
                  fill=fill, countered=countered, momentum=momentum(seats),
                  plan=plan(world, m, draft.side, list(draft.bans), red_h, shown),
@@ -486,7 +493,7 @@ def _expected(
     likely = compute.expected_picks(world, m, banned=bans_h)
     return Result(kind="expected", map_name=m.name if m else None, red=[],
                   blue=[p["hero"] for p in likely], locked=[], catalog=catalog, base=base,
-                  bans=list(draft.bans), side=draft.side, seat="red",
+                  bans=list(draft.bans), side=draft.side, stage=draft.stage, seat="red",
                   picks=[Pick(hero=p["hero"], role=p["role"], locked=p["locked"], why=p["why"],
                               evidence=[])
                          for p in likely])

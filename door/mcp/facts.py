@@ -16,8 +16,9 @@ from facts.roster import RosterHero, RosterMap, roster_of
 @tool(
     "roster", "Every hero with role, subrole, health pool, portrait and status"
     " (released, or announced with its release day - shown, never picked), plus"
-    " the map pool with each map's mode, the style it rewards most and whether it"
-    " has an attacking and a defending side - the vocabulary the board tools accept.")
+    " the map pool with each map's mode, the style it rewards most, whether it"
+    " has an attacking and a defending side and its stages in play order - the"
+    " vocabulary the board tools accept.")
 def roster(ctx: Context) -> ToolReply:
     with ctx.connect() as cx:
         world = tables.load(cx)

@@ -10,7 +10,9 @@ their weight times bonus less penalty; assumptions are the agent's. A
 `when` reading only the enemy, the map and the world is settled once per
 board, not once per candidate. A heuristic guarded on the six's own state
 is a need: see Objective.score(). The legal shapes live in
-inference.shapes.
+inference.shapes. A board's stage moves the map's metrics (the ground in
+play) and nothing else; the scale is measured on the whole map (prepare's
+`measure`), so every stage of a map shares it.
 
 A six is scored in one seat order, whatever order it arrives in: tanks,
 then damage, then supports, each by hero id (Candidate). The score is then a
@@ -258,16 +260,18 @@ def _score_base(base: Base, cand: Candidate, out: list[Contribution] | None) -> 
 
 class Objective:
     """The part of a board's search that scores a six: the default engine and
-    the playbook's objective against this enemy, on this map, side and bans,
-    with every `when` the board settles read once and each heuristic's bounds,
-    once frozen, turned into the norms the scoring loop reads."""
+    the playbook's objective against this enemy, on this map, side, stage and
+    bans, with every `when` the board settles read once and each heuristic's
+    bounds, once frozen, turned into the norms the scoring loop reads. The
+    stage is one the map lists (facts.draft.board_stage), empty for the
+    whole map."""
 
     def __init__(self, world: World, m: Map | None, *, red: Sequence[Hero],
-                 banned: Sequence[Hero] = (), side: str = "",
+                 banned: Sequence[Hero] = (), side: str = "", stage: str = "",
                  catalog: list[Strategy], base: BaseWeights) -> None:
         self.world, self.m, self.red = world, m, list(red)
         self.banned = {h.id for h in banned}
-        self.side = side
+        self.side, self.stage = side, stage
         self.catalog = catalog
         # the default engine on this board; None while it is off
         self.base = Base(world, m, red=self.red, banned=banned, weights=base) if base.on else None
@@ -281,8 +285,12 @@ class Objective:
         self.red_t = team_metrics(world, self.red, m, ())
         self.static: Namespace = {
             "enemy": self.red_t,
-            "map": compute.map_metrics(m, side, ban_count=len(self.banned)),
+            "map": compute.map_metrics(m, side, ban_count=len(self.banned), stage=stage),
             "world": compute.world_metrics(world)}
+        # what the scale is measured on: the same board on the whole map, so
+        # every stage of a map shares one scale (prepare's `measure`)
+        self.measured: Namespace = self.static if not stage else dict(
+            self.static, map=compute.map_metrics(m, side, ban_count=len(self.banned)))
         self.bounds: Bounds = {}             # heuristic id -> (min, max)
         self._norms: list[Norm] = []
         # each strategy's gate - True or False where `when` is settled for the
@@ -340,16 +348,23 @@ class Objective:
 
     # --- namespace and preparation -------------------------------------------
 
-    def namespace(self, heroes: Sequence[Hero]) -> Namespace:
+    def namespace(self, heroes: Sequence[Hero], static: Namespace | None = None) -> Namespace:
+        """A six's metric bags: the board's (`static`, else the board's own) and
+        the six's team and matchup."""
         team = team_metrics(self.world, heroes, self.m, self.red)
-        ns = dict(self.static)
+        ns = dict(self.static if static is None else static)
         ns["team"] = team
         ns["matchup"] = compute.matchup_metrics(self.world, team, self.red_t)
         return ns
 
-    def prepare(self, cand: Candidate) -> Candidate:
-        """Namespace, the limits' check, raw heuristic values."""
-        ns = cand.ns = self.namespace(cand.heroes)
+    def prepare(self, cand: Candidate, *, measure: bool = False) -> Candidate:
+        """Namespace, the limits' check, raw heuristic values. To `measure` - a
+        six the scale is drawn from (inference.scale) - is to read it on the
+        whole map (`measured`), a heuristic's raw value read wherever the
+        board settles its `when`, on or off: the scale then holds still
+        across the stages of a map, whose gates differ. Such a six is never
+        scored as it stands: a heuristic the board gates off would count."""
+        ns = cand.ns = self.namespace(cand.heroes, self.measured if measure else None)
         sc = cand.scope = scope(ns)
         held: list[bool | None] = [None] * self.gate_slots
         violations = []
@@ -363,6 +378,8 @@ class Objective:
         for g, gate, slot, section, key in self._heuristics:
             if gate is None:
                 gate = _slot_gate(held, slot, g, sc)
+            elif measure:
+                gate = True
             if gate:
                 value = ns.get(section, _EMPTY).get(key)
                 keep(float(value) if isinstance(value, NUMBER_TYPES) else _not_a_number(value))
@@ -373,6 +390,22 @@ class Objective:
             cand.terms = self.base.terms(cand.heroes, number(ns["team"]["synergy_score"]))
         cand.tiebreak = sum(self.draws[h.id] for h in cand.heroes)
         return cand
+
+    def reads_the_stage(self) -> bool:
+        """Whether a term of the playbook reads a map metric the board's stage
+        moves from the whole map's: then a six measured on the whole map
+        (prepare's `measure`) is not the six the board scores, beyond the
+        heuristics its gates turn off."""
+        whole, here = self.measured["map"], self.static["map"]
+        moved = {"map.%s" % k for k, v in here.items() if whole.get(k) != v}
+        if not moved:
+            return False
+        read = {s.metric for s in self.catalog if s.metric}
+        for s in self.catalog:
+            for e in (s.require, s.when, s.bonus, s.penalty):
+                if e is not None:
+                    read |= set(e.names)
+        return bool(read & moved)
 
     @staticmethod
     def slim(cand: Candidate) -> Candidate:

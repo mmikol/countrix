@@ -69,7 +69,7 @@ def seated(world, draft, playbook, base, scale_of=None):
     from inference.solver import Solver
     m, red, locked, banned = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
     solver = Solver(world, m, red=red, locked=locked, banned=banned, side=draft.side,
-                    catalog=playbook, base=base)
+                    stage=draft.stage, catalog=playbook, base=base)
     if scale_of is not None:
         solver.adopt_scale(scale_of)
     return solver
@@ -555,3 +555,58 @@ def test_the_floor_is_the_lowest_reference_six(synthetic_world):
                                 catalog=playbook, base=DEFAULT)
     fill.adopt_scale(solver)
     assert fill.floor == solver.floor and fill.bounds == solver.bounds
+
+
+# a board that reads the terrain: a rule and a limit Forge's hazards turn on
+HAZARD_RULES = {
+    "hazard-cc": "---\nname: Hazards reward crowd control\nkind: heuristic\n"
+                 "metric: team.cc_count\ndirection: maximize\nweight: 1\n"
+                 "when: map.hazards >= 1.5\n---\nPush them off.\n",
+    "hazard-needs-cc": "---\nname: Hazards need crowd control\nkind: constraint\n"
+                       "require: team.cc_count >= 1 or map.hazards < 1.5\n---\nAlways.\n"}
+
+
+def hazard_playbook(world, directory):
+    """The reference playbook's assumptions and HAZARD_RULES, and Ember
+    Ruins' Forge stage whose text raises its hazards past the map's."""
+    for sid, text in HAZARD_RULES.items():
+        with open(os.path.join(directory, "%s.md" % sid), "w", encoding="utf-8") as handle:
+            handle.write(text)
+    world.map("Ember Ruins").stage_z["Forge"]["hazards"] = 2.5
+    return [*ASSUMPTIONS_ONLY, *catalog.load(str(directory))]
+
+
+def test_every_stage_of_a_map_shares_one_scale_and_reads_its_own_floor(
+        synthetic_world, tmp_path):
+    """The scale is measured on the whole map, each heuristic read wherever
+    the board settles its gate: a stage that turns a rule on and a limit
+    that reads the terrain move no bound. The floor is the board's own -
+    the lowest reference six under its stage's gates and limits - so a
+    stage that reads as the map floors where the map does, off the same
+    measured sixes. Each stage is searched exactly: its best sixes are the
+    enumeration's."""
+    from inference import scale
+    from inference import solver as solver_module
+    world = synthetic_world
+    playbook = hazard_playbook(world, tmp_path)
+    m = world.map("Ember Ruins")
+    solvers = {
+        stage: solver_module.Solver(world, m, red=[], locked=[], stage=stage, catalog=playbook,
+                                    base=DEFAULT)
+        for stage in ("", "Courtyard", "Forge")}
+    for solver in solvers.values():
+        solver.freeze_bounds()
+    assert [solvers[s].gates["hazard-cc"] for s in solvers] == [False, False, True]
+    assert [solvers[s].reads_the_stage() for s in solvers] == [False, False, True]
+    assert solvers[""].bounds == solvers["Courtyard"].bounds == solvers["Forge"].bounds
+    assert "hazard-cc" in solvers[""].bounds
+    for solver in solvers.values():
+        scores = [solver.score(c, detail=False).score for c in scale._prepared(solver)]
+        assert solver.floor == min(scores)
+        applies = {c.raw[0] is not None for c in scale._prepared(solver)}
+        assert applies == {solver.stage == "Forge"}
+    assert solvers["Courtyard"].floor == solvers[""].floor != solvers["Forge"].floor
+    for solver in solvers.values():
+        assert verdicts(solver.solve(top=6).ranked) == verdicts(enumerated(solver)[:6])
+    assert verdicts(solvers["Forge"].solve(top=1).ranked) != verdicts(
+        solvers[""].solve(top=1).ranked)

@@ -25,7 +25,7 @@ one of them.
     pulls        pull, clean, store: the pull_* tools, load_authored, sync_all
     lifecycle    the database's life: status, migrate, rebuild, the
                  generated docs, read-only query
-    boards       the five properties a board tool takes, and board_tool,
+    boards       the six properties a board tool takes, and board_tool,
                  which hands its function the one Draft they name
     facts        the facts layer: roster and a board's facts
     solver       the inference layer: infer, reach, board

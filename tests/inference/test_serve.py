@@ -56,18 +56,24 @@ def test_the_board_handler_serves_both_seats_and_the_current_comp(db):
         assert (current["rank"] or 0) >= 1 or current["outranked"]
     with pytest.raises(Refusal, match="banned"):          # the boundary answers it 400
         serve.handle_board(db, {"red": ["Zarya"], "blue": ["Ana"], "bans": ["Ana"]})
+    data, code = serve.handle_board(db, {
+        "map": ["King's Row"], "stage": ["assault"], "red": ["Zarya"], "side": ["attack"]})
+    assert code == 200 and data["stage"] == "Assault"
+    assert data["blue"]["stage"] == data["red"]["stage"] == "Assault"
+    with pytest.raises(Refusal, match="King's Row has no stage 'Well'"):
+        serve.handle_board(db, {"map": ["King's Row"], "stage": ["Well"]})
     db.rollback()
 
 
 def test_a_refused_board_supersedes_nothing():
     """handle_board reads the whole query before it takes the client's lane,
-    so a board its parse refuses - a junk weight, a seventh pick - leaves
-    the board still solving in that lane alone. No database is reached:
-    each is refused before the World loads."""
+    so a board its parse refuses - a junk weight, a seventh pick, a stage
+    with no map - leaves the board still solving in that lane alone. No
+    database is reached: each is refused before the World loads."""
     from inference import supersede
     ticket = supersede.LATEST.take("tab1")
     seven = ["Ana", "Ashe", "Baptiste", "Cassidy", "Genji", "Kiriko", "Mercy"]
-    for refused in ({"weights": ["junk"]}, {"red": seven}):
+    for refused in ({"weights": ["junk"]}, {"red": seven}, {"stage": ["Well"]}):
         with pytest.raises(Refusal):
             serve.handle_board(None, {**refused, "client": ["tab1"]})
     assert ticket() is False

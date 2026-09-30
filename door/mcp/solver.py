@@ -123,8 +123,9 @@ def reach_tool(ctx: Context, hero: str) -> ToolReply:   # _tool: inference.reach
 
 
 @board_tool(
-    "board", "The whole board at any stage of the draft (no map, a map, a side,"
-    " bans, red's picks as they reveal): blue's optimal six as the best counter"
+    "board", "The whole board at any step of the draft (no map, a map, a side,"
+    " the stage in play, bans, red's picks as they reveal), every seat solved on"
+    " that stage: blue's optimal six as the best counter"
     " to red's selection - to their likely six until they reveal a pick"
     " (blue's own picks never constrain it), red's best"
     " counter to yours, both current comps scored on those scales, your picks"

@@ -1,13 +1,14 @@
 """The Draft from facts/draft.py refuses a board no lobby holds wherever it
 is built - by a door's parse_board, by the MCP tools' _draft, by the engine's
-dataclasses.replace. No database."""
+dataclasses.replace - and board_stage, the stage a board is played on, as
+its map spells it. No database."""
 
 import dataclasses
 
 import pytest
 
 from db import Refusal
-from facts.draft import MAX_BANS, TEAM_SIZE, Draft, parse_board
+from facts.draft import MAX_BANS, TEAM_SIZE, Draft, board_stage, parse_board
 
 SEVEN = ("Ana", "Kiriko", "Lúcio", "Tracer", "Genji", "Sojourn", "Ashe")
 
@@ -48,5 +49,33 @@ def test_a_replaced_draft_is_checked_again():
 
 def test_parse_board_drops_empty_values():
     draft = parse_board({"map": [""], "red": ["", "Ana"], "blue": [""], "bans": ["", "Ashe"],
-                         "side": [""]})
-    assert draft == Draft(None, ("Ana",), (), ("Ashe",), "")
+                         "side": [""], "stage": [""]})
+    assert draft == Draft(None, ("Ana",), (), ("Ashe",), "", "")
+
+
+def test_parse_board_reads_the_stage_and_a_stage_needs_a_map():
+    """The stage rides the `stage` key, its first value; a stage with no map
+    names no ground, and the Draft refuses it wherever it is built."""
+    draft = parse_board({"map": ["Ember Ruins"], "stage": ["forge", "Spire"]})
+    assert (draft.map_name, draft.stage) == ("Ember Ruins", "forge")
+    for build in (lambda: Draft(stage="Forge"), lambda: parse_board({"stage": ["Forge"]}),
+                  lambda: dataclasses.replace(Draft("Ember Ruins", stage="Forge"), map_name=None)):
+        with pytest.raises(Refusal, match="name the map for stage 'Forge'"):
+            build()
+
+
+def test_a_board_is_played_on_a_stage_its_map_lists(synthetic_world):
+    """board_stage answers the stage as the map spells it, whatever the
+    spelling sent, and none for none; a stage the map does not list is
+    refused naming the map's stages, and any stage on a map that lists none."""
+    w = synthetic_world
+    ember, salt = w.map("Ember Ruins"), w.map("Salt Flats")
+    assert board_stage(ember, "forge") == "Forge" and board_stage(ember, "") == ""
+    assert board_stage(None, "") == ""
+    with pytest.raises(Refusal, match="Ember Ruins has no stage 'Well'; its stages:"
+                                      " Courtyard, Forge, Spire"):
+        board_stage(ember, "Well")
+    with pytest.raises(Refusal, match="Salt Flats lists no stages"):
+        board_stage(salt, "Forge")
+    with pytest.raises(Refusal, match="name the map"):
+        board_stage(None, "Forge")

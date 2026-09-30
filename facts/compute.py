@@ -12,11 +12,15 @@ here) are the vocabulary a strategy's frontmatter may use: `team.<key>`,
 Unknowns are numeric, never None: a metric that needs a map reads 0 (or
 falls back to the roster-wide figure where that is the honest substitute,
 which the description says) and `map.known` tells a strategy which.
+
+The map.* metrics read the ground in play: the whole map, or the stage a
+board names. A stage changes the terrain a strategy reads (ground), the
+objective (map.objective) and map.stage; no team metric reads it.
 """
 
 from collections import OrderedDict
 from collections.abc import Sequence
-from typing import NamedTuple, TypedDict
+from typing import Literal, NamedTuple, TypedDict
 
 from facts.draft import EXPECTED_SHAPE, is_sided
 from facts.model import ROLES, TERRAIN_FEATURES, Hero, Map, World
@@ -57,6 +61,11 @@ MAP_METRICS = OrderedDict([
     ("phases", "named parts of one route, played in order: Hybrid's 2, an Escort map's"
                 " named stretches; else 0"),
     ("bans", "bans already made in this match: a ban rate is a risk only before them"),
+    ("name", "the map's name; empty with no map"),
+    ("stage", "the stage in play, as the map lists it; empty for the whole map"),
+    ("objective", "what the ground in play is won on: point (Control, Flashpoint, a Hybrid's"
+                  " first phase), payload (Escort, a Hybrid's later phase), push (Push);"
+                  " empty for a Hybrid played whole, or no map"),
 ])
 TERRAIN_WORDS = {
     "chokes": "chokepoints, narrow streets, corridors, tunnels, gates and doorways",
@@ -68,10 +77,14 @@ TERRAIN_WORDS = {
     "hazards": "drops, pits and other environmental hazards",
     "cover": "cover",
 }
-# map.<feature>: one per terrain feature, numeric
-MAP_METRICS.update((f, "%s: the wiki article's mentions per thousand words, in sd from the mean of"
-                       " the maps with text (0 with no text)" % TERRAIN_WORDS[f])
+# map.<feature>: one per terrain feature, numeric, on the ground in play (ground)
+MAP_METRICS.update((f, "%s on the ground in play: the wiki article's mentions per thousand"
+                       " words, in sd from the mean of the maps with text (0 with no text),"
+                       " raised to the stage's own where a stage is in play and its text"
+                       " names them %d times or more" % (TERRAIN_WORDS[f], STAGE_MENTIONS))
                    for f in TERRAIN_FEATURES)
+# what each mode's ground is won on, a Hybrid's by its phase (objective)
+OBJECTIVES = {"Control": "point", "Flashpoint": "point", "Escort": "payload", "Push": "push"}
 
 WORLD_METRICS = OrderedDict([
     ("heal_bench", "2 x the median peak heal across the released supports"),
@@ -268,17 +281,57 @@ def stage_standouts(m: Map, stage: str) -> list[Standout]:
     return sorted(found, key=lambda s: (-s.z, s.feature))[:STAGE_FEATURES]
 
 
-def map_metrics(m: Map | None, side: str = "", *, ban_count: int) -> MetricBag:
+class Ground(NamedTuple):
+    """A terrain feature on the ground in play: its z, and whose text it was
+    read off - the stage's own, or the map's article."""
+    feature: str
+    z: float
+    source: Literal["stage", "map"]
+
+
+def ground(m: Map, stage: str, feature: str) -> Ground:
+    """A feature on the ground in play: the map's z, raised to the stage's
+    where the stage's own text names the feature STAGE_MENTIONS times or
+    more. A stage's text can add a feature, never drop one: a stage's text
+    is a paragraph, and a feature it leaves out is unsaid, not absent. No
+    stage reads the map."""
+    z = m.terrain_z[feature]
+    said = m.stage_terrain.get(stage, {}).get(feature)
+    if said is not None and said.mentions >= STAGE_MENTIONS:
+        own = m.stage_z.get(stage, {}).get(feature, 0.0)
+        if own > z:
+            return Ground(feature, own, "stage")
+    return Ground(feature, z, "map")
+
+
+def objective(m: Map | None, stage: str = "") -> str:
+    """What the ground in play is won on (OBJECTIVES): a Hybrid's first phase
+    is a point and its later one a payload, and a Hybrid played whole reads
+    empty, as does no map."""
+    if m is None:
+        return ""
+    if m.mode == "Hybrid":
+        if not stage:
+            return ""
+        return "point" if m.stages[:1] == [stage] else "payload"
+    return OBJECTIVES.get(m.mode or "", "")
+
+
+def map_metrics(m: Map | None, side: str = "", *, ban_count: int, stage: str = "") -> MetricBag:
+    """MAP_METRICS on the ground in play: the map, or `stage`, one the map
+    lists (facts.draft.board_stage), where a board names one."""
     if m is None:
         return {"known": 0, "sided": 0, "side": "", "style_top": "",
                 "style_margin": 0, "mode": "", "stages": 0, "phases": 0, "bans": ban_count,
+                "name": "", "stage": "", "objective": "",
                 **dict.fromkeys(TERRAIN_FEATURES, 0.0)}
     sided = 1 if is_sided(m) else 0
     return {"known": 1, "sided": sided, "side": side if sided else "",
             "style_top": m.style_top or "", "style_margin": m.style_margin,
             "mode": m.mode or "", "stages": len(arenas(m)),
             "phases": len(phases(m)), "bans": ban_count,
-            **{f: m.terrain_z[f] for f in TERRAIN_FEATURES}}
+            "name": m.name, "stage": stage, "objective": objective(m, stage),
+            **{f: ground(m, stage, f).z for f in TERRAIN_FEATURES}}
 
 
 def world_metrics(world: World) -> MetricBag:
@@ -297,7 +350,7 @@ TEXT_METRICS = {
     "team.style_lean", "team.weakest", "team.squishies", "team.burst_hero",
     "team.isolated", "team.pairs", "team.unwritten_pairs", "team.max_ban_hero",
     "team.unanswered", "team.exposed",
-    "map.style_top", "map.mode", "map.side",
+    "map.style_top", "map.mode", "map.side", "map.name", "map.stage", "map.objective",
 }
 TEXT_METRICS |= {n.replace("team.", "enemy.", 1) for n in TEXT_METRICS
                  if n.startswith("team.") and n.split(".", 1)[1] not in VERSUS_KEYS}

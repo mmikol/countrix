@@ -13,7 +13,7 @@ import pytest
 from facts import compute
 from facts.compute import STAGE_FEATURES, STAGE_MENTIONS, TERRAIN_STANDOUT
 from facts.draft import EXPECTED_SHAPE, TEAM_SIZE, is_sided, opposite
-from facts.model import TERRAIN_FEATURES
+from facts.model import TERRAIN_FEATURES, Map
 from facts.records import MapRate, StageTerrain
 from facts.team import TEAM_METRICS, team_metrics
 
@@ -201,6 +201,53 @@ def test_a_stage_stands_out_on_its_own_text_and_enough_mentions(synthetic_world)
     ember.stage_z["Forge"] = {"cover": 0.8, "flanks": 1.5, "hazards": 1.5}
     assert STAGE_FEATURES == 2
     assert compute.stage_standouts(ember, "Forge") == [("flanks", 1.5), ("hazards", 1.5)]
+
+
+def test_the_ground_in_play_is_the_map_raised_where_a_stage_text_names_a_feature(
+        synthetic_world):
+    """A stage's text can add a feature, never drop one: its z counts where
+    the text names the feature STAGE_MENTIONS times or more and stands above
+    the map's; a feature it leaves out, names once or reads lower is the
+    map's. No stage is the map."""
+    w = synthetic_world
+    ember = w.map("Ember Ruins")
+    assert ember.terrain_z["hazards"] == 1.0 and ember.terrain_z["flanks"] == 1.0
+    assert compute.ground(ember, "", "hazards") == ("hazards", 1.0, "map")
+    assert compute.ground(ember, "Forge", "hazards") == ("hazards", 1.0, "map")    # a tie
+    ember.stage_z["Forge"]["hazards"] = 2.5
+    assert compute.ground(ember, "Forge", "hazards") == ("hazards", 2.5, "stage")
+    assert compute.ground(ember, "", "hazards") == ("hazards", 1.0, "map")
+    ember.stage_z["Spire"]["high_ground"] = 3.0                     # named once
+    assert compute.ground(ember, "Spire", "high_ground") == ("high_ground", 1.0, "map")
+    ember.stage_terrain["Forge"]["flanks"] = StageTerrain(1.0, STAGE_MENTIONS)
+    ember.stage_z["Forge"]["flanks"] = -0.5                           # lower: never drops
+    assert compute.ground(ember, "Forge", "flanks") == ("flanks", 1.0, "map")
+    assert compute.ground(ember, "Courtyard", "cover") == ("cover", -1.0, "map")
+    staged = compute.map_metrics(ember, ban_count=0, stage="Forge")
+    whole = compute.map_metrics(ember, ban_count=0)
+    assert {k for k in staged if staged[k] != whole[k]} == {"hazards", "stage"}
+    assert (staged["hazards"], staged["stage"], whole["stage"]) == (2.5, "Forge", "")
+
+
+def test_the_objective_is_the_point_the_payload_or_the_push_a_stage_is_won_on(
+        synthetic_world):
+    """Control and Flashpoint rounds are points, Escort a payload, Push a
+    push; a Hybrid's first phase is a point and its later one a payload, and
+    a Hybrid played whole reads empty, as does no map. The map's name and the
+    stage ride beside it, all three text."""
+    w = synthetic_world
+    harbor, ember, salt = w.map("Harbor Gate"), w.map("Ember Ruins"), w.map("Salt Flats")
+    assert [compute.objective(harbor, s) for s in ("", "Assault", "Escort")] == [
+        "", "point", "payload"]
+    assert [compute.objective(ember, s) for s in ("", "Forge")] == ["point", "point"]
+    assert compute.objective(salt) == "push" and compute.objective(None) == ""
+    escort = Map(99, "Long Road", "Escort")
+    assert compute.objective(escort) == "payload"
+    x = compute.map_metrics(harbor, "attack", ban_count=0, stage="Escort")
+    assert (x["name"], x["stage"], x["objective"]) == ("Harbor Gate", "Escort", "payload")
+    none = compute.map_metrics(None, ban_count=0)
+    assert (none["name"], none["stage"], none["objective"]) == ("", "", "")
+    assert {"map.name", "map.stage", "map.objective"} <= compute.TEXT_METRICS
 
 
 def test_expected_picks_read_the_map_and_the_meta_and_no_strategy(synthetic_world):

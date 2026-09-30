@@ -16,9 +16,9 @@ imports only db.
                     kit, and the counter graph the default engine reads: the
                     wiki's edges, the matrix's where the wiki has none
     records         the typed records a Hero, a Map and the World hand on
-    draft           the board's vocabulary - the lobby's limits, the sides -
-                    and the Draft, the board at one stage of the pick-and-ban
-                    draft
+    draft           the board's vocabulary - the lobby's limits, the sides,
+                    the stage in play - and the Draft, the board at one step
+                    of the pick-and-ban draft
     roster          every hero and map the board tools accept, as the board's
                     /api/roster and the door's roster tool list them
     team            the team metrics and the typed bag every metric section
@@ -26,7 +26,8 @@ imports only db.
     compute         the matchup, map and world metrics and registry(), which
                     gathers every metric a strategy may name - pure functions
                     over a World, shared with the inference layer's solver so
-                    both compute the same numbers
+                    both compute the same numbers; the map's read on the
+                    ground in play, the whole map or a stage
     factset         the FactSet - a board's facts numbered F1.., each filed
                     under every metric it states
     board_facts     generate() - every fact for a map and two teams:

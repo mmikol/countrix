@@ -1,6 +1,7 @@
 """The roster facts/roster.py builds once for the board's /api/roster and the
 door's roster tool: its heroes in role order with every field both readers
-take, its maps in name order with their mode, style and side. No database."""
+take, its maps in name order with their mode, style, side and stages. No
+database."""
 
 from facts.roster import RosterHero, RosterMap, roster_of
 
@@ -30,3 +31,11 @@ def test_the_maps_come_in_name_order_with_their_style_and_side(synthetic_world):
     assert any(m["style"] for m in maps)          # or the style check proves nothing
     assert {m["name"]: m["mode"] for m in maps} == {
         "Ember Ruins": "Control", "Harbor Gate": "Hybrid", "Salt Flats": "Push"}
+
+
+def test_each_map_lists_the_stages_a_board_may_name_in_play_order(synthetic_world):
+    """The stages a board's stage may name, as the map spells them and in
+    play order; a map played as a whole lists none."""
+    stages = {m["name"]: m["stages"] for m in roster_of(synthetic_world)["maps"]}
+    assert stages == {"Ember Ruins": ["Courtyard", "Forge", "Spire"],
+                      "Harbor Gate": ["Assault", "Escort"], "Salt Flats": []}

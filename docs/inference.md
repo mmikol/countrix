@@ -94,6 +94,21 @@ COMP   = the legal six of highest score, exactly; the next best after it, in ord
    (F1, F2, ...): each pick's reasons, and each bar of the breakdown,
    the engine's three terms among them.
 
+**The ground in play.** A board is played on the whole map or on one of
+its stages - a Control or Flashpoint round, an Escort or Hybrid phase -
+named by `stage` (`/api/board`, the board tools; the roster lists each
+map's). The stage moves the `map.*` metrics and nothing else, and every
+seat of the board plays it. A terrain feature reads the map's article,
+raised to the stage's own where the stage's text names it
+`STAGE_MENTIONS` (2) times or more: a stage's text can add a feature,
+never drop one, since a paragraph that leaves a feature out has not said
+it is absent. `map.stage` and `map.objective` (a point, a payload or a
+push) say where the fight is, and `map.name` which map. The scale is
+measured on the whole map, each heuristic read wherever the board
+settles its gate, so every stage of a map shares one; the floor is the
+stage's own. With a stage named, the facts state the ground in play
+(`map.ground`), and a rule gated on the terrain cites it.
+
 **The weights are not learned.** No weight is fit to outcomes. A
 heuristic's starting weight is derived from its prose on the house
 scale, 0.25 a whisper, 1 the default, 2.5 strong and 4 dominant, when
@@ -555,9 +570,9 @@ six's own state (`team.*` or `matchup.*`) is a need: it adds
 weight, and the needs on one guard cost `NEED_BUDGET` (2) together at
 most, or the largest of their weights where that is more, so a need alone
 on its guard weighs its own weight, a slider's past 2 too. The scale is
-a seeded
-sample of 1200 legal sixes plus the field of each role's top six by the
-board's prior (`inference/scale.py`).
+a seeded sample of 1200 legal sixes plus the field of each role's top six
+by the board's prior (`inference/scale.py`), measured on the whole map
+whatever the stage.
 
 A strategy's prose is three sentences at most (`add_strategy` refuses
 more): the claim, why and when, what is measured.
@@ -991,14 +1006,17 @@ the `team.*` metrics computed for the red side.
 | `map.stages` | separate arenas, one played at a time: Control's 3, Flashpoint's 5; else 0 |
 | `map.phases` | named parts of one route, played in order: Hybrid's 2, an Escort map's named stretches; else 0 |
 | `map.bans` | bans already made in this match: a ban rate is a risk only before them |
-| `map.chokes` | chokepoints, narrow streets, corridors, tunnels, gates and doorways: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text) |
-| `map.interiors` | rooms, caves and other indoor ground: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text) |
-| `map.high_ground` | high ground, rooftops, balconies and other vertical ground: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text) |
-| `map.flanks` | flank routes and side paths: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text) |
-| `map.sightlines` | long sightlines: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text) |
-| `map.open_ground` | open ground and ground said to lack cover: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text) |
-| `map.hazards` | drops, pits and other environmental hazards: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text) |
-| `map.cover` | cover: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text) |
+| `map.name` (text) | the map's name; empty with no map |
+| `map.stage` (text) | the stage in play, as the map lists it; empty for the whole map |
+| `map.objective` (text) | what the ground in play is won on: point (Control, Flashpoint, a Hybrid's first phase), payload (Escort, a Hybrid's later phase), push (Push); empty for a Hybrid played whole, or no map |
+| `map.chokes` | chokepoints, narrow streets, corridors, tunnels, gates and doorways on the ground in play: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text), raised to the stage's own where a stage is in play and its text names them 2 times or more |
+| `map.interiors` | rooms, caves and other indoor ground on the ground in play: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text), raised to the stage's own where a stage is in play and its text names them 2 times or more |
+| `map.high_ground` | high ground, rooftops, balconies and other vertical ground on the ground in play: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text), raised to the stage's own where a stage is in play and its text names them 2 times or more |
+| `map.flanks` | flank routes and side paths on the ground in play: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text), raised to the stage's own where a stage is in play and its text names them 2 times or more |
+| `map.sightlines` | long sightlines on the ground in play: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text), raised to the stage's own where a stage is in play and its text names them 2 times or more |
+| `map.open_ground` | open ground and ground said to lack cover on the ground in play: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text), raised to the stage's own where a stage is in play and its text names them 2 times or more |
+| `map.hazards` | drops, pits and other environmental hazards on the ground in play: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text), raised to the stage's own where a stage is in play and its text names them 2 times or more |
+| `map.cover` | cover on the ground in play: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text), raised to the stage's own where a stage is in play and its text names them 2 times or more |
 | `world.heal_bench` | 2 x the median peak heal across the released supports |
 | `world.hps_bench` | 2 x the median sustained healing across the released supports |
 <!-- /generated:catalog -->

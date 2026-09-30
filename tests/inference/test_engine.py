@@ -2,9 +2,9 @@
 odds, the shapes and the queue's tank limit, an empty catalog kept as the
 caller's, a limit red's reveal already breaks and blue's picks may not, the
 share read from the seat's floor and a mirror's even odds, the likely six, a
-full six on control, every seat of a board on the synthetic World, the
-page's boards superseding one another, and the healing floor on top of the
-default engine.
+full six on control, every seat of a board on the synthetic World and on
+the stage it names, the page's boards superseding one another, and the
+healing floor on top of the default engine.
 Every board is the synthetic World's but the last two, King's Row and
 Samoa on the built database. test_board_gate holds the lobby's limits on every door."""
 
@@ -17,7 +17,7 @@ from facts import compute
 from facts.draft import MAX_TANKS, Draft
 from facts.records import MapRate
 from facts.team import team_metrics
-from inference import catalog
+from inference import catalog, engine
 from inference.base import OFF
 from tests.inference import ASSUMPTIONS_ONLY, BRIEF, DEFAULT, FIXTURE_PLAYBOOK, heal_rate
 
@@ -543,3 +543,42 @@ def test_the_search_proves_real_boards_scoring_few_sixes_in_full(world):
         assert len(solved.ranked) == 6 and solver.considered > released ** 3
         assert solver.leaves < 2_000 and solver.nodes < 100_000, (map_name, solver.leaves)
 
+
+
+def test_every_seat_of_a_board_plays_the_stage_it_names(synthetic_world, tmp_path):
+    """A board on a stage solves every seat there - both optimals, both
+    current comps, the fill, the countered case and the likely six - so the
+    two sides fight on one ground: a rule the stage's terrain turns on
+    applies to red's seat as to blue's, each six keeps the limit it turns
+    on, and the rule cites the ground in play's fact. The whole map turns
+    the rule off, and a stage the map does not list is refused."""
+    from tests.inference.test_solver import hazard_playbook
+    world = synthetic_world
+    (tmp_path / "hazard-ground.md").write_text(
+        "---\nname: Hazards pay\nkind: heuristic\nweight: 0.5\n"
+        "bonus: 1 if map.hazards >= 1.5 else 0\n---\nOn the ground in play.\n",
+        encoding="utf-8")
+    playbook = hazard_playbook(world, tmp_path)
+    b = engine.board(world, Draft("Ember Ruins", ("Mortar",), ("Anvil",), stage="forge"),
+                     catalog=playbook, brief=BRIEF)
+    seats = (b.blue, b.red, b.current, b.red_current, b.fill, b.countered, b.expected)
+    assert b.stage == "Forge" and {r.stage for r in seats} == {"Forge"}
+    assert b.to_dict()["stage"] == b.to_dict()["blue"]["stage"] == "Forge"
+    for r in (b.blue, b.red, b.fill, b.countered):
+        terms = {c["id"]: c for c in r.contributions}
+        assert terms["hazard-cc"]["applies"] and terms["hazard-cc"]["raw"] >= 1
+        assert terms["hazard-ground"]["bonus"] == 1
+        assert terms["hazard-ground"]["text"].startswith(
+            "Ember Ruins - Forge is the ground in play: hazards 2.5")
+    assert " on Ember Ruins - Forge vs " in b.blue.rendered()
+    whole = engine.board(world, Draft("Ember Ruins", ("Mortar",), ("Anvil",)),
+                         catalog=playbook, brief=BRIEF)
+    assert whole.stage == "" and {r.stage for r in (whole.blue, whole.red)} == {""}
+    for r in (whole.blue, whole.red):
+        terms = {c["id"]: c for c in r.contributions}
+        assert not terms["hazard-cc"]["applies"] and terms["hazard-ground"]["bonus"] == 0
+        assert "text" not in terms["hazard-ground"]
+    with pytest.raises(Refusal, match="its stages: Courtyard, Forge, Spire"):
+        engine.board(world, Draft("Ember Ruins", stage="Well"), catalog=playbook, brief=BRIEF)
+    with pytest.raises(Refusal, match="its stages: Courtyard, Forge, Spire"):
+        engine.infer(world, Draft("Ember Ruins", stage="Well"), catalog=playbook, base=DEFAULT)

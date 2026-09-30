@@ -28,11 +28,11 @@ This module writes the meta, the bans and the map; facts.hero_facts writes
 a hero's facts, and facts.team_facts a team's and the matchup's.
 """
 
-from typing import NotRequired, TypedDict
+from typing import Literal, NotRequired, TypedDict
 
 from facts import compute, hero_facts, team_facts
 from facts.compute import TERRAIN_STANDOUT
-from facts.draft import MAX_BANS, Draft, board_side, is_sided, opposite
+from facts.draft import MAX_BANS, Draft, board_side, board_stage, is_sided, opposite
 from facts.factset import FactSet
 from facts.model import TERRAIN_FEATURES, Map, Resolved, World
 
@@ -54,6 +54,21 @@ class StageTerrainValue(TypedDict):
     features: list[TerrainValue]
 
 
+class GroundValue(TypedDict):
+    """A feature of a map.ground fact's value: the feature, its z on the
+    ground in play, and whose text it was read off (compute.ground)."""
+    feature: str
+    z: float
+    source: Literal["stage", "map"]
+
+
+class GroundFact(TypedDict):
+    """A map.ground fact's value: the stage in play and its features above
+    the ordinary map, largest first."""
+    stage: str
+    features: list[GroundValue]
+
+
 def _g(value: float) -> str:
     return "%g" % value if isinstance(value, float) else str(value)
 
@@ -61,22 +76,24 @@ def _g(value: float) -> str:
 # --- the board -------------------------------------------------------------
 
 def generate(world: World, draft: Draft) -> FactSet:
-    """The FactSet for a board: the map (and blue's side on a sided map),
-    the red and blue picks, and the match's bans (each team's two and the
-    lobby's - up to five, all optional). A banned hero cannot be picked and
-    cannot be recommended; every name World.resolve refuses is a Refusal. The
-    FactSet's draft holds the resolved names and the side the map keeps."""
+    """The FactSet for a board: the map (and blue's side on a sided map, and
+    the stage in play where one is named), the red and blue picks, and the
+    match's bans (each team's two and the lobby's - up to five, all
+    optional). A banned hero cannot be picked and cannot be recommended;
+    every name World.resolve refuses is a Refusal, as is a stage the map
+    does not list. The FactSet's draft holds the resolved names and the
+    side the map keeps."""
     board = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans, allow_announced=True)
-    side = board_side(board.map, draft.side)
+    side, stage = board_side(board.map, draft.side), board_stage(board.map, draft.stage)
     fs = FactSet(Draft(
         map_name=board.map.name if board.map else None,
         red=tuple(h.name for h in board.red), blue=tuple(h.name for h in board.blue),
-        bans=tuple(h.name for h in board.banned), side=side))
+        bans=tuple(h.name for h in board.banned), side=side, stage=stage))
     _meta_facts(fs, world)
     if board.banned:
         _ban_facts(fs, world, board)
     if board.map is not None:
-        _map_facts(fs, world, board.map, side)
+        _map_facts(fs, world, board.map, side, stage)
     for h in board.red:
         hero_facts.write(fs, world, board, h, "red")
     for h in board.blue:
@@ -126,11 +143,13 @@ def _ban_facts(fs: FactSet, world: World, board: Resolved) -> None:
 
 # --- the map ---------------------------------------------------------------
 
-def _map_facts(fs: FactSet, world: World, m: Map, side: str = "") -> None:
-    """The map's own facts - its mode and sides, its ground, the styles it
-    rewards - then the heroes who do well on it."""
+def _map_facts(fs: FactSet, world: World, m: Map, side: str = "", stage: str = "") -> None:
+    """The map's own facts - its mode and sides, its ground and the ground
+    in play, the styles it rewards - then the heroes who do well on it."""
     _map_mode(fs, m, side)
     _map_terrain(fs, m)
+    if stage:
+        _map_ground(fs, m, stage)
     _map_styles(fs, m)
     _map_heroes(fs, world, m)
 
@@ -193,6 +212,25 @@ def _map_terrain(fs: FactSet, m: Map) -> None:
         fs.add("map", m.name, "map.terrain_unread", "%s: the wiki's article has too little on"
             " the ground; its terrain metrics read 0" % m.name, value=0,
             source="map_terrain")
+
+
+def _map_ground(fs: FactSet, m: Map, stage: str) -> None:
+    """The ground in play on a stage: each terrain feature above the
+    ordinary map as the board's map.* metrics read it (compute.ground),
+    largest first, and whose text it came from. The fact carries each
+    feature's map.* metric, so a rule gated on the terrain cites it."""
+    read = sorted((compute.ground(m, stage, f) for f in TERRAIN_FEATURES),
+                  key=lambda g: (-g.z, g.feature))
+    above = [g for g in read if round(g.z, 1) > 0]           # as the sentence words it
+    source = {"stage": "the stage's text", "map": "the map's article"}
+    said = "; ".join("%s %.1f sd above the ordinary (%s)"
+                     % (g.feature.replace("_", " "), g.z, source[g.source])
+                     for g in above)
+    fs.add("map", m.name, "map.ground", "%s - %s is the ground in play: %s" % (
+        m.name, stage, said or "no terrain feature above the ordinary map"),
+        value=GroundFact(stage=stage, features=[
+            GroundValue(feature=g.feature, z=g.z, source=g.source) for g in above]),
+        source="stage_terrain+map_terrain", also=["map.%s" % g.feature for g in above])
 
 
 def _map_styles(fs: FactSet, m: Map) -> None:

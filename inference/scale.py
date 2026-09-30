@@ -10,6 +10,12 @@ functions of an Objective.
                 field, adopted by the objective, and the board's floor: the
                 lowest score among the reference sixes, the zero of every share
                 on it
+
+The low and high are measured on the whole map, each heuristic read
+wherever the board settles its gate, on or off (Objective.prepare's
+`measure`): a stage moves which rules apply, never the scale they are read
+on, so every stage of a map shares one. The floor is the board's own, its
+stage's gates and limits in force.
 """
 
 import itertools
@@ -71,10 +77,30 @@ def sample(objective: Objective, size: int = REFERENCE_SIZE) -> list[Candidate]:
     return out
 
 
-def _prepared(objective: Objective) -> list[Candidate]:
-    """The sample prepared, minus what the limits refuse: what every
-    heuristic is normalised against."""
-    return [c for c in (objective.prepare(c) for c in sample(objective)) if not c.violations]
+def _prepared(objective: Objective, measure: bool = False) -> list[Candidate]:
+    """The sample prepared on the board, minus what the limits refuse: the
+    sixes the floor is read off; to `measure`, prepared as the scale reads
+    them (Objective.prepare)."""
+    return [c for c in (objective.prepare(c, measure=measure) for c in sample(objective))
+            if not c.violations]
+
+
+def _on_board(objective: Objective, measured: list[Candidate]) -> list[Candidate]:
+    """The measured sample as the board reads it, to score its floor: the
+    same sixes with each heuristic the board gates off read as off again;
+    prepared anew on a stage whose moved map metrics a term reads
+    (Objective.reads_the_stage), since its limits and scope are the
+    stage's."""
+    if objective.reads_the_stage():
+        return _prepared(objective)
+    off = [i for i, g in enumerate(objective.heuristics) if objective.gates[g.id] is False]
+    if off:
+        for cand in measured:
+            raw = list(cand.raw)
+            for i in off:
+                raw[i] = None
+            cand.raw = raw
+    return measured
 
 
 def _bounds_over(objective: Objective, prepared: Sequence[Candidate]) -> Bounds:
@@ -137,7 +163,7 @@ def _board_field(objective: Objective) -> Iterator[list[Hero]]:
 
 
 def _field_sample(objective: Objective) -> list[Candidate]:
-    """The board's field, prepared but unscored.
+    """The board's field, measured (Objective.prepare) but unscored.
 
     The sample alone is 1,200 random legal sixes, and the search picks from
     comps far better than random, so a good six sat above the sample's high
@@ -146,7 +172,7 @@ def _field_sample(objective: Objective) -> list[Candidate]:
     nothing. The field belongs in the population that sets the scale."""
     out = []
     for heroes in _board_field(objective):
-        cand = objective.prepare(Candidate(heroes))
+        cand = objective.prepare(Candidate(heroes), measure=True)
         if not cand.violations:
             out.append(cand)
     return out
@@ -158,11 +184,12 @@ def freeze(objective: Objective) -> float | None:
     sixes under them, None where no legal six is drawn. The sample is drawn
     once here. The field is read only where a heuristic on a metric exists:
     the bounds read nothing else, so a playbook without one skips it and
-    lands on the same scale."""
-    reference = _prepared(objective)
+    lands on the same scale. Both are measured on the whole map; the floor
+    is read on the board's stage."""
+    measured = _prepared(objective, measure=True)
     field = _field_sample(objective) if objective.heuristics else []
-    objective.adopt_bounds(_bounds_over(objective, reference + field))
-    return _floor(objective, reference)
+    objective.adopt_bounds(_bounds_over(objective, measured + field))
+    return _floor(objective, _on_board(objective, measured))
 
 
 def _floor(objective: Objective, prepared: Iterable[Candidate]) -> float | None:

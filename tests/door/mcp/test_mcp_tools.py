@@ -233,9 +233,9 @@ def test_the_tuning_log_tool_refuses_fewer_than_one_line(tmp_path, monkeypatch):
 
 
 def test_a_board_tool_hands_its_function_one_draft(tmp_path, monkeypatch):
-    """The board tools share BOARD's five properties, first and in order, and
+    """The board tools share BOARD's six properties, first and in order, and
     each function gets them as one Draft: tuples, with what the call left out
-    empty."""
+    empty, and the stage as sent."""
     seen = []
 
     class Stub:
@@ -252,9 +252,12 @@ def test_a_board_tool_hands_its_function_one_draft(tmp_path, monkeypatch):
     monkeypatch.setattr(board_facts, "generate", lambda world, draft: seen.append(draft) or Stub())
     Offline(dsn="postgresql://nowhere").call(
         "facts", map="Ilios", red=["Ana"], bans=["Mei"])
-    assert seen == [Draft("Ilios", ("Ana",), (), ("Mei",), "")]
+    Offline(dsn="postgresql://nowhere").call("facts", map="Ilios", stage="Well")
+    assert seen == [Draft("Ilios", ("Ana",), (), ("Mei",), ""), Draft("Ilios", stage="Well")]
+    assert list(boards.BOARD) == ["map", "red", "blue", "bans", "side", "stage"]
     for name in ("facts", "infer", "board"):
-        assert list(tools.REGISTRY.get(name).schema["properties"])[:5] == list(boards.BOARD)
+        properties = list(tools.REGISTRY.get(name).schema["properties"])
+        assert properties[:len(boards.BOARD)] == list(boards.BOARD)
 
 
 def test_readiness_is_the_first_unmet_condition(monkeypatch):

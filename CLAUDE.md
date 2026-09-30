@@ -150,10 +150,14 @@ db <- facts <- inference <- door <- ui.
   seven Results (blue, red, current, red_current, fill, countered, expected);
   fill is None unless one to five blue picks are locked, countered is None
   without blue picks or when the caller's `Brief` leaves it out, as the
-  page's boards do. Each seat has one scale: reference sixes drawn from a
-  string seed, the map and the side, bounded against the enemy; the lowest
-  of their scores is the seat's floor, a share's 0, as its optimal is the
-  100. current shares blue's optimal's scale, red_current red's, so within
+  page's boards do. A Draft may name a stage the map lists (`stage`,
+  resolved by `facts.draft.board_stage`); every seat plays it, and it moves
+  the `map.*` metrics alone - the ground in play, `compute.ground`. Each
+  seat has one scale: reference sixes drawn from a string seed, the map
+  and the side, bounded against the enemy and measured on the whole map
+  (`prepare(measure=True)`), so the stages of a map share it; the lowest
+  of their scores under the board's own gates is the seat's floor, a
+  share's 0, as its optimal is the 100. current shares blue's optimal's scale, red_current red's, so within
   a seat infer, the fill and current are comparable. The search is exact
   (`inference/solver.py`, its bounds in `inference/bounds.py`): every
   legal six of the released, unbanned roster, each once, by branch and

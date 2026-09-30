@@ -90,5 +90,6 @@ class FactSet:
     def to_dict(self) -> dict[str, object]:
         draft = self.draft
         return {"map": draft.map_name, "red": list(draft.red), "blue": list(draft.blue),
-                "bans": list(draft.bans), "side": draft.side, "count": self.count,
+                "bans": list(draft.bans), "side": draft.side, "stage": draft.stage,
+                "count": self.count,
                 "facts": [f.to_dict() for f in self.facts]}

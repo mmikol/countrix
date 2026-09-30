@@ -86,3 +86,28 @@ def test_sides_exist_only_on_escort_and_hybrid(synthetic_world):
     assert fs.draft.side == ""
     assert [f.text for f in fs.find("map.side")] == [
         "Ember Ruins (Control) has no attacking or defending side"]
+
+
+def test_the_ground_in_play_is_a_fact_only_where_a_stage_is_named(synthetic_world):
+    """A stage named, the map.ground fact states each feature above the
+    ordinary map as the map.* metrics read it there - largest first, each
+    saying whose text it came from - and is filed under those metrics, so a
+    rule gated on the terrain cites it. The whole map has no such fact, and
+    a stage the map does not list is refused."""
+    w = synthetic_world
+    whole = board_facts.generate(w, Draft("Ember Ruins"))
+    assert not whole.find("map.ground") and whole.to_dict()["stage"] == ""
+    w.map("Ember Ruins").stage_z["Forge"]["hazards"] = 2.5
+    fs = board_facts.generate(w, Draft("Ember Ruins", stage="forge"))
+    assert fs.draft.stage == "Forge" and fs.to_dict()["stage"] == "Forge"
+    (ground,) = fs.find("map.ground", "Ember Ruins")
+    assert ground.text == (
+        "Ember Ruins - Forge is the ground in play: hazards 2.5 sd above the ordinary (the"
+        " stage's text); flanks 1.0 sd above the ordinary (the map's article); high ground"
+        " 1.0 sd above the ordinary (the map's article); open ground 1.0 sd above the"
+        " ordinary (the map's article)")
+    assert ground.value["features"][0] == {"feature": "hazards", "z": 2.5, "source": "stage"}
+    assert fs.find("map.hazards", "Ember Ruins") == [ground]
+    assert not fs.find("map.chokes")                    # below the ordinary: not stated
+    with pytest.raises(Refusal, match="Ember Ruins has no stage 'Well'"):
+        board_facts.generate(w, Draft("Ember Ruins", stage="Well"))
