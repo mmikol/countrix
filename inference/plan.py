@@ -1,13 +1,15 @@
 """The board in prose: the momentum verdict read off the two current comps,
-the badge above each picker, and the game plan - the ground, what to play
-on it, what red's picks mean, the family of heroes to stay in and what the
-six is built for - worded from the facts, the default engine's terms and
-the strategies the solver scored.
+the badge above each picker, the game plan - the ground, what to play on
+it, what red's picks mean, the family of heroes to stay in and what the
+six is built for - and a blurb a stage of the plan (stage_blurb), worded
+from the facts, the default engine's terms and the strategies the solver
+scored. No sentence comes from anywhere else.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
 from typing import NamedTuple
 
+from facts import compute
 from facts.board_facts import StageTerrainValue, TerrainValue
 from facts.draft import TEAM_SIZE
 from facts.factset import FactSet
@@ -22,6 +24,8 @@ from inference.result import (
     Momentum,
     Odds,
     Result,
+    StageRules,
+    StageSwap,
     rates_queue,
 )
 
@@ -477,3 +481,48 @@ def _basis(
     if red_h:
         basis.append("red's " + counted(len(red_h), "revealed pick"))
     return "Based on: %s." % ", ".join(basis)
+
+
+def stage_blurb(
+        m: Map, stage: str, index: tuple[int, int], rules: StageRules,
+        swaps: Sequence[StageSwap], gains: Sequence[str], cost: float, *,
+        origin: bool = False, solved: bool = True, lean: str = "") -> str:
+    """A stage of the plan in four sentences at most, each dropped when it
+    has nothing to say: the ground - the stage, its place on the route
+    (`index`, phase and phases; (0, 0) for an arena), and what its own text
+    stresses, else that it reads as the map; what changes here - the rules
+    its ground turns on and off; the swaps and what the six gains most on
+    (`gains`, titled), or the six kept under the cost; and how to play it,
+    where the six's lean turns (`lean`, empty where it holds)."""
+    place = ", phase %d of %d" % index if index[1] > 1 else ""
+    stressed = compute.stage_standouts(m, stage)[:TERRAIN_NAMED]
+    if stressed:
+        ground = "its own text stresses %s" % _and(TERRAIN_GROUND[s.feature] for s in stressed)
+    else:
+        ground = "the wiki says too little of it, so it reads as %s" % m.name
+    read = ["%s%s: %s" % (stage, place, ground)]
+    changes = []
+    if rules["on"]:
+        changes.append("%s count%s here" % (_and(rules["on"]), "" if len(rules["on"]) > 1 else "s"))
+    if rules["off"]:
+        changes.append("%s drop%s out" % (_and(rules["off"]), "" if len(rules["off"]) > 1 else "s"))
+    if changes:
+        read.append("; ".join(changes))
+    if origin:
+        read.append("Play the six the board suggests here")
+    elif not solved:
+        read.append("Not solved within the search's budget: keep the six before it")
+    elif swaps:
+        said = _and("%s for %s" % (s["out"], s["in"]) for s in swaps)
+        read.append("Swap %s%s" % (said, ": the six gains most on %s" % _and(gains)
+                                   if gains else ""))
+    else:
+        read.append("Keep the six: no swap pays for its cost (%s)" % _cost(cost))
+    if lean in STYLE_PLAY:
+        read.append("The six turns %s here: %s" % (lean, STYLE_PLAY[lean]))
+    return " ".join(_sentence(r) for r in read)
+
+
+def _cost(value: float) -> str:
+    """A cost as the blurb writes it: whole where it is whole."""
+    return "%d" % value if value == int(value) else "%g" % value

@@ -22,6 +22,7 @@ dropped costing the swap cost.
                 picks as sent. A half-drafted seat's incoming heroes past
                 those fill its empty slots
     verdict     the swaps in words
+    chain       the plan stage by stage (below)
 
 A swap is suggested only where the target's net beats the six that keeps
 every pick - the picks at six, the fill around fewer - at SCORE_PLACES; a
@@ -32,16 +33,42 @@ two tanks in for one slot, a hero taken twice - and taking one leaves the
 rest the best answer from the new picks: for R' = R less the pick dropped
 plus the hero taken, net_R'(x) <= net_R(T) + c = net_R'(T). Blue's seat
 alone is searched; red's picks are the other side's facts.
+
+The stage plan walks the map's stages in play order from one origin, the
+six the board suggests - blue's picks with the swaps taken, the fill around
+fewer, the optimal without picks. The phases of a route (Hybrid, Escort)
+chain: each phase's six is the best reachable from the one before, each
+hero changed costing the swap cost, so a hero stays into the next stage
+unless swapping gains more than the cost - greedy, stage by stage, never
+trading a swap now against one later. The arenas (Control, Flashpoint) come
+up in no fixed order, so each is reached from the origin. The board's
+chosen stage is the origin itself, and the phases before it are played.
+Two stages that score every six alike from the same six are one search
+(scoring.Objective.ground_key); a stage past its budget is not solved, and
+the next phase goes on from the last six that was.
 """
 
 from collections.abc import Sequence
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
-from facts.model import Hero
+from facts import compute
+from facts.board_facts import GroundValue
+from facts.model import Hero, Map
+from facts.team import text
+from inference import base, plan
 from inference.base import OFF
-from inference.result import OpenSlot, Pick, Result, Span, SwapPair
-from inference.scoring import Candidate, quantized
-from inference.solver import Infeasible, Solver
+from inference.result import (
+    OpenSlot,
+    Pick,
+    Result,
+    Span,
+    StageRow,
+    StageRules,
+    StageSwap,
+    SwapPair,
+)
+from inference.scoring import Candidate, Objective, quantized, seat_order
+from inference.solver import Infeasible, Solver, Unbounded
 
 
 def raw_cost(cost: float, span: Span) -> float | None:
@@ -61,13 +88,16 @@ class Target(NamedTuple):
     gains: bool
 
 
-def keeping(plain: Solver, picks: Sequence[Hero], cost: float) -> Solver:
+def keeping(plain: Solver, picks: Sequence[Hero], cost: float,
+            stage: str | None = None) -> Solver:
     """The swap search's Solver on `plain`'s board - blue's optimal's,
     nothing locked - with `cost` points, the raw cost, for each of `picks`
-    a six keeps, on `plain`'s scale: its bounds and its floor."""
+    a six keeps, on `plain`'s scale: its bounds and its floor; on `stage`
+    where given, else on `plain`'s."""
     solver = Solver(plain.world, plain.m, red=plain.red, locked=(),
                     banned=[plain.world.heroes[i] for i in sorted(plain.banned)],
-                    side=plain.side, stage=plain.stage, catalog=plain.catalog,
+                    side=plain.side, stage=plain.stage if stage is None else stage,
+                    catalog=plain.catalog,
                     base=plain.base.weights if plain.base is not None else OFF,
                     check=plain.check, keep=frozenset(h.id for h in picks), swap=cost)
     solver.adopt_scale(plain)
@@ -159,3 +189,184 @@ def _swaps(pairs: Sequence[SwapPair]) -> str:
 def _number(value: float) -> str:
     """A cost as the verdict writes it: whole where it is whole."""
     return "%d" % value if value == int(value) else "%g" % value
+
+
+# --- the stage plan -----------------------------------------------------------
+
+type StageKind = Literal["phase", "arena"]
+
+
+class Leg(NamedTuple):
+    """One stage's answer from a reference six: the six to play there and
+    the reference, each scored with its breakdown on the stage's objective
+    (the keep term adds to the score and is no contribution), and whether
+    the six is not the reference - a swap pays for its cost."""
+    six: Candidate
+    reference: Candidate
+    gains: bool
+
+
+type Memo = dict[tuple[object, ...], Leg]
+
+
+def stages(m: Map | None) -> list[tuple[str, StageKind]]:
+    """The map's stages in play order, each a phase of one route or an
+    arena of its own; none on a map without stages."""
+    return ([(s, "phase") for s in compute.phases(m)]
+            + [(s, "arena") for s in compute.arenas(m)])
+
+
+def leg(solver: Solver, reference: Sequence[Hero], memo: Memo) -> Leg:
+    """The best six on `solver`'s stage reachable from `reference` - the
+    swap search's Solver (keeping) on that stage, its keep term on the
+    reference: exact over every legal six. The reference stays where no six
+    beats its net at SCORE_PLACES and it keeps the stage's limits. Memoised
+    on the stage's ground key and the reference; Unbounded past the search's
+    budget."""
+    key = (solver.ground_key(), tuple(sorted(h.id for h in reference)))
+    if key in memo:
+        return memo[key]
+    ref = solver.score(solver.prepare(Candidate(reference)))
+    solved = solver.solve(top=1)
+    if not solved.ranked:
+        raise Infeasible("no composition satisfies the limits on this stage")
+    best = solved.ranked[0]
+    gains = not solver.keep <= set(best.key) and (
+        bool(ref.violations) or quantized(best.score) > quantized(ref.score))
+    six = solver.score(solver.prepare(Candidate(best.heroes))) if gains else ref
+    memo[key] = Leg(six=six, reference=ref, gains=gains)
+    return memo[key]
+
+
+def moved(reference: Sequence[Hero], six: Sequence[Hero]) -> list[StageSwap]:
+    """The swaps from `reference` to `six`: each hero that goes, in seat
+    order, met by an incoming hero of its role first, then by whichever are
+    left."""
+    kept = {h.id for h in six}
+    going = [h for h in sorted(reference, key=seat_order) if h.id not in kept]
+    held = {h.id for h in reference}
+    coming = [h for h in sorted(six, key=seat_order) if h.id not in held]
+    out = []
+    for h in going:
+        same = next((c for c in coming if c.role == h.role), coming[0] if coming else None)
+        if same is None:
+            break
+        coming.remove(same)
+        out.append(StageSwap({"out": h.name, "in": same.name}))
+    return out
+
+
+GAIN_NAMED = 0.05       # a term's rise, in the objective's points, the blurb names
+
+
+def gains_on(reference: Candidate, six: Candidate, titles: dict[str, str]) -> list[str]:
+    """What a stage's six gains most on over the reference: the two terms
+    whose weighted contribution rises most, titled; none where nothing rises."""
+    before = {c["id"]: c["weighted"] if c["applies"] else 0.0 for c in reference.contributions}
+    rises = [
+        ((c["weighted"] if c["applies"] else 0.0) - before.get(c["id"], 0.0), c["id"])
+        for c in six.contributions]
+    top = sorted((r for r in rises if r[0] > GAIN_NAMED), key=lambda r: (-r[0], r[1]))
+    return [titles.get(sid, sid).lower() for _, sid in top[:2]]
+
+
+def lean(cand: Candidate) -> str:
+    """The six's lean as a Result reads it: its style, else the map's."""
+    if cand.ns is None:
+        return ""
+    team = cand.ns["team"]
+    return text(team["style_lean"]) or text(team["style_top"])
+
+
+def ground(m: Map, stage: str) -> list[GroundValue]:
+    """The terrain at or over the standout on a stage's ground, largest
+    first, and whose text each feature was read off."""
+    read = sorted((compute.ground(m, stage, f) for f in compute.TERRAIN_FEATURES),
+                  key=lambda g: (-g.z, g.feature))
+    return [GroundValue(feature=g.feature, z=g.z, source=g.source)
+            for g in read if g.z >= compute.TERRAIN_STANDOUT]
+
+
+def ruled(solver: Objective, whole: Objective) -> StageRules:
+    """The weighted rules `solver`'s ground turns on that the map as a
+    whole leaves off, and those it turns off, by name."""
+    weighted = [s for s in solver.catalog if s.form in ("heuristic", "scored")]
+    return StageRules(
+        on=[s.name for s in weighted if solver.gates[s.id] is True and whole.gates[s.id] is False],
+        off=[s.name for s in weighted if solver.gates[s.id] is False and whole.gates[s.id] is True])
+
+
+class Plan(NamedTuple):
+    """What the stage plan is walked from: blue's optimal's Solver, whose
+    board and scale every stage shares; the whole map's objective, which a
+    stage's rules are read against; the board's chosen stage; the origin -
+    the six the board suggests; the raw cost and the cost in share points."""
+    plain: Solver
+    whole: Objective
+    chosen: str
+    origin: Sequence[Hero]
+    raw: float
+    cost: float
+
+
+def chain(p: Plan, memo: Memo | None = None) -> list[StageRow]:
+    """The plan stage by stage (the module's docstring): a row a stage of
+    the map, in play order; none on a map without stages."""
+    m = p.plain.m
+    if m is None:
+        return []
+    memo = {} if memo is None else memo
+    titles = {s.id: s.name for s in p.plain.catalog} | base.TITLES
+    walk = stages(m)
+    phases = [name for name, kind in walk if kind == "phase"]
+    rows: list[StageRow] = []
+    previous = p.origin
+    played = p.chosen in phases
+    for name, kind in walk:
+        current = name == p.chosen
+        if kind == "phase" and played and not current:
+            rows.append(_row(m, name, kind, played=True))
+            continue
+        played = False
+        reference = previous if kind == "phase" else p.origin
+        index = (phases.index(name) + 1, len(phases)) if kind == "phase" else (0, 0)
+        if current:
+            here = Objective(p.plain.world, m, red=p.plain.red, banned=[
+                p.plain.world.heroes[i] for i in sorted(p.plain.banned)],
+                side=p.plain.side, stage=name, catalog=p.plain.catalog, base=OFF)
+            rules = ruled(here, p.whole)
+            origin = sorted(p.origin, key=seat_order)
+            rows.append(_row(m, name, kind, current=True, six=[h.name for h in origin],
+                             rules=rules, blurb=plan.stage_blurb(
+                                 m, name, index, rules, [], [], p.cost, origin=True)))
+            continue
+        solver = keeping(p.plain, reference, p.raw, stage=name)
+        rules = ruled(solver, p.whole)
+        try:
+            got = leg(solver, reference, memo)
+        except (Unbounded, Infeasible):
+            rows.append(_row(m, name, kind, rules=rules, solved=False, blurb=plan.stage_blurb(
+                m, name, index, rules, [], [], p.cost, solved=False)))
+            continue
+        heroes = got.six.heroes
+        swaps = moved(reference, heroes)
+        turned = lean(got.six)
+        rows.append(_row(m, name, kind, six=[h.name for h in heroes], swaps=swaps, rules=rules,
+                         blurb=plan.stage_blurb(
+                             m, name, index, rules, swaps,
+                             gains_on(got.reference, got.six, titles), p.cost,
+                             lean=turned if turned != lean(got.reference) else "")))
+        if kind == "phase":
+            previous = heroes
+    return rows
+
+
+def _row(
+        m: Map, stage: str, kind: StageKind, *, current: bool = False, played: bool = False,
+        six: Sequence[str] = (), swaps: Sequence[StageSwap] = (),
+        rules: StageRules | None = None, blurb: str = "", solved: bool = True) -> StageRow:
+    """One row of the plan, its ground read off the map."""
+    return StageRow(stage=stage, kind=kind, current=current, played=played, six=list(six),
+                    swaps=list(swaps), ground=ground(m, stage),
+                    rules=rules if rules is not None else StageRules(on=[], off=[]),
+                    blurb=blurb, solved=solved)

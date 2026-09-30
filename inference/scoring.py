@@ -410,14 +410,27 @@ class Objective:
         heuristics its gates turn off."""
         whole, here = self.measured["map"], self.static["map"]
         moved = {"map.%s" % k for k, v in here.items() if whole.get(k) != v}
-        if not moved:
-            return False
+        return bool(moved and self._reads() & moved)
+
+    def ground_key(self) -> tuple[object, ...]:
+        """What makes two grounds of a map one search for the same six: each
+        gate the board settles, and each map metric a term of the playbook
+        reads, on this ground. Two stages with the same key score every six
+        alike (inference.swaps.chain memoises on it)."""
+        here = self.static["map"]
+        read = sorted(n for n in self._reads() if n.startswith("map."))
+        return (tuple(sorted(self.gates.items())),
+                tuple((n, here.get(n.removeprefix("map."))) for n in read))
+
+    def _reads(self) -> set[str]:
+        """Every metric name a strategy reads: its metric and the names of
+        its expressions."""
         read = {s.metric for s in self.catalog if s.metric}
         for s in self.catalog:
             for e in (s.require, s.when, s.bonus, s.penalty):
                 if e is not None:
                     read |= set(e.names)
-        return bool(read & moved)
+        return read
 
     @staticmethod
     def slim(cand: Candidate) -> Candidate:

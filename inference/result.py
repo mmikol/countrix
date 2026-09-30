@@ -11,6 +11,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Literal, NotRequired, TypedDict
 
+from facts.board_facts import GroundValue
 from facts.draft import TEAM_SIZE, Seat
 from facts.factset import Fact, FactSet
 from facts.model import ROLES, TERRAIN_FEATURES
@@ -102,6 +103,37 @@ class Swaps(TypedDict):
     after: int | None
     odds: SwapOdds
     verdict: str
+
+
+# One swap between two stages of the plan: the hero that goes, the one that
+# comes in. Functional for the same reason as SwapPair
+StageSwap = TypedDict("StageSwap", {"out": str, "in": str})
+
+
+class StageRules(TypedDict):
+    """The weighted rules a stage's ground turns on that the map as a whole
+    does not, and those it turns off, by name."""
+    on: list[str]
+    off: list[str]
+
+
+class StageRow(TypedDict):
+    """One stage of the plan (inference.swaps.chain): its name, whether it
+    is a phase of one route or an arena of its own, whether it is the
+    board's chosen stage and whether that is already behind (`played`, no
+    six), the six to play there, the swaps from the six before it, the
+    terrain at or over the standout on its ground, the rules it turns on
+    and off, the blurb, and whether its search finished within budget."""
+    stage: str
+    kind: Literal["phase", "arena"]
+    current: bool
+    played: bool
+    six: list[str]
+    swaps: list[StageSwap]
+    ground: list[GroundValue]
+    rules: StageRules
+    blurb: str
+    solved: bool
 
 
 class Badge(TypedDict):
@@ -476,11 +508,12 @@ class Board:
     shapes: list[list[int]]
     expected: Result
     swaps: Swaps | None = None          # blue's swaps, None without blue picks
+    stages: list[StageRow] = field(default_factory=list)    # the plan stage by stage
 
     def to_dict(self) -> Payload:
         """The board as JSON-ready data."""
         return {"map": self.map_name, "side": self.side, "stage": self.stage, "bans": self.bans,
-                "plan": self.plan, "swaps": self.swaps,
+                "plan": self.plan, "swaps": self.swaps, "stages": self.stages,
                 "blue": self.blue.to_dict(), "red": self.red.to_dict(),
                 "current": self.current.to_dict(), "red_current": self.red_current.to_dict(),
                 "countered": self.countered.to_dict() if self.countered else None,
@@ -501,7 +534,19 @@ class Board:
         parts.append("momentum: " + self.momentum["verdict"])
         if self.swaps is not None:
             parts.append("swaps: " + self.swaps["verdict"])
+        if self.stages:
+            parts.append("stages:\n" + "\n".join(_stage_line(row) for row in self.stages))
         return "\n\n".join(parts)
+
+
+def _stage_line(row: StageRow) -> str:
+    """A stage of the plan as one line: its name, marked where it is the
+    board's, the six, and the blurb."""
+    mark = " (here)" if row["current"] else ""
+    if row["played"]:
+        return "  %s%s: played" % (row["stage"], mark)
+    six = ", ".join(row["six"]) if row["six"] else "not solved"
+    return "  %s%s: %s - %s" % (row["stage"], mark, six, row["blurb"])
 
 
 def rates_queue(fs: FactSet) -> str:

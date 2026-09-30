@@ -52,6 +52,7 @@ from inference.result import (
     Result,
     ResultKind,
     Span,
+    StageRow,
     SwapOdds,
     Swaps,
     not_allowed,
@@ -90,14 +91,15 @@ class Brief(NamedTuple):
     check that says a newer request from the same client has superseded
     this one, the default engine's weights, the playbook's meta.md's (None)
     unless a caller names others (OFF turns it off), the swap cost in share
-    points, meta.md's (None) unless a caller names another, and whether to
-    search blue's swaps."""
+    points, meta.md's (None) unless a caller names another, whether to
+    search blue's swaps, and whether to walk the plan stage by stage."""
     weights: Mapping[str, float] | None = None
     countered: bool = True
     superseded: Callable[[], bool] | None = None
     base: BaseWeights | None = None
     swap: float | None = None
     swaps: bool = True
+    stages: bool = True
 
 
 def weights_in_force(
@@ -437,13 +439,15 @@ def board(
     # that is not allowed is described by the optimal instead
     held = len(draft.blue) == TEAM_SIZE and cur.barred is None
     shown = fill if fill is not None else cur if held else blue.result
+    staged = solve.stages(m, draft, blue, suggested or shown.blue,
+                          swap_in_force(brief)) if brief.stages else []
     return Board(map_name=expected.map_name, side=draft.side, stage=draft.stage,
                  bans=list(draft.bans),
                  blue=blue.result, red=red.result, current=cur, red_current=red_cur,
                  fill=fill, countered=countered, momentum=mo,
                  plan=plan(world, m, draft.side, list(draft.bans), red_h, shown),
                  shapes=[list(s) for s in legal_shapes(catalog)], expected=expected,
-                 swaps=suggested)
+                 swaps=suggested, stages=staged)
 
 
 class _Seat(NamedTuple):
@@ -563,6 +567,29 @@ class _Pass:
                          (odds["blue"], odds_after["blue"])
                          if odds is not None and odds_after is not None else None),
                          partial=not full))
+
+    def stages(
+            self, m: Map | None, draft: Draft, blue: _Optimal,
+            origin: Swaps | Sequence[str], cost: float) -> list[StageRow]:
+        """The plan stage by stage (inference.swaps.chain) from the six the
+        board suggests - blue's swaps' six where they name one, else
+        `origin`, the six the comps tab shows - against blue's enemy, on
+        blue's optimal's board and scale, at `cost` share points a hero
+        changed; none on a map without stages."""
+        if m is None or not m.stages:
+            return []
+        names = origin.get("six") or [] if isinstance(origin, dict) else list(origin)
+        if not names:
+            return []
+        six = self.world.resolve(None, (), tuple(names)).blue
+        plain = blue.solver
+        whole = Objective(self.world, m, red=plain.red,
+                          banned=[self.world.heroes[i] for i in sorted(plain.banned)],
+                          side=plain.side, catalog=plain.catalog, base=OFF)
+        raw = swaps.raw_cost(cost, blue.span)
+        self.watch.check()
+        return swaps.chain(swaps.Plan(plain=plain, whole=whole, chosen=draft.stage, origin=six,
+                                      raw=0.0 if raw is None else raw, cost=cost))
 
     def _against(self, draft: Draft, six: Result, blue: _Optimal) -> Momentum:
         """The momentum were blue to field `six`: red's optimal, current comp
