@@ -274,9 +274,12 @@ def _section_keys(world: World) -> dict[str, frozenset[str]]:
     """Each section's keys: every helper writes its keys on an empty team
     too, so one call apiece names them."""
     if not _KEYS:
+        # read whole, then set at once: a second thread never sees half of it
+        keys: dict[str, frozenset[str]] = {}
         for name in SECTIONS:
             [bag] = _bags(world, [], None, [], (name,))
-            _KEYS[name] = frozenset(bag)
+            keys[name] = frozenset(bag)
+        _KEYS.update(keys)
     return _KEYS
 
 

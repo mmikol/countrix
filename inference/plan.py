@@ -486,7 +486,8 @@ def _basis(
 def stage_blurb(
         m: Map, stage: str, index: tuple[int, int], rules: StageRules,
         swaps: Sequence[StageSwap], gains: Sequence[str], cost: float, *,
-        origin: bool = False, solved: bool = True, lean: str = "") -> str:
+        origin: bool = False, solved: bool = True, infeasible: bool = False,
+        lean: str = "") -> str:
     """A stage of the plan in four sentences at most, each dropped when it
     has nothing to say: the ground - the stage, its place on the route
     (`index`, phase and phases; (0, 0) for an arena), and what its own text
@@ -510,6 +511,8 @@ def stage_blurb(
         read.append("; ".join(changes))
     if origin:
         read.append("Play the six the board suggests here")
+    elif infeasible:
+        read.append("No six keeps this stage's limits: keep the six before it")
     elif not solved:
         read.append("Not solved within the search's budget: keep the six before it")
     elif swaps:

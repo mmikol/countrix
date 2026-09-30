@@ -194,11 +194,12 @@ def test_the_reference_and_the_live_playbooks_are_valid_and_reference_real_metri
 
 
 def test_the_shipped_healing_floor_is_a_scored_heuristic_at_weight_two():
-    """inference/strategies/heal-rate.md, the shipped playbook's one
+    """inference/strategies/heal-rate.md, the shipped playbook's healing
     heuristic: weighted, so a heuristic, and scored - it charges its weight
-    times matchup.heal_shortfall on every board, unguarded. HEAL_RATE holds
-    the same fields, so the solver tests that stand it in for the file prove
-    this rule."""
+    times matchup.heal_shortfall on every board, unguarded, the one scored
+    rule on sustain and the one no gate closes. HEAL_RATE holds the same
+    fields, so the solver tests that stand it in for the file prove this
+    rule."""
     shipped = catalog.load(catalog.SHIPPED_DIR)
     heal = next(h for h in shipped if h.id == "heal-rate")
     assert (heal.kind, heal.form, heal.category, heal.weight) == (
@@ -206,7 +207,8 @@ def test_the_shipped_healing_floor_is_a_scored_heuristic_at_weight_two():
     assert heal.penalty is not None and heal.penalty.source == "matchup.heal_shortfall"
     assert heal.when is None and heal.bonus is None and heal.require is None
     assert {k: heal.to_dict()[k] for k in HEAL_RATE} == HEAL_RATE
-    assert [h.id for h in shipped if h.form == "scored"] == ["heal-rate"]
+    scored = [h for h in shipped if h.form == "scored"]
+    assert [h.id for h in scored if h.category == "sustain" or h.when is None] == ["heal-rate"]
 
 
 def test_the_shipped_support_limit_is_a_shape_limit_at_three():

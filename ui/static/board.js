@@ -229,13 +229,13 @@ function solving(on) {
     if (mo) mo.innerHTML = "<span class='lbl'>fight odds</span><span class='legend searching'>solving…</span>";
     var pl = el('plan');
     if (pl && !pl.dataset.held) { pl.dataset.held = '1'; pl.classList.add('waiting'); }
-    ['blueslots', 'redslots'].forEach(function (id) {
+    ['blueslots', 'redslots', 'blueswaps', 'stageplan'].forEach(function (id) {
       var s = el(id); if (s) s.classList.add('waiting');
     });
   } else {
     var pl2 = el('plan');
     if (pl2) { delete pl2.dataset.held; pl2.classList.remove('waiting'); }
-    ['blueslots', 'redslots'].forEach(function (id) {
+    ['blueslots', 'redslots', 'blueswaps', 'stageplan'].forEach(function (id) {
       var s = el(id); if (s) s.classList.remove('waiting');
     });
   }
@@ -282,7 +282,7 @@ function refresh() {
        the map, the side and the bans, so a pick leaves it standing */
     solving(true);
     el('inf-blue').innerHTML = "<p class='legend searching'>searching both seats…</p>";
-    var key = [st.map, st.side].concat(st.bans).join('|');
+    var key = [st.map, st.side, st.stage].concat(st.bans).join('|');
     if (key !== redKey) el('inf-red').innerHTML = "<p class='legend searching'>searching…</p>";
     if (solve) solve.abort();           /* the older request; this one's arrival stops its board */
     solve = window.AbortController ? new AbortController() : null;
@@ -328,9 +328,10 @@ function renderFacts() {
 function paintSuggestions() {
   var slots = el('blueslots').children, d = INF;
   var src = !d || d.error ? null : (st.blue.length ? d.fill : d.blue);
-  var sw = !d || d.error ? null : d.swaps;       /* a suggested swap names the rest of its six */
-  var open = sw && sw.open && sw.open.length ? sw.open
-           : src && src.picks ? src.picks.filter(function (p) { return !p.locked && st.blue.indexOf(p.hero) < 0; }) : [];
+  var sw = answered() ? d.swaps : null;         /* a suggested swap names the rest of its six */
+  var free = function (p) { return st.blue.indexOf(p.hero) < 0; };
+  var open = sw && sw.open && sw.open.length ? sw.open.filter(free)
+           : src && src.picks ? src.picks.filter(function (p) { return !p.locked && free(p); }) : [];
   for (var i = st.blue.length, k = 0; i < TEAM; i++) {
     var s = slots[i], p = open[k++];
     if (!p) continue;
@@ -345,9 +346,12 @@ function paintSuggestions() {
    and the caption is the board's verdict. Taking one leaves the rest the
    board's answer from the new picks. Nothing is drawn for red */
 function paintSwaps() {
-  var d = INF, sw = !d || d.error ? null : d.swaps, box = el('blueswaps');
+  var d = INF, sw = answered() ? d.swaps : null, box = el('blueswaps');
   var pairs = sw && sw.pairs ? sw.pairs : [];
-  if (!pairs.length) { box.innerHTML = ''; return; }
+  if (!pairs.length) {                   /* a withheld swap says why; a kept six says nothing */
+    box.innerHTML = sw && sw.status === 'withheld' ? "<div class='swapcap'>" + esc(sw.verdict) + '</div>' : '';
+    return;
+  }
   var cells = '';
   for (var i = 0; i < TEAM; i++) {
     var p = pairs.filter(function (x) { return x.at === i; })[0];
@@ -361,17 +365,36 @@ function paintSwaps() {
 function takeSwap(out, into) {
   var at = st.blue.indexOf(out);
   if (at < 0 || st.blue.indexOf(into) >= 0) return;
-  st.blue[at] = into;
+  if (st.bans.indexOf(into) >= 0) { flash(into + ' is banned this match'); return; }
+  st.blue.splice(at, 1);                             /* the role cap, as a pick is checked */
+  var h = hero(into), cap = h ? roleCap('blue', h.role) : null;
+  if (cap !== null && roleCounts('blue')[h.role] >= cap) {
+    st.blue.splice(at, 0, out);
+    flash('the queue allows at most ' + cap + ' ' + h.role + (cap === 1 ? '' : 's')); return;
+  }
+  st.blue.splice(at, 0, into);
   save(); paint(); refresh();
+}
+/* whether the board in hand answered blue's picks as they stand, in the
+   order sent: its swaps and the slots it fills are drawn only for those
+   picks, and a local change hides them until the next board lands */
+function answered() {
+  var d = INF, asked = d && !d.error && d.current ? d.current.blue || [] : null;
+  return !!asked && asked.length === st.blue.length &&
+    asked.every(function (n, i) { return st.blue[i] === n; });
 }
 /* the stage picker: the map's stages in play order after the whole map,
    hidden on a map without stages; a stage the map does not list is dropped */
+var stagesFor = null;       /* the map the stage picker's options were built for */
 function paintStagePicker(m) {
   var names = m && m.stages ? m.stages : [], sel = el('stagesel');
   if (names.indexOf(st.stage) < 0) st.stage = '';
   sel.style.display = names.length ? '' : 'none';
-  sel.innerHTML = names.length ? "<option value=''>WHOLE MAP</option>" + names.map(function (n) {
-    return "<option value=\"" + esc(n) + "\">" + esc(n) + '</option>'; }).join('') : '';
+  if (stagesFor !== st.map) {            /* rebuilt on a new map alone: an open picker stays open */
+    stagesFor = st.map;
+    sel.innerHTML = names.length ? "<option value=''>WHOLE MAP</option>" + names.map(function (n) {
+      return "<option value=\"" + esc(n) + "\">" + esc(n) + '</option>'; }).join('') : '';
+  }
   sel.value = st.stage;
 }
 

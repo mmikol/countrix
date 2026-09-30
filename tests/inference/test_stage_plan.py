@@ -175,3 +175,29 @@ def test_the_board_carries_the_plan_on_a_staged_map_and_none_elsewhere(synthetic
     off = engine.board(synthetic_world, Draft("Harbor Gate", ("Mortar",), ORIGIN, side="attack"),
                        catalog=staged, brief=brief._replace(stages=False))
     assert off.stages == []
+
+
+def test_the_swaps_between_stages_meet_their_own_role_first(synthetic_world):
+    """A stage's swaps pair each hero that goes with an incoming hero of its
+    own role wherever the six has one, before any leftover is matched across
+    roles, as the board's swaps are paired."""
+    heroes = {h.name: h for h in synthetic_world.heroes.values()}
+    reference = [heroes[n] for n in ("Anvil", "Kite", "Rook", "Needle", "Balm", "Myrrh")]
+    six = [heroes[n] for n in ("Kite", "Needle", "Flint", "Balm", "Myrrh", "Sorrel")]
+    got = swaps.moved(reference, six)
+    assert sorted(s["out"] for s in got) == ["Anvil", "Rook"]
+    for s in got:
+        out, into = heroes[s["out"]], heroes[s["in"]]
+        same = [h for h in six if h.role == out.role and h not in reference]
+        assert not same or into.role == out.role, s
+
+
+def test_a_stage_no_six_can_hold_says_so_and_not_that_it_ran_out(synthetic_world):
+    """A stage whose limits no six keeps reads that, not that the search ran
+    out of its budget."""
+    m = synthetic_world.resolve("Ember Ruins", (), (), ())[0]
+    none = StageRules(on=[], off=[])
+    stuck = plan.stage_blurb(m, "Forge", (0, 0), none, [], [], COST, solved=False,
+                             infeasible=True)
+    assert "No six keeps this stage's limits" in stuck and "budget" not in stuck
+    assert "budget" in plan.stage_blurb(m, "Forge", (0, 0), none, [], [], COST, solved=False)

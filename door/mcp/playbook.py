@@ -168,17 +168,20 @@ def add_strategy(
 @tool(
     "infer_strategy", "Complete a draft (or rewrite a strategy's scoring): set several"
     " frontmatter fields at once - a constraint's require; a heuristic's"
-    " metric/direction/weight or when/bonus/penalty/weight; params - validated as a"
-    " whole, mirrored, logged as one line.",
+    " metric/direction/weight or when/bonus/penalty/weight; params - and remove the"
+    " ones `unset` names, validated as a whole, mirrored, logged as one line.",
     {
         "id": {"type": "string"},
         "reason": {"type": "string", "description": "how the fields follow from the prose"},
+        "unset": {"type": "array", "items": {"type": "string"},
+                  "description": "fields to remove, or params.NAME: a heuristic moving from a"
+                                 " metric to a bonus or penalty drops metric and direction"},
         **BY, **STRATEGY_FIELDS},
     ["id", "reason"])
 def infer_strategy(
         ctx: Context, id: str, reason: str, by: str = tune.BY_SESSION,
-        **fields: object) -> ToolReply:
-    done = tune.complete(id, fields, reason, by=by)
+        unset: list[str] | None = None, **fields: object) -> ToolReply:
+    done = tune.complete(id, fields, reason, by=by, unset=unset or ())
     _remirror(ctx)
     return ToolReply("%s is now %s: %s\n%s" % (id, done["form"], ", ".join(
         "%s=%s" % kv for kv in done["set"].items()), done["line"]), done)

@@ -392,3 +392,27 @@ def test_a_folder_with_no_meta_is_seeded_from_the_shipped_one(catalog_copy, monk
     with pytest.raises(tune.TuneError, match=r"meta\.md: missing"):
         tune.tune("meta", "rate", 1, "r", directory=str(empty))
     assert sorted(os.listdir(empty)) == ["open-queue-tanks.md"]
+
+
+def test_complete_moves_a_heuristic_from_a_metric_to_a_bonus_in_one_write(catalog_copy):
+    """infer_strategy's unset removes a field in the same validated write as
+    the fields it sets: a heuristic on a metric becomes a scored one with a
+    capped bonus and its dial, its metric and direction gone; unsetting the
+    dial drops the params block with it; kind and category, and a name that
+    is no field, are refused with the file untouched."""
+    sid = next(s.id for s in catalog.load(catalog_copy) if s.form == "heuristic" and not s.params)
+    done = tune.complete(sid, {"bonus": "min(team.cc_count / params.CAP, 1)",
+                               "params": {"CAP": 2}}, "the rule pays in full at two",
+                         directory=catalog_copy, unset=["metric", "direction"])
+    moved = next(s for s in catalog.load(catalog_copy) if s.id == sid)
+    assert done["form"] == moved.form == "scored" and moved.metric is None
+    assert done["unset"] == ["metric", "direction"] and moved.params == {"CAP": 2.0}
+    assert "unset metric, direction" in done["line"]
+    tune.complete(sid, {"bonus": "min(team.cc_count, 2)"}, "no dial", directory=catalog_copy,
+                  unset=["params.CAP"])
+    text = Path(catalog_copy, sid + ".md").read_text(encoding="utf-8")
+    assert "params:" not in text and "CAP" not in text
+    for field in ("kind", "category", "colour"):
+        with pytest.raises(tune.TuneError, match="cannot be unset"):
+            tune.complete(sid, None, "r", directory=catalog_copy, unset=[field])
+    assert Path(catalog_copy, sid + ".md").read_text(encoding="utf-8") == text

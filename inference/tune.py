@@ -89,10 +89,12 @@ class Change(TypedDict):
 
 
 class Completion(TypedDict):
-    """What complete() set: the form the strategy took and each field's text."""
+    """What complete() set: the form the strategy took, each field's text,
+    and the fields it removed."""
     id: str
     form: Form
     set: dict[str, str]
+    unset: list[str]
     line: str
 
 
@@ -183,6 +185,36 @@ def _trial_load(directory: str, strategy_id: str, new_text: str) -> list[Strateg
         raise TuneError(str(error)) from error
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _unset(lines: list[str], field: str) -> str | None:
+    """A flat field, or params.NAME, removed -> its old value, None where it
+    was not set; a params block left empty goes with its last dial."""
+    if field.startswith("params."):
+        name = field[len("params."):]
+        block = next((i for i, line in enumerate(lines) if line.strip() == "params:"), None)
+        if block is None:
+            return None
+        i = block + 1
+        while i < len(lines) and lines[i][:1] in (" ", "\t"):
+            if lines[i].strip().split(":")[0] == name:
+                old = lines.pop(i).split(":", 1)[1].strip()
+                if not (block + 1 < len(lines) and lines[block + 1][:1] in (" ", "\t")):
+                    lines.pop(block)
+                return old
+            i += 1
+        return None
+    for i, line in enumerate(lines):
+        if line[:1] not in (" ", "\t") and line.split(":")[0].strip() == field:
+            return lines.pop(i).split(":", 1)[1].strip()
+    return None
+
+
+def _unsetting(field: str) -> Callable[[list[str]], str | None]:
+    """The edit that removes one field (_unset), for _edited."""
+    def edit(lines: list[str]) -> str | None:
+        return _unset(lines, field)
+    return edit
 
 
 # --- the values a field accepts -------------------------------------------------
@@ -411,24 +443,37 @@ def _tune_meta(directory: str, field: str, value: object, reason: str, by: str) 
 
 def complete(
         strategy_id: str, fields: Mapping[str, object] | None, reason: str,
-        directory: str | None = None, by: str = BY_SESSION) -> Completion:
+        directory: str | None = None, by: str = BY_SESSION,
+        unset: Sequence[str] = ()) -> Completion:
     """Set several frontmatter fields at once - what /strategy infers for a
-    draft - validated as a whole, logged as one line -> the form it took and
-    each field's text."""
+    draft - and remove those `unset` names, a field or params.NAME, validated
+    as a whole and logged as one line -> the form it took, each field's text
+    and what went. A heuristic moving from a metric to a bonus or penalty
+    drops its metric and direction in the same write, so no half-moved file
+    is ever read; its name and kind stay."""
     directory = _where(directory)[0]
     _reason(reason, "an inferred strategy needs a reason")
     path = _existing(directory, strategy_id)
     pairs = [(f, _coerce(f, v)) for f, v in _flatten(fields)]
-    if not pairs:
+    gone = list(dict.fromkeys(unset))
+    removable = [f for f in TUNABLE if f not in ("kind", "category")]
+    for field in gone:
+        if not (field.startswith("params.") or field in removable):
+            raise TuneError("%s cannot be unset: one of %s, or params.NAME"
+                            % (field, ", ".join(removable)))
+    if not pairs and not gone:
         raise TuneError("nothing to set")
     with open(path, encoding="utf-8") as handle:
         text = handle.read()
     for field, value in pairs:
         text, _ = edit_frontmatter(text, field, value)
+    for field in gone:
+        text, _ = _edited(text, _unsetting(field))
+    said = _pairs(pairs) + ("; unset %s" % ", ".join(gone) if gone else "")
     strategy, line = _commit(directory, strategy_id, text, lambda s: "inferred -> %s: %s" % (
-        s.form, _pairs(pairs)), reason, by)
+        s.form, said), reason, by)
     return {"id": strategy_id, "form": strategy.form, "set": {f: field_text(v) for f, v in pairs},
-            "line": line}
+            "unset": gone, "line": line}
 
 
 def sentence_count(body: str) -> int:

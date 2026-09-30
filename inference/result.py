@@ -88,12 +88,20 @@ class SwapOdds(TypedDict):
     after: Odds | None
 
 
+# what came of blue's swap search: a swap suggested; the picks kept, no swap
+# gaining its cost; a swap withheld, since it would not raise the fight odds;
+# or none searched, the seat unscored or the search refused
+type SwapStatus = Literal["suggested", "keep", "withheld", "none"]
+
+
 class Swaps(TypedDict):
-    """Blue's swaps, one joint answer (inference.swaps): the stage it was
-    solved on, the cost in share points, the six the swaps make (the six
-    the picks keep where none is suggested), each swap, the heroes the empty
-    slots show, blue's share before and after, the fight odds before and
-    after, and the verdict in words."""
+    """Blue's swaps, one joint answer (inference.swaps): what came of the
+    search, the stage it was solved on, the cost in share points, the six
+    the swaps make (the six the picks keep where none is suggested), each
+    swap, the heroes the empty slots show - the fill's, as the rest of the
+    board shows it - blue's share before and after, the fight odds before
+    and after, and the verdict in words."""
+    status: SwapStatus
     stage: str
     cost: float
     six: list[str]

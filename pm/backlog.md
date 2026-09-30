@@ -8,7 +8,7 @@ keeps it current.
 
 - **Fuller stage texts.** 36 of the 64 stages have no text of their own
   on the wiki as the pull reads it, and most of the rest a few sentences,
-  so the terrain rules score a six of their own on 7 stages of 5 maps.
+  so the terrain rules score a six of their own on 8 stages of 5 maps.
   Reading each article's stage sections more fully, or a second
   paragraph per stage, is the lever that makes the plan stage by stage
   say more. Cost: the map pull and its cache; no engine change.

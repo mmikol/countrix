@@ -15,7 +15,7 @@ import pytest
 from facts import board_facts, compute
 from facts.draft import Draft
 from inference import base, catalog, engine, scale, scoring, serve, solver
-from inference.result import Badge, Momentum, Pick, StageRow, SwapPair, Swaps
+from inference.result import Badge, Momentum, OpenSlot, Pick, StageRow, SwapPair, Swaps
 from inference.scoring import Contribution
 from inference.strategy import WEIGHT_RANGE, StrategyRecord
 from tests.inference import BRIEF, FIXTURE_PLAYBOOK
@@ -210,8 +210,9 @@ def test_the_scripts_read_payload_keys_the_server_writes(synthetic_world, monkey
     read(
         "plan momentum shapes current red_current fill expected blue map side swaps stages",
         solved)
-    read("pairs open verdict", Swaps.__annotations__)
+    read("pairs open verdict status", Swaps.__annotations__)
     read("out in at portrait why", SwapPair.__annotations__)
+    read("hero portrait why", OpenSlot.__annotations__)
     read("stage kind current played six swaps blurb solved", StageRow.__annotations__)
     read(
         "picks contributions alternatives considered seconds playstyle cited scoring unscored"
@@ -267,6 +268,23 @@ def test_the_swap_cost_slider_rides_the_weights_key_the_engine_reads_to_its_ceil
     assert "costRow(m)" in function(script, "renderPlaybook")
     assert "SWAP_MAX = %g;" % base.SWAP_RANGE[1] in body
     assert catalog.parse_weights(["%s:99" % base.SWAP]) == {base.SWAP: base.SWAP_RANGE[1]}
+
+
+def test_the_swap_row_and_the_slots_it_fills_follow_the_picks_the_board_answered():
+    """A swap and a suggested slot are drawn only for the picks the board in
+    hand answered - the current comp's picks, in the order sent - so a local
+    change hides them until the next board lands; a picked hero is never
+    suggested again; the swap row and the stage plan wait with the rest while
+    a board is solving; and a swap is checked against the bans and the role
+    caps as a pick is."""
+    script = scripts()
+    assert "answered() ? d.swaps : null" in function(script, "paintSwaps")
+    suggest = function(script, "paintSuggestions")
+    assert "answered() ? d.swaps : null" in suggest and "sw.open.filter(free)" in suggest
+    assert "d.current.blue" in function(script, "answered")
+    assert "'blueswaps', 'stageplan'" in function(script, "solving")
+    take = function(script, "takeSwap")
+    assert "st.bans.indexOf(into)" in take and "roleCap('blue'" in take
 
 
 def test_a_reply_to_an_older_request_is_dropped_and_its_board_cancelled():

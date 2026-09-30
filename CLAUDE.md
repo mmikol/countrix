@@ -134,7 +134,8 @@ db <- facts <- inference <- door <- ui.
   (1, 1, 0.26, 0.05 shipped); `tune` with id `meta` changes them and the
   file's prose (`body`), and the playbook tab's Meta slider
   (`weights=meta:<v>`) sets the meta for a session. Its fifth field,
-  `swap` (`base.SWAP`, 10 shipped, 0..50), is the swap cost in share
+  `swap` (named by `base.SWAP`; 10 shipped, within `base.SWAP_RANGE`,
+  0..50), is the swap cost in share
   points of blue's span; it scores no six, so `BaseWeights` and the stamp
   leave it out, and a folder whose `meta.md` lacks it (the reference
   playbook's) reads the shipped file's. No term's weight

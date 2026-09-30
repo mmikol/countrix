@@ -53,6 +53,7 @@ from inference.result import (
     ResultKind,
     Span,
     StageRow,
+    StageSwap,
     SwapOdds,
     Swaps,
     not_allowed,
@@ -405,6 +406,7 @@ def board(
     solve = _Pass(world, catalog, base, watch)
     blue = solve.optimal(blue_seat, seat="blue")
     red = solve.optimal(red_seat, seat="red")
+    unsolved = False
     try:
         fill = solve.filled(ours, seat="blue", of=blue)
         stuck = False
@@ -413,7 +415,9 @@ def board(
         # limits: the fill is not solved, and blue's current comp is not allowed
         fill, stuck = None, True
     except Unbounded:
-        fill, stuck = None, False
+        # the fill ran out of budget: no answer either way, which the swaps
+        # must not read as a proof that no six keeps the picks
+        fill, stuck, unsolved = None, False, True
     # a full six is ranked against every legal six through its seat's search;
     # 100 is the seat's optimal, whatever it holds. The limits bind blue's picks
     cur = solve.current(ours, blue, seat="blue", stuck=stuck)
@@ -434,13 +438,14 @@ def board(
     mo = momentum(seats)
     suggested = None
     if brief.swaps and draft.blue:
-        suggested = solve.swaps(draft, enemy, blue, _Seat(cur, fill, mo), swap_in_force(brief))
+        suggested = solve.swaps(draft, enemy, blue, _Seat(cur, fill, mo, unsolved),
+                                swap_in_force(brief))
     # the six the comps tab shows for blue, which the plan describes: a comp
     # that is not allowed is described by the optimal instead
     held = len(draft.blue) == TEAM_SIZE and cur.barred is None
     shown = fill if fill is not None else cur if held else blue.result
-    staged = solve.stages(m, draft, blue, suggested or shown.blue,
-                          swap_in_force(brief)) if brief.stages else []
+    staged = solve.stages(m, draft, blue, shown.blue, swap_in_force(brief),
+                          suggested) if brief.stages else []
     return Board(map_name=expected.map_name, side=draft.side, stage=draft.stage,
                  bans=list(draft.bans),
                  blue=blue.result, red=red.result, current=cur, red_current=red_cur,
@@ -452,11 +457,12 @@ def board(
 
 class _Seat(NamedTuple):
     """Blue's seat as the swaps read it: its current comp, its fill where it
-    is half-drafted, and the board's momentum, whose share and odds are the
-    swaps' before."""
+    is half-drafted, the board's momentum, whose share and odds are the
+    swaps' before, and whether the fill ran out of budget."""
     current: Result
     fill: Result | None
     momentum: Momentum
+    unsolved: bool = False
 
 
 def _drafting(seat: Draft) -> bool:
@@ -533,20 +539,27 @@ class _Pass:
         keeper = (picks if full and seat.current.barred is None
                   else None if full or fill is None
                   else self.world.resolve(None, (), fill.blue).blue)
-        kept = Swaps(stage=draft.stage, cost=cost,
+        kept = Swaps(status="keep", stage=draft.stage, cost=cost,
                      six=_order(keeper) if keeper is not None else [],
                      pairs=[], open=swaps.open_slots(
                          [p for p in fill.picks if not p["locked"]] if fill is not None else []),
                      before=before, after=before, odds=SwapOdds(before=odds, after=odds),
                      verdict=swaps.verdict([], cost, before, 0, None, partial=not full))
         raw = swaps.raw_cost(cost, blue.span)
+        if seat.unsolved:
+            kept["status"] = "none"
+            kept["verdict"] = "no swaps: the fill around the picks was not solved within the" \
+                              " search's budget"
+            return kept
         if raw is None:
+            kept["status"] = "none"
             kept["verdict"] = "no swaps: " + (blue.result.waiting() or "the seat is unscored")
             return kept
         self.watch.check()
         try:
             target = swaps.search(blue.solver, picks, raw, keeper)
         except (Infeasible, Unbounded) as error:
+            kept["status"] = "none"
             kept["verdict"] = "no swaps: %s" % error
             return kept
         if not target.gains:
@@ -554,14 +567,17 @@ class _Pass:
         ours = dataclasses.replace(draft, red=enemy, blue=tuple(h.name for h in target.six.heroes))
         six = _scored(self.world, ours, blue, target.six, self.catalog, self.base,
                       locked=[h.name for h in picks])
-        pairs, open_slots = swaps.paired(picks, six)
+        pairs, _ = swaps.paired(picks, six)
         after = six.share()
         odds_after = self._against(draft, six, blue)["odds"] if draft.red else None
-        if odds is not None and odds_after is not None and odds_after["blue"] < odds["blue"]:
+        # the owner's rule: a swap raises the score and the odds of winning a
+        # fight, so a swap the odds read and do not rise on is withheld
+        if odds is not None and odds_after is not None and odds_after["blue"] <= odds["blue"]:
+            kept["status"] = "withheld"
             kept["verdict"] = swaps.withheld(pairs, (odds["blue"], odds_after["blue"]))
             return kept
-        return Swaps(stage=draft.stage, cost=cost, six=list(six.blue), pairs=pairs,
-                     open=open_slots, before=before, after=after,
+        return Swaps(status="suggested", stage=draft.stage, cost=cost, six=list(six.blue),
+                     pairs=pairs, open=kept["open"], before=before, after=after,
                      odds=SwapOdds(before=odds, after=odds_after),
                      verdict=swaps.verdict(pairs, cost, before, after, (
                          (odds["blue"], odds_after["blue"])
@@ -569,19 +585,23 @@ class _Pass:
                          partial=not full))
 
     def stages(
-            self, m: Map | None, draft: Draft, blue: _Optimal,
-            origin: Swaps | Sequence[str], cost: float) -> list[StageRow]:
-        """The plan stage by stage (inference.swaps.chain) from the six the
-        board suggests - blue's swaps' six where they name one, else
-        `origin`, the six the comps tab shows - against blue's enemy, on
-        blue's optimal's board and scale, at `cost` share points a hero
-        changed; none on a map without stages."""
-        if m is None or not m.stages:
+            self, m: Map | None, draft: Draft, blue: _Optimal, origin: Sequence[str],
+            cost: float, suggested: Swaps | None) -> list[StageRow]:
+        """The plan stage by stage (inference.swaps.chain) from `origin`, the
+        six the comps tab shows, against blue's enemy, on blue's optimal's
+        board and scale, at `cost` share points a hero changed; the board's
+        chosen stage takes the board's own swap suggestion, solved on that
+        stage, so its row and the swaps above the picks are one answer. None
+        on a map without stages."""
+        if m is None or not m.stages or not origin:
             return []
-        names = origin.get("six") or [] if isinstance(origin, dict) else list(origin)
-        if not names:
-            return []
-        six = self.world.resolve(None, (), tuple(names)).blue
+        six = self.world.resolve(None, (), tuple(origin)).blue
+        taken = None
+        if suggested is not None:
+            taken = swaps.Taken(
+                six=self.world.resolve(None, (), tuple(suggested["six"])).blue
+                if suggested["status"] == "suggested" else six,
+                swaps=[StageSwap({"out": p["out"], "in": p["in"]}) for p in suggested["pairs"]])
         plain = blue.solver
         whole = Objective(self.world, m, red=plain.red,
                           banned=[self.world.heroes[i] for i in sorted(plain.banned)],
@@ -589,7 +609,7 @@ class _Pass:
         raw = swaps.raw_cost(cost, blue.span)
         self.watch.check()
         return swaps.chain(swaps.Plan(plain=plain, whole=whole, chosen=draft.stage, origin=six,
-                                      raw=0.0 if raw is None else raw, cost=cost))
+                                      raw=0.0 if raw is None else raw, cost=cost, taken=taken))
 
     def _against(self, draft: Draft, six: Result, blue: _Optimal) -> Momentum:
         """The momentum were blue to field `six`: red's optimal, current comp

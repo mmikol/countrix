@@ -1,5 +1,5 @@
 {
- "playbook": "06f3452f49c9aee4df54aac16544cd139af9263e2998a952b8c3508c1a9848f6",
+ "playbook": "0bb4ba22583c4927d7c9ed3bbc4c1d8eb659e5de759b238018d2e46811fbddc6",
  "base": {
   "meta": 1.0,
   "rate": 1.0,
@@ -395,9 +395,9 @@
    "banned": [],
    "six": [
     "D.Mon",
-    "Reinhardt",
     "Junkrat",
     "Symmetra",
+    "Torbj\u00f6rn",
     "Brigitte",
     "L\u00facio"
    ],
@@ -482,9 +482,9 @@
    "banned": [],
    "six": [
     "D.Mon",
-    "Reinhardt",
     "Junkrat",
     "Symmetra",
+    "Torbj\u00f6rn",
     "Brigitte",
     "L\u00facio"
    ],
@@ -652,8 +652,8 @@
     "D.Mon",
     "Junkrat",
     "Pharah",
+    "Tracer",
     "Brigitte",
-    "Jetpack Cat",
     "L\u00facio"
    ],
    "gap": 0.0
@@ -937,7 +937,7 @@
    "six": [
     "D.Mon",
     "Junkrat",
-    "Pharah",
+    "Reaper",
     "Venture",
     "Jetpack Cat",
     "L\u00facio"

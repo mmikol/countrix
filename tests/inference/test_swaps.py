@@ -103,12 +103,15 @@ def test_the_swap_search_is_the_enumerated_best_net(synthetic_world, limited, ba
             assert s["pairs"] == [] and s["verdict"].startswith("keep the picks"), (name, cost)
             continue
         if not s["pairs"]:              # the odds gate withheld it, and says so
+            assert s["status"] == "withheld", (name, cost)
             assert s["verdict"].startswith("keep the picks: the best swaps"), (name, cost)
             continue
-        assert sorted(s["six"]) == sorted(best.names), (name, cost)
+        assert s["status"] == "suggested" and sorted(s["six"]) == sorted(best.names), (name, cost)
         held = [p for p in draft.blue if p in s["six"]]
-        assert sorted([*held, *(p["in"] for p in s["pairs"]),
-                       *(o["hero"] for o in s["open"])]) == sorted(s["six"])
+        assert set(held) | {p["in"] for p in s["pairs"]} <= set(s["six"])
+        # the empty slots show the fill, as the rest of the board does
+        filled = [p["hero"] for p in board.fill.picks if not p["locked"]] if board.fill else []
+        assert [o["hero"] for o in s["open"]] == filled
         for pair in s["pairs"]:
             assert draft.blue[pair["at"]] == pair["out"] and pair["out"] not in s["six"]
             assert pair["why"] and pair["portrait"] == synthetic_world.hero(pair["in"]).portrait
@@ -127,9 +130,11 @@ def test_a_cost_of_zero_suggests_the_optimal_and_the_ceiling_keeps_the_picks(syn
                             brief=engine.Brief(base=DEFAULT, swap=0.0))
         assert sorted(free.swaps["six"]) == sorted(free.blue.blue)
         assert free.swaps["after"] == 100 and free.swaps["pairs"]
+        assert free.swaps["status"] == "suggested"
         dear = engine.board(synthetic_world, draft, catalog=playbook,
                             brief=engine.Brief(base=DEFAULT, swap=SWAP_RANGE[1]))
         assert dear.swaps["pairs"] == [] and dear.swaps["after"] == dear.swaps["before"]
+        assert dear.swaps["status"] == "keep"
         assert dear.swaps["verdict"] == "keep the picks: no swap gains its cost of 50 / 100"
         filled = [p["hero"] for p in dear.fill.picks if not p["locked"]] if dear.fill else []
         assert [o["hero"] for o in dear.swaps["open"]] == filled
@@ -230,20 +235,38 @@ def test_the_search_ranks_a_kept_hero_first_with_the_engine_off(synthetic_world)
     assert {h.id for h in picks} <= set(got[0].key)
 
 
-def test_a_swap_that_lowers_the_fight_odds_is_withheld(synthetic_world, monkeypatch):
+def test_a_swap_that_does_not_raise_the_fight_odds_is_withheld(synthetic_world, monkeypatch):
     """The odds after are read off red solved again against the six the
-    swaps make; where they would fall, the picks keep and the verdict names
-    the swaps it held back and the odds they would cost."""
+    swaps make; a swap is suggested only where they rise, as the owner asked,
+    and where they would not, the picks keep, the status says withheld and
+    the verdict names the swaps it held back and the odds they would read."""
     playbook = catalog.load(FIXTURE_PLAYBOOK)
     draft = BOARDS["full"]
     brief = engine.Brief(base=DEFAULT, swap=5.0)
     offered = engine.board(synthetic_world, draft, catalog=playbook, brief=brief).swaps
     odds = offered["odds"]
-    assert offered["pairs"] and odds["after"]["blue"] >= odds["before"]["blue"]
+    assert offered["pairs"] and odds["after"]["blue"] > odds["before"]["blue"]
+    assert offered["status"] == "suggested"
     worse = {"odds": {"blue": 0, "red": 100}}
     monkeypatch.setattr(engine._Pass, "_against", lambda self, draft, six, blue: worse)
     held = engine.board(synthetic_world, draft, catalog=playbook, brief=brief).swaps
     assert held["pairs"] == [] and sorted(held["six"]) == sorted(draft.blue)
-    assert held["verdict"] == "keep the picks: the best swaps (%s) would lower the fight odds" \
+    assert held["status"] == "withheld"
+    assert held["verdict"] == "keep the picks: the best swaps (%s) would not raise the fight odds" \
         " %d -> 0" % (", ".join("%s for %s" % (p["out"], p["in"]) for p in offered["pairs"]),
                       offered["odds"]["before"]["blue"])
+
+
+def test_a_fill_out_of_budget_suggests_no_swap(synthetic_world, monkeypatch):
+    """A half-drafted seat whose fill ran out of budget is no proof that no
+    six keeps its picks: the swaps say they were not searched, and suggest
+    nothing."""
+    from inference.solver import Unbounded
+
+    def spent(self, draft, **_):
+        raise Unbounded("out of budget")
+    monkeypatch.setattr(engine._Pass, "filled", spent)
+    board = engine.board(synthetic_world, BOARDS["partial"], catalog=catalog.load(FIXTURE_PLAYBOOK),
+                         brief=engine.Brief(base=DEFAULT, swap=5.0))
+    assert board.swaps["status"] == "none" and board.swaps["pairs"] == []
+    assert "not solved within the search's budget" in board.swaps["verdict"]

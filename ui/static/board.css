@@ -318,6 +318,15 @@ table.facts tr.warn td { color:#ff9d8f; } table.facts tr.derived td.text { color
 .top h1 .expand { font-size: .44em; letter-spacing: .1em; text-transform: uppercase;
                   opacity: .55; margin-left: .6em; white-space: nowrap; }
 @media (max-width: 560px) { .top h1 .expand { display: none; } }
+/* a phone: the header's pills flow under the title, and the map and stage
+   pickers share a wrapping row */
+@media (max-width:700px) {
+  header.top { padding:10px 16px; }
+  header.top .links { position:static; }
+  .mapsel { margin-left:0; width:100%; flex-wrap:wrap; }
+  .mapsel select { min-width:0; flex:1 1 140px; }
+  .swapcell img, .swapcell .ph { width:100%; }
+}
 
 /* --- while the solver is running ------------------------------------------
    a search is seconds of work; the figures it owns say so rather than showing

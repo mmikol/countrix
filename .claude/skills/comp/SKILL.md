@@ -13,7 +13,9 @@ shows). Prefer whichever is connected; they expose the same tools.
 ## Workflow
 
 1. Pull the map, the SIDE (attack or defense, Escort and Hybrid maps
-   only; red gets the other), the BANS (up to five: each team's two and
+   only; red gets the other), the STAGE when they name one (a Control
+   round, a Hybrid or Escort phase: `stage`, as the `roster` tool lists
+   the map's stages), the BANS (up to five: each team's two and
    the lobby's, all optional), the RED picks (the enemy's revealed
    heroes), the user's LOCKED BLUE picks, and the actual question out of
    what they said. Missing pieces are fine - the board just knows less.
@@ -31,8 +33,12 @@ shows). Prefer whichever is connected; they expose the same tools.
    that counter, their locked picks with the empty slots filled, red's
    likely starting comp and the fight odds - use it when the user asks
    how the game is going, how their six rates, what the enemy should be
-   playing, or for the plan in a few lines. It answers at any stage: no
-   map yet, a map, a side, bans, red's picks as they show.
+   playing, or for the plan in a few lines. With blue picks it also
+   carries `swaps`, the swaps of their picks that pay for the swap cost,
+   one joint answer, and on a map with stages `stages`, the plan a stage
+   at a time with a blurb each - use them when the user asks what to
+   swap, or how to play the map through. It answers at any stage: no
+   map yet, a map, a side, a stage, bans, red's picks as they show.
    If the tools are unavailable, the shell equivalent is
    `.venv/bin/python -m door.mcp call infer '{"map": "King's Row", "red": ["Zarya"]}'`
    (prefix `./docker-db` to read the Docker database).
@@ -62,7 +68,8 @@ shows). Prefer whichever is connected; they expose the same tools.
    why and its [F#] tags, then a short overall argument. Note the vintage
    warning if the facts opened with one.
 6. Follow-ups ("what if they swap to Pharah?") re-run step 2 with the new
-   red picks - inference is cheap and always current.
+   red picks, and "we're on the second point now" with the new `stage` -
+   inference is cheap and always current.
 
 ## Ground rules
 

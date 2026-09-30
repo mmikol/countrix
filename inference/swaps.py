@@ -176,8 +176,8 @@ def verdict(pairs: Sequence[SwapPair], cost: float, before: int | None, after: i
 
 
 def withheld(pairs: Sequence[SwapPair], odds: tuple[int, int]) -> str:
-    """Why a suggestion is withheld: its swaps would lower the fight odds."""
-    return "keep the picks: the best swaps (%s) would lower the fight odds %d -> %d" % (
+    """Why a suggestion is withheld: its swaps would not raise the fight odds."""
+    return "keep the picks: the best swaps (%s) would not raise the fight odds %d -> %d" % (
         _swaps(pairs), *odds)
 
 
@@ -240,20 +240,23 @@ def leg(solver: Solver, reference: Sequence[Hero], memo: Memo) -> Leg:
 
 def moved(reference: Sequence[Hero], six: Sequence[Hero]) -> list[StageSwap]:
     """The swaps from `reference` to `six`: each hero that goes, in seat
-    order, met by an incoming hero of its role first, then by whichever are
-    left."""
+    order, met first by an incoming hero of its own role, and only then, the
+    same-role matches all made, by whichever are left - as paired() pairs
+    the board's swaps."""
     kept = {h.id for h in six}
     going = [h for h in sorted(reference, key=seat_order) if h.id not in kept]
     held = {h.id for h in reference}
     coming = [h for h in sorted(six, key=seat_order) if h.id not in held]
-    out = []
+    met: dict[int, Hero] = {}
     for h in going:
-        same = next((c for c in coming if c.role == h.role), coming[0] if coming else None)
-        if same is None:
-            break
-        coming.remove(same)
-        out.append(StageSwap({"out": h.name, "in": same.name}))
-    return out
+        same = next((c for c in coming if c.role == h.role), None)
+        if same is not None:
+            coming.remove(same)
+            met[h.id] = same
+    for h in going:
+        if h.id not in met and coming:
+            met[h.id] = coming.pop(0)
+    return [StageSwap({"out": h.name, "in": met[h.id].name}) for h in going if h.id in met]
 
 
 GAIN_NAMED = 0.05       # a term's rise, in the objective's points, the blurb names
@@ -296,17 +299,27 @@ def ruled(solver: Objective, whole: Objective) -> StageRules:
         off=[s.name for s in weighted if solver.gates[s.id] is False and whole.gates[s.id] is True])
 
 
+class Taken(NamedTuple):
+    """The board's swap answer on its chosen stage: the six it makes (the
+    origin where none is suggested) and its swaps."""
+    six: Sequence[Hero]
+    swaps: Sequence[StageSwap]
+
+
 class Plan(NamedTuple):
     """What the stage plan is walked from: blue's optimal's Solver, whose
     board and scale every stage shares; the whole map's objective, which a
     stage's rules are read against; the board's chosen stage; the origin -
-    the six the board suggests; the raw cost and the cost in share points."""
+    the six the comps tab shows; the raw cost and the cost in share points;
+    and the board's swap answer on the chosen stage, None where it searched
+    none."""
     plain: Solver
     whole: Objective
     chosen: str
     origin: Sequence[Hero]
     raw: float
     cost: float
+    taken: Taken | None = None
 
 
 def chain(p: Plan, memo: Memo | None = None) -> list[StageRow]:
@@ -335,18 +348,26 @@ def chain(p: Plan, memo: Memo | None = None) -> list[StageRow]:
                 p.plain.world.heroes[i] for i in sorted(p.plain.banned)],
                 side=p.plain.side, stage=name, catalog=p.plain.catalog, base=OFF)
             rules = ruled(here, p.whole)
-            origin = sorted(p.origin, key=seat_order)
-            rows.append(_row(m, name, kind, current=True, six=[h.name for h in origin],
-                             rules=rules, blurb=plan.stage_blurb(
-                                 m, name, index, rules, [], [], p.cost, origin=True)))
+            # the board's own swap answer on this stage, one answer with the
+            # swaps above the picks; where none was searched, the origin
+            played_six = sorted(p.taken.six if p.taken is not None else p.origin,
+                                key=seat_order)
+            taken = list(p.taken.swaps) if p.taken is not None else []
+            rows.append(_row(m, name, kind, current=True, six=[h.name for h in played_six],
+                             swaps=taken, rules=rules, blurb=plan.stage_blurb(
+                                 m, name, index, rules, taken, [], p.cost,
+                                 origin=p.taken is None)))
+            if kind == "phase":
+                previous = played_six
             continue
         solver = keeping(p.plain, reference, p.raw, stage=name)
         rules = ruled(solver, p.whole)
         try:
             got = leg(solver, reference, memo)
-        except (Unbounded, Infeasible):
+        except (Unbounded, Infeasible) as error:
             rows.append(_row(m, name, kind, rules=rules, solved=False, blurb=plan.stage_blurb(
-                m, name, index, rules, [], [], p.cost, solved=False)))
+                m, name, index, rules, [], [], p.cost, solved=False,
+                infeasible=isinstance(error, Infeasible))))
             continue
         heroes = got.six.heroes
         swaps = moved(reference, heroes)
