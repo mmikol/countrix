@@ -94,6 +94,14 @@ COMP   = the legal six of highest score, exactly; the next best after it, in ord
    (F1, F2, ...): each pick's reasons, and each bar of the breakdown,
    the engine's three terms among them.
 
+**The swaps.** Once blue has picks, the board asks one more question of
+the same objective: which of them to trade, and for whom. The answer is
+one six, the best reachable from the picks as they stand when each pick
+dropped costs the swap cost - `meta.md`'s `swap`, in share points of
+blue's span - searched exactly over every legal six, and the swaps are
+the picks it drops matched to the heroes it takes ([The
+swaps](#the-swaps)).
+
 **The ground in play.** A board is played on the whole map or on one of
 its stages - a Control or Flashpoint round, an Escort or Hybrid phase -
 named by `stage` (`/api/board`, the board tools; the roster lists each
@@ -399,6 +407,74 @@ allowed: no six that keeps these picks meets the playbook's limits`. Red's
 revealed picks are the other side's facts and are never ruled out.
 The `infer` tool refuses such picks in the same words.
 
+## The swaps
+
+Above blue's picks the board suggests the swaps that pay for their cost,
+as one joint answer (`inference/swaps.py`, the board's `swaps`). For
+blue's picks R, as sent, and the swap cost c:
+
+```
+target = the legal six x maximising  score(x) - c * |R - x|
+c      = swap * (best - floor) / 100          swap: meta.md's, in share points
+```
+
+`|R - x|` counts the picks x drops, so a half-drafted seat's empty slots
+fill for free and a full six pays c for each hero it replaces. Written as
+a keep bonus, `score(x) + c * |x ∩ R|`, which differs by the constant
+`c * |R|`, the term is each pick's own part, and the search's bound
+carries it exactly beside the default engine's own parts: the target is
+one branch and bound on blue's seat, over every legal six of the
+released, unbanned roster, on blue's optimal's scale, ties broken by the
+board's draw. The keep term ranks the search and nothing else - it is no
+bar of any breakdown, and the target is scored again on blue's plain
+objective, so its share is the one `evaluate` gives it.
+
+The cost is in share points so that it reads in the badge's units on
+every board and under every meta: a swap must gain that many of blue's
+100 before it is suggested, the stand-in for the ultimate charge and the
+walk a swap costs. The shipped cost is 10; 0 suggests blue's optimal six
+outright, and the range is 0..50. The `tune` tool sets it (`{"id":
+"meta", "field": "swap", ...}`), and a board's `weights=swap:<v>` sets it
+for that board alone. A playbook folder whose `meta.md` predates the
+dial reads the shipped file's.
+
+A swap is suggested only where the target's net beats the six that keeps
+every pick - the picks themselves at six, the fill around fewer - at
+`SCORE_PLACES`: a tie keeps the picks. Where no six keeps them (a six
+that breaks a limit, picks no six completes) the target is the cheapest
+way back to an allowed six, and the verdict says so. Each dropped pick
+is paired with an incoming hero of its own role where the target has
+one, then with whichever is left, and carries its place among the picks
+as sent (`at`), so the page draws the incoming portrait over that slot
+and decides nothing; a half-drafted seat's other incoming heroes are the
+ones its empty slots show (`open`), the fill's where nothing is
+suggested.
+
+Where a swap is suggested, red's optimal, current comp and fill are
+solved again against the target, and the fight odds read off them as the
+board's own are read; a suggestion that would lower them is withheld,
+and the verdict names the swaps it held back. The gate reads the picks
+as they stand.
+
+**Why joint.** Each pick's best single swap, taken alone, can conflict:
+two tanks in for one slot, one hero taken twice, or a union of bests
+below the joint answer. One search over every legal six gives one
+consistent answer, and taking one of its swaps leaves the rest the
+answer from the new picks: with R' the picks after one swap, `net_R'(x)
+<= net_R(target) + c = net_R'(target)` for every six x. Red's seat is
+never searched for swaps; its picks are the other side's facts.
+
+The verdict reads `swap <pick> for <hero>: <before> -> <after> / 100 of
+the optimal, fight odds <before> -> <after>, at a cost of <c> / 100 a
+swap`, or `keep the picks: no swap gains its cost of <c> / 100`.
+
+`tests/inference/test_swaps.py` holds the search to a full enumeration
+of the net on the synthetic World - a full, a half-drafted and a
+not-allowed reference, the default engine on and off, the cost from 0 to
+50 - and `tests/inference/prove_exact.py`'s swap boards hold it to a
+brute force of every legal six on the built database, around locks that
+keep some of the reference and with nothing locked, as a board runs it.
+
 ## The search
 
 `inference/solver.py` returns the best sixes of the whole legal space:
@@ -600,15 +676,17 @@ completes it through `infer_strategy`. No API key anywhere.
 
 The default engine's weights are `meta.md`'s, and the `tune` tool moves
 them: `{"id": "meta", "field": "synergy", "value": 0.2, "reason": ...}`,
-the field one of `meta`, `rate`, `synergy` and `counter`, or `body`, the
+the field one of `meta`, `rate`, `synergy`, `counter` and `swap`, the
+swap cost in share points ([The swaps](#the-swaps)), or `body`, the
 file's prose rewritten whole, which the playbook tab shows on the Meta
 card; a playbook folder with no `meta.md` is seeded from the shipped
 one's, and the log line says so. The board's
 sliders override a weight for one board - `weights=<id>:<0..10>` on
 `/api/board`, `weights` on the `board` tool - the Meta slider among them
-as `meta:<0..10>`, and every result names the weights it was scored
-under; the board writes none of them. Three tools write a strategy file -
-`tune`, `add_strategy` and `infer_strategy` - and `tune` writes
+as `meta:<0..10>` and the swap cost as `swap:<0..50>`, and every result
+names the weights it was scored under; the board writes none of them.
+Three tools write a strategy file - `tune`, `add_strategy` and
+`infer_strategy` - and `tune` writes
 `meta.md`, each validated through the catalog before it writes and
 logged with its reason in `strategies/tuning-log.md`.
 
@@ -804,9 +882,9 @@ with three 7%.
 
 #### The meta
 
-`meta.md`: meta 1 x (rate 1, synergy 0.26, counter 0.05) - the default engine's weights, which the tune tool changes (id `meta`)
+`meta.md`: meta 1 x (rate 1, synergy 0.26, counter 0.05); swap cost 10 - the default engine's weights, which the tune tool changes (id `meta`)
 
-The default engine scores every six before the playbook's rules do: each pick's win rate on the map, trusted by its pick rate (rate), the wiki's synergy scores among the six, a cell no article writes at the written cells' claim share (synergy), and the counter graph against the other side (counter). The meta scales the three together - 0 is the playbook alone, 1 the engine as calibrated - and the board's Meta slider sets it for a session without touching this file. Rate is 1, so its term is in win-rate points, and synergy and counter are set so that each term spreads a typical board's sixes about half as far as the rates do; synergy was set again once a blank cell read at the written cells' claim share, which narrowed its range.
+The default engine scores every six before the playbook's rules do: each pick's win rate on the map, trusted by its pick rate (rate), the wiki's synergy scores among the six, a cell no article writes at the written cells' claim share (synergy), and the counter graph against the other side (counter). The meta scales the three together - 0 is the playbook alone, 1 the engine as calibrated - and the board's Meta slider sets it for a session without touching this file. Rate is 1, so its term is in win-rate points, and synergy and counter are set so that each term spreads a typical board's sixes about half as far as the rates do; synergy was set again once a blank cell read at the written cells' claim share, which narrowed its range. The swap cost, in share points of blue's span, is what a swap of one of blue's picks must gain before the board suggests it - the stand-in for the ultimate charge and the walk a swap costs; at 10 a board with blue's six drafted is offered one or two; a board's own swap weight sets it for a session without touching this file, and 0 suggests the optimal six outright.
 
 #### Constraints
 

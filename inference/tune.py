@@ -28,16 +28,19 @@ change made through a container lands on the host and in git with the file
 it changed.
 
     tune("meta", "synergy", 0.2, "the wiki's pairs should count for more")
+    tune("meta", "swap", 15, "a swap costs a fight's ultimate charge")
     tune("meta", "body", prose, "the synergy clause names the imputed cells")
 
 The id `meta` names meta.md, the default engine's weights beside the
 strategy files: its fields are meta, rate, synergy and counter
-(base.DIALS), each checked by catalog.meta_dial, and `body`, the prose the
-playbook tab and the docs catalog show, rewritten whole; the file is read
-back by catalog.parse_meta before it is written, then documented and
-logged like any other change (_tune_meta). A playbook folder with no
-meta.md is seeded from the shipped one's by its first such change, and the
-log line says so. No strategy may take the name.
+(base.DIALS) and the swap cost, swap (base.FIELDS), each checked by
+catalog.meta_dial - a swap cost the file leaves out is written in place,
+as any field is - and `body`, the prose the playbook tab and the docs
+catalog show, rewritten whole; the file is read back by catalog.parse_meta
+before it is written, then documented and logged like any other change
+(_tune_meta). A playbook folder with no meta.md is seeded from the shipped
+one's by its first such change, and the log line says so. No strategy may
+take the name, nor swap's (catalog.RESERVED).
 """
 
 import os
@@ -50,7 +53,7 @@ from typing import TypedDict
 
 from db import Refusal
 from inference import catalog as catalog_module
-from inference.base import DIALS, META
+from inference.base import FIELDS, META
 from inference.strategy import (
     FIELD_RULE,
     TUNABLE,
@@ -380,9 +383,9 @@ def _tune_meta(directory: str, field: str, value: object, reason: str, by: str) 
     regenerated and one line logged, which names a rewritten prose and
     does not quote it."""
     path = os.path.join(directory, catalog_module.META_FILE)
-    if field != META_PROSE and field not in DIALS:
+    if field != META_PROSE and field not in FIELDS:
         raise TuneError("%s's fields are %s" % (catalog_module.META_FILE,
-                                                ", ".join((*DIALS, META_PROSE))))
+                                                ", ".join((*FIELDS, META_PROSE))))
     text, seeded = _meta_text(directory)
     old: str | None
     try:
@@ -441,9 +444,9 @@ def _check_new(sid: str, name: str, kind: str, body: str) -> None:
     the prose within its length and three sentences at most."""
     if not catalog_module.ID_RE.fullmatch(sid or ""):
         raise TuneError("id must be lowercase-kebab, got %r" % sid)
-    if sid == META:
-        raise TuneError("%s is %s, the default engine's weights, and no strategy: tune"
-                        " changes them" % (META, catalog_module.META_FILE))
+    if sid in catalog_module.RESERVED:
+        raise TuneError("%s is %s's, the default engine's weights and the swap cost, and no"
+                        " strategy's: tune changes them" % (sid, catalog_module.META_FILE))
     _coerce("kind", kind)
     if not (name or "").strip() or not (body or "").strip():
         raise TuneError("a strategy needs a name and its prose")

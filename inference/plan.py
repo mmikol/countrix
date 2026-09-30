@@ -61,7 +61,7 @@ def momentum(seats: Seats) -> Momentum:
         return Momentum(blue=None, red=None, countered=None, partial=False, odds=None,
                         verdict=blue_why, badges=badges)
     blue_share, red_share, countered_share = _shares(seats, blue_why, red_why)
-    odds = _odds(blue_share, red_share)
+    odds = fight_odds(blue_share, red_share)
     partial = bool((cur.blue and cur.partial) or (red_cur.blue and red_cur.partial))
     verdict = _verdict_line(cur, red_cur, blue_share, red_share, partial, odds, blue_why, red_why)
     if countered_share is not None:
@@ -115,7 +115,7 @@ def _badge(current: Result, fill: Result | None) -> Badge:
     return Badge(label="%d / 100" % share, tip="%s %d%% of %s" % (reach, share, of))
 
 
-def _odds(blue_share: int | None, red_share: int | None) -> Odds | None:
+def fight_odds(blue_share: int | None, red_share: int | None) -> Odds | None:
     """The fight odds: the two shares pitted against each other - each side's
     share of the two shares' sum, so the pair reads as a split of 100; defined
     only when both seats score."""

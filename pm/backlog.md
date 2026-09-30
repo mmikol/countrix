@@ -199,6 +199,16 @@ few match-ups the wiki rates (the counters table is a list).
 
 ## Done
 
+- **Blue's picks are offered the swaps that pay for their cost.** With
+  blue picks the board answers which to trade and for whom, as one joint
+  six: the best legal six reachable from the picks when each pick dropped
+  costs the swap cost, `meta.md`'s fifth field (`swap`, share points of
+  blue's span, 10 shipped), which `tune` moves and `weights=swap:<v>`
+  overrides for a board. The cost is a per-hero keep bonus the bound
+  carries exactly, so the search stays one exact branch and bound, held
+  to enumeration in `tests/inference/test_swaps.py` and to brute force on
+  real boards (`prove_exact`'s swap boards). The board draws the swaps in
+  a later step, with the stage plan.
 - **A tie is a draw, and the engine is verified in stages.** Tied sixes
   break by a per-board draw per hero (`scoring.draw`, seeded by the map
   and the side) in place of the mean map win rate, so a tie leaks no rate

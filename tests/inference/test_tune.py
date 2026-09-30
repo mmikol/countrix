@@ -277,12 +277,13 @@ def test_tune_sets_a_meta_weight_validated_and_logged(catalog_copy):
 
 
 def test_a_meta_weight_the_reader_would_refuse_is_never_written(catalog_copy):
-    """A field that is not one of the four, a value past 0..10 or not a
+    """A field that is not one of the five, a value past 0..10 or not a
     number, and a playbook with no meta.md are refused, and nothing is
     written or logged; meta is no strategy to add or complete."""
     path = Path(catalog_copy, catalog.META_FILE)
     before = path.read_text(encoding="utf-8")
-    for field, value, message in (("weight", 1, "fields are meta, rate, synergy, counter, body"),
+    for field, value, message in (("weight", 1,
+                                   "fields are meta, rate, synergy, counter, swap, body"),
                                   ("rate", 11, r"within 0\.\.10"),
                                   ("counter", -0.1, r"within 0\.\.10"),
                                   ("synergy", "much", "a number"),
@@ -290,7 +291,8 @@ def test_a_meta_weight_the_reader_would_refuse_is_never_written(catalog_copy):
         with pytest.raises(tune.TuneError, match=message):
             tune.tune("meta", field, value, "r", directory=catalog_copy)
     assert path.read_text(encoding="utf-8") == before
-    with pytest.raises(tune.TuneError, match="the default engine's weights, and no strategy"):
+    with pytest.raises(tune.TuneError,
+                       match="the default engine's weights and the swap cost, and no"):
         tune.add("meta", "The meta", "assumption", "One.", None, "r", directory=catalog_copy)
     with pytest.raises(tune.TuneError, match="beside the playbook"):
         tune.complete("meta", {"category": "general"}, "r", directory=catalog_copy)
@@ -320,6 +322,29 @@ def test_tune_rewrites_meta_prose_and_keeps_its_weights_and_title(catalog_copy):
                          " [claude-code-session]")
     tune.tune("meta", "body", "# Weights\n\nOne line.", "a new title", directory=catalog_copy)
     assert catalog.read_meta(catalog_copy).body == "# Weights\n\nOne line."
+
+
+def test_tune_sets_the_swap_cost_where_the_file_has_none(catalog_copy):
+    """swap is meta.md's fifth field: tune writes it into a file written
+    before the dial, then moves it, the weights untouched; a cost past its
+    range is refused with nothing written, and no strategy may take the
+    dial's id."""
+    before = catalog.read_meta(catalog_copy)
+    change = tune.tune("meta", "swap", 15, "a swap costs a fight's charge",
+                       directory=catalog_copy)
+    assert change["old"] is None and change["new"] == "15"
+    after = catalog.read_meta(catalog_copy)
+    assert after.swap == 15.0 and after.weights == before.weights
+    [line] = tune.log_tail(5, os.path.join(catalog_copy, "tuning-log.md"))
+    assert "`meta` swap: unset -> 15 (a swap costs a fight's charge)" in line
+    assert tune.tune("meta", "swap", 20, "r", directory=catalog_copy)["old"] == "15"
+    path = Path(catalog_copy, catalog.META_FILE)
+    text = path.read_text(encoding="utf-8")
+    with pytest.raises(tune.TuneError, match=r"swap is a number within 0\.\.50"):
+        tune.tune("meta", "swap", 51, "r", directory=catalog_copy)
+    assert path.read_text(encoding="utf-8") == text
+    with pytest.raises(tune.TuneError, match=r"swap is meta\.md's"):
+        tune.add("swap", "Swap", "assumption", "Prose.", None, "r", directory=catalog_copy)
 
 
 def test_tune_rewrites_a_strategys_prose_under_its_title(catalog_copy):

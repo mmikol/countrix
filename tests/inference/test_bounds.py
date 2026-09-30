@@ -4,8 +4,9 @@ whitelist admits has one; and on random branches of random boards, synergy
 cells no article writes among them, under the reference playbook and
 scratch strategies of every form - a need, text gates, and/or/not, a
 chained comparison, a clamped division, len, in, if, powers and
-remainders, the synergy graph's isolated picks and largest group -
-every metric's range holds its value on every
+remainders, the synergy graph's isolated picks and largest group - and
+the swap search's keep term, the default engine on and off, every
+metric's range holds its value on every
 completion, every expression's holds its value, the bound holds every
 completion's score and tie-break, and a branch the limits rule out holds
 no six that keeps them. Every board is the synthetic World's: no
@@ -169,34 +170,43 @@ def imputing(world):
     return world
 
 
+# the swap search's reference heroes and raw cost where a case keeps them
+KEEP, KEEP_COST = ("Anvil", "Rook", "Gale", "Balm"), 0.35
 CASES = {
-    "scratch-base-off": ("scratch", OFF, False),
-    "scratch-base-on": ("scratch", DEFAULT, False),
-    "engine-alone": ("assumptions", DEFAULT, False),
-    "engine-pairs-heavy": ("assumptions", PAIRS_HEAVY, False),
-    "unwritten-pairs": ("scratch", PAIRS_HEAVY, True)}
+    "scratch-base-off": ("scratch", OFF, False, False),
+    "scratch-base-on": ("scratch", DEFAULT, False, False),
+    "engine-alone": ("assumptions", DEFAULT, False, False),
+    "engine-pairs-heavy": ("assumptions", PAIRS_HEAVY, False, False),
+    "unwritten-pairs": ("scratch", PAIRS_HEAVY, True, False),
+    "keep-base-off": ("scratch", OFF, False, True),
+    "keep-alone": ("assumptions", OFF, False, True),
+    "keep-base-on": ("assumptions", DEFAULT, False, True)}
 
 
-@pytest.mark.parametrize(("rules", "base", "imputed"), list(CASES.values()), ids=list(CASES))
+@pytest.mark.parametrize(("rules", "base", "imputed", "keeps"), list(CASES.values()),
+                         ids=list(CASES))
 def test_every_bound_holds_every_completion_of_random_branches(
-        synthetic_world, tmp_path, rules, base, imputed):
+        synthetic_world, tmp_path, rules, base, imputed, keeps):
     """On random branches of each board, for every six the branch can still
     become: each team and matchup metric lies in its rule's range, each
     strategy's expressions lie in their abstract values, the tie-break lies
     under its bound, the score under the bound, and a branch the bound
     rules out holds no six that keeps every limit. Under assumptions alone
-    the bound is the default engine's, nothing else's slack beside it, and
-    on some branch it is within a hair of a completion's score."""
+    the bound is the default engine's and the keep term's, nothing else's
+    slack beside it, and on some branch it is within a hair of a
+    completion's score."""
     rules = playbook(tmp_path) if rules == "scratch" else ASSUMPTIONS_ONLY
     world = imputing(synthetic_world) if imputed else synthetic_world
-    rng = random.Random("bounds|%s|%s|%s" % (len(rules), base, imputed))
+    keep = frozenset(world.hero(name).id for name in KEEP) if keeps else frozenset()
+    rng = random.Random("bounds|%s|%s|%s%s" % (len(rules), base, imputed,
+                                               "|keep" if keeps else ""))
     closest = math.inf
     keys = sorted(bounds.RULES)
     checked = 0
     for draft in BOARDS:
         m, red, locked, banned = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
         solver = Solver(world, m, red=red, locked=locked, banned=banned,
-                        side=draft.side, catalog=rules, base=base)
+                        side=draft.side, catalog=rules, base=base, keep=keep, swap=KEEP_COST)
         static = bounds._board_values(solver)
         expressions = [(s, e, bounds.abstract(e, s.params, static))
                        for s in rules for e in (s.when, s.require, s.bonus, s.penalty)

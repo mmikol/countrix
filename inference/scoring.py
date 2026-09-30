@@ -14,6 +14,15 @@ inference.shapes. A board's stage moves the map's metrics (the ground in
 play) and nothing else; the scale is measured on the whole map (prepare's
 `measure`), so every stage of a map shares it.
 
+The swap search (inference.swaps) adds one term, the keep term: `swap`
+points for each hero of a reference six (`keep`) the six holds, added
+right after the default engine's value. Maximising it is maximising the
+score less `swap` for each reference hero dropped, over every legal six,
+and it is a hero's own part, which the search's bound carries exactly
+(inference.bounds). It is never a contribution: a six the swap search
+finds is scored again on its seat's plain objective before anything reads
+its score.
+
 A six is scored in one seat order, whatever order it arrives in: tanks,
 then damage, then supports, each by hero id (Candidate). The score is then a
 function of the hero set, down to its last bit, which the exact search and
@@ -268,8 +277,11 @@ class Objective:
 
     def __init__(self, world: World, m: Map | None, *, red: Sequence[Hero],
                  banned: Sequence[Hero] = (), side: str = "", stage: str = "",
-                 catalog: list[Strategy], base: BaseWeights) -> None:
+                 catalog: list[Strategy], base: BaseWeights,
+                 keep: frozenset[int] = frozenset(), swap: float = 0.0) -> None:
         self.world, self.m, self.red = world, m, list(red)
+        # the keep term: `swap` points for each hero of `keep`, by id, a six holds
+        self.keep, self.swap = keep, swap
         self.banned = {h.id for h in banned}
         self.side, self.stage = side, stage
         self.catalog = catalog
@@ -456,7 +468,8 @@ class Objective:
         """Score with the frozen bounds; with detail, fill the breakdown too.
 
         The default engine's value comes first, where it is on; it reads no
-        scale. A heuristic with no guard, or a guard on the board (enemy, map), adds
+        scale. The keep term follows it where a reference six is set, and
+        is no contribution. A heuristic with no guard, or a guard on the board (enemy, map), adds
         weight x norm. A heuristic guarded on the six's own state (team.*,
         matchup.*) is a need - "a solo healer needs an escape" - and adds
         weight x (norm - 1): met in full it costs nothing, unmet it costs the
@@ -474,6 +487,8 @@ class Objective:
         contributions: list[Contribution] = []
         out = contributions if detail else None
         total = 0.0 if self.base is None else _score_base(self.base, cand, out)
+        if self.keep:
+            total += self.swap * sum(1 for h in cand.heroes if h.id in self.keep)
         if out is not None:
             self._limit_terms(sc, out)
         total = self._score_heuristics(cand, total, out)

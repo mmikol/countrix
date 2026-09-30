@@ -43,6 +43,9 @@ The search, which reads the playbook:
     result        the Result and Board records and their citations into the
                   facts the facts layer generated
     plan          the game plan and the verdict in prose
+    swaps         blue's swaps: the best six reachable from blue's picks when
+                  each pick dropped costs the swap cost, one exact search,
+                  paired with the picks it replaces
     supersede     latest wins: a board a newer request replaced stops at its
                   next check
     reach         the board each released hero is optimal on, within a match's bans

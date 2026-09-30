@@ -22,6 +22,14 @@ tests' package; pytest does not collect it:
 each load it; start COUNT slices of a board at once, in the background,
 then merge. BOARDS names the boards; the playbook is the one in force.
 Each slice writes OUT/BOARD.INDEX-of-COUNT.json.
+
+A swap board (`keep` set) proves blue's swap search (inference.swaps): its
+Solver carries the keep term - the cost, in share points of the unlocked
+board's span, for each reference hero a six holds - on the unlocked
+board's scale, and the enumeration scores every six around its locks by
+that one objective. Its locks hold some of the reference and leave the
+rest open, so a kept hero is met both locked and searched; `engine` off
+runs it at base.OFF, where the keep term is the bound's own part alone.
 """
 
 import itertools
@@ -37,7 +45,9 @@ import psycopg
 from db import psql
 from facts import tables
 from facts.model import ROLES, World
-from inference import catalog
+from inference import catalog, swaps
+from inference.base import OFF
+from inference.result import Span
 from inference.scoring import Candidate, quantized, rank_key
 from inference.solver import RANK_CAP, Solver
 
@@ -46,13 +56,25 @@ K = 6                        # the sixes a board's seat keeps
 
 class Board(NamedTuple):
     """A board to prove: the map, red's picks, the locked picks, the bans,
-    the side, and a full six to rank (empty for none)."""
+    the side, a full six to rank (empty for none), and for a swap board
+    the reference picks, the swap cost in share points and whether the
+    default engine is on."""
     map_name: str | None
     red: tuple[str, ...]
     locked: tuple[str, ...]
     bans: tuple[str, ...]
     side: str
     six: tuple[str, ...] = ()
+    keep: tuple[str, ...] = ()
+    cost: float = 0.0
+    engine: bool = True
+
+
+# the swap boards' red, reference and locks: a full reference with three of
+# its heroes locked, and a half-drafted one whose locks hold one of its three
+SWAP_RED = ("Reinhardt", "Zarya", "Genji", "Tracer", "Ana", "Lúcio")
+SWAP_FULL = ("Sigma", "Winston", "Cassidy", "Sojourn", "Kiriko", "Mercy")
+SWAP_HALF = ("D.Va", "Echo", "Baptiste")
 
 
 BOARDS = {
@@ -75,6 +97,18 @@ BOARDS = {
                              "defense", ("Reinhardt", "Zarya", "Soldier: 76", "Cassidy", "Ana",
                                          "Kiriko")),
 }
+for _cost in (0.0, 10.0, 25.0):
+    for _on in (True, False):
+        _tag = "%d%s" % (_cost, "" if _on else "-off")
+        BOARDS["kings-row-swap-" + _tag] = Board(
+            "King's Row", SWAP_RED, ("Sigma", "Cassidy", "Kiriko"), (), "attack",
+            keep=SWAP_FULL, cost=_cost, engine=_on)
+        BOARDS["havana-swap-" + _tag] = Board(
+            "Havana", SWAP_RED, ("D.Va", "Ashe", "Lifeweaver"), (), "defense",
+            keep=SWAP_HALF, cost=_cost, engine=_on)
+# the swap search as a board runs it: nothing locked, every legal six searched
+BOARDS["kings-row-swap-open"] = Board("King's Row", SWAP_RED, (), (), "attack",
+                                      keep=SWAP_FULL, cost=10.0)
 
 
 def _world(out: str) -> World:
@@ -89,12 +123,25 @@ def _world(out: str) -> World:
 
 
 def _solver(world: World, name: str) -> Solver:
-    """The Solver of a named board, its scale frozen."""
+    """The Solver of a named board, its scale frozen; a swap board's with
+    the keep term, on the unlocked board's scale."""
     board = BOARDS[name]
     m, red, locked, banned = world.resolve(board.map_name, board.red, board.locked, board.bans)
+    weights = catalog.engine_weights() if board.engine else OFF
+    if not board.keep:
+        solver = Solver(world, m, red=red, locked=locked, banned=banned, side=board.side,
+                        catalog=catalog.load(), base=weights)
+        solver.freeze_bounds()
+        return solver
+    plain = Solver(world, m, red=red, locked=(), banned=banned, side=board.side,
+                   catalog=catalog.load(), base=weights)
+    best = plain.solve(top=1).ranked[0]
+    raw = swaps.raw_cost(board.cost, Span(best=best.score, floor=plain.floor))
     solver = Solver(world, m, red=red, locked=locked, banned=banned, side=board.side,
-                    catalog=catalog.load(), base=catalog.engine_weights())
-    solver.freeze_bounds()
+                    catalog=plain.catalog, base=weights,
+                    keep=frozenset(h.id for h in world.resolve(None, (), board.keep).blue),
+                    swap=raw or 0.0)
+    solver.adopt_scale(plain)
     return solver
 
 

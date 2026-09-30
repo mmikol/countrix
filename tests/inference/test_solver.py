@@ -31,6 +31,9 @@ ROLE_QUEUE = (
     "---\nname: role queue\nkind: constraint\nrequire: team.tanks == 2 and team.damage == 2"
     " and team.supports == 2\n---\nx\n")
 K = 6                   # the sixes a board's seat keeps: its best and BOARD_TOP alternatives
+# a swap search's reference picks and its raw cost a pick dropped: the keep term
+# the gate holds the bound to beside the plain objective
+KEEP, KEEP_COST = ("Kite", "Needle", "Myrrh"), 0.4
 
 
 def shape(six):
@@ -64,12 +67,15 @@ def verdicts(sixes):
     return [(c.score, c.tiebreak, sorted(c.names)) for c in sixes]
 
 
-def seated(world, draft, playbook, base, scale_of=None):
-    """The Solver of a board's seat, on `scale_of`'s scale where given."""
+def seated(world, draft, playbook, base, scale_of=None, keep=(), swap=0.0):
+    """The Solver of a board's seat, on `scale_of`'s scale where given; with
+    `keep`, the swap search's keep term: `swap` for each of those heroes a
+    six holds."""
     from inference.solver import Solver
     m, red, locked, banned = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
     solver = Solver(world, m, red=red, locked=locked, banned=banned, side=draft.side,
-                    stage=draft.stage, catalog=playbook, base=base)
+                    stage=draft.stage, catalog=playbook, base=base,
+                    keep=frozenset(world.hero(name).id for name in keep), swap=swap)
     if scale_of is not None:
         solver.adopt_scale(scale_of)
     return solver
@@ -118,8 +124,10 @@ def test_the_search_reaches_the_enumerated_maximum(synthetic_world, catalog_copy
     and on some board the search scores fewer sixes than it enumerates, so
     the bound prunes. The pair is two heroes worth nothing apart, made the
     one synergy pair of a copy of the world, and the best six fields both.
-    A board this misses is a solver defect: fix the search, never swap the
-    board out."""
+    The swap search's keep term - a bonus for each of three reference
+    heroes a six holds, some locked or banned - is held to the same
+    enumeration on every board. A board this misses is a solver defect:
+    fix the search, never swap the board out."""
     from inference import engine
     open_queue = catalog.load(catalog_copy)
     with open(os.path.join(catalog_copy, "role-queue.md"), "w", encoding="utf-8") as handle:
@@ -150,6 +158,10 @@ def test_the_search_reaches_the_enumerated_maximum(synthetic_world, catalog_copy
             if verdicts(got.ranked) != verdicts(full[:K]):
                 missed.append("%s: %s, enumerated %s" % (draft, verdicts(got.ranked)[:2],
                                                          verdicts(full[:2])))
+            kept = seated(world, draft, playbook, base, keep=KEEP, swap=KEEP_COST)
+            ranked = kept.solve(top=K).ranked
+            if verdicts(ranked) != verdicts(enumerated(kept)[:K]):
+                missed.append("%s, keeping %s: %s" % (draft, KEEP, verdicts(ranked)[:2]))
             pruned = pruned or solver.leaves < len(full)
             assert solver.considered == len(legal_sixes(
                 world, playbook, solver.locked, [world.heroes[i] for i in solver.banned]))
@@ -175,7 +187,7 @@ def test_every_seat_of_a_board_is_the_enumerated_maximum(synthetic_world, base):
     for draft in (Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm", "Rook"), side="attack"),
                   Draft("Ember Ruins", ("Anvil",), ("Needle",), ("Myrrh",))):
         board = engine.board(synthetic_world, draft, catalog=playbook,
-                             brief=engine.Brief(base=base))
+                             brief=engine.Brief(base=base, swaps=False))
         blue_seat = dataclasses.replace(draft, blue=())
         red_seat = Draft(draft.map_name, draft.blue, (), draft.bans, opposite(draft.side))
         blue = seated(synthetic_world, blue_seat, playbook, base)

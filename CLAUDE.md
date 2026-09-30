@@ -131,7 +131,11 @@ db <- facts <- inference <- door <- ui.
   scales the whole engine, over the `rate`, `synergy` and `counter` dials
   (1, 1, 0.26, 0.05 shipped); `tune` with id `meta` changes them and the
   file's prose (`body`), and the playbook tab's Meta slider
-  (`weights=meta:<v>`) sets the meta for a session. No term's weight
+  (`weights=meta:<v>`) sets the meta for a session. Its fifth field,
+  `swap` (`base.SWAP`, 10 shipped, 0..50), is the swap cost in share
+  points of blue's span; it scores no six, so `BaseWeights` and the stamp
+  leave it out, and a folder whose `meta.md` lacks it (the reference
+  playbook's) reads the shipped file's. No term's weight
   lives in code; what a term counts inside - `WIKI_WEIGHT` and
   `DERIVED_WEIGHT`, `RATE_PICK_HALF`, `NEED_BUDGET` - is its definition,
   and a fixture's stamp records it. A `BaseWeights` rides the `Brief`
@@ -174,6 +178,19 @@ db <- facts <- inference <- door <- ui.
   proves no six completes - are not allowed: no score, no share, no odds;
   red's picks are never ruled out. A search past its budget refuses
   (`solver.Unbounded`), never guesses.
+- **Blue's swaps are one joint answer.** With blue picks, `Board.swaps`
+  (`inference/swaps.py`) is the best legal six reachable from them when
+  each pick dropped costs the swap cost - `weights=swap:<v>`, else
+  `Brief.swap`, else `meta.md`'s (`engine.swap_in_force`) - scaled to raw
+  points on blue's span. The cost is a per-hero keep bonus in
+  `Objective` (`keep`, `swap`) that the bound carries exactly, so the
+  search stays one exact branch and bound; the keep term is never a
+  contribution, and the target is scored again on the plain objective.
+  A swap needs its net to beat the six that keeps every pick; red is
+  re-solved against the target for the odds after, and a suggestion that
+  lowers them is withheld. Red is never searched for swaps. `BRIEF` in
+  tests/inference/__init__.py turns them off (`Brief.swaps`); a test that
+  reads them names its cost.
 - **The board** (`ui/board.py`, its pages in `ui/pages.py`) serves
   `/api/facts` and answers `/api/board`, `/api/strategies` and `/health`
   with `inference/serve.py`'s handlers, all in its own process - the

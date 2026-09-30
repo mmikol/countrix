@@ -31,7 +31,10 @@ Its weights are the playbook's - `meta.md` beside the strategy files,
 one meta weight over the three terms' - and at meta 0 it is off.
 The playbook's heuristics sit on top and adjust that answer, and the
 search proves the best six
-([inference.md](inference.md#how-a-six-is-chosen)).
+([inference.md](inference.md#how-a-six-is-chosen)). Once blue has picks,
+the same search, with `meta.md`'s swap cost charged for each pick
+dropped, answers which of them to trade and for whom, as one six
+(`inference/swaps.py`, [inference.md](inference.md#the-swaps)).
 
 One input is the user's, the strategies, which the solver reads; every
 other table is pulled from Blizzard or the wiki.

@@ -115,6 +115,13 @@ TITLES = {
 META = "meta"
 # meta.md's fields, in the order the file sets them: the meta and the three dials
 DIALS = (META, "rate", "synergy", "counter")
+# the swap cost: meta.md's fifth field and a board's weights key beside META,
+# in share points of blue's span - what a swap of one of blue's picks must
+# gain before the board suggests it (inference.swaps). It scores no six, so
+# BaseWeights and the stamp leave it out and it moves no optimal six
+SWAP = "swap"
+SWAP_RANGE = (0.0, 50.0)            # the swap cost's range, in share points
+FIELDS = (*DIALS, SWAP)             # meta.md's fields, in the order the file sets them
 
 
 class BaseRecord(TypedDict):

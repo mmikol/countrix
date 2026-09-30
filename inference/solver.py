@@ -184,9 +184,10 @@ class Solver(Objective):
     def __init__(self, world: World, m: Map | None, *, red: Sequence[Hero],
                  locked: Sequence[Hero], banned: Sequence[Hero] = (), side: str = "",
                  stage: str = "", catalog: list[Strategy], base: BaseWeights,
-                 check: Callable[[], None] | None = None) -> None:
+                 check: Callable[[], None] | None = None,
+                 keep: frozenset[int] = frozenset(), swap: float = 0.0) -> None:
         super().__init__(world, m, red=red, banned=banned, side=side, stage=stage,
-                         catalog=catalog, base=base)
+                         catalog=catalog, base=base, keep=keep, swap=swap)
         self.locked = list(locked)
         self._locked_by_role = {r: [h for h in self.locked if h.role == r] for r in ROLES}
         self.check = check            # raises where a newer board superseded this one

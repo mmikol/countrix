@@ -131,7 +131,10 @@ def reach_tool(ctx: Context, hero: str) -> ToolReply:   # _tool: inference.reach
     " counter to yours, both current comps scored on those scales, your picks"
     " against red's best counter, your locked picks with the empty slots filled,"
     " the fight odds (each seat's share of its own optimal, and the two against"
-    " each other), the game plan in prose, the shapes the queue and the"
+    " each other), the swaps from blue's picks that pay for the swap cost - one"
+    " joint answer, the best six reachable from the picks when each pick"
+    " dropped costs that many share points, with blue's share and the fight"
+    " odds before and after - the game plan in prose, the shapes the queue and the"
     " playbook's limits allow, and red's likely six"
     " from the data alone (a two-two-two from the map's pick rates and the"
     " wiki's synergies, past the bans; static for the board, no strategy read).",
@@ -139,9 +142,11 @@ def reach_tool(ctx: Context, hero: str) -> ToolReply:   # _tool: inference.reach
         "weights": {"type": "object",
                     "description": "{heuristic id: 0..10} - weights to score this"
                                    " board under instead of the files' (the playbook"
-                                   " tab's sliders), and meta: 0..10 in place of"
+                                   " tab's sliders), meta: 0..10 in place of"
                                    " meta.md's meta, which scales the default engine"
-                                   " (the Meta slider); the files are untouched"}})
+                                   " (the Meta slider), and swap: 0..50 in place of"
+                                   " meta.md's swap cost, in share points of blue's"
+                                   " span; the files are untouched"}})
 def board(
         ctx: Context, draft: Draft, weights: Mapping[str, object] | None = None) -> ToolReply:
     with ctx.connect() as cx:

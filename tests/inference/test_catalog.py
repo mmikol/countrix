@@ -358,6 +358,54 @@ def test_meta_md_holds_the_engines_weights_and_is_no_strategy(catalog_copy):
     assert catalog.read_meta(catalog.SHIPPED_DIR).weights.on
 
 
+def test_meta_md_sets_the_swap_cost_and_a_folder_without_one_reads_the_shipped(
+        catalog_copy, tmp_path, monkeypatch):
+    """The shipped meta.md sets the swap cost, in share points; a folder
+    written before the dial - the reference playbook's - reads the shipped
+    one's, and one that sets its own reads its own, served and rendered
+    beside the weights. The cost keeps its own range, 0..50, and swap.md is
+    no strategy: the id is the dial's. With the shipped file silent too, a
+    folder without one is refused by name."""
+    shipped = Path(catalog.SHIPPED_DIR, catalog.META_FILE).read_text(encoding="utf-8")
+    assert catalog.parse_meta(shipped).swap is not None
+    path = Path(catalog_copy, catalog.META_FILE)
+    text = path.read_text(encoding="utf-8")
+    assert catalog.parse_meta(text).swap is None
+    assert catalog.swap_cost(catalog_copy) == catalog.swap_cost(catalog.SHIPPED_DIR)
+    path.write_text(text.replace("counter: 0.05\n", "counter: 0.05\nswap: 25\n"),
+                    encoding="utf-8")
+    meta = catalog.read_meta(catalog_copy)
+    assert catalog.swap_cost(catalog_copy) == 25.0 == catalog.meta_record(meta)["swap"]
+    assert catalog.meta_rendered(meta.weights, meta.swap) == (
+        "meta 1 x (rate 1, synergy 0.1, counter 0.05); swap cost 25")
+    for bad in ("51", "-1", "much"):
+        path.write_text(text.replace("counter: 0.05\n", "counter: 0.05\nswap: %s\n" % bad),
+                        encoding="utf-8")
+        with pytest.raises(CatalogError, match=r"^meta.md: swap is a number within 0\.\.50"):
+            catalog.read_meta(catalog_copy)
+    path.write_text(text, encoding="utf-8")
+    Path(catalog_copy, "swap.md").write_text(
+        "---\nname: Swap\nkind: assumption\n---\nx\n", encoding="utf-8")
+    with pytest.raises(CatalogError, match=r"^swap\.md: swap is meta\.md's and no strategy's"):
+        catalog.load(catalog_copy)
+    silent = tmp_path / "silent"
+    silent.mkdir()
+    (silent / catalog.META_FILE).write_text(text, encoding="utf-8")
+    monkeypatch.setattr(catalog, "SHIPPED_DIR", str(silent))
+    with pytest.raises(CatalogError, match=r"swap unset - the shipped meta\.md sets the swap cost"):
+        catalog.read_meta(catalog_copy)
+
+
+def test_a_boards_swap_weight_keeps_the_swap_costs_range():
+    """The swap cost rides a board's weights beside the heuristics' and the
+    meta, clamped to its own range, 0..50 share points, not a weight's."""
+    assert catalog.parse_weights(["swap:80", "meta:80", "swap-ish:30"]) == {
+        "swap": 50.0, "meta": 10.0, "swap-ish": 10.0}
+    assert catalog.parse_weights({"swap": "-3"}) == {"swap": 0.0}
+    cat = catalog.load(FIXTURE_PLAYBOOK)
+    assert catalog.weighted(cat, {"swap": 20.0}) == cat
+
+
 @pytest.mark.parametrize(("text", "message"), [
     ("---\nmeta: 1\nrate: 1\nsynergy: 0.1\n---\nx\n", "counter unset"),
     ("---\nmeta: 1\nrate: 1\nsynergy: 0.1\ncounter: 0.05\nweight: 2\n---\n", "weight is not"),

@@ -17,9 +17,9 @@ from db import ROOT, Refusal
 from door.mcp.registry import Context, tool
 from door.mcp.schema import Properties, Property, ToolReply
 from facts import compute
-from inference import catalog, tune
-from inference.base import DIALS, META
-from inference.strategy import FIELDS, TUNABLE, Field, FieldKind
+from inference import base, catalog, tune
+from inference.base import META, SWAP_RANGE
+from inference.strategy import FIELDS, TUNABLE, WEIGHT_RANGE, Field, FieldKind
 
 
 @tool(
@@ -43,13 +43,14 @@ def metrics(ctx: Context) -> ToolReply:
     " assumption), its form (a constraint's limit; a heuristic on a metric, or scored on"
     " bonus/penalty; draft), metric, direction, weight and expressions - and, first,"
     " meta.md: the default engine's weights, the meta that scales it and its rate,"
-    " synergy and counter dials.")
+    " synergy and counter dials, and the swap cost.")
 def strategies(ctx: Context) -> ToolReply:
     cat = catalog.load()
     meta = catalog.read_meta()
     pending = [s.id for s in cat if s.pending]
     text = "%-10s %-10s %-28s %s\n%s" % (
-        "engine", "meta", META, catalog.meta_rendered(meta.weights), catalog.catalog_rendered(cat))
+        "engine", "meta", META, catalog.meta_rendered(meta.weights, meta.swap),
+        catalog.catalog_rendered(cat))
     if catalog.strategies_dir() != catalog.SHIPPED_DIR:
         text = "playbook in force: %s (the shipped one is %s)\n\n%s" % (
             os.path.relpath(catalog.strategies_dir(), ROOT),
@@ -101,7 +102,9 @@ def _remirror(ctx: Context) -> None:
     " a when/require/bonus/penalty expression - or its prose, body, rewritten"
     " whole within three sentences under its title - or, with id meta, meta.md: one"
     " of the default engine's weights - meta, which scales the whole engine"
-    " (0 turns it off), or its rate, synergy or counter dial - or its prose,"
+    " (0 turns it off), or its rate, synergy or counter dial - or the swap"
+    " cost, swap, in share points of blue's span: what a swap of one of blue's"
+    " picks must gain before the board suggests it - or its prose,"
     " body, rewritten whole. A playbook folder with no meta.md is seeded from"
     " the shipped one's. Validated through the catalog before it is written,"
     " the strategies re-mirrored into the database (meta.md's weights live in"
@@ -115,10 +118,12 @@ def _remirror(ctx: Context) -> None:
             "type": "string",
             "description": "%s; for id %s: %s" % (
                 " | ".join((*TUNABLE, "params.NAME", tune.META_PROSE)), META,
-                " | ".join((*DIALS, tune.META_PROSE)))},
+                " | ".join((*base.FIELDS, tune.META_PROSE)))},
         "value": {"description": "the new value: a number, a word (kind, category, metric,"
                                  " direction) or an expression; meta.md's weights are"
-                                 " numbers within 0..10, its body the prose in markdown"},
+                                 " numbers within %g..%g, its swap cost one within"
+                                 " %g..%g, its body the prose in markdown"
+                                 % (*WEIGHT_RANGE, *SWAP_RANGE)},
         "reason": {"type": "string", "description": "why, in a sentence"},
         **BY},
     ["id", "field", "value", "reason"])

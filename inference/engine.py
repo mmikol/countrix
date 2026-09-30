@@ -8,7 +8,8 @@ that justify it (the facts the board would show for map + red + the
 six), the score broken down into the default engine's terms and each
 strategy's, and the alternatives. board() does it for both seats - blue's
 absolute optimal, red around its revealed ones, on opposite sides of a
-sided map - and scores the current blue picks as they stand. Both refuse
+sided map - scores the current blue picks as they stand, and suggests the
+swaps from blue's picks that pay for their cost (inference.swaps). Both refuse
 a team past the queue's tanks, on either seat, and a stage the map does
 not list, and score under the default engine at the playbook's weights
 (its meta.md) unless the caller names others; base.OFF, the meta at 0, is
@@ -40,16 +41,19 @@ from facts.draft import (
 from facts.factset import FactSet
 from facts.model import ROLES, Hero, Map, World
 from inference import catalog as catalog_module
-from inference import supersede
-from inference.base import OFF, BaseWeights
+from inference import supersede, swaps
+from inference.base import OFF, SWAP, BaseWeights
 from inference.plan import Seats, momentum, plan
 from inference.result import (
     Alternative,
     Board,
+    Momentum,
     Pick,
     Result,
     ResultKind,
     Span,
+    SwapOdds,
+    Swaps,
     not_allowed,
 )
 from inference.scoring import Candidate, Objective
@@ -80,16 +84,20 @@ BOARD_TOP = 5               # the alternatives each of a board's seats keeps
 
 class Brief(NamedTuple):
     """What a caller asks of one board beyond the draft: the playbook tab's
-    weights ({heuristic id: 0..10}, and META, the default engine's meta -
-    for this board only), whether to solve the countered case - the MCP
-    board prints it, the page never reads it - the check that says a newer
-    request from the same client has superseded this one, and the default
-    engine's weights, the playbook's meta.md's (None) unless a caller names
-    others (OFF turns it off)."""
+    weights ({heuristic id: 0..10}, META, the default engine's meta, and
+    SWAP, the swap cost - for this board only), whether to solve the
+    countered case - the MCP board prints it, the page never reads it - the
+    check that says a newer request from the same client has superseded
+    this one, the default engine's weights, the playbook's meta.md's (None)
+    unless a caller names others (OFF turns it off), the swap cost in share
+    points, meta.md's (None) unless a caller names another, and whether to
+    search blue's swaps."""
     weights: Mapping[str, float] | None = None
     countered: bool = True
     superseded: Callable[[], bool] | None = None
     base: BaseWeights | None = None
+    swap: float | None = None
+    swaps: bool = True
 
 
 def weights_in_force(
@@ -99,6 +107,15 @@ def weights_in_force(
     (catalog.engine_weights), with a board's own meta on top where its
     `weights` set one (BaseWeights.metered)."""
     return (catalog_module.engine_weights() if base is None else base).metered(weights)
+
+
+def swap_in_force(brief: Brief) -> float:
+    """The swap cost a board suggests blue's swaps under, in share points:
+    its weights' SWAP (the playbook tab's Swap cost slider), else the
+    brief's, else the playbook in force's meta.md (catalog.swap_cost)."""
+    if brief.weights and SWAP in brief.weights:
+        return brief.weights[SWAP]
+    return catalog_module.swap_cost() if brief.swap is None else brief.swap
 
 
 def _order(heroes: Iterable[Hero]) -> list[str]:
@@ -316,6 +333,13 @@ def board(
         red_current  red's picks as they stand, scored against blue's
                      selection on red's optimal's scale; red's picks are the
                      other side's facts, never ruled out
+        swaps        the swaps from blue's picks that pay for their cost -
+                     one joint answer, the best six reachable from the picks
+                     when each pick dropped costs the swap cost (meta.md's,
+                     the brief's, or its weights' SWAP), with blue's share
+                     and the fight odds before and after; the suggestion is
+                     withheld where the odds would fall (None without blue
+                     picks, or when the brief does not ask for it)
         countered    blue's picks against red's optimal six - how you hold
                      if they answer you perfectly: a full six as it stands, a
                      half-drafted one filled, on the scale of blue's best
@@ -405,6 +429,10 @@ def board(
             countered = solve.countered(dataclasses.replace(draft, red=tuple(red.result.blue)))
     seats = Seats(current=cur, red_current=red_cur, blue=blue.result, red=red.result,
                   fill=fill, red_fill=red_fill, countered=countered)
+    mo = momentum(seats)
+    suggested = None
+    if brief.swaps and draft.blue:
+        suggested = solve.swaps(draft, enemy, blue, _Seat(cur, fill, mo), swap_in_force(brief))
     # the six the comps tab shows for blue, which the plan describes: a comp
     # that is not allowed is described by the optimal instead
     held = len(draft.blue) == TEAM_SIZE and cur.barred is None
@@ -412,9 +440,19 @@ def board(
     return Board(map_name=expected.map_name, side=draft.side, stage=draft.stage,
                  bans=list(draft.bans),
                  blue=blue.result, red=red.result, current=cur, red_current=red_cur,
-                 fill=fill, countered=countered, momentum=momentum(seats),
+                 fill=fill, countered=countered, momentum=mo,
                  plan=plan(world, m, draft.side, list(draft.bans), red_h, shown),
-                 shapes=[list(s) for s in legal_shapes(catalog)], expected=expected)
+                 shapes=[list(s) for s in legal_shapes(catalog)], expected=expected,
+                 swaps=suggested)
+
+
+class _Seat(NamedTuple):
+    """Blue's seat as the swaps read it: its current comp, its fill where it
+    is half-drafted, and the board's momentum, whose share and odds are the
+    swaps' before."""
+    current: Result
+    fill: Result | None
+    momentum: Momentum
 
 
 def _drafting(seat: Draft) -> bool:
@@ -473,6 +511,90 @@ class _Pass:
             return self.filled(draft, seat="blue", of=top, kind="countered")
         return _current(self.world, draft, optimal=top, catalog=self.catalog,
                         base=self.base, seat="blue", kind="countered")
+
+    def swaps(
+            self, draft: Draft, enemy: tuple[str, ...], blue: _Optimal, seat: _Seat,
+            cost: float) -> Swaps:
+        """Blue's swaps (inference.swaps): the best six reachable from blue's
+        picks (`draft.blue`) against `enemy` - red's picks, else its likely
+        six - at `cost` share points a pick dropped, on blue's optimal's
+        board and scale. Where a swap is suggested, red's optimal, current
+        comp and fill are solved again against the six it makes, and the
+        fight odds read off them as the momentum reads the board's; a
+        suggestion that lowers them is withheld."""
+        picks = self.world.resolve(draft.map_name, draft.red, draft.blue, draft.bans).blue
+        full = len(picks) == TEAM_SIZE
+        before, odds = seat.momentum["blue"], seat.momentum["odds"]
+        fill = seat.fill
+        keeper = (picks if full and seat.current.barred is None
+                  else None if full or fill is None
+                  else self.world.resolve(None, (), fill.blue).blue)
+        kept = Swaps(stage=draft.stage, cost=cost,
+                     six=_order(keeper) if keeper is not None else [],
+                     pairs=[], open=swaps.open_slots(
+                         [p for p in fill.picks if not p["locked"]] if fill is not None else []),
+                     before=before, after=before, odds=SwapOdds(before=odds, after=odds),
+                     verdict=swaps.verdict([], cost, before, 0, None, partial=not full))
+        raw = swaps.raw_cost(cost, blue.span)
+        if raw is None:
+            kept["verdict"] = "no swaps: " + (blue.result.waiting() or "the seat is unscored")
+            return kept
+        self.watch.check()
+        try:
+            target = swaps.search(blue.solver, picks, raw, keeper)
+        except (Infeasible, Unbounded) as error:
+            kept["verdict"] = "no swaps: %s" % error
+            return kept
+        if not target.gains:
+            return kept
+        ours = dataclasses.replace(draft, red=enemy, blue=tuple(h.name for h in target.six.heroes))
+        six = _scored(self.world, ours, blue, target.six, self.catalog, self.base,
+                      locked=[h.name for h in picks])
+        pairs, open_slots = swaps.paired(picks, six)
+        after = six.share()
+        odds_after = self._against(draft, six, blue)["odds"] if draft.red else None
+        if odds is not None and odds_after is not None and odds_after["blue"] < odds["blue"]:
+            kept["verdict"] = swaps.withheld(pairs, (odds["blue"], odds_after["blue"]))
+            return kept
+        return Swaps(stage=draft.stage, cost=cost, six=list(six.blue), pairs=pairs,
+                     open=open_slots, before=before, after=after,
+                     odds=SwapOdds(before=odds, after=odds_after),
+                     verdict=swaps.verdict(pairs, cost, before, after, (
+                         (odds["blue"], odds_after["blue"])
+                         if odds is not None and odds_after is not None else None),
+                         partial=not full))
+
+    def _against(self, draft: Draft, six: Result, blue: _Optimal) -> Momentum:
+        """The momentum were blue to field `six`: red's optimal, current comp
+        and fill solved again against it, and read with blue's six on blue's
+        optimal, as the board's own is."""
+        theirs = Draft(map_name=draft.map_name, red=tuple(six.blue), blue=draft.red,
+                       bans=draft.bans, side=opposite(draft.side), stage=draft.stage)
+        red = self.optimal(dataclasses.replace(theirs, blue=()), seat="red")
+        red_cur = self.current(theirs, red, seat="red")
+        try:
+            red_fill = self.filled(theirs, seat="red", of=red)
+        except (Infeasible, Unbounded):
+            red_fill = None
+        return momentum(Seats(current=six, red_current=red_cur, blue=blue.result,
+                              red=red.result, red_fill=red_fill))
+
+
+def _scored(world: World, draft: Draft, optimal: _Optimal, cand: Candidate,
+            catalog: list[Strategy], base: BaseWeights, locked: Sequence[str]) -> Result:
+    """Blue's six `cand` (`draft.blue`), scored on its optimal's objective,
+    as a Result on the optimal's span: its picks, their reasons and its
+    breakdown - `locked`, the picks it keeps, marked."""
+    m, red_h, blue_h, bans_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
+    result = Result(kind="evaluate", map_name=m.name if m else None,
+                    red=[h.name for h in red_h], blue=_order(blue_h),
+                    locked=[name for name in locked if name in set(draft.blue)],
+                    catalog=catalog, base=base, bans=[h.name for h in bans_h], side=draft.side,
+                    stage=draft.stage, seat="blue")
+    result.record_candidate(cand, _board_facts(world, result, draft.side),
+                            optimal.solver.considered)
+    result.scale_to(optimal.span)
+    return result
 
 
 def _check_teams(red_h: Sequence[Hero], blue_h: Sequence[Hero], seat: Seat) -> None:

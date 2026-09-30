@@ -3,8 +3,8 @@
 A Result is one seat's six on one board: who is in it and why, each pick
 citing the board facts that justify it, the score and its breakdown per
 strategy, and the runners-up. A Board holds the seven Results board()
-solves, with the verdict, the seat badges and the plan read off them. Both
-render as JSON-ready data (to_dict) and as text (rendered).
+solves, with the verdict, the seat badges, the plan and blue's swaps read
+off them. Both render as JSON-ready data (to_dict) and as text (rendered).
 """
 
 from collections.abc import Callable, Iterable
@@ -61,6 +61,47 @@ class Odds(TypedDict):
     """The two shares pitted against each other: each seat's part of 100."""
     blue: int
     red: int
+
+
+# One swap the board suggests above blue's picks: the pick that goes (`out`),
+# the hero that comes in (`in`), where the pick sits in blue's picks as sent
+# (`at`), the incoming hero's portrait and the reason it is in the six. A
+# functional TypedDict: `in` is a keyword, and the page reads the key by name
+SwapPair = TypedDict("SwapPair", {
+    "out": str, "in": str, "at": int, "portrait": str | None, "why": str})
+
+
+class OpenSlot(TypedDict):
+    """A hero the board draws in one of blue's empty slots: the swap's six
+    where a swap is suggested, else the fill's."""
+    hero: str
+    role: str
+    portrait: str | None
+    why: str
+
+
+class SwapOdds(TypedDict):
+    """The fight odds before the swaps and after them; None where they
+    cannot be read - red has no picks, or a seat's share waits."""
+    before: Odds | None
+    after: Odds | None
+
+
+class Swaps(TypedDict):
+    """Blue's swaps, one joint answer (inference.swaps): the stage it was
+    solved on, the cost in share points, the six the swaps make (the six
+    the picks keep where none is suggested), each swap, the heroes the empty
+    slots show, blue's share before and after, the fight odds before and
+    after, and the verdict in words."""
+    stage: str
+    cost: float
+    six: list[str]
+    pairs: list[SwapPair]
+    open: list[OpenSlot]
+    before: int | None
+    after: int | None
+    odds: SwapOdds
+    verdict: str
 
 
 class Badge(TypedDict):
@@ -434,11 +475,12 @@ class Board:
     plan: str
     shapes: list[list[int]]
     expected: Result
+    swaps: Swaps | None = None          # blue's swaps, None without blue picks
 
     def to_dict(self) -> Payload:
         """The board as JSON-ready data."""
         return {"map": self.map_name, "side": self.side, "stage": self.stage, "bans": self.bans,
-                "plan": self.plan,
+                "plan": self.plan, "swaps": self.swaps,
                 "blue": self.blue.to_dict(), "red": self.red.to_dict(),
                 "current": self.current.to_dict(), "red_current": self.red_current.to_dict(),
                 "countered": self.countered.to_dict() if self.countered else None,
@@ -456,7 +498,10 @@ class Board:
         if self.countered:
             parts.append(self.countered.rendered())
         parts.append(self.expected.rendered())
-        return "\n\n".join([*parts, "momentum: " + self.momentum["verdict"]])
+        parts.append("momentum: " + self.momentum["verdict"])
+        if self.swaps is not None:
+            parts.append("swaps: " + self.swaps["verdict"])
+        return "\n\n".join(parts)
 
 
 def rates_queue(fs: FactSet) -> str:

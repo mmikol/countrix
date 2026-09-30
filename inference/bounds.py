@@ -28,8 +28,9 @@ tests/inference/test_bounds.py holds each to it on random branches.
     Bound                 the objective over a branch, summed in the order the
                           score sums it: the default engine's terms jointly -
                           each open pick's own part, its pairs with the picks
-                          made, and half its best pairs among the rest - then
-                          each heuristic and each scored term apart
+                          made, and half its best pairs among the rest - with
+                          the swap search's keep term in each pick's own part,
+                          then each heuristic and each scored term apart
 
 Floating point: a metric the bound sums in another order than the metric
 itself carries a slack, SLACK times the magnitude of its addends, outward on
@@ -1515,7 +1516,14 @@ class Bound:
     default engine's terms jointly, then every heuristic and scored term of
     the playbook apart, summed in the order the score sums them. It orders
     the Space's candidates by their potential - a pick's own part of the
-    engine plus half its five best pairs - as it is built."""
+    engine plus half its five best pairs - as it is built.
+
+    The swap search's keep term (Objective.keep) is a pick's own part too:
+    `swap` for a reference hero, nothing for another, added to the engine's
+    own parts - or alone, with the engine off - so the bound carries it
+    exactly, and the walk takes the reference heroes first. The score
+    multiplies it once where the bound sums it hero by hero; the engine's
+    slack, which counts every own part's magnitude, covers the difference."""
 
     def __init__(self, objective: Objective, space: Space) -> None:
         self.space = space
@@ -1526,8 +1534,11 @@ class Bound:
         self.pairs: list[list[float]] | None = None
         self.halves: list[list[float]] = []
         self.engine_slack = 0.0
+        kept = [objective.swap if h.id in objective.keep else 0.0 for h in heroes]
+        if base is None and objective.keep:
+            self.own = kept
         if base is not None:
-            self.own = [base.unary(h, TEAM_SIZE) for h in heroes]
+            self.own = [base.unary(h, TEAM_SIZE) + k for h, k in zip(heroes, kept, strict=True)]
             weight = base.scaled.synergy
             if weight:
                 self.pairs = [[weight * v for v in row] for row in space.pairs()]
@@ -1537,6 +1548,7 @@ class Bound:
                         others = sorted((self.pairs[x][y] for y in pool if y != x), reverse=True)
                         row.append(sum(others[:k]) / 2)
                     self.halves.append(row)
+        if self.own is not None:
             largest = sorted((abs(v) for v in self.own), reverse=True)[:TEAM_SIZE]
             spread = max((abs(v) for row in self.pairs for v in row), default=0.0) \
                 if self.pairs else 0.0

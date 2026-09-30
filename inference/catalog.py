@@ -12,15 +12,19 @@ and digest.
     rate: 1
     synergy: 0.1
     counter: 0.05
+    swap: 10
     ---
     prose: what the weights do and why they are set so
 
-meta.md sets the four and nothing else, each a number within the weight
-range (strategy.WEIGHT_RANGE), and every playbook folder holds one: a
-board, an infer and the math page read it, and a folder without it is a
-CatalogError. It is no strategy - the catalog never loads it as one, the
-digest leaves it out (a fixture's stamp, inference.base.stamp, records the
-weights) and no strategy may take its name.
+meta.md sets the four weights, each a number within the weight range
+(strategy.WEIGHT_RANGE), and the swap cost (base.SWAP), in share points
+within base.SWAP_RANGE, and nothing else; every playbook folder holds one:
+a board, an infer and the math page read it, and a folder without it is a
+CatalogError. The swap cost is the one field a folder may leave out: it
+reads the shipped meta.md's (read_meta), which must set it. It is no
+strategy - the catalog never loads it as one, the digest leaves it out (a
+fixture's stamp, inference.base.stamp, records the weights) and no
+strategy may take its name, nor the swap cost's (RESERVED).
 """
 
 import copy
@@ -35,7 +39,7 @@ import psycopg
 from db import ROOT, Refusal, Source, embed
 from db.psql import now, register_source
 from facts import compute
-from inference.base import DIALS, META, BaseRecord, BaseWeights
+from inference.base import DIALS, FIELDS, META, SWAP, SWAP_RANGE, BaseRecord, BaseWeights
 from inference.frontmatter import FrontmatterError, parse_frontmatter
 from inference.strategy import (
     FORMS,
@@ -70,6 +74,9 @@ DOCS_PATH = os.path.join(ROOT, "docs", "inference.md")
 META_FILE = META + ".md"            # the default engine's weights, beside the strategy files
 # markdown that lives beside the files
 NOT_STRATEGIES = ("README.md", "tuning-log.md", META_FILE)
+# the ids no strategy may take: meta.md's name and the swap cost's, each a key
+# of a board's weights beside the heuristics' ids
+RESERVED = (META, SWAP)
 
 
 def _read(directory: str, name: str) -> Strategy:
@@ -79,6 +86,8 @@ def _read(directory: str, name: str) -> Strategy:
     try:
         if not ID_RE.fullmatch(sid):
             raise CatalogError("%s: the filename must be lowercase-kebab" % name)
+        if sid in RESERVED:
+            raise CatalogError("%s: %s is %s's and no strategy's" % (name, sid, META_FILE))
         with open(os.path.join(directory, name), encoding="utf-8") as handle:
             parsed = parse_frontmatter(handle.read())
         if "id" in parsed.meta and str(parsed.meta["id"]) != sid:
@@ -115,54 +124,60 @@ def load(directory: str | None = None) -> list[Strategy]:
 
 
 class Meta(NamedTuple):
-    """meta.md, read: the default engine's weights and the prose that says
-    what they do and why."""
+    """meta.md, read: the default engine's weights, the swap cost - None
+    where the file leaves it out and nothing has seeded it (parse_meta) -
+    and the prose that says what they do and why."""
     weights: BaseWeights
+    swap: float | None
     body: str
 
 
 class MetaRecord(BaseRecord):
-    """meta.md as the tools and the board serve it: the weights and the prose."""
+    """meta.md as the tools and the board serve it: the weights, the swap
+    cost and the prose."""
+    swap: float | None
     body: str
 
 
 def meta_dial(field: str, value: object) -> float:
-    """One of meta.md's four weights: a finite number within WEIGHT_RANGE,
-    else a CatalogError with the rule. The reader and the tune tool both
-    check a value by it."""
-    if field not in DIALS:
-        raise CatalogError("%s's fields are %s" % (META_FILE, ", ".join(DIALS)))
+    """One of meta.md's fields: a weight a finite number within
+    WEIGHT_RANGE, the swap cost one within SWAP_RANGE, else a CatalogError
+    with the rule. The reader and the tune tool both check a value by it."""
+    if field not in FIELDS:
+        raise CatalogError("%s's fields are %s" % (META_FILE, ", ".join(FIELDS)))
+    low, high = SWAP_RANGE if field == SWAP else WEIGHT_RANGE
     number = finite_number(value)
-    if number is None or not WEIGHT_RANGE[0] <= number <= WEIGHT_RANGE[1]:
-        raise CatalogError("%s is a number within %g..%g" % (field, *WEIGHT_RANGE))
+    if number is None or not low <= number <= high:
+        raise CatalogError("%s is a number within %g..%g" % (field, low, high))
     return number
 
 
 def parse_meta(text: str) -> Meta:
-    """meta.md's text -> its weights and prose: the four set, each by
-    meta_dial, and no other key; else a CatalogError naming the file."""
+    """meta.md's text -> its weights, swap cost and prose: the four weights
+    set, each by meta_dial, the swap cost where the file sets it, and no
+    other key; else a CatalogError naming the file."""
     try:
         parsed = parse_frontmatter(text)
-        unknown = sorted(str(key) for key in parsed.meta if key not in DIALS)
+        unknown = sorted(str(key) for key in parsed.meta if key not in FIELDS)
         if unknown:
             raise CatalogError("%s is not a field (the fields: %s)"
-                               % (", ".join(unknown), ", ".join(DIALS)))
+                               % (", ".join(unknown), ", ".join(FIELDS)))
         missing = [field for field in DIALS if parsed.meta.get(field) is None]
         if missing:
             raise CatalogError("%s unset: it sets %s" % (", ".join(missing), ", ".join(DIALS)))
         dials = {field: meta_dial(field, parsed.meta[field]) for field in DIALS}
+        swap = parsed.meta.get(SWAP)
+        cost = None if swap is None else meta_dial(SWAP, swap)
     except (CatalogError, FrontmatterError) as error:
         raise CatalogError("%s: %s" % (META_FILE, error)) from error
-    return Meta(weights=BaseWeights(**dials), body=parsed.body)
+    return Meta(weights=BaseWeights(**dials), swap=cost, body=parsed.body)
 
 
-def read_meta(directory: str | None = None) -> Meta:
-    """The playbook's meta.md - the playbook in force's unless `directory`
-    names another - read and checked. A folder without one is a
+def _meta_file(directory: str) -> Meta:
+    """The meta.md in `directory`, parsed; a folder without one is a
     CatalogError: the default engine has no weights there."""
-    path = os.path.join(directory or strategies_dir(), META_FILE)
     try:
-        with open(path, encoding="utf-8") as handle:
+        with open(os.path.join(directory, META_FILE), encoding="utf-8") as handle:
             text = handle.read()
     except FileNotFoundError as error:
         raise CatalogError("%s: missing - the playbook's folder holds the default engine's"
@@ -170,27 +185,51 @@ def read_meta(directory: str | None = None) -> Meta:
     return parse_meta(text)
 
 
+def read_meta(directory: str | None = None) -> Meta:
+    """The playbook's meta.md - the playbook in force's unless `directory`
+    names another - read and checked, its swap cost seeded from the shipped
+    meta.md's where it sets none: a folder written before the dial existed
+    reads the shipped cost. The shipped file without one is a CatalogError."""
+    meta = _meta_file(directory or strategies_dir())
+    if meta.swap is None:
+        shipped = _meta_file(SHIPPED_DIR).swap
+        if shipped is None:
+            raise CatalogError("%s: %s unset - the shipped %s sets the swap cost"
+                               % (META_FILE, SWAP, META_FILE))
+        meta = meta._replace(swap=shipped)
+    return meta
+
+
 def engine_weights(directory: str | None = None) -> BaseWeights:
     """The default engine's weights in force: meta.md's (read_meta)."""
     return read_meta(directory).weights
 
 
+def swap_cost(directory: str | None = None) -> float:
+    """The swap cost in force, in share points: meta.md's, else the shipped
+    meta.md's (read_meta)."""
+    return read_meta(directory).swap or 0.0
+
+
 def meta_record(meta: Meta) -> MetaRecord:
     """meta.md as the strategies tool and the board's playbook tab serve it."""
-    return MetaRecord(**meta.weights.record(), body=meta.body)
+    return MetaRecord(**meta.weights.record(), swap=meta.swap, body=meta.body)
 
 
-def meta_rendered(weights: BaseWeights) -> str:
-    """The weights as one line of text: the meta, and each dial under it."""
-    return "meta %s x (rate %s, synergy %s, counter %s)" % tuple(
+def meta_rendered(weights: BaseWeights, swap: float | None = None) -> str:
+    """The weights as one line of text: the meta, and each dial under it,
+    then the swap cost where one is given."""
+    line = "meta %s x (rate %s, synergy %s, counter %s)" % tuple(
         field_text(getattr(weights, field)) for field in DIALS)
+    return line if swap is None else "%s; swap cost %s" % (line, field_text(swap))
 
 
 def parse_weights(items: Mapping[str, object] | Iterable[object] | None) -> dict[str, float]:
     """`id:value` strings (a query's repeated `weights` parameter) or a mapping
-    -> {id: weight}, each clamped to the file's WEIGHT_RANGE. What a board's
-    sliders send: a heuristic's id, or META for the default engine's meta
-    (BaseWeights.metered). An entry that is not id:value, or a value that
+    -> {id: weight}, each clamped to the file's WEIGHT_RANGE, the swap cost
+    to SWAP_RANGE. What a board's sliders send: a heuristic's id, META for
+    the default engine's meta (BaseWeights.metered), or SWAP for the swap
+    cost (engine.swap_in_force). An entry that is not id:value, or a value that
     is not a finite number (strategy.finite_number: nan and inf are not), is
     a Refusal, which the board and the board tool answer as the caller's
     error."""
@@ -198,12 +237,12 @@ def parse_weights(items: Mapping[str, object] | Iterable[object] | None) -> dict
         pairs = [(str(sid), value) for sid, value in items.items()]
     else:
         pairs = [_weight_entry(item) for item in items or []]
-    low, high = WEIGHT_RANGE
     out = {}
     for sid, value in pairs:
         weight = finite_number(value)
         if weight is None:
             raise Refusal("weight %r for %r is not a number" % (value, sid))
+        low, high = SWAP_RANGE if sid.strip() == SWAP else WEIGHT_RANGE
         out[sid.strip()] = min(high, max(low, weight))
     return out
 
@@ -221,8 +260,8 @@ def weighted(catalog: list[Strategy], weights: Mapping[str, float] | None) -> li
     weights instead of their files' - shallow copies, so the files and the
     loaded catalog stay as they are. Only a heuristic has a weight to set -
     on a metric or scored alike; a constraint has none, and an unknown id is
-    ignored, META among them: the meta is the engine's
-    (BaseWeights.metered)."""
+    ignored, META and SWAP among them: the meta is the engine's
+    (BaseWeights.metered), the swap cost the swap search's."""
     if not weights:
         return catalog
     out = []
@@ -371,7 +410,7 @@ def write_docs(catalog: Sequence[Strategy], path: str = DOCS_PATH) -> str | None
             "; %d draft(s) awaiting /strategy" % forms["draft"] if forms["draft"] else ""),
         "", "#### The meta", "",
         "`%s`: %s - the default engine's weights, which the tune tool changes (id `%s`)"
-        % (META_FILE, meta_rendered(meta.weights), META),
+        % (META_FILE, meta_rendered(meta.weights, meta.swap), META),
         "", _without_title(meta.body), ""]
     for kind in KINDS:
         items = [s for s in catalog if s.kind == kind]

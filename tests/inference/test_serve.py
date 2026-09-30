@@ -245,15 +245,18 @@ def test_a_slider_weight_rides_the_board_and_a_malformed_one_is_refused(
         synthetic_world, monkeypatch):
     """The playbook tab's weight reaches the solve through the query: under
     the reference playbook a heuristic is scored at the weight sent, not the
-    file's, and a weight that is not id:value is the caller's error. The
-    synthetic World stands in for the database."""
+    file's, the Swap cost slider's swap:value is the cost blue's swaps are
+    searched at, and a weight that is not id:value is the caller's error.
+    The synthetic World stands in for the database."""
     monkeypatch.setattr(tables, "load", lambda cx: synthetic_world)
     monkeypatch.setenv("COUNTRIX_STRATEGIES", FIXTURE_PLAYBOOK)
     heuristic = next(s for s in catalog.load(FIXTURE_PLAYBOOK) if s.kind == "heuristic")
     data, code = serve.handle_board(None, {
         "map": ["Harbor Gate"], "red": ["Mortar"], "blue": ["Balm"],
-        "weights": ["%s:3" % heuristic.id]})
+        "weights": ["%s:3" % heuristic.id, "swap:0"]})
     assert code == 200 and heuristic.weight != 3
     assert data["blue"]["weights"][heuristic.id] == 3
+    assert data["swaps"]["cost"] == 0 and sorted(data["swaps"]["six"]) == sorted(
+        data["blue"]["blue"])
     with pytest.raises(Refusal, match="id:value"):
         serve.handle_board(None, {"map": ["Harbor Gate"], "weights": ["junk"]})

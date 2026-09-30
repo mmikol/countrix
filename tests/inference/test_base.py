@@ -365,13 +365,15 @@ def test_the_meta_scales_every_term_and_nothing_else(synthetic_world):
 
 def test_a_board_at_meta_zero_is_the_board_off(synthetic_world):
     """The Meta slider at 0 is OFF: every seat of the board scores, ranks and
-    reads as it does with the engine off, and only the weights each result
-    records say which it was."""
+    reads as it does with the engine off, blue's swaps too, and only the
+    weights each result records say which it was."""
     fix = catalog.load(FIXTURE_PLAYBOOK)
     draft = Draft("Harbor Gate", ("Mortar",), ("Balm",), side="attack")
-    zero = engine.board(synthetic_world, draft, catalog=fix,
-                        brief=engine.Brief(base=DEFAULT, weights={base.META: 0.0})).to_dict()
-    off = engine.board(synthetic_world, draft, catalog=fix, brief=engine.Brief(base=OFF)).to_dict()
+    zero = engine.board(synthetic_world, draft, catalog=fix, brief=engine.Brief(
+        base=DEFAULT, weights={base.META: 0.0}, swap=10.0)).to_dict()
+    off = engine.board(synthetic_world, draft, catalog=fix,
+                       brief=engine.Brief(base=OFF, swap=10.0)).to_dict()
+    assert zero["swaps"] is not None
     seats = ("blue", "red", "current", "red_current", "fill", "countered", "expected")
     assert [zero[k]["base"] for k in seats] == [dict(DEFAULT.record(), meta=0.0)] * len(seats)
     assert [off[k]["base"] for k in seats] == [OFF.record()] * len(seats)
