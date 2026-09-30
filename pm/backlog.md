@@ -6,6 +6,17 @@ keeps it current.
 
 ## Next
 
+- **Fuller stage texts.** 36 of the 64 stages have no text of their own
+  on the wiki as the pull reads it, and most of the rest a few sentences,
+  so the terrain rules score a six of their own on 7 stages of 5 maps.
+  Reading each article's stage sections more fully, or a second
+  paragraph per stage, is the lever that makes the plan stage by stage
+  say more. Cost: the map pull and its cache; no engine change.
+- **A source for the cover rule.** "Cover closes the distance" (cover
+  rewards mobility, `team.mobility_count` where `map.cover` stands out)
+  was drafted with the terrain rules and held back on 2026-09-30: the
+  citation record has no source for it. Mine one, or file it as the
+  owner's own rule, then add it through `add_strategy`.
 - **Tunings by map.** The user's request: each map carries its own tuning
   set - a weight per heuristic (and a params dial where a rule has one)
   that applies when that map is on the board, so a rule can matter on
@@ -199,6 +210,15 @@ few match-ups the wiki rates (the counters table is a list).
 
 ## Done
 
+- **Swaps are scored, and the plan runs stage by stage.** A board names
+  the stage in play and the map metrics read its terrain; above blue's
+  picks the board suggests the swaps that pay for their cost as one
+  joint answer, clickable; each phase of a route keeps its heroes unless
+  a swap beats the cost, each arena is reached from the board's six, and
+  every row carries a blurb from the facts. The swap cost is meta.md's
+  fifth field and a slider. Twelve terrain heuristics from the citation
+  record read the ground in play; the scale's field is read on the keys
+  they need alone, which holds a board near half a second.
 - **Blue's picks are offered the swaps that pay for their cost.** With
   blue picks the board answers which to trade and for whom, as one joint
   six: the best legal six reachable from the picks when each pick dropped

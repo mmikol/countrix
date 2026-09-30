@@ -43,6 +43,12 @@ hide the rate figures: Blizzard licenses those for personal use only.*
   full, and returns the next best in order; every reason cites a fact.
   No weight is learned: a rule's starts from its prose, the engine's
   from a calibration, and each one is yours to turn.
+- **Scores the swaps.** A six is not held for the map. Above blue's picks
+  the board suggests the swaps that pay for their cost, as one joint
+  answer: the incoming hero's portrait over the pick it replaces, a click
+  to take it. On a map with stages it lays the map out a stage at a time,
+  each phase keeping its heroes unless a swap there beats the cost, with a
+  plan for each stage worded from the facts.
 - **Serves it two ways.** A web board and an MCP (Model Context Protocol)
   server, the tool interface a Claude Code session uses to draft comps and
   tune the playbook. The solver is arithmetic; the board
@@ -83,7 +89,7 @@ the solver reads nothing else.
 
 ## Engineering
 
-- **847 tests.** CI runs ruff, mypy and the 728 that need no database on
+- **890 tests.** CI runs ruff, mypy and the 770 that need no database on
   every push to main and every pull request; they cover 93% of the lines,
   held to 78%. With the database built, all of them run against a 75% floor.
 - **The search is held to brute force.** A CI gate enumerates every legal six
@@ -128,8 +134,9 @@ reuse the database.
 
 The reference playbook is the one the tests prove the solver against. Leave out
 the `echo` line and the board runs the shipped playbook while its rules are
-rebuilt: eight assumptions in prose, one heuristic, a healing floor set by the
-kit, and one limit, at most three supports, on top of the default engine,
+rebuilt: eight assumptions in prose, thirteen heuristics - a healing floor
+set by the kit, and twelve that read the terrain of the map or the stage in
+play - and one limit, at most three supports, on top of the default engine,
 which scores the sixes on their win rates, synergies and counters.
 
 | | |

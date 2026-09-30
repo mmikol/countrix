@@ -106,9 +106,11 @@ db <- facts <- inference <- door <- ui.
   (`Strategy`, `CatalogError`); one bad file makes `catalog.load` raise
   everywhere. `meta.md` beside the strategy files is no strategy and no
   strategy may take its name: it holds the default engine's weights
-  (below). The shipped playbook is eight assumptions, one heuristic,
-  `heal-rate`, scored (the healing floor, `matchup.heal_shortfall`,
-  docs/inference.md), and one limit, `at-most-three-supports`, while
+  (below). The shipped playbook is eight assumptions, thirteen
+  heuristics - `heal-rate`, scored (the healing floor,
+  `matchup.heal_shortfall`, docs/inference.md), and twelve on the terrain
+  of the ground in play (`map.<feature>`, `map.objective`) - and one
+  limit, `at-most-three-supports`, while
   it is rebuilt rule by rule from the citation record in
   `inference/README.md`. Solver behaviour is tested against the 19-file
   reference playbook in `tests/fixtures/playbook/` and its own `meta.md`
@@ -191,6 +193,14 @@ db <- facts <- inference <- door <- ui.
   lowers them is withheld. Red is never searched for swaps. `BRIEF` in
   tests/inference/__init__.py turns them off (`Brief.swaps`); a test that
   reads them names its cost.
+- **The plan runs stage by stage.** On a map with stages, `Board.stages`
+  (`swaps.chain`) is a row a stage in play order from the six the board
+  suggests: each phase of a route the exact best reachable from the phase
+  before under the swap cost, greedy; each arena from that six; a chosen
+  stage the six itself, the phases before it played. Two stages with the
+  same `Objective.ground_key` are one search. Each row's blurb is
+  `plan.stage_blurb`, worded from the facts. `BRIEF` leaves it out too
+  (`Brief.stages`); test_stage_plan names its brief.
 - **The board** (`ui/board.py`, its pages in `ui/pages.py`) serves
   `/api/facts` and answers `/api/board`, `/api/strategies` and `/health`
   with `inference/serve.py`'s handlers, all in its own process - the

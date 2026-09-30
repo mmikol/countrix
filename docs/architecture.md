@@ -34,7 +34,10 @@ search proves the best six
 ([inference.md](inference.md#how-a-six-is-chosen)). Once blue has picks,
 the same search, with `meta.md`'s swap cost charged for each pick
 dropped, answers which of them to trade and for whom, as one six
-(`inference/swaps.py`, [inference.md](inference.md#the-swaps)).
+(`inference/swaps.py`, [inference.md](inference.md#the-swaps)). On a map
+with stages it lays the map out a stage at a time, each phase keeping its
+heroes unless a swap beats the cost there
+([inference.md](inference.md#the-plan-stage-by-stage)).
 
 One input is the user's, the strategies, which the solver reads; every
 other table is pulled from Blizzard or the wiki.

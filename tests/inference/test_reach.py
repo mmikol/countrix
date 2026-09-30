@@ -22,7 +22,7 @@ from tests.inference import FIXTURE_PLAYBOOK, in_force, recorded
 from tests.inference import record_reach as recorder
 
 # named, not waived - see the test
-UNSEATED = {"Emre", "Freja", "Kiriko", "Sojourn"}
+UNSEATED = {"Emre", "Freja", "Sojourn"}
 
 
 @pytest.mark.invariant
@@ -42,14 +42,14 @@ def test_every_hero_reach_finds_a_board_for_is_still_seated_and_none_is_newly_lo
         else " - recorded under a different objective")
     assert len(fell) <= len(boards) // 5, "the recorded boards have gone stale%s: %s" % (
         stale, fell)
-    # Four heroes the recorder's search found no board for. That is not a proof none
+    # Three heroes the recorder's search found no board for. That is not a proof none
     # exists - the search tries every map but a few reds per hero, so a board it
     # never visits could seat any of them - but it is what the search establishes,
-    # and they are named rather than waived: a fifth fails here. The default engine
-    # and the healing floor score the shipped playbook's boards, and on the boards the
-    # search tries they value none of the four above its rivals for the seat, even
+    # and they are named rather than waived: a fourth fails here. The default engine,
+    # the healing floor and the terrain rules score the shipped playbook's boards, and
+    # on the boards the search tries they value none of the three above its rivals, even
     # with five of them banned; the playbook's rules are what can answer it. They are
-    # not searched again on every run - four searches are a minute, more under
+    # not searched again on every run - three searches are a minute, more under
     # coverage - so one that comes to seat leaves UNSEATED when the recorder
     # re-records. The healing floor seated Illari and Lifeweaver and unseated Cassidy;
     # summed healing seated Kiriko and unseated Zarya; the written pairs' mean for an

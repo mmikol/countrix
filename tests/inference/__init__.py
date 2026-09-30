@@ -34,9 +34,10 @@ ASSUMPTIONS_ONLY = [s for s in catalog.load(FIXTURE_PLAYBOOK) if s.kind == "assu
 # at, which every test that runs the engine names, so none reads the live meta.md the
 # owner tunes
 DEFAULT = catalog.engine_weights(FIXTURE_PLAYBOOK)
-# a board's brief at those weights, blue's swaps left out: a test that reads them
-# names its swap cost (test_swaps), so none reads the live meta.md's
-BRIEF = engine.Brief(base=DEFAULT, swaps=False)
+# a board's brief at those weights, blue's swaps and the plan stage by stage left
+# out: a test that reads them names its swap cost (test_swaps, test_stage_plan), so
+# none reads the live meta.md's, and no other board pays for a stage's search
+BRIEF = engine.Brief(base=DEFAULT, swaps=False, stages=False)
 DIGEST_RE = re.compile(r"[0-9a-f]{64}\Z")
 # the frontmatter of inference/strategies/heal-rate.md, which test_catalog holds
 # the shipped file to

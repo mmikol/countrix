@@ -45,6 +45,7 @@ from facts.model import ROLES, Hero, Map, World
 from facts.team import NUMBER_TYPES, MetricBag, MetricValue, number, team_metrics
 from inference.base import COUNTERS, RATES, READS, SYNERGY, Base, BaseWeights, Terms
 from inference.expr import Expr, Scope, Value, scope
+from inference.shapes import is_shape_limit
 from inference.strategy import Strategy, settled_by_board
 
 NEED_BUDGET = 2.0                 # what one guarded state costs at most, or its largest need
@@ -401,6 +402,35 @@ class Objective:
         if self.base is not None:
             cand.terms = self.base.terms(cand.heroes, number(ns["team"]["synergy_score"]))
         cand.tiebreak = sum(self.draws[h.id] for h in cand.heroes)
+        return cand
+
+    def lean_keys(self) -> frozenset[str] | None:
+        """The team keys a six of the scale's field is read on, where they
+        are all it needs (inference.scale): every heuristic on a metric reads
+        a team key or one the board settles, under a gate the board settles,
+        and every limit is a shape limit, which the field's shapes keep
+        already. None where one is not - a matchup metric, a gate a six
+        decides, a limit on a metric - and the field is prepared whole."""
+        if not all(is_shape_limit(s) for s in self.limits):
+            return None
+        keys = set()
+        for _, gate, _, section, key in self._heuristics:
+            if gate is None or section not in ("team", *self.measured):
+                return None
+            if section == "team":
+                keys.add(key)
+        return frozenset(keys)
+
+    def measure_lean(self, cand: Candidate, keys: frozenset[str]) -> Candidate:
+        """A six of the scale's field read on `keys` alone (lean_keys): its
+        raw heuristic values as prepare(measure=True) reads them, every
+        heuristic read, and no limit broken - the field's shapes keep them."""
+        bag = team_metrics(self.world, cand.heroes, self.m, self.red, only=keys)
+        raw: list[float | None] = []
+        for _, _, _, section, key in self._heuristics:
+            value = (bag if section == "team" else self.measured.get(section, _EMPTY)).get(key)
+            raw.append(float(value) if isinstance(value, NUMBER_TYPES) else _not_a_number(value))
+        cand.raw, cand.violations = raw, []
         return cand
 
     def reads_the_stage(self) -> bool:

@@ -80,6 +80,18 @@ tagged "coming soon", with its portrait or a silhouette. It has no click
 handler, so it never enters the state, and the solver never fields it;
 once Blizzard lists the hero, the tile comes alive on the next refresh.
 
+**The swaps.** Above blue's picks, where the board suggests a swap, the
+incoming hero's portrait sits over the pick it replaces (`swaps.pairs`,
+each at its pick's place), under the board's verdict; a click trades that
+pick in place, and the board solves again. The suggestion is one joint
+answer ([The swaps](inference.md#the-swaps)): taking one leaves the rest
+the board's answer from the new picks, and a half-drafted seat's empty
+slots show the rest of its six (`swaps.open`). Nothing is drawn for red.
+
+**The stage picker** beside the map lists the map's stages after WHOLE
+MAP, hidden on a map without stages and cleared when the map changes; a
+stage rides every request as `stage=`.
+
 **The bans bar** starts collapsed: the count and the current bans as small
 portraits, a click on one un-bans it. Opened, it shows the five slots (two
 red, two blue, the lobby's) over the rosters' portrait grid. A click on a
@@ -87,7 +99,11 @@ tile bans that hero, which leaves both rosters and the search; a click on
 a banned tile or its slot un-bans it; at five, the rest dim.
 
 **The comps panel** answers at every stage of a draft: the game plan in
-prose on top, then two seats, neither with a score. Blue's (left) shows
+prose on top, then the plan stage by stage on a map with stages - a row a
+stage in play order, its six with the heroes swapped in outlined, marked
+where it is the board's stage and dimmed where it is played, and its
+blurb ([The plan stage by stage](inference.md#the-plan-stage-by-stage)) -
+then two seats, neither with a score. Blue's (left) shows
 the six the plan describes - *your picks, the rest filled* from one to
 five picks, *your six* at six - over blue's *optimal vs red's picks* (*vs
 red's likely six* before red reveals one, alone before any pick), which
@@ -137,8 +153,9 @@ holds beside the filter ("12 of 464 facts" under a filter); the tab
 carries no number.
 
 **The playbook panel** opens with the meta, the card of `meta.md`: its
-four weights, its prose and the Meta slider, which scales the whole
-default engine. Under it the catalog follows in three groups in the
+four weights and swap cost, its prose, the Meta slider, which scales the
+whole default engine, and the Swap cost slider, 0 to `SWAP_MAX` (50)
+share points in halves, sent as `weights=swap:<value>`. Under it the catalog follows in three groups in the
 equation's order, under a row of anchors, each card edged in its kind's
 colour and its meta line its form. Under each heuristic sits a slider for
 its weight, 0 to 10 to the hundredth, with a number box, a reset and the
@@ -147,8 +164,9 @@ setting stays in the browser and rides with every board request as
 `weights=<id>:<value>`, the meta's as `weights=meta:<value>`; the solver
 applies it to that board only (each result names its `weights`), and the
 file is untouched. A setting whose heuristic the catalog no longer holds
-is dropped when the playbook loads; the meta's is always kept. Only
-`tune` changes a file's weight, the meta's included.
+is dropped when the playbook loads; the meta's and the swap cost's are
+always kept. Only `tune` changes a file's weight, the meta's and the swap
+cost included.
 
 **The header** pins two pills top-right: *the math* and the repository on
 GitHub. Its *clear all* empties the map, the side, the bans and both teams

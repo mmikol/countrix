@@ -219,3 +219,19 @@ def test_a_metric_read_as_the_wrong_kind_is_the_callers_error():
             (team.style_tally, {"brawl": "2"}), (team.style_tally, [])):
         with pytest.raises(TypeError, match="a metric read as"):
             reader(wrong)
+
+
+def test_team_metrics_on_a_few_keys_reads_them_as_the_whole_bag_does(synthetic_world):
+    """team_metrics named a few keys computes their sections alone: every key
+    it returns holds the value the whole bag holds, and every key named is
+    among them."""
+    m = synthetic_world.resolve("Harbor Gate", (), (), ())[0]
+    released = sorted((h for h in synthetic_world.heroes.values() if h.released),
+                      key=lambda h: h.id)
+    enemies = released[:2]
+    for six in (released[:6], released[3:9], released[6:12]):
+        whole = team_metrics(synthetic_world, six, m, enemies)
+        for keys in ({"cc_count", "supports"}, {"map_win_mean"}, {"net_edges", "melee"}):
+            part = team_metrics(synthetic_world, six, m, enemies, only=keys)
+            assert keys <= set(part) and len(part) < len(whole)
+            assert all(part[k] == whole[k] for k in part)

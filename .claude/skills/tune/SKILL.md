@@ -1,6 +1,6 @@
 ---
 name: tune
-description: Change how Countrix's inference engine scores compositions - a strategy's weight, a params dial, an expression, or the default engine's weights in meta.md (the meta that scales it, and its rate, synergy and counter dials). Use when the user says the solver over- or under-values something, wants a rule changed, asks to "tune", "reweight" or "adjust".
+description: Change how Countrix's inference engine scores compositions - a strategy's weight, a params dial, an expression, or the default engine's weights in meta.md (the meta that scales it, its rate, synergy and counter dials, and the swap cost). Use when the user says the solver over- or under-values something, wants a rule changed, asks to "tune", "reweight" or "adjust".
 ---
 
 You are editing the brain: the playbook in `inference/strategies/`,
@@ -52,11 +52,16 @@ them on its first line:
   rate 1 puts its term in win-rate points, and synergy and counter are
   set so that each term spreads a typical board's sixes about half as far
   as the rates do. The rule was measured again when a blank synergy cell
-  came to read half the written pairs' mean, which narrowed that term's
-  range, and synergy went from 0.1 to 0.18 (docs/inference.md, Why the
+  came to read the written cells' claim share, which narrowed that term's
+  range, and synergy went from 0.1 to 0.26 (docs/inference.md, Why the
   weights are the playbook's); measure again before quoting the rule.
+- **swap** is the swap cost, in share points of blue's span, 0..50: what
+  a swap of one of blue's picks must gain before the board suggests it,
+  and what a hero changed between two stages of the plan costs. It scores
+  no six. "It keeps telling me to swap" raises it; "it never suggests a
+  swap" lowers it; 0 suggests blue's optimal outright.
 
-Each is a number within 0..10. When the user names one term ("the synergy
+Each weight is a number within 0..10. When the user names one term ("the synergy
 pairs count for too little"), turn its dial; when they mean the engine as
 a whole against their rules ("it ignores my rules", "trust the meta
 less"), turn the meta. Call `tune` with the id `meta`: `{"id": "meta",

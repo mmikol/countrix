@@ -1,5 +1,5 @@
 {
- "playbook": "ceda47b8bef980a21d2dd42c666b0be3a961eeb1135472e01a471be82c320e2a",
+ "playbook": "06f3452f49c9aee4df54aac16544cd139af9263e2998a952b8c3508c1a9848f6",
  "base": {
   "meta": 1.0,
   "rate": 1.0,
@@ -66,11 +66,11 @@
    "red": [],
    "banned": [],
    "six": [
-    "D.Mon",
-    "Reinhardt",
     "Ashe",
+    "Genji",
+    "Hanzo",
     "Widowmaker",
-    "Juno",
+    "Ana",
     "Zenyatta"
    ],
    "gap": 0.0
@@ -108,11 +108,11 @@
    "banned": [],
    "six": [
     "D.Mon",
+    "Reinhardt",
     "Bastion",
-    "Reaper",
-    "Tracer",
+    "Symmetra",
     "Brigitte",
-    "L\u00facio"
+    "Illari"
    ],
    "gap": 0.0
   },
@@ -136,7 +136,7 @@
   {
    "hero": "Cassidy",
    "seated": true,
-   "map": "Junkertown",
+   "map": "Watchpoint: Gibraltar",
    "side": "attack",
    "red": [
     "Reinhardt",
@@ -147,16 +147,15 @@
     "Jetpack Cat"
    ],
    "banned": [
-    "Tracer",
-    "Sombra"
+    "Ashe"
    ],
    "six": [
-    "D.Mon",
     "Cassidy",
+    "Genji",
+    "Tracer",
     "Widowmaker",
-    "Ana",
-    "Juno",
-    "Zenyatta"
+    "Baptiste",
+    "Juno"
    ],
    "gap": 0.0
   },
@@ -210,10 +209,10 @@
    "banned": [],
    "six": [
     "Domina",
-    "Sombra",
+    "Ashe",
     "Widowmaker",
+    "Baptiste",
     "Juno",
-    "Mizuki",
     "Zenyatta"
    ],
    "gap": 0.0
@@ -267,11 +266,11 @@
    "red": [],
    "banned": [],
    "six": [
-    "D.Mon",
-    "Reinhardt",
+    "D.Va",
+    "Ashe",
     "Genji",
     "Widowmaker",
-    "Baptiste",
+    "Juno",
     "Zenyatta"
    ],
    "gap": 0.0
@@ -281,21 +280,14 @@
    "seated": true,
    "map": "Havana",
    "side": "attack",
-   "red": [
-    "Orisa",
-    "Roadhog",
-    "Ashe",
-    "Cassidy",
-    "Moira",
-    "Mercy"
-   ],
+   "red": [],
    "banned": [],
    "six": [
-    "D.Mon",
     "Ashe",
+    "Genji",
     "Hanzo",
     "Widowmaker",
-    "Juno",
+    "Ana",
     "Zenyatta"
    ],
    "gap": 0.0
@@ -334,22 +326,15 @@
    "seated": true,
    "map": "Antarctic Peninsula",
    "side": "",
-   "red": [
-    "Doomfist",
-    "Orisa",
-    "Soldier: 76",
-    "Bastion",
-    "Mercy",
-    "Jetpack Cat"
-   ],
+   "red": [],
    "banned": [],
    "six": [
     "D.Mon",
-    "Bastion",
-    "Sombra",
-    "Tracer",
-    "Illari",
-    "Juno"
+    "Reinhardt",
+    "Symmetra",
+    "Torbj\u00f6rn",
+    "Brigitte",
+    "Illari"
    ],
    "gap": 0.0
   },
@@ -369,8 +354,8 @@
    "banned": [],
    "six": [
     "D.Mon",
+    "Junkrat",
     "Pharah",
-    "Tracer",
     "Jetpack Cat",
     "Juno",
     "L\u00facio"
@@ -410,9 +395,9 @@
    "banned": [],
    "six": [
     "D.Mon",
+    "Reinhardt",
     "Junkrat",
-    "Reaper",
-    "Torbj\u00f6rn",
+    "Symmetra",
     "Brigitte",
     "L\u00facio"
    ],
@@ -427,8 +412,8 @@
    "banned": [],
    "six": [
     "Doomfist",
-    "Reinhardt",
     "Ashe",
+    "Hanzo",
     "Widowmaker",
     "Juno",
     "Zenyatta"
@@ -436,9 +421,38 @@
    "gap": 0.0
   },
   {
+   "hero": "Kiriko",
+   "seated": true,
+   "map": "Blizzard World",
+   "side": "attack",
+   "red": [
+    "Reinhardt",
+    "Roadhog",
+    "Ashe",
+    "Anran",
+    "Wuyang",
+    "Moira"
+   ],
+   "banned": [
+    "Baptiste",
+    "Juno",
+    "Ana",
+    "Mercy"
+   ],
+   "six": [
+    "Ashe",
+    "Genji",
+    "Hanzo",
+    "Widowmaker",
+    "Kiriko",
+    "Zenyatta"
+   ],
+   "gap": 0.0
+  },
+  {
    "hero": "Lifeweaver",
    "seated": true,
-   "map": "Havana",
+   "map": "Dorado",
    "side": "attack",
    "red": [
     "Ramattra",
@@ -448,15 +462,12 @@
     "Moira",
     "Juno"
    ],
-   "banned": [
-    "Baptiste",
-    "Ana"
-   ],
+   "banned": [],
    "six": [
-    "D.Mon",
     "Ashe",
+    "Genji",
     "Widowmaker",
-    "Juno",
+    "Baptiste",
     "Lifeweaver",
     "Zenyatta"
    ],
@@ -471,9 +482,9 @@
    "banned": [],
    "six": [
     "D.Mon",
+    "Reinhardt",
     "Junkrat",
-    "Reaper",
-    "Torbj\u00f6rn",
+    "Symmetra",
     "Brigitte",
     "L\u00facio"
    ],
@@ -518,12 +529,12 @@
    ],
    "banned": [],
    "six": [
+    "D.Mon",
     "Reinhardt",
     "Mei",
     "Symmetra",
     "Brigitte",
-    "L\u00facio",
-    "Zenyatta"
+    "L\u00facio"
    ],
    "gap": 0.0
   },
@@ -535,15 +546,15 @@
    "red": [
     "Reinhardt",
     "Doomfist",
+    "Torbj\u00f6rn",
     "Ashe",
-    "Sierra",
     "Moira",
     "Lifeweaver"
    ],
    "banned": [],
    "six": [
-    "Reinhardt",
     "Ashe",
+    "Hanzo",
     "Widowmaker",
     "Baptiste",
     "Mercy",
@@ -568,8 +579,8 @@
    "six": [
     "D.Mon",
     "Reinhardt",
-    "Vendetta",
-    "Baptiste",
+    "Ashe",
+    "Brigitte",
     "Mizuki",
     "Zenyatta"
    ],
@@ -591,9 +602,9 @@
    "banned": [],
    "six": [
     "D.Mon",
+    "Reinhardt",
     "Symmetra",
-    "Torbj\u00f6rn",
-    "Baptiste",
+    "Brigitte",
     "L\u00facio",
     "Moira"
    ],
@@ -641,8 +652,8 @@
     "D.Mon",
     "Junkrat",
     "Pharah",
-    "Tracer",
     "Brigitte",
+    "Jetpack Cat",
     "L\u00facio"
    ],
    "gap": 0.0
@@ -650,7 +661,7 @@
   {
    "hero": "Ramattra",
    "seated": true,
-   "map": "Antarctic Peninsula",
+   "map": "Nepal",
    "side": "",
    "red": [
     "D.Va",
@@ -664,10 +675,10 @@
    "six": [
     "D.Mon",
     "Ramattra",
-    "Tracer",
+    "Junkrat",
+    "Symmetra",
     "Brigitte",
-    "L\u00facio",
-    "Zenyatta"
+    "L\u00facio"
    ],
    "gap": 0.0
   },
@@ -699,8 +710,8 @@
     "D.Mon",
     "Reinhardt",
     "Genji",
-    "Hanzo",
-    "Juno",
+    "Widowmaker",
+    "Baptiste",
     "Zenyatta"
    ],
    "gap": 0.0
@@ -722,9 +733,9 @@
    "six": [
     "D.Mon",
     "Roadhog",
+    "Junkrat",
     "Reaper",
-    "Tracer",
-    "Brigitte",
+    "Jetpack Cat",
     "L\u00facio"
    ],
    "gap": 0.0
@@ -734,19 +745,13 @@
    "seated": true,
    "map": "New Junk City",
    "side": "",
-   "red": [
-    "Reinhardt",
-    "D.Va",
-    "Emre",
-    "Soldier: 76",
-    "Moira",
-    "Juno"
-   ],
+   "red": [],
    "banned": [
-    "Zenyatta",
-    "Vendetta",
+    "Brigitte",
     "Junkrat",
-    "Genji"
+    "L\u00facio",
+    "Juno",
+    "Vendetta"
    ],
    "six": [
     "D.Mon",
@@ -754,7 +759,7 @@
     "Torbj\u00f6rn",
     "Tracer",
     "Baptiste",
-    "Brigitte"
+    "Zenyatta"
    ],
    "gap": 0.0
   },
@@ -774,10 +779,10 @@
    "banned": [],
    "six": [
     "D.Mon",
+    "Reinhardt",
     "Ashe",
     "Sierra",
-    "Widowmaker",
-    "Baptiste",
+    "Brigitte",
     "Juno"
    ],
    "gap": 0.0
@@ -856,11 +861,11 @@
    "banned": [],
    "six": [
     "D.Mon",
+    "Reinhardt",
     "Symmetra",
     "Torbj\u00f6rn",
     "Brigitte",
-    "L\u00facio",
-    "Zenyatta"
+    "L\u00facio"
    ],
    "gap": 0.0
   },
@@ -873,11 +878,11 @@
    "banned": [],
    "six": [
     "D.Mon",
+    "Reinhardt",
     "Symmetra",
     "Torbj\u00f6rn",
     "Brigitte",
-    "L\u00facio",
-    "Zenyatta"
+    "L\u00facio"
    ],
    "gap": 0.0
   },
@@ -908,8 +913,8 @@
    "six": [
     "D.Mon",
     "Reinhardt",
-    "Genji",
     "Vendetta",
+    "Brigitte",
     "Juno",
     "Zenyatta"
    ],
@@ -918,7 +923,7 @@
   {
    "hero": "Venture",
    "seated": true,
-   "map": "Lijiang Tower",
+   "map": "Ilios",
    "side": "",
    "red": [
     "Doomfist",
@@ -930,11 +935,11 @@
    ],
    "banned": [],
    "six": [
-    "Reinhardt",
-    "Symmetra",
-    "Torbj\u00f6rn",
+    "D.Mon",
+    "Junkrat",
+    "Pharah",
     "Venture",
-    "Baptiste",
+    "Jetpack Cat",
     "L\u00facio"
    ],
    "gap": 0.0
@@ -947,11 +952,11 @@
    "red": [],
    "banned": [],
    "six": [
-    "D.Mon",
-    "Reinhardt",
     "Ashe",
+    "Genji",
+    "Hanzo",
     "Widowmaker",
-    "Juno",
+    "Ana",
     "Zenyatta"
    ],
    "gap": 0.0
@@ -976,8 +981,8 @@
   {
    "hero": "Wrecking Ball",
    "seated": true,
-   "map": "Colosseo",
-   "side": "",
+   "map": "Dorado",
+   "side": "attack",
    "red": [
     "Winston",
     "Reinhardt",
@@ -988,12 +993,12 @@
    ],
    "banned": [],
    "six": [
-    "D.Mon",
+    "D.Va",
     "Wrecking Ball",
-    "Tracer",
-    "Vendetta",
-    "Brigitte",
-    "L\u00facio"
+    "Ashe",
+    "Sombra",
+    "Jetpack Cat",
+    "Juno"
    ],
    "gap": 0.0
   },
@@ -1035,8 +1040,7 @@
     "Brigitte"
    ],
    "banned": [
-    "Reinhardt",
-    "Tracer"
+    "Reinhardt"
    ],
    "six": [
     "D.Mon",
@@ -1057,8 +1061,8 @@
    "banned": [],
    "six": [
     "Doomfist",
-    "Reinhardt",
     "Ashe",
+    "Hanzo",
     "Widowmaker",
     "Juno",
     "Zenyatta"

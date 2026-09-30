@@ -1,10 +1,11 @@
 # The playbook's sources
 
 **The playbook was emptied on purpose.** `strategies/` now holds eight
-assumptions, one heuristic, `heal-rate`, and one limit,
-`at-most-three-supports`, beside `meta.md`, the default engine's weights,
-which is no strategy and cites nothing. This file is the record of the 245 entries it held
-and the four added since, with the citation behind
+assumptions, thirteen heuristics - `heal-rate` and twelve on the ground in
+play - and one limit, `at-most-three-supports`, beside `meta.md`, the
+default engine's weights, which is no strategy and cites nothing. This file
+is the record of the 245 entries it held and the six added since, with the
+citation behind
 each, and it is the source the playbook is being rebuilt from by hand - so it
 describes more than the folder does, and is meant to. `docs/inference.md` is
 generated from the folder and says what is in force today.
@@ -250,11 +251,11 @@ the catalog is `docs/inference.md`.
 - `contest-a-dive-red` - Contest a dive red (constraint). applies on 4/6 boards, spreads on 0.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1vyt9si/is_it_my_fault_as_a_tank_that_my_teams_dies_a_lot/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1s13py2/why_do_people_get_absolutely_triggered_by_counter/
-- `control-area-healing` - Control rewards area healing (heuristic). applies on 2/6 boards, spreads on 2.
+- `control-area-healing` - Capture points reward area effects (heuristic; on every capture point since 2026-09-30, the owner's choice over Control alone). applies on 2/6 boards, spreads on 2.
   - https://www.reddit.com/r/OverwatchUniversity/comments/7xaq6l/dear_moira_youre_great_superbly_designed_and_well/
   - https://www.reddit.com/r/Competitiveoverwatch/comments/9fmwwg/the_composition_dictionary_for_intermediate_owl/
   - https://www.reddit.com/r/OverwatchUniversity/comments/yc8i2n/supports_are_you_struggling_to_stay_alive_in_ow2/
-- `control-points-have-edges` - Control points have edges (constraint). applies on 2/6 boards, spreads on 0.
+- `control-points-have-edges` - Control points have edges (heuristic; refiled from a scored constraint, 2026-09-30, and read on the ground in play). applies on 2/6 boards, spreads on 0.
   - https://www.reddit.com/r/OverwatchUniversity/comments/9oo9zv/3_dps_exists_because_dps_are_largely_easy_to/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1tmv9w3/korean_tank_players_creating_a_literal_tank_union/
   - https://www.reddit.com/r/OverwatchUniversity/comments/7xaq6l/dear_moira_youre_great_superbly_designed_and_well/
@@ -353,7 +354,7 @@ the catalog is `docs/inference.md`.
 - `escape-beats-one-shot` - An escape beats the one-shot (heuristic). applies on 4/6 boards, spreads on 4.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1u5r05c/walls_have_unlimited_health_the_1_rule_of/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1vjjd1p/when_your_team_pushes_far_forward_is_it_better_to/
-- `escort-longest-gun` - Escort lanes reward the longest gun (heuristic). applies on 2/6 boards, spreads on 2.
+- `escort-longest-gun` - Escort lanes reward the longest gun (heuristic; on every payload stretch since 2026-09-30, a Hybrid's later phase with Escort). applies on 2/6 boards, spreads on 2.
   - https://www.reddit.com/r/Competitiveoverwatch/comments/v1r3si/understanding_owl_metagames_analysis/
   - https://www.reddit.com/r/Competitiveoverwatch/comments/1wdhogb/calculating_the_map_synergy_of_every_overwatch/
   - https://www.reddit.com/r/OverwatchUniversity/comments/bwi0sl/widowmaker_is_the_reason_goats_is_meta_in_owl/
@@ -370,6 +371,10 @@ the catalog is `docs/inference.md`.
   - https://www.reddit.com/r/OverwatchUniversity/comments/9oo9zv/3_dps_exists_because_dps_are_largely_easy_to/
   - https://www.reddit.com/r/Competitiveoverwatch/comments/b8l41z/satire_i_just_want_goats_to_die_says_owl_viewer/
   - https://www.reddit.com/r/Competitiveoverwatch/comments/1wdhogb/calculating_the_map_synergy_of_every_overwatch/
+- `flank-routes-want-deployables` - Flank routes want deployables (heuristic). New on 2026-09-30, the owner's request for heuristics per map, on the sources `deployables-stop-flankers` cites: a placed object fights a flanker, read where the ground's flank routes stand out.
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1w9epk0/has_2_tanks_4_supports_ever_been_a_viable_6v6_comp/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1vxqniw/genuinely_how_do_you_fight_anran/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1wdivt5/how_to_counter_bastion_torbjorn_mauga_in_low_elo/
 - `flankers-catch-the-loner` - Flankers catch the pick fighting alone (heuristic). applies on 4/6 boards, spreads on 4.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1vxqniw/genuinely_how_do_you_fight_anran/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1vyikbe/how_can_i_have_higher_survivability_as_support/
@@ -385,7 +390,7 @@ the catalog is `docs/inference.md`.
 - `grind-down-the-brawl` - Grind the brawl down (heuristic). applies on 3/6 boards, spreads on 3.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w5v9nd/what_3_dps_and_3_tanks_would_you_choose_and_why/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w00w6m/can_someone_explain_team_comps_to_me_like_im_in/
-- `hard-choke-needs-barrier` - A hard choke needs a barrier (constraint). applies on 2/6 boards, spreads on 0.
+- `hard-choke-needs-barrier` - A hard choke needs a barrier (heuristic; refiled from a scored constraint, 2026-09-30, and read on the ground in play). applies on 2/6 boards, spreads on 0.
   - https://www.reddit.com/r/Competitiveoverwatch/comments/naye5a/how_to_play_winston/
   - https://www.reddit.com/r/OverwatchUniversity/comments/9oo9zv/3_dps_exists_because_dps_are_largely_easy_to/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w9epk0/has_2_tanks_4_supports_ever_been_a_viable_6v6_comp/
@@ -403,7 +408,7 @@ the catalog is `docs/inference.md`.
 - `heroes-have-home-maps` - Heroes have home maps (heuristic). Renamed from `counterpick-knows-its-maps`: the best maps are read from Blizzard's map rates.
   - https://www.reddit.com/r/OverwatchUniversity/comments/9oo9zv/3_dps_exists_because_dps_are_largely_easy_to/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w90zka/working_on_a_tank_guide_what_are_some_general/
-- `high-ground-over-barrier` - High ground looks over a barrier (constraint). applies on 2/6 boards, spreads on 0.
+- `high-ground-over-barrier` - High ground looks over a barrier (heuristic; refiled from a scored constraint, 2026-09-30, and read on the ground in play). applies on 2/6 boards, spreads on 0.
   - https://www.reddit.com/r/OverwatchUniversity/comments/9oo9zv/3_dps_exists_because_dps_are_largely_easy_to/
   - https://www.reddit.com/r/Competitiveoverwatch/comments/naye5a/how_to_play_winston/
 - `high-ground-strands-melee` - High ground strands melee (heuristic). applies on 2/6 boards, spreads on 2.
@@ -495,6 +500,9 @@ the catalog is `docs/inference.md`.
 - `one-long-gun` - One long gun (heuristic). applies on 6/6 boards, spreads on 6.
   - https://www.reddit.com/r/Overwatch/comments/1w8a38j/overwatchs_most_impressive_feature_might_be_that/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1mwkecz/a_grandmasters_overly_detailed_echo_guide/
+- `open-ground-punishes-short-reach` - Open ground punishes short reach (heuristic). New on 2026-09-30, the owner's request for heuristics per map, on the sources `short-reach-fails-poke` cites: poke is read off sightlines and open ground, and this reads the open ground in play.
+  - https://www.reddit.com/r/OverwatchUniversity/comments/9oo9zv/3_dps_exists_because_dps_are_largely_easy_to/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1s13py2/why_do_people_get_absolutely_triggered_by_counter/
 - `open-queue-ranked` - the user's assumption: this is Open Queue Ranked (assumption, 2026-09-17).
 - `out-ult-their-ults` - Out-ult their ultimates (heuristic). applies on 4/6 boards, spreads on 4.
   - https://www.reddit.com/r/Competitiveoverwatch/comments/b8l41z/satire_i_just_want_goats_to_die_says_owl_viewer/

@@ -3,7 +3,9 @@ bag they come in.
 
 team_metrics computes the lot for one side, on a map, facing the other side;
 each section of the registry - shape, durability, damage, sustain, tools,
-cohesion, meta, map, versus - is one helper that writes its keys once. The
+cohesion, meta, map, versus - is one helper that writes its keys once, and
+a caller that reads a few keys names them (`only`) and pays for their
+sections alone. The
 facts engine words the bag, the solver scores it, and compute's registry()
 offers its keys to a strategy as team.<key> and enemy.<key>. MetricBag is
 the shape every metric section shares, and number, text and the other
@@ -12,7 +14,7 @@ readers narrow a value where one kind is read.
 
 import statistics
 from collections import Counter, OrderedDict
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 from typing import NamedTuple
 
 from facts.draft import EXPECTED_SHAPE, TEAM_SIZE
@@ -228,12 +230,71 @@ def _mean(values: Iterable[float | None]) -> float:
     return sum(known) / len(known) if known else 0.0
 
 
+# the registry's sections, in its order: the helpers team_metrics sums
+SECTIONS = ("shape", "durability", "damage", "sustain", "tools", "cohesion", "meta", "on_map",
+            "versus")
+# each section's keys, read once off an empty team (_section_keys)
+_KEYS: dict[str, frozenset[str]] = {}
+
+
+def _bags(
+        world: World, heroes: list[Hero], m: Map | None, enemies: list[Hero],
+        wanted: Collection[str]) -> list[MetricBag]:
+    """The `wanted` sections' bags for these picks, in registry order: the
+    map's section reads the meta's, and the meta and versus sections the
+    most-banned pick."""
+    top_ban = max(heroes, key=lambda h: h.ban or 0) if heroes else None
+    out = []
+    for name in SECTIONS:
+        if name not in wanted:
+            continue
+        if name == "shape":
+            out.append(_shape(heroes, m))
+        elif name == "durability":
+            out.append(_durability(heroes))
+        elif name == "damage":
+            out.append(_damage(heroes))
+        elif name == "sustain":
+            out.append(_sustain(world, heroes))
+        elif name == "tools":
+            out.append(_tools(heroes))
+        elif name == "cohesion":
+            out.append(_cohesion(world, heroes))
+        elif name == "meta":
+            out.append(_meta(heroes, m, top_ban))
+        elif name == "on_map":
+            meta = _meta(heroes, m, top_ban)
+            out.append(_on_map(heroes, m, number(meta["win_mean"]), number(meta["pick_mass"])))
+        else:
+            out.append(_versus(world, heroes, enemies, top_ban))
+    return out
+
+
+def _section_keys(world: World) -> dict[str, frozenset[str]]:
+    """Each section's keys: every helper writes its keys on an empty team
+    too, so one call apiece names them."""
+    if not _KEYS:
+        for name in SECTIONS:
+            [bag] = _bags(world, [], None, [], (name,))
+            _KEYS[name] = frozenset(bag)
+    return _KEYS
+
+
 def team_metrics(world: World, heroes: Iterable[Hero], m: Map | None = None,
-                 enemies: Iterable[Hero] = ()) -> MetricBag:
+                 enemies: Iterable[Hero] = (), only: Collection[str] | None = None) -> MetricBag:
     """Every TEAM_METRICS key for these picks, on this map, vs these
-    enemies. Each section's helper returns its keys in registry order, and
-    the bag keeps that order."""
+    enemies; with `only`, the keys of the sections that hold those keys,
+    and no others - a caller reading a few keys (inference.scale's field)
+    skips the rest. Each section's helper returns its keys in registry
+    order, and the bag keeps that order."""
     heroes, enemies = list(heroes), list(enemies)
+    if only is not None:
+        keys, named = _section_keys(world), set(only)
+        bag: MetricBag = {}
+        for part in _bags(world, heroes, m, enemies,
+                          [name for name in SECTIONS if keys[name] & named]):
+            bag.update(part)
+        return bag
     # the most-banned pick: max_ban_* name it and banproof_coverage takes its
     # answers away; with no ban rate on the team it is the first pick
     top_ban = max(heroes, key=lambda h: h.ban or 0) if heroes else None

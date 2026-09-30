@@ -45,7 +45,8 @@ The search, which reads the playbook:
     plan          the game plan and the verdict in prose
     swaps         blue's swaps: the best six reachable from blue's picks when
                   each pick dropped costs the swap cost, one exact search,
-                  paired with the picks it replaces
+                  paired with the picks it replaces; and the plan stage by
+                  stage, each phase from the one before under that cost
     supersede     latest wins: a board a newer request replaced stops at its
                   next check
     reach         the board each released hero is optimal on, within a match's bans

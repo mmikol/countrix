@@ -4,6 +4,7 @@ fingerprints, the frontmatter and the forms a strategy takes, and the
 weights one board overrides."""
 
 import os
+import re
 import shutil
 from collections.abc import Iterable
 from pathlib import Path
@@ -430,3 +431,21 @@ def test_a_playbook_without_a_meta_file_has_no_engine_weights(tmp_path, monkeypa
     assert [s.id for s in catalog.load()] == ["open-queue-tanks"]
     with pytest.raises(CatalogError, match=r"meta\.md: missing"):
         catalog.engine_weights()
+
+
+@pytest.mark.invariant
+def test_every_map_and_stage_a_strategy_names_is_one_the_database_holds(world):
+    """A strategy that names a map or a stage in an expression - map.name ==
+    'Havana', map.stage in ['City Streets', 'Sea Fort'] - names one the maps
+    and their stages hold, as the map lists it: a name spelled otherwise
+    would leave its gate shut on every board without a word."""
+    names = {m.name for m in world.maps.values()}
+    stages = {s for m in world.maps.values() for s in m.stages}
+    literal = re.compile(r"map\.(name|stage)\s*(?:==|in)\s*(\[[^\]]*\]|'[^']*')")
+    for s in catalog.load():
+        for expr in (s.require, s.when, s.bonus, s.penalty):
+            if expr is None:
+                continue
+            for kind, value in literal.findall(expr.source):
+                held = names if kind == "name" else stages
+                assert set(re.findall(r"'([^']*)'", value)) <= held, (s.id, value)

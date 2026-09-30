@@ -169,10 +169,17 @@ def _field_sample(objective: Objective) -> list[Candidate]:
     comps far better than random, so a good six sat above the sample's high
     on most metrics and every one of them normalised to the same 1.0: the
     rule stopped telling them apart, and a weight raised past that bought
-    nothing. The field belongs in the population that sets the scale."""
+    nothing. The field belongs in the population that sets the scale.
+
+    A six is read on the team keys its heuristics read alone where those
+    are all it needs (Objective.lean_keys), the same values at a third of
+    the cost; else it is prepared whole."""
+    keys = objective.lean_keys()
     out = []
     for heroes in _board_field(objective):
-        cand = objective.prepare(Candidate(heroes), measure=True)
+        cand = Candidate(heroes)
+        cand = (objective.prepare(cand, measure=True) if keys is None
+                else objective.measure_lean(cand, keys))
         if not cand.violations:
             out.append(cand)
     return out

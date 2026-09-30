@@ -21,9 +21,10 @@ Two things infer:
   on your subscription.
 
 One input is written by hand: the playbook, which the solver reads. A pull
-tool fills every other table. The shipped playbook is eight assumptions, one
-heuristic, `heal-rate`, scored ([The healing floor](#the-healing-floor)),
-and one limit, `at-most-three-supports`, while it is rebuilt from the
+tool fills every other table. The shipped playbook is eight assumptions,
+thirteen heuristics - `heal-rate`, scored ([The healing
+floor](#the-healing-floor)), and twelve that read the terrain of the ground
+in play - and one limit, `at-most-three-supports`, while it is rebuilt from the
 citations in [inference/README.md](../inference/README.md); the default
 engine scores every board beneath it ([The objective](#the-objective)).
 The solver tests run on the reference playbook in
@@ -80,9 +81,12 @@ COMP   = the legal six of highest score, exactly; the next best after it, in ord
    subtracts, times its weight: a metric normalised to 0..1 on the
    board's scale, or a bonus less a penalty where its `when` holds
    ([How a strategy file works](#how-a-strategy-file-works)). The
-   shipped playbook's one, `heal-rate`, charges a six that heals less
-   than the other side's rate up to its weight, 2 ([The healing
-   floor](#the-healing-floor)).
+   shipped playbook's `heal-rate` charges a six that heals less than the
+   other side's rate up to its weight, 2 ([The healing
+   floor](#the-healing-floor)), and twelve more read the terrain of the
+   ground in play - chokes reward crowd control, sightlines want hitscan,
+   high ground rewards fliers, a payload rewards the longest gun - each
+   gated where the feature stands 0.5 or more above the ordinary map's.
 5. **The argmax.** The search returns the legal six of highest score,
    proved by branch and bound, and the next best in rank order as the
    alternatives, five unless a caller asks for up to twenty. Ties break
@@ -101,6 +105,12 @@ dropped costs the swap cost - `meta.md`'s `swap`, in share points of
 blue's span - searched exactly over every legal six, and the swaps are
 the picks it drops matched to the heroes it takes ([The
 swaps](#the-swaps)).
+
+**The plan stage by stage.** On a map with stages the board also lays
+out the map a stage at a time: each phase of a route keeps its heroes
+into the next unless a swap there beats the swap cost, and each arena is
+reached from the six the board suggests ([The plan stage by
+stage](#the-plan-stage-by-stage)).
 
 **The ground in play.** A board is played on the whole map or on one of
 its stages - a Control or Flashpoint round, an Escort or Hybrid phase -
@@ -369,8 +379,8 @@ seated their hero. The cell reading with synergy at 0.26 changed 19 of
 the 30 boards from the pair reading's: Juno is seated on 11 maps where she
 was on 21, Baptiste on 12 where he was on 6, Reinhardt on 16 where he
 was on 11, D.Va on 1 where she was on 6, and D.Mon on 27 where he was
-on 28. The reach fixture, recorded again, seats 49 of
-the 53 released heroes, as before, and the same four stay unseated;
+on 28. The reach fixture, recorded again, then seated 49 of
+the 53 released heroes, as before, and the same four stayed unseated;
 under the half-mean reading at 0.18 it would have seated 47, Kiriko in
 and Cassidy, Hazard and Shion out. The synergy term is honest about the
 documented pairs and neutral about the rest; the rates and the counter
@@ -468,12 +478,57 @@ The verdict reads `swap <pick> for <hero>: <before> -> <after> / 100 of
 the optimal, fight odds <before> -> <after>, at a cost of <c> / 100 a
 swap`, or `keep the picks: no swap gains its cost of <c> / 100`.
 
+**Why swaps are scored.** The owner's words: swaps mid-fight should be
+scored, and the engine "needs to be dynamic". A six is not held for the
+map: players trade heroes as a match turns, so the board prices a trade
+against what it gains, and the plan below prices it from stage to stage.
+
 `tests/inference/test_swaps.py` holds the search to a full enumeration
 of the net on the synthetic World - a full, a half-drafted and a
 not-allowed reference, the default engine on and off, the cost from 0 to
 50 - and `tests/inference/prove_exact.py`'s swap boards hold it to a
 brute force of every legal six on the built database, around locks that
 keep some of the reference and with nothing locked, as a board runs it.
+
+## The plan stage by stage
+
+The board carries a row a stage of the map, in play order (`Board.stages`,
+`swaps.chain`), from one origin: the six the board suggests - blue's
+picks with the swaps taken, the fill around fewer, the optimal before
+any pick.
+
+- **The phases of a route** (Hybrid, Escort) chain: each phase's six is
+  the best reachable from the phase before, each hero changed costing
+  the swap cost, by the same exact search as the swaps. A hero stays into
+  the next phase unless swapping gains more than the cost there. The
+  chain is greedy, stage by stage: it never trades a swap now against
+  one later.
+- **The arenas** (Control rounds, Flashpoint points) come up in no fixed
+  order, so each is reached from the origin, never from the arena listed
+  before it.
+- **A chosen stage** is the origin itself, and the phases before it read
+  as played, with no six.
+
+Red on every stage is its revealed picks, else its likely six. Two stages
+that score every six alike from the same six - the same gates and the
+same map values a rule reads (`Objective.ground_key`) - are one search.
+A stage past the search's budget reads not solved, and the next phase
+goes on from the last six that was.
+
+Each row's blurb is worded from the facts, never a model, four sentences
+at most, each dropped when it has nothing to say: the ground its own
+text stresses, else that it reads as the map; the rules its ground turns
+on and off against the whole map; the swaps and the two terms the six
+gains most on, or the six kept under the cost; and how to play it where
+the six's lean turns (`plan.stage_blurb`). A stage differs from its map
+only through its terrain and the rules that read it, since the rates are
+per map: under the shipped playbook, 7 of the 64 stages score a six of
+their own, on Havana, Midtown, Neon Junction, Nepal and Rialto. 36 of the
+64 have no text of their own on the wiki; fuller stage texts are the
+lever (pm/backlog.md).
+
+`tests/inference/test_stage_plan.py` holds each phase and each arena to
+an enumeration on the synthetic World.
 
 ## The search
 
@@ -648,7 +703,12 @@ most, or the largest of their weights where that is more, so a need alone
 on its guard weighs its own weight, a slider's past 2 too. The scale is
 a seeded sample of 1200 legal sixes plus the field of each role's top six
 by the board's prior (`inference/scale.py`), measured on the whole map
-whatever the stage.
+whatever the stage. The field is 12,038 sixes on an open board; where
+every heuristic on a metric reads a team key under a gate the board
+settles, and every limit is a shape limit, each is read on the sections
+of `team_metrics` those keys live in alone (`Objective.lean_keys`), the
+same values at a third of the cost, and `tests/inference/test_scale.py`
+holds the two readings to the same bounds and floor.
 
 A strategy's prose is three sentences at most (`add_strategy` refuses
 more): the claim, why and when, what is measured.
@@ -878,7 +938,7 @@ with three 7%.
 ## The catalog
 
 <!-- generated:catalog -->
-10 strategy files in `inference/strategies/`: 1 constraint (a limit), 1 heuristic (0 on a metric, 1 scored) and 8 assumptions. Regenerated by `.venv/bin/python -m door.mcp call db_docs`.
+22 strategy files in `inference/strategies/`: 1 constraint (a limit), 13 heuristics (12 on a metric, 1 scored) and 8 assumptions. Regenerated by `.venv/bin/python -m door.mcp call db_docs`.
 
 #### The meta
 
@@ -896,6 +956,78 @@ params: MAX_SUPPORTS=3
 A six fields at most three supports, on every board. Open Queue sets no cap on supports, so this rule sets one: a six with a fourth support is never chosen. Measured as the six's support count.
 
 #### Heuristics
+
+##### Choke maps reward melee (`choke-maps-reward-melee`, map)
+
+`maximize team.melee` - picks with a melee weapon. weight 1; when `map.chokes >= 0.5 or map.interiors >= 0.5`
+
+A map of tight chokes and rooms puts the fight in someone's face, where a melee weapon does its full damage and a long gun does not. Reinhardt is the community's brawl tank because he swings his hammer at close quarters. Picks with a melee weapon are counted, read on the ground whose chokes or interiors stand 0.5 or more above the ordinary map's.
+
+##### Chokes reward crowd control (`chokes-reward-crowd-control`, map)
+
+`maximize team.cc_count` - picks with crowd control (stun, sleep, immobilize, hinder, knockback). weight 1; when `map.chokes >= 0.5 or map.interiors >= 0.5`
+
+Where a map funnels both teams into a choke, crowd control decides who gets through it. A stun, a wall or a knockback at a doorway takes a pick out of the fight at the one moment the whole team is committed, and enclosed space leaves nowhere to dodge it. Picks with a crowd-control tool are counted, read on the ground whose chokes or interiors stand 0.5 or more above the ordinary map's.
+
+##### Capture points reward area effects (`control-area-healing`, map)
+
+`maximize team.aoe_count` - kit pieces tagged area of effect or shockwave. weight 0.25; when `map.objective == 'point'`
+
+A capture-point fight happens on one point with the whole six stacked on it, so healing and damage that touch an area touch everyone. Lúcio's aura and Junkrat's splash both reach the whole point, and a Lúcio and Brigitte pairing was called too strong on king of the hill. Kit pieces tagged area of effect are counted, read wherever the ground is won on a point: Control, Flashpoint and a Hybrid's first phase.
+
+##### Control points have edges (`control-points-have-edges`, map)
+
+`maximize team.cc_count` - picks with crowd control (stun, sleep, immobilize, hinder, knockback). weight 1; when `map.hazards >= 0.5 or (map.name == 'Nepal' and map.stage == 'Sanctum')`
+
+Control stages are built around drops - the well on Ilios, the sanctum pit on Nepal, the edges of Lijiang Tower - and a knockback or a pull turns a full-health enemy into a kill. Roadhog hooking into the well and Lúcio booping on Lighthouse are the community's Control examples, and Orisa is named as good on maps with environmental hazards. Picks with crowd control are counted, read on the ground whose hazards stand 0.5 or more above the ordinary map's and on Nepal's sanctum, which the examples name.
+
+##### Escort lanes reward the longest gun (`escort-longest-gun`, map)
+
+`maximize team.range_max` - the longest range on the team. weight 0.25; when `map.objective == 'payload'`
+
+A payload runs down long lanes, and the pick with the longest reach on the six owns the lane before the fight closes. Every payload route opens onto a long sightline somewhere along the path, which is why the community names Escort as the mode that favours poke and Ashe as a Junkertown pick. The longest published range on the team is the measure, read wherever the ground is won on a payload: an Escort map and a Hybrid's later phase.
+
+##### Flank routes want deployables (`flank-routes-want-deployables`, map)
+
+`maximize team.deployables` - picks with deployables. weight 1; when `map.flanks >= 0.5`
+
+A placed object fights a flanker while the team looks elsewhere: turrets counter flank pressure, a wall cuts the diver off, and a tree or a barrier gives the backline something to stand behind. Symmetra is rated one of the better damage picks in coordinated play for her turrets against flanks, and Torbjörn is the answer offered to a flanking Anran. Picks with deployables are counted, read on the ground whose flank routes stand 0.5 or more above the ordinary map's.
+
+##### A hard choke needs a barrier (`hard-choke-needs-barrier`, map)
+
+`maximize team.barrier_hp` - summed barrier health the team fields. weight 1; when `map.chokes >= 0.5 or (map.name == 'Havana' and map.stage in ['City Streets', 'Sea Fort'])`
+
+A hard choke is crossed behind a barrier or not at all, and a map whose fights are chokes is a map where one barrier is worth a pick. The community's list of the places a shield is needed is a list of hard chokes - King's Row first point, Eichenwalde third, Havana first and third - and the maps left off it have long sightlines instead. Barrier health is measured, read on the ground whose chokes stand 0.5 or more above the ordinary map's and on Havana's first and third stages, which the list names.
+
+##### High ground looks over a barrier (`high-ground-over-barrier`, map)
+
+`minimize team.barrier_hp` - summed barrier health the team fields. weight 1; when `map.high_ground >= 0.5`
+
+A barrier faces one way and the enemy on the high ground above it shoots past it, so on a map built around high ground a barrier tank is a slow pick paying for a tool that does not work. Reinhardt is named as ineffective on Numbani's first two points for the high ground around them. Barrier health is measured, minimised on the ground whose high ground stands 0.5 or more above the ordinary map's.
+
+##### High ground strands melee (`high-ground-strands-melee`, map)
+
+`minimize team.melee` - picks with a melee weapon. weight 0.25; when `map.high_ground >= 0.5`
+
+On a map built around high ground a melee pick has no way to touch an enemy standing above and no quick way up. Reinhardt is named as the tank who suffers most where high ground matters, with nothing to throw at it but a Fire Strike, and brawl's movement tools are said to have no vertical component at all. Picks with a melee weapon are counted, minimised on the ground whose high ground stands 0.5 or more above the ordinary map's.
+
+##### Open ground punishes short reach (`open-ground-punishes-short-reach`, map)
+
+`maximize team.range_min` - the shortest longest-range. weight 1; when `map.open_ground >= 0.5`
+
+On open ground the pick with the shortest reach is the one who spends the fight unable to shoot back. Beams and shotguns that own a corridor are helpless across a canyon, so a comp is judged there by its shortest longest-range. The smallest of the picks' longest published ranges is the measure, read on the ground whose open ground stands 0.5 or more above the ordinary map's.
+
+##### Sightlines want hitscan (`sightlines-want-hitscan`, map)
+
+`maximize team.hitscan` - picks with a hitscan weapon or ability. weight 1; when `map.sightlines >= 0.5`
+
+Long sightlines belong to hitscan weapons, which land at any distance the map offers while projectiles arc and slow. On such a map the fight opens at the range where a Soldier: 76, Ashe or Widowmaker is already hitting and a projectile kit is not. Picks with a hitscan weapon or ability are counted, read on the ground whose sightlines stand 0.5 or more above the ordinary map's.
+
+##### Vertical maps reward fliers (`vertical-maps-reward-fliers`, map)
+
+`maximize team.flyers` - picks that fly or hover. weight 0.25; when `map.high_ground >= 0.5`
+
+A map with high ground everywhere rewards the picks that travel between its levels without a staircase. Echo is named as the fill pick for maps with verticality, and the maps with the most high ground are called best for heroes that move easily between low and high ground. Picks that fly or hover are counted, read on the ground whose high ground stands 0.5 or more above the ordinary map's.
 
 ##### Heal at the other side's rate (`heal-rate`, sustain, scored)
 
