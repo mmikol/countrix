@@ -141,12 +141,14 @@ function renderInf() {
   if (!d || d.error) {
     el('inf-blue').innerHTML = "<div class='warnbox'>" + esc(d ? d.error : 'no result') + '</div>';
     el('inf-red').innerHTML = ''; el('momentum').innerHTML = ''; el('plan').innerHTML = '';
+    el('stageplan').innerHTML = '';
     ['bluescore', 'redscore'].forEach(function (id) { el(id).textContent = ''; el(id).title = ''; });
     paint();                              /* the last board's suggestions go with it */
     return;
   }
   var text = (d.plan || '').split('\n'), basis = text.length && text[text.length - 1].indexOf('Based on:') === 0 ? text.pop() : '';
   el('plan').innerHTML = "<span class='lbl'>game plan</span><div class='text'>" + text.map(esc).join('<br>') + '</div>' + (basis ? "<div class='basis'>" + esc(basis) + '</div>' : '');
+  renderStages(d.stages);
   var mo = d.momentum;                  /* every board carries it, the badges included */
   /* the strip is two bars, blue's and red's. With both seats scored the bars
      are the odds - each share over the two shares' sum, a split of 100 - and
@@ -188,6 +190,24 @@ function renderInf() {
   el('redscore').textContent = mo.badges.red.label; el('redscore').title = mo.badges.red.tip;
   if (d.shapes && d.shapes.length) SHAPES = d.shapes;   /* what the roster dims */
   paint();                    /* the dimmed tiles, the suggestions and each filled slot's reason */
+}
+
+/* the plan stage by stage (stages): a row a stage in play order - its name
+   and kind, marked where it is the board's stage and dimmed where it is
+   played, the six with the heroes swapped in outlined, and the board's
+   words; nothing on a map without stages */
+function renderStages(rows) {
+  if (!rows || !rows.length) { el('stageplan').innerHTML = ''; return; }
+  el('stageplan').innerHTML = "<span class='lbl'>stage by stage</span>" + rows.map(function (r) {
+    var incoming = r.swaps.map(function (x) { return x.in; });
+    var six = r.played ? '' : r.six.map(function (n) {
+      var h = hero(n) || { name: n, portrait: '' };
+      return "<span class='stagepic" + (incoming.indexOf(n) >= 0 ? ' in' : '') + "' title=\"" + esc(n) + "\">" + portrait(h) + '</span>';
+    }).join('');
+    var name = r.stage + ' · ' + r.kind + (r.current ? ' · here' : '') + (r.played ? ' · played' : '') + (r.solved ? '' : ' · not solved');
+    return "<div class='stagerow" + (r.current ? ' here' : '') + (r.played ? ' played' : '') + "'><div class='stagename'>" + esc(name) +
+      "</div><div class='stagesix'>" + six + "</div><div class='stageblurb'>" + esc(r.blurb) + '</div></div>';
+  }).join('');
 }
 
 /* a count with thousands separators: 14,101 candidates */

@@ -4,7 +4,7 @@ var el = function (id) { return document.getElementById(id); };
 /* an empty board, and every field's default: a board saved before a field
    existed takes it from here. It is a function because Object.assign copies
    array references, and one shared object would take the next ban pushed */
-function blank() { return { map: '', red: [], blue: [], bans: [], side: '', weights: {} }; }
+function blank() { return { map: '', stage: '', red: [], blue: [], bans: [], side: '', weights: {} }; }
 var ROSTER = null, st = blank();
 var SHAPES = null;   /* the (tank, damage, support) triples the queue and the playbook allow, from the board */
 var ROLES = ['tank', 'damage', 'support'];
@@ -158,8 +158,10 @@ function paint() {
     }
   });
   paintSuggestions();
+  paintSwaps();
   el('mapsel').value = st.map;
   var m = currentMap();
+  paintStagePicker(m);
   var sided = !!(m && m.sided);
   if (!sided) st.side = '';
   el('mode').textContent = m ? m.mode + (m.style ? ' · rewards ' + m.style : '') +
@@ -178,6 +180,8 @@ document.addEventListener('click', function (e) {
   var ban = near('[data-ban]');                       /* a ban slot or a header chip: un-ban */
   if (ban) { toggleBan(ban.getAttribute('data-ban')); return; }
   if (near('#banhead')) { bansOpen = !bansOpen; paintBans(); return; }
+  var swap = near('[data-swap-in]');                  /* a suggested swap: that pick is traded in place */
+  if (swap) { takeSwap(swap.getAttribute('data-swap-out'), swap.getAttribute('data-swap-in')); return; }
   var hit = near('[data-h][data-team]');              /* a roster tile, a team slot, or a picker tile */
   if (hit) {
     var team = hit.getAttribute('data-team'), name = hit.getAttribute('data-h');
@@ -195,6 +199,7 @@ function flash(msg) { el('flash').textContent = msg; clearTimeout(flashTimer);
 function qs() {
   var q = [];
   if (st.map) q.push('map=' + encodeURIComponent(st.map));
+  if (st.stage) q.push('stage=' + encodeURIComponent(st.stage));
   st.red.forEach(function (h) { q.push('red=' + encodeURIComponent(h)); });
   st.blue.forEach(function (h) { q.push('blue=' + encodeURIComponent(h)); });
   st.bans.forEach(function (h) { q.push('bans=' + encodeURIComponent(h)); });
@@ -252,6 +257,7 @@ function boardFailed() {
   INF = null; paint();
   el('inf-blue').innerHTML = "<div class='warnbox'>the board is not answering</div>";
   el('inf-red').innerHTML = ''; el('plan').innerHTML = '';
+  el('stageplan').innerHTML = ''; el('blueswaps').innerHTML = '';
   el('momentum').innerHTML = "<span class='lbl'>fight odds</span><span class='legend'>the board is not answering</span>";
   ['bluescore', 'redscore'].forEach(function (id) { el(id).textContent = ''; el(id).title = ''; });
 }
@@ -322,7 +328,9 @@ function renderFacts() {
 function paintSuggestions() {
   var slots = el('blueslots').children, d = INF;
   var src = !d || d.error ? null : (st.blue.length ? d.fill : d.blue);
-  var open = src && src.picks ? src.picks.filter(function (p) { return !p.locked && st.blue.indexOf(p.hero) < 0; }) : [];
+  var sw = !d || d.error ? null : d.swaps;       /* a suggested swap names the rest of its six */
+  var open = sw && sw.open && sw.open.length ? sw.open
+           : src && src.picks ? src.picks.filter(function (p) { return !p.locked && st.blue.indexOf(p.hero) < 0; }) : [];
   for (var i = st.blue.length, k = 0; i < TEAM; i++) {
     var s = slots[i], p = open[k++];
     if (!p) continue;
@@ -330,6 +338,41 @@ function paintSuggestions() {
     s.className = 'slot suggested'; s.setAttribute('data-h', p.hero); s.title = p.why;
     s.innerHTML = portrait(h) + "<span class='idx'>" + (i + 1) + "</span><span class='nm'>" + esc(p.hero) + '</span>';
   }
+}
+
+/* the swaps above blue's picks: the board's one joint answer (swaps) - the
+   incoming hero's portrait over the pick it replaces, a click takes that swap,
+   and the caption is the board's verdict. Taking one leaves the rest the
+   board's answer from the new picks. Nothing is drawn for red */
+function paintSwaps() {
+  var d = INF, sw = !d || d.error ? null : d.swaps, box = el('blueswaps');
+  var pairs = sw && sw.pairs ? sw.pairs : [];
+  if (!pairs.length) { box.innerHTML = ''; return; }
+  var cells = '';
+  for (var i = 0; i < TEAM; i++) {
+    var p = pairs.filter(function (x) { return x.at === i; })[0];
+    if (!p) { cells += "<div class='swapcell'></div>"; continue; }
+    var h = hero(p.in) || { name: p.in, portrait: p.portrait };
+    cells += "<div class='swapcell' data-swap-in=\"" + esc(p.in) + "\" data-swap-out=\"" + esc(p.out) +
+      "\" title=\"" + esc('swap ' + p.out + ' for ' + p.in + ' - ' + p.why) + "\">" + portrait(h) + '</div>';
+  }
+  box.innerHTML = "<div class='swapcap'>" + esc(sw.verdict) + '</div>' + cells;
+}
+function takeSwap(out, into) {
+  var at = st.blue.indexOf(out);
+  if (at < 0 || st.blue.indexOf(into) >= 0) return;
+  st.blue[at] = into;
+  save(); paint(); refresh();
+}
+/* the stage picker: the map's stages in play order after the whole map,
+   hidden on a map without stages; a stage the map does not list is dropped */
+function paintStagePicker(m) {
+  var names = m && m.stages ? m.stages : [], sel = el('stagesel');
+  if (names.indexOf(st.stage) < 0) st.stage = '';
+  sel.style.display = names.length ? '' : 'none';
+  sel.innerHTML = names.length ? "<option value=''>WHOLE MAP</option>" + names.map(function (n) {
+    return "<option value=\"" + esc(n) + "\">" + esc(n) + '</option>'; }).join('') : '';
+  sel.value = st.stage;
 }
 
 function showTab(name) {
@@ -351,7 +394,8 @@ function start(d) {
   var w = el('vintage'), newer = d.newer_patches || [];     /* the patches, or nothing: boot's failure note goes */
   w.style.display = newer.length ? 'block' : 'none';
   w.textContent = newer.length ? newer.length + ' patch(es) since the rates were captured (newest ' + newer[0][0] + ') - run pull_rates' : '';
-  el('mapsel').onchange = function () { st.map = this.value; save(); paint(); refresh(); };
+  el('mapsel').onchange = function () { st.map = this.value; st.stage = ''; save(); paint(); refresh(); };
+  el('stagesel').onchange = function () { st.stage = this.value; save(); paint(); refresh(); };
   el('filter').oninput = renderFacts;
   var chips = el('chips'); chips.innerHTML = SCOPES.map(function (s) { return "<button class='chip on' data-scope='" + s + "'>" + s + '</button>'; }).join('');
   chips.onclick = function (e) { var c = e.target.closest('.chip'); if (!c) return; var s = c.getAttribute('data-scope');

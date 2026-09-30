@@ -11,6 +11,7 @@
 <a class='sub' href='#argmax'>the argmax</a>
 <a class='sub' href='#searched'>what is searched</a>
 <a class='sub' href='#against-red'>what it is optimal against</a>
+<a class='sub' href='#swaps'>swaps and stages</a>
 <a class='sub' href='#deterministic'>deterministic, not probabilistic</a>
 <a href='#board'>the board</a>
 <a class='sub' href='#likely-comp'>red's likely starting comp</a>
@@ -228,6 +229,18 @@ re-solves against what is now known. It is a best reply to present information a
 that information does. The hedge is the <i>if countered optimally</i> case the
 <code>board</code> tool reports: it scores your six against red's best reply to it, so a comp
 that wins only while red plays badly shows up there. The board page does not solve it.</p>
+<p id='swaps'><b>Swaps and stages.</b> A six is not held for the map. Above blue's picks the
+board suggests the swaps that pay for their cost, as one answer: of every legal six, the one that
+scores most less the swap cost for each of blue's picks it drops. The suggested swaps never pull
+against each other, and taking one leaves the rest the best answer from the new picks. The cost
+is in share points of blue's span, %(SWAP)g by default (meta.md's swap, 0 to %(SWAP_MAX)g, a
+slider on the playbook tab), and stands in for the ultimate charge and the walk a swap costs. A
+swap that would lower the fight odds is not suggested, and red is never told to swap. The plan
+stage by stage walks the map's stages in play order: each phase of a route keeps its heroes into
+the next unless a swap gains more than the cost there, one stage at a time, and each arena of a
+Control or Flashpoint map is reached from the six the board suggests, since the game sets no
+order. A stage differs from its map only through its terrain - what the wiki's text on it
+stresses - and the playbook's rules that read it; the win rates are per map.</p>
 <p id='reach'><b>Reach.</b> The weights are meant to make a hero common or rare, never
 impossible. What is established is narrower: at the reach fixture's recording of 2026-09-28,
 under the shipped playbook, the default engine and the healing floor, 49 of the 53 released

@@ -15,7 +15,7 @@ import pytest
 from facts import board_facts, compute
 from facts.draft import Draft
 from inference import base, catalog, engine, scale, scoring, serve, solver
-from inference.result import Badge, Momentum, Pick
+from inference.result import Badge, Momentum, Pick, StageRow, SwapPair, Swaps
 from inference.scoring import Contribution
 from inference.strategy import WEIGHT_RANGE, StrategyRecord
 from tests.inference import BRIEF, FIXTURE_PLAYBOOK
@@ -133,7 +133,7 @@ def test_the_page_is_a_shell_over_static_files():
     assert links.count("<a ") == 2
     assert links.rstrip().endswith("GitHub</a></span>")
     # the page hands the scripts the counts they need
-    assert "var TEAM = 6, BANS = 5;" in body
+    assert "var TEAM = 6, BANS = 5, SWAP_MAX = 50;" in body
     data, ctype = pages.static_file("board.js")
     assert ctype.startswith("application/javascript") and b"function paint" in data
     data, ctype = pages.static_file("comps.js")
@@ -169,7 +169,7 @@ def test_the_scripts_send_the_routes_and_query_keys_the_board_reads():
     for route in ("/api/roster", "/api/facts?", "/api/board?", "/api/strategies"):
         assert route in script, route
     assert "POST" not in script
-    for key in ("map", "side", "red", "blue", "bans", "weights", "client"):
+    for key in ("map", "stage", "side", "red", "blue", "bans", "weights", "client"):
         assert "'%s='" % key in script, key
 
 
@@ -184,9 +184,11 @@ def test_the_scripts_write_the_ids_and_read_the_globals_the_shell_holds():
     assert [i for i in sorted(ids) if "id='%s'" % i not in body] == []
     for attribute in ("data-tab", "data-clear", "data-side"):
         assert attribute in script and attribute in body, attribute
+    for attribute in ("data-swap-in", "data-swap-out"):       # drawn by the script alone
+        assert attribute in script, attribute
     shell = re.search(r"<script>var (.*?);</script>", body).group(1)
     names = [part.split(" = ")[0] for part in shell.split(", ")]
-    assert names == ["TEAM", "BANS"]
+    assert names == ["TEAM", "BANS", "SWAP_MAX"]
     for name in names:
         assert re.search(r"\b%s\b" % name, script), name
     assert script.count("min='%g' max='%g' step='0.01'" % WEIGHT_RANGE) == 2
@@ -205,7 +207,12 @@ def test_the_scripts_read_payload_keys_the_server_writes(synthetic_world, monkey
             assert re.search(r"\.%s\b" % key, script), key
     solved = engine.board(synthetic_world, Draft("Harbor Gate", ("Mortar",), ("Balm",)),
                           catalog=catalog.load(FIXTURE_PLAYBOOK), brief=BRIEF).to_dict()
-    read("plan momentum shapes current red_current fill expected blue map side", solved)
+    read(
+        "plan momentum shapes current red_current fill expected blue map side swaps stages",
+        solved)
+    read("pairs open verdict", Swaps.__annotations__)
+    read("out in at portrait why", SwapPair.__annotations__)
+    read("stage kind current played six swaps blurb solved", StageRow.__annotations__)
     read(
         "picks contributions alternatives considered seconds playstyle cited scoring unscored"
         " tie blue", solved["current"])
@@ -221,14 +228,14 @@ def test_the_scripts_read_payload_keys_the_server_writes(synthetic_world, monkey
     monkeypatch.setenv("COUNTRIX_STRATEGIES", FIXTURE_PLAYBOOK)
     playbook = serve.handle_strategies().body
     read("strategies meta", playbook)
-    read("meta rate synergy counter body", playbook["meta"])
+    read("meta rate synergy counter swap body", playbook["meta"])
     fact = board_facts.generate(synthetic_world, Draft()).to_dict()["facts"][0]
     read("id key subject text scope team source", fact)
     monkeypatch.setattr(board.tables, "load", lambda cx: synthetic_world)
     roster = board.api_roster(None).body
     read("heroes maps role_icons newer_patches", roster)
     read("name role subrole portrait status release_date", roster["heroes"][0])
-    read("name mode style sided", roster["maps"][0])
+    read("name mode style sided stages", roster["maps"][0])
     assert not re.search(r"\.score\b", script)
 
 
@@ -246,6 +253,20 @@ def test_the_meta_slider_rides_the_weights_key_under_the_name_the_engine_reads()
     assert catalog.parse_weights(["%s:0.5" % base.META, "coverage:2"]) == {
         base.META: 0.5, "coverage": 2.0}
     assert catalog.META_FILE == base.META + ".md" and base.META in base.DIALS
+
+
+def test_the_swap_cost_slider_rides_the_weights_key_the_engine_reads_to_its_ceiling():
+    """The playbook tab's Swap cost slider is one more weight row: its id is
+    base.SWAP, which parse_weights clamps to SWAP_RANGE and the engine reads
+    as the board's swap cost, so it rides the one weights=id:value key, is
+    never pruned, starts at meta.md's swap and reaches the ceiling the page
+    is given."""
+    script, body = scripts(), pages.view_board()
+    assert "var SWAP = '%s';" % base.SWAP in script
+    assert "live[SWAP] = true;" in function(script, "pruneWeights")
+    assert "costRow(m)" in function(script, "renderPlaybook")
+    assert "SWAP_MAX = %g;" % base.SWAP_RANGE[1] in body
+    assert catalog.parse_weights(["%s:99" % base.SWAP]) == {base.SWAP: base.SWAP_RANGE[1]}
 
 
 def test_a_reply_to_an_older_request_is_dropped_and_its_board_cancelled():

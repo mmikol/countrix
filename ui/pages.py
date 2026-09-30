@@ -2,8 +2,8 @@
 they load - the stylesheet, the scripts and the display font.
 
 The page is a shell over the static files: board.js loads last because it
-calls into comps.js and playbook.js, and TEAM and BANS come from the page
-so the scripts keep no constant in step with the Python. The math page's
+calls into comps.js and playbook.js, and TEAM, BANS and SWAP_MAX come from
+the page so the scripts keep no constant in step with the Python. The math page's
 code numbers are filled in here too, from the modules that hold them, and
 the default engine's weights from the playbook's meta.md, so math.html
 quotes no constant of its own.
@@ -77,7 +77,9 @@ def view_board() -> str:
     shell = (HEAD + "<title>Countrix</title><main>"
             "<header class='top'><h1>Countrix"
             "<span class='expand'> the counter utility matrix</span></h1>"
-            "<div class='mapsel'><select id='mapsel'></select><span class='mode' id='mode'></span>"
+            "<div class='mapsel'><select id='mapsel'></select>"
+            "<select id='stagesel' title='the stage in play; the whole map by default'"
+            " style='display:none'></select><span class='mode' id='mode'></span>"
             "<span class='sideseg' id='sideseg' title=\"blue's side;"
             " red gets the other\">"
             "<button data-side='attack'>attack</button><button data-side='defense'>defense</button>"
@@ -104,6 +106,7 @@ def view_board() -> str:
             "</span>"
             "<button class='clearteam' data-clear='blue'>clear</button>"
             "</h2>"
+            "<div class='swaps' id='blueswaps'></div>"
             "<div class='slots' id='blueslots'></div><div class='roles' id='blueroster'>"
             "</div></section>"
             "<section class='team red'><h2>red team <span class='tscore' id='redscore'"
@@ -118,7 +121,7 @@ def view_board() -> str:
             "<button data-tab='facts'>facts</button>"
             "<button data-tab='playbook'>playbook</button></nav>"
             "<section class='panel' id='tab-comps'><div class='plan' id='plan'>"
-            "</div><div class='seats'>"
+            "</div><div class='stages' id='stageplan'></div><div class='seats'>"
             "<div class='seat blue' id='inf-blue'></div><div class='seat red' id='inf-red'>"
             "</div></div></section>"
             "<section class='panel' id='tab-facts'><div class='tools'>"
@@ -126,11 +129,11 @@ def view_board() -> str:
             "<span id='chips'></span><span id='factsn' class='count'></span></div>"
             "<table class='facts'><tbody id='factbody'></tbody></table></section>"
             "<section class='panel' id='tab-playbook'><div id='playbook'></div></section>"
-            "</main><script>var TEAM = %d, BANS = %d;</script>"
+            "</main><script>var TEAM = %d, BANS = %d, SWAP_MAX = %g;</script>"
             "<script src='/static/comps.js'></script>"
             "<script src='/static/playbook.js'></script>"
             "<script src='/static/board.js'></script>")
-    return shell % (REPO_URL, GITHUB_MARK, TEAM_SIZE, MAX_BANS)
+    return shell % (REPO_URL, GITHUB_MARK, TEAM_SIZE, MAX_BANS, base.SWAP_RANGE[1])
 
 
 def page(title: str, body: str) -> str:
@@ -159,6 +162,8 @@ def view_math() -> str:
         "W_RATE": weights.rate,
         "W_SYNERGY": weights.synergy,
         "W_COUNTER": weights.counter,
+        "SWAP": catalog.swap_cost(),
+        "SWAP_MAX": base.SWAP_RANGE[1],
         "WIKI_WEIGHT": counters.WIKI_WEIGHT,
         "DERIVED_WEIGHT": counters.DERIVED_WEIGHT,
         "TOP_ANSWERS": counters.TOP_ANSWERS,

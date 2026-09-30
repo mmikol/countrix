@@ -15,7 +15,19 @@ function weightRow(h, label) {
     "<span class='wbreak'></span>" +
     "<button class='wreset' " + (set ? '' : 'disabled') + ">reset</button></div>";
 }
-function clampWeight(x) { x = Math.round(+x * 100) / 100; return isNaN(x) ? null : Math.min(10, Math.max(0, x)); }
+function clampWeight(x, max) { x = Math.round(+x * 100) / 100; return isNaN(x) ? null : Math.min(max || 10, Math.max(0, x)); }
+/* the swap cost: meta.md's swap, in share points of blue's span, 0 to
+   SWAP_MAX - what a swap of one of blue's picks must gain before the board
+   suggests it; a slider like the weights', sent as weights=swap:value */
+var SWAP = 'swap';
+function costRow(m) {
+  var set = st.weights.hasOwnProperty(SWAP), v = set ? st.weights[SWAP] : m.swap;
+  return "<div class='wrow' data-id='" + SWAP + "' data-inferred='" + m.swap + "' data-max='" + SWAP_MAX + "'>" +
+    "<span class='wlbl'>swap cost</span><input type='range' min='0' max='" + SWAP_MAX + "' step='0.5' value='" + v + "' aria-label='the swap cost'>" +
+    "<input type='number' class='wval' min='0' max='" + SWAP_MAX + "' step='0.5' value='" + v + "' aria-label='the exact swap cost'>" +
+    "<span class='wbreak'></span>" +
+    "<button class='wreset' " + (set ? '' : 'disabled') + ">reset</button></div>";
+}
 function setWeight(id, value, inferred) {
   if (value === null || value === inferred) delete st.weights[id]; else st.weights[id] = value;
   save(); refresh();
@@ -38,6 +50,7 @@ function weighs(h) { return h.form === 'heuristic' || h.form === 'scored'; }
 function pruneWeights(d) {
   var live = {};
   live[META] = true;
+  live[SWAP] = true;
   d.strategies.forEach(function (h) { if (weighs(h)) live[h.id] = true; });
   var stale = Object.keys(st.weights).filter(function (id) { return !live[id]; });
   stale.forEach(function (id) { delete st.weights[id]; });
@@ -57,8 +70,8 @@ function renderPlaybook(d) {
   var m = d.meta;
   out += "<section class='pbgroup engine' id='pb-engine'><h3>the meta</h3><div class='hcards'><div class='hcard engine'>" +
     "<span class='kind engine'>engine</span><b>The meta</b><div class='meta'>" +
-    esc('meta.md · meta ' + m.meta + ' × (rate ' + m.rate + ' · synergy ' + m.synergy + ' · counter ' + m.counter + ')') +
-    '</div>' + prose(m.body) + weightRow({ id: META, name: 'the meta', weight: m.meta }, 'meta') + '</div></div></section>';
+    esc('meta.md · meta ' + m.meta + ' × (rate ' + m.rate + ' · synergy ' + m.synergy + ' · counter ' + m.counter + ') · swap cost ' + m.swap) +
+    '</div>' + prose(m.body) + weightRow({ id: META, name: 'the meta', weight: m.meta }, 'meta') + costRow(m) + '</div></div></section>';
   KINDS.forEach(function (k) {
     /* by name inside a kind: a rule is looked up by what it is called, not by
        where the catalog puts it. The catalog's own order is the scoring order
@@ -77,9 +90,9 @@ function renderPlaybook(d) {
     b.onclick = function () { el(b.getAttribute('data-group')).scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   });
   el('playbook').querySelectorAll('.wrow').forEach(function (row) {
-    var id = row.getAttribute('data-id'), inferred = +row.getAttribute('data-inferred');
+    var id = row.getAttribute('data-id'), inferred = +row.getAttribute('data-inferred'), max = +(row.getAttribute('data-max') || 10);
     var range = row.querySelector('input[type=range]'), val = row.querySelector('.wval'), reset = row.querySelector('.wreset');
-    var commit = function (x) { x = clampWeight(x); if (x === null) return; range.value = x; val.value = x; reset.disabled = x === inferred; setWeight(id, x, inferred); };
+    var commit = function (x) { x = clampWeight(x, max); if (x === null) return; range.value = x; val.value = x; reset.disabled = x === inferred; setWeight(id, x, inferred); };
     range.oninput = function () { val.value = range.value; };
     range.onchange = function () { commit(range.value); };
     val.onchange = function () { commit(val.value); };

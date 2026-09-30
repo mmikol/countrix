@@ -166,7 +166,7 @@ table.facts tr.warn td { color:#ff9d8f; } table.facts tr.derived td.text { color
 
 /* the comps panel: the game plan, then the two seats side by side */
 .plan { padding:12px 14px; margin-bottom:10px; border-radius:10px; border:1px solid var(--line); background:linear-gradient(170deg,#1b2436 0%,#161a24 70%); }
-.plan .lbl, .momentum .lbl { font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); }
+.plan .lbl, .momentum .lbl, .stages .lbl { font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); }
 .plan .text { margin-top:6px; line-height:1.55; font-size:13.5px; }
 .momentum { display:flex; flex-wrap:wrap; align-items:center; gap:8px 16px; padding:10px 14px; margin:14px 0 0; border-radius:10px; border:1px solid var(--line); background:#151a24; }
 .momentum .verdict { flex:1 0 100%; color:var(--muted); font-size:12px; }   /* why neither bar has a figure */
@@ -202,6 +202,30 @@ table.facts tr.warn td { color:#ff9d8f; } table.facts tr.derived td.text { color
   text-transform:uppercase; background:rgba(0,0,0,.6); padding:2px 6px; border-radius:3px; }
 .slot.suggested { border:1px dashed var(--blue); cursor:pointer; opacity:.7; }
 .slot.suggested:hover { opacity:1; box-shadow:0 0 16px rgba(62,166,255,.35); }
+/* the swaps above blue's picks: the incoming hero over the pick it replaces */
+.swaps { display:flex; flex-wrap:wrap; gap:8px; margin:2px 0 0; }
+.swaps:empty { display:none; }
+.swapcap { flex-basis:100%; font-size:11.5px; color:var(--gold); }
+.swapcell { flex:1; max-width:110px; display:flex; justify-content:center; }
+.swapcell[data-swap-in] { cursor:pointer; }
+.swapcell img, .swapcell .ph { width:58%; aspect-ratio:3/4; object-fit:cover; display:flex;
+  align-items:center; justify-content:center; border-radius:5px; border:2px solid var(--gold);
+  box-shadow:0 0 12px rgba(245,166,35,.35); background:#0b0e14; }
+.swapcell[data-swap-in]:hover img { box-shadow:0 0 18px rgba(245,166,35,.6); }
+/* the plan stage by stage, under the game plan */
+.stages { margin-bottom:10px; }
+.stages:empty { display:none; }
+.stagerow { display:grid; grid-template-columns:200px auto 1fr; gap:12px; align-items:center;
+  padding:8px 12px; margin-top:6px; border:1px solid var(--line); border-radius:8px; background:#10141c; }
+.stagerow.here { border-color:var(--blue); }
+.stagerow.played { opacity:.5; }
+.stagename { font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+.stagesix { display:flex; gap:4px; }
+.stagepic img, .stagepic .ph { width:32px; height:42px; object-fit:cover; display:flex;
+  align-items:center; justify-content:center; border-radius:3px; border:1px solid var(--line); }
+.stagepic.in img, .stagepic.in .ph { border:2px solid var(--gold); }
+.stageblurb { font-size:12.5px; line-height:1.5; }
+@media (max-width:700px) { .stagerow { grid-template-columns:1fr; } }
 .slot.suggested img { filter:saturate(.6); }
 .team h2 .tscore { font:600 15px/1 -apple-system,"Segoe UI",sans-serif; letter-spacing:0; color:var(--text);
   background:rgba(62,166,255,.18); border:1px solid var(--blue); border-radius:999px; padding:4px 10px; }
