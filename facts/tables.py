@@ -386,7 +386,7 @@ def _read_provenance(cx: Connection, w: World) -> None:
             order by p.released desc""")]
 
 
-def _ally_lifesteal(w: World) -> None:
+def _derive_ally_lifesteal(w: World) -> None:
     """A heal that rides the teammates' damage (Cardiac Overdrive) at what the
     caster's five teammates of a 2-2-2 deal: each role's median dps over the
     released heroes, the caster's own seat taken out."""
@@ -400,7 +400,7 @@ def _ally_lifesteal(w: World) -> None:
         ally_lifesteal(hero, ally)
 
 
-def _benches(w: World) -> None:
+def _derive_benches(w: World) -> None:
     """The roster's healing benches, each role's median pool and the ultimate
     cap, over the released heroes' derived numbers: an announced hero sets
     nothing."""
@@ -450,7 +450,7 @@ def load(cx: Connection) -> World:
     derive_map_styles(w)
     for hero in w.heroes.values():
         derive_scalars(hero)
-    _ally_lifesteal(w)
-    _benches(w)
+    _derive_ally_lifesteal(w)
+    _derive_benches(w)
     counters.derive(w)
     return w

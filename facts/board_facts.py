@@ -155,7 +155,8 @@ def _map_facts(fs: FactSet, world: World, m: Map, side: Side = "", stage: str = 
 
 
 def _map_mode(fs: FactSet, m: Map, side: Side) -> None:
-    """The mode, who attacks, and the stages or phases in play order."""
+    """The mode, who attacks, and the stages in play order: the arenas, or
+    the phases of a route."""
     fs.add("map", m.name, "map.mode", "%s is a %s map" % (m.name, m.mode),
         value=m.mode, source="map_modes")
     if is_sided(m):
@@ -176,7 +177,7 @@ def _map_mode(fs: FactSet, m: Map, side: Side) -> None:
         fs.add("map", m.name, "map.side", "%s (%s) has no attacking or defending side"
             % (m.name, m.mode), value="", source="derived:map.side")
     if compute.arenas(m):
-        fs.add("map", m.name, "map.stages", "%s stages: %s"
+        fs.add("map", m.name, "map.arenas", "%s stages: %s"
             % (m.name, ", ".join(m.stages)), value=m.stages, source="map_stages")
     elif compute.phases(m):
         fs.add("map", m.name, "map.phases", "%s phases, in order: %s"

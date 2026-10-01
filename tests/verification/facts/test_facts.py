@@ -110,17 +110,17 @@ def test_terrain_and_both_halves_of_the_style_are_facts(world):
 
 
 def test_a_map_lists_its_stages_as_arenas_or_as_the_phases_of_a_route(world):
-    # one list fact a map: stages on arenas, phases on a route, neither without rows
-    for name, key, other in (("Ilios", "map.stages", "map.phases"),
-                             ("Havana", "map.phases", "map.stages"),
-                             ("King's Row", "map.phases", "map.stages")):
+    # one list fact a map: its arenas, or the phases of a route, neither without rows
+    for name, key, other in (("Ilios", "map.arenas", "map.phases"),
+                             ("Havana", "map.phases", "map.arenas"),
+                             ("King's Row", "map.phases", "map.arenas")):
         fs = board_facts.generate(world, Draft(name))
         assert fs.find(key)[0].value == world.map(name).stages and not fs.find(other)
         assert fs.find(key)[0].source == "map_stages"
     assert board_facts.generate(world, Draft("Havana")).find("map.phases")[0].text == \
         "Havana phases, in order: City Streets, Distillery, Sea Fort"
     fs = board_facts.generate(world, Draft("Colosseo"))
-    assert not fs.find("map.stages") and not fs.find("map.phases")
+    assert not fs.find("map.arenas") and not fs.find("map.phases")
 
 
 def test_a_stage_fact_names_the_terrain_its_own_text_stresses(world):
@@ -160,7 +160,7 @@ def test_a_stage_without_text_of_its_own_gets_no_stage_fact(world):
     for m in (oasis, dorado, world.map("Colosseo"), world.map("Blizzard World")):
         assert not board_facts.generate(world, Draft(m.name)).find("map.stage_terrain"), m.name
         assert all(compute.stage_standouts(m, s) == [] for s in m.stages)
-    assert board_facts.generate(world, Draft("Oasis")).find("map.stages")  # the list still stands
+    assert board_facts.generate(world, Draft("Oasis")).find("map.arenas")  # the list still stands
 
 
 def test_map_rates_are_the_intersection_with_the_board(world):

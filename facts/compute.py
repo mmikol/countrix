@@ -59,7 +59,7 @@ MAP_METRICS = OrderedDict([
     ("style_top", "the playstyle the map rewards most: the rates' lift plus the terrain's lean"),
     ("style_margin", "top style score minus the runner-up, in sd"),
     ("mode", "the game mode"),
-    ("stages", "separate arenas, one played at a time: Control's 3, Flashpoint's 5; else 0"),
+    ("arenas", "separate arenas, one played at a time: Control's 3, Flashpoint's 5; else 0"),
     ("phases", "named parts of one route, played in order: Hybrid's 2, an Escort map's"
                 " named stretches; else 0"),
     ("bans", "bans already made in this match: a ban rate is a risk only before them"),
@@ -328,13 +328,13 @@ def map_metrics(m: Map | None, side: Side = "", *, ban_count: int, stage: str = 
     lists (facts.draft.board_stage), where a board names one."""
     if m is None:
         return {"known": 0, "sided": 0, "side": "", "style_top": "",
-                "style_margin": 0, "mode": "", "stages": 0, "phases": 0, "bans": ban_count,
+                "style_margin": 0, "mode": "", "arenas": 0, "phases": 0, "bans": ban_count,
                 "name": "", "stage": "", "objective": "",
                 **dict.fromkeys(TERRAIN_FEATURES, 0.0)}
     sided = 1 if is_sided(m) else 0
     return {"known": 1, "sided": sided, "side": side if sided else "",
             "style_top": m.style_top or "", "style_margin": m.style_margin,
-            "mode": m.mode or "", "stages": len(arenas(m)),
+            "mode": m.mode or "", "arenas": len(arenas(m)),
             "phases": len(phases(m)), "bans": ban_count,
             "name": m.name, "stage": stage, "objective": objective(m, stage),
             **{f: ground(m, stage, f).z for f in TERRAIN_FEATURES}}

@@ -1237,7 +1237,7 @@ the `team.*` metrics computed for the red side.
 | `map.style_top` (text) | the playstyle the map rewards most: the rates' lift plus the terrain's lean |
 | `map.style_margin` | top style score minus the runner-up, in sd |
 | `map.mode` (text) | the game mode |
-| `map.stages` | separate arenas, one played at a time: Control's 3, Flashpoint's 5; else 0 |
+| `map.arenas` | separate arenas, one played at a time: Control's 3, Flashpoint's 5; else 0 |
 | `map.phases` | named parts of one route, played in order: Hybrid's 2, an Escort map's named stretches; else 0 |
 | `map.bans` | bans already made in this match: a ban rate is a risk only before them |
 | `map.name` (text) | the map's name; empty with no map |
