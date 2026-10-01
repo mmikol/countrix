@@ -5,14 +5,14 @@ call lands in.
                      schema.ToolSchema), function and family, and for a pull
                      the source whose cache it reads
     Registry         tools family by family, each name once: bind() hands a
-                     server its Tools, run() is the in-process call,
-                     write_docs() the tool reference in docs/mcp.md
+                     server its Tools, write_docs() the tool reference in
+                     docs/mcp.md
     FAMILIES         the family modules, in the order the registry lists them
     REGISTRY, tool   the one registry, and the decorator a family declares
                      each of its tools with
     Context          where a call lands: the database, the page caches, the
-                     log, a refresh's cutoff, and the registry one tool calls
-                     another through (call)
+                     log, a refresh's cutoff and the registry; call() is the
+                     in-process call, by which one tool calls another
     REFRESH          the refresh argument of every pull and of the rebuild
 
 A family module - pulls, lifecycle, facts, solver, playbook - declares
@@ -145,16 +145,6 @@ class Registry:
         """Every tool bound to a context, for a server to serve -> [Tool]."""
         return [_bind(ctx, spec) for spec in self]
 
-    def run(self, ctx: "Context", name: str, /, **arguments: object) -> ToolReply:
-        """Call a tool by name, in-process - the refresher's, the shell's and
-        one tool's call of another. The call is validated against
-        the tool's schema, like a call through either door: a call the schema
-        refuses is a Refusal, and a name no tool has is a NoSuchToolError,
-        which reaches no tool. The name is positional only, so a tool
-        argument called `name` (add_strategy has one) reaches the tool
-        instead of colliding here."""
-        return _bind(ctx, self.get(name))(arguments)
-
     def write_docs(self, path: str | None = None) -> str:
         """The tool reference - every tool, its description and its arguments -
         generated into docs/mcp.md between its markers -> the path written."""
@@ -249,6 +239,11 @@ class Context:
         return path
 
     def call(self, name: str, /, **arguments: object) -> ToolReply:
-        """A tool by name, in-process - the refresher's, the shell's and one
-        tool's call of another (Registry.run)."""
-        return self.tools.run(self, name, **arguments)
+        """Call a tool by name, in-process - the refresher's, the shell's and
+        one tool's call of another. The call is validated against the tool's
+        schema, like a call through either door: a call the schema refuses
+        is a Refusal, and a name no tool has is a NoSuchToolError, which
+        reaches no tool. The name is positional only, so a tool argument
+        called `name` (add_strategy has one) reaches the tool instead of
+        colliding here."""
+        return _bind(self, self.tools.get(name))(arguments)

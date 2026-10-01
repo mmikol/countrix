@@ -94,6 +94,18 @@ def test_a_batch_is_a_request_of_the_wrong_shape_and_runs_no_tool():
     assert ran == []
 
 
+def test_an_empty_list_of_lines_is_answered_with_nothing(monkeypatch):
+    """serve() reads the lines it is handed, an empty list of them too; only
+    None stands for the process's own stdin, which is never read here."""
+    class Unread:
+        def __iter__(self):
+            raise AssertionError("serve read the process's stdin")
+    monkeypatch.setattr(sys, "stdin", Unread())
+    out = io.StringIO()
+    stdio.serve(Server([]), [], out)
+    assert out.getvalue() == ""
+
+
 def test_tool_refuses_unknown_and_missing_arguments():
     tool = Tool("t", "d", tool_schema({
         "a": {"type": "string"}, "n": {"type": "integer"}, "x": {"type": "number"},
@@ -159,8 +171,9 @@ def test_a_fault_inside_a_tool_is_internal_and_logged_not_a_bad_parameter():
         "code": -32602, "message": "missing parameter 'name'"}
     assert call("tools/call", {"name": "nope"})["error"] == {
         "code": -32602, "message": "no tool named 'nope'"}
-    assert call("tools/call", {"name": "t", "arguments": [1]})["error"] == {
-        "code": -32602, "message": "arguments must be an object"}
+    for arguments in ([1], []):                 # an empty list is no object either
+        assert call("tools/call", {"name": "t", "arguments": arguments})["error"] == {
+            "code": -32602, "message": "arguments must be an object"}
 
 
 def test_a_request_of_the_wrong_shape_is_the_callers_error_and_logs_nothing():
@@ -173,8 +186,9 @@ def test_a_request_of_the_wrong_shape_is_the_callers_error_and_logs_nothing():
     def error(message):
         return server.handle(dict({"jsonrpc": "2.0", "id": 1}, **message))["error"]
     assert error({"method": 5}) == {"code": -32600, "message": "method must be a string"}
-    assert error({"method": "tools/call", "params": [1]}) == {
-        "code": -32602, "message": "params must be an object"}
+    for params in ([1], [], 0, False, ""):      # falsy or not, none of these is an object
+        assert error({"method": "tools/call", "params": params}) == {
+            "code": -32602, "message": "params must be an object"}
     assert error({"method": "tools/call", "params": {"name": ["t"]}}) == {
         "code": -32602, "message": "no tool named ['t']"}
     assert server.handle({"jsonrpc": "2.0", "method": "notifications/initialized",

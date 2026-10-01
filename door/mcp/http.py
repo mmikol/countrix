@@ -8,7 +8,8 @@ db.web's guard refuses a request that does not name this server before any
 of it runs. The door then asks for the bearer token when one is set,
 refuses a body not labelled application/json with 415, caps a body at
 MAX_BODY, and holds each client address to RATE_LIMIT tool calls a
-RATE_WINDOW.
+RATE_WINDOW. A tool call it admits is logged on stderr before it runs, with
+the client's address and the tool's name.
 
 Each request runs on a thread of its own, but the messages are handled one
 at a time, as over stdio: a playbook write reads its file, edits it and
@@ -78,7 +79,8 @@ class HttpHandler(web.Handler):
     def do_POST(self) -> None:
         """One JSON-RPC message: the token checked, the body's JSON label
         checked, the body read, a tool call admitted against the client's
-        rate, then handled - 202 for a notification, else the answer."""
+        rate and logged, then handled - 202 for a notification, else the
+        answer."""
         if urlsplit(self.path).path != "/mcp":
             return self._json({"error": "nothing here"}, 404)
         try:
@@ -89,6 +91,7 @@ class HttpHandler(web.Handler):
             self._admit(message)
         except _RejectedError as rejected:
             return self._json(rejected.payload, rejected.code, rejected.headers)
+        self._log_call(message)
         with self.server.one_at_a_time:
             response = self.server.mcp.handle(message)
         self._json(response, 202 if response is None else 200)
@@ -126,6 +129,16 @@ class HttpHandler(web.Handler):
                 and not self.server.admit(self.client_address[0])):
             raise _RejectedError(429, "too many calls; try again in a minute",
                                  headers={"Retry-After": str(RATE_WINDOW)})
+
+    def _log_call(self, message: object) -> None:
+        """One line on stderr for a tool call, before it runs: the tool's
+        name, after the client's address and the time log_message writes,
+        so a write, a migration or a rebuild over HTTP leaves a record of
+        who asked for it."""
+        if isinstance(message, dict) and message.get("method") == "tools/call":
+            params = message.get("params")
+            name = params.get("name") if isinstance(params, dict) else None
+            self.log_message("tools/call %r", name)
 
 
 class HttpServer(web.LocalServer):

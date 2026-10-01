@@ -59,7 +59,9 @@ stays open for the healthchecks.
 refusal's reason or 500 with the error's type and message
 (`db.web.failure`), and the traceback goes to stderr; the door's JSON-RPC
 says the same with `isError` and `INTERNAL`. Each server logs one line to
-stderr for every request that fails and every board it solves.
+stderr for every request that fails; the board logs one for every board it
+solves, and the door one for every tool call before it runs, with the
+client's address and the tool's name.
 
 **SQL runs as the reader.** The `query` tool in `door/mcp/lifecycle.py`
 runs one read-only statement under a ten-second timeout, refuses names

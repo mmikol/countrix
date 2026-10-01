@@ -1,6 +1,7 @@
 """The tools in-process: query, db_status, roster, the board tools, the
 compact infer, db_migrate and metrics against the built database; and,
-with no database, query's refusals, the playbook writes' mirror, the Draft
+with no database, query's refusals, db_status's remedy for a stale schema,
+the playbook writes' mirror, the Draft
 a board tool hands its function, the readiness every door reports, a
 migration that fails, and how query turns a cell into JSON, pages its rows
 and words an empty result. The one registry's family order is
@@ -47,6 +48,9 @@ def test_query_is_read_only(ctx):
     # what Postgres rejects is the caller's to fix too, answered in its words
     with pytest.raises(Refusal, match='query: column "nosuch" does not exist'):
         ctx.call("query", sql="select nosuch from heroes")
+    # a write past the first word reaches the read-only transaction, which refuses it
+    with pytest.raises(Refusal, match="query: "):
+        ctx.call("query", sql="with d as (delete from heroes returning *) select * from d")
 
 
 @pytest.mark.invariant
@@ -126,6 +130,44 @@ def test_query_refuses_file_and_server_reaching_sql_before_connecting():
     assert len(long) == lifecycle.MAX_SQL_CHARS + 1
     with pytest.raises(Refusal, match="too long"):
         nowhere.call("query", sql=long)
+
+
+def test_what_the_read_only_transaction_refuses_is_the_callers_to_fix(monkeypatch):
+    """A statement past the first-word check can still write - a WITH that
+    deletes, FOR UPDATE - or use what Postgres does not support: Postgres
+    refuses it in the read-only transaction, and the caller hears a Refusal
+    in its words, never INTERNAL. The connection is stubbed."""
+    class Refusing:
+        def __init__(self, error):
+            self.error = error
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def execute(self, sql):
+            if not sql.startswith("SET "):
+                raise self.error
+    refused = (
+        psycopg.errors.ReadOnlySqlTransaction("cannot execute DELETE in a read-only transaction"),
+        psycopg.errors.FeatureNotSupported("FOR UPDATE is not allowed with aggregate functions"))
+    for error in refused:
+        monkeypatch.setattr(lifecycle.psycopg, "connect", lambda dsn, error=error: Refusing(error))
+        with pytest.raises(Refusal, match="query: %s" % error):
+            tools.Context(dsn="postgresql://nowhere").call("query", sql="select 1")
+
+
+def test_db_status_answers_pending_migrations_with_db_migrate(monkeypatch):
+    """A schema behind the files catches up through db_migrate, which keeps
+    the data; db_status names it, never a rebuild, which drops the rates
+    history."""
+    monkeypatch.setattr(lifecycle, "read_status", lambda ctx: lifecycle.DbStatus(
+        dsn="postgresql://nowhere", state="stale", table_count=1, counts={}, snapshots=[],
+        newest_capture=None, pending_migrations=["099_future.sql"]))
+    text, _ = tools.Context(dsn="postgresql://nowhere").call("db_status")
+    assert text.endswith("\nPENDING MIGRATIONS (db_migrate keeps the data): 099_future.sql")
 
 
 def test_only_db_rebuild_creates_the_cluster(tmp_path, monkeypatch):

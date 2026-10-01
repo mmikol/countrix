@@ -2,7 +2,7 @@
 server spawned on a free port, and an in-process HttpServer for the guards -
 the origin check, the bearer token, the JSON label, the body cap, the rate
 limit per client address, and /health's 500 for a status that raises - and
-for the one message it handles at a time."""
+for the one message it handles at a time and the line each tool call logs."""
 
 import http.client
 import json
@@ -22,6 +22,17 @@ from db import ROOT
 from door.mcp import tools
 from door.mcp.http import HttpServer
 from door.mcp.server import Server
+
+
+@pytest.fixture(scope="module", autouse=True)
+def no_ambient_token():
+    """A door given no token reads COUNTRIX_MCP_TOKEN, which a shell may
+    export for .mcp.json: cleared for the module, so the spawned door and
+    every HttpServer(token=None) here ask for none. An autouse fixture is
+    set up before http_server, which shares its scope."""
+    with pytest.MonkeyPatch.context() as patch:
+        patch.delenv("COUNTRIX_MCP_TOKEN", raising=False)
+        yield
 
 
 @pytest.fixture(scope="module")
@@ -137,6 +148,20 @@ def test_the_door_requires_its_token_when_one_is_set():
     code, reply = _knock(url, call, {"Authorization": "Bearer s3cret"})
     assert code == 200 and reply["result"]["isError"] is False
     httpd.shutdown()
+
+
+def test_each_tool_call_leaves_a_line_naming_the_tool_and_the_client(capsys):
+    """A tool call over HTTP is logged on stderr before it runs - the
+    client's address, the time and the tool's name - so a rebuild through
+    the door leaves a record; a ping, no tool call, leaves none."""
+    httpd, url = _http_server()
+    assert _knock(url, {"jsonrpc": "2.0", "id": 1, "method": "ping"})[0] == 200
+    call = {"jsonrpc": "2.0", "id": 2, "method": "tools/call",
+            "params": {"name": "metrics", "arguments": {}}}
+    assert _knock(url, call)[0] == 200
+    httpd.shutdown()
+    [line] = capsys.readouterr().err.splitlines()
+    assert line.startswith("127.0.0.1 - - [") and line.endswith("] tools/call 'metrics'")
 
 
 def test_the_door_refuses_huge_bodies_and_rate_limits_a_client():

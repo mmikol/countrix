@@ -102,7 +102,8 @@ class Server:
             return error_response(None, INVALID_REQUEST, "expected an object")
         msg_id: object = message.get("id")
         method: object = message.get("method")
-        params: object = message.get("params") or {}
+        raw = message.get("params")
+        params: object = {} if raw is None else raw
         if method is None:
             return None            # a response to something we never sent
         if not isinstance(method, str):
@@ -158,7 +159,8 @@ class Server:
         tool = self.tools.get(name) if isinstance(name, str) else None
         if tool is None:
             raise InvalidParamsError("no tool named %r" % (name,))
-        arguments = params.get("arguments") or {}
+        raw = params.get("arguments")
+        arguments = {} if raw is None else raw
         if not isinstance(arguments, dict):
             raise InvalidParamsError("arguments must be an object")
         try:
