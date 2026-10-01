@@ -103,7 +103,7 @@ def db_status(ctx: Context) -> ToolReply:
         status["dsn"], status["state"], status["table_count"],
         "\n".join("  %-16s %d" % kv for kv in status["counts"].items()),
         len(status["snapshots"]), ", newest capture %s" % newest if newest else "",
-        "\nPENDING MIGRATIONS (rebuild): %s" % ", ".join(missing)
+        "\nPENDING MIGRATIONS (db_migrate keeps the data): %s" % ", ".join(missing)
         if missing else "")
     return ToolReply(text, status)
 
@@ -205,8 +205,10 @@ MAX_QUERY_BYTES = 1 << 20              # what one query may return
 MAX_CELL = 2000                        # characters per cell
 # What Postgres says of a statement the caller can fix: a syntax error, an
 # unknown table, column or function, a privilege the reader lacks, a bad cast,
-# the ten-second timeout.
+# a construct Postgres does not support, a write the read-only transaction
+# refuses, the ten-second timeout.
 QUERY_REFUSED = (psycopg.errors.ProgrammingError, psycopg.errors.DataError,
+                 psycopg.errors.NotSupportedError, psycopg.errors.ReadOnlySqlTransaction,
                  psycopg.errors.QueryCanceled)
 
 # A cell as JSON carries it.

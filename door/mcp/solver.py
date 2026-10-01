@@ -148,7 +148,11 @@ def reach_tool(ctx: Context, hero: str) -> ToolReply:   # _tool: inference.reach
                                    " meta.md's meta, which scales the default engine"
                                    " (the Meta slider), and swap: 0..50 in place of"
                                    " meta.md's swap cost, in share points of blue's"
-                                   " span; the files are untouched"}})
+                                   " span; the files are untouched. A value outside"
+                                   " its range is clamped into it, and any other id"
+                                   " that names no heuristic of the playbook in force"
+                                   " is ignored (the reply's weights list those in"
+                                   " force)"}})
 def board(
         ctx: Context, draft: Draft, weights: Mapping[str, object] | None = None) -> ToolReply:
     with ctx.connect() as cx:
