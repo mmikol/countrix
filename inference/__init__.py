@@ -1,5 +1,14 @@
 """The INFERENCE LAYER: facts in, the optimal composition out.
 
+The default engine, which the playbook and the search both read:
+
+    base          the default engine: a six's win rates on the map, the
+                  wiki's synergies and its counters against the other side,
+                  under one meta weight, the three terms the search scores
+                  first and the playbook's sit on top of; and meta.md's
+                  fields and weights record (DIALS, FIELDS, BaseWeights),
+                  which catalog reads and tune writes. It imports only facts
+
 The playbook, which imports nothing from the search:
 
     strategies/   the playbook - STRATEGIES = CONSTRAINTS ∪ HEURISTICS ∪ ASSUMPTIONS:
@@ -25,9 +34,6 @@ The playbook, which imports nothing from the search:
 
 The search, which reads the playbook:
 
-    base          the default engine: a six's win rates on the map, the
-                  wiki's synergies and its counters against the other side,
-                  under one meta weight, the terms the playbook's sit on top of
     scoring       the objective: what one six scores on one board, the
                   default engine's terms and then the playbook's
     shapes        the legal shapes: the role counts a six may take around the
