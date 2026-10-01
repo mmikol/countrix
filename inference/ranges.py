@@ -13,6 +13,9 @@ which the bound (inference.bounds) reads as the search walks.
                           the shape
     rule_order, evaluate  the rules a search reads, each after the rules it
                           reads, and their values over one branch
+    pair_halves           half each hero's best and worst few pairs with the
+                          rest of the roster, which the pairwise rules and
+                          the bound's synergy term read
 
 A metric a rule sums in another order than the metric itself carries a
 slack, SLACK times the magnitude of its addends, outward on both ends; one
@@ -54,6 +57,7 @@ from inference.intervals import (
 from inference.scoring import Objective
 
 SLACK = 1e-12              # a float computation's slack per unit of its addends' magnitude
+PAIR_COUNT = TEAM_SIZE * (TEAM_SIZE - 1) // 2      # the pairs a six holds
 
 
 # the roles still open at a node: (role, first candidate, picks left)
@@ -397,22 +401,32 @@ def _product(factor: Feature) -> Spec:
     return Spec(build)
 
 
+def pair_halves(matrix: Sequence[Sequence[float]], pool: Sequence[int],
+                size: int) -> list[list[tuple[float, float]]]:
+    """[k][x] -> (best, worst): half the sum of hero x's k best pairs in
+    `matrix` with the rest of `pool`, and half its k worst, for each k below
+    TEAM_SIZE and each of the `size` heroes. An open pick takes them for its
+    pairs among the other open picks, each such pair counted from both
+    ends."""
+    halves: list[list[tuple[float, float]]] = []
+    for k in range(TEAM_SIZE):
+        row = []
+        for x in range(size):
+            others = sorted(matrix[x][y] for y in pool if y != x)
+            row.append((sum(others[len(others) - k:]) / 2 if k else 0.0,
+                        sum(others[:k]) / 2))
+        halves.append(row)
+    return halves
+
+
 def _pairwise(weight: Callable[[Space], list[list[float]]], per: float = 1.0) -> Spec:
     """A sum over the six's pairs, divided by `per`: the picks' own pairs,
     each open candidate's pairs with the picks, and half its best (or worst)
-    pairs among the rest of the roster - each pair among the open picks is
-    counted from both ends. Each role then takes its best (or worst) few."""
+    pairs among the rest of the roster (pair_halves). Each role then takes
+    its best (or worst) few."""
     def build(space: Space) -> Rule:
         matrix = weight(space)
-        pool = space.candidates
-        halves: list[list[tuple[float, float]]] = []     # [k][x] -> (best, worst)
-        for k in range(TEAM_SIZE):
-            row = []
-            for x in range(len(space.heroes)):
-                others = sorted(matrix[x][y] for y in pool if y != x)
-                row.append((sum(others[len(others) - k:]) / 2 if k else 0.0,
-                            sum(others[:k]) / 2))
-            halves.append(row)
+        halves = pair_halves(matrix, space.candidates, len(space.heroes))
         flat = [v for row in matrix for v in row]
 
         def read(branch: Branch, env: Env) -> Abstract:
@@ -437,7 +451,7 @@ def _pairwise(weight: Callable[[Space], list[list[float]]], per: float = 1.0) ->
                 hi += sum(best[:n])
                 lo += sum(worst[:n])
             return Iv(lo / per, hi / per)
-        return Rule(read, _slack(flat, count=TEAM_SIZE * (TEAM_SIZE - 1) // 2) / per)
+        return Rule(read, _slack(flat, count=PAIR_COUNT) / per)
     return Spec(build)
 
 
@@ -750,13 +764,12 @@ TEAM_RULES: dict[str, Spec] = {
     "synergy_edges": _pairwise(lambda s: [[1.0 if a is not b and s.world.synergy(a.id, b.id)
                                            else 0.0 for b in s.heroes] for a in s.heroes]),
     "synergy_score": _pairwise(Space.pairs),
-    "synergy_density": _scaled("team.synergy_edges",
-                               lambda s: TEAM_SIZE * (TEAM_SIZE - 1) // 2),
+    "synergy_density": _scaled("team.synergy_edges", lambda s: PAIR_COUNT),
     "isolated_count": _isolated(),
     "isolated": _fixed(Top(TEAM_SIZE)),
     "core_size": _core(),
-    "pairs": _fixed(Top(TEAM_SIZE * (TEAM_SIZE - 1) // 2)),
-    "unwritten_pairs": _fixed(Top(TEAM_SIZE * (TEAM_SIZE - 1) // 2)),
+    "pairs": _fixed(Top(PAIR_COUNT)),
+    "unwritten_pairs": _fixed(Top(PAIR_COUNT)),
     "unwritten_cells": _pairwise(lambda s: [[float(s.world.unwritten_cells(a.id, b.id))
                                              if a is not b else 0.0 for b in s.heroes]
                                             for a in s.heroes]),
@@ -812,38 +825,42 @@ def _red_less(red: str, key: str) -> Spec:
     return Spec(build, (key,))
 
 
+# a chew time where either side's pool or damage is 0 (compute.matchup_metrics)
+CHEW_POINT = Iv(compute.CHEW_UNKNOWN, compute.CHEW_UNKNOWN)
+
+
 def _chew_ours() -> Spec:
-    """matchup.chew_time_ours: red's pool over the six's damage, 999 where
-    either is 0."""
+    """matchup.chew_time_ours: red's pool over the six's damage,
+    CHEW_POINT where either is 0."""
     def build(space: Space) -> Rule:
         pool = _red(space, "pool_total")
 
         def read(branch: Branch, env: Env) -> Abstract:
             dps = env["team.dps_floor"]
             if not pool:
-                return Iv(999.0, 999.0)
+                return CHEW_POINT
             if not isinstance(dps, Iv):
                 return ANY
             out = divide(Iv(pool, pool), dps)
-            return join(out, Iv(999.0, 999.0)) if dps.lo <= 0 <= dps.hi else out
+            return join(out, CHEW_POINT) if dps.lo <= 0 <= dps.hi else out
         return Rule(read)
     return Spec(build, ("team.dps_floor",))
 
 
 def _chew_theirs() -> Spec:
-    """matchup.chew_time_theirs: the six's pool over red's damage, 999 where
-    either is 0."""
+    """matchup.chew_time_theirs: the six's pool over red's damage,
+    CHEW_POINT where either is 0."""
     def build(space: Space) -> Rule:
         dps = _red(space, "dps_floor")
 
         def read(branch: Branch, env: Env) -> Abstract:
             pool = env["team.pool_total"]
             if not dps:
-                return Iv(999.0, 999.0)
+                return CHEW_POINT
             if not isinstance(pool, Iv):
                 return ANY
             out = divide(pool, Iv(dps, dps))
-            return join(out, Iv(999.0, 999.0)) if pool.lo <= 0 <= pool.hi else out
+            return join(out, CHEW_POINT) if pool.lo <= 0 <= pool.hi else out
         return Rule(read)
     return Spec(build, ("team.pool_total",))
 

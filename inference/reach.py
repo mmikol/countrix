@@ -119,9 +119,10 @@ def search(world: World, name: str) -> Reach:
                            % hero.name)
     near: list[_Near] = []
     fenced = past_budget = 0          # the misses, named in the refusal when nothing seats
+    to_try = reds(world, hero)
     for m in boards:
-        for red in reds(world, hero):
-            sides: tuple[Side, ...] = SIDES if is_sided(m) else ("",)
+        sides: tuple[Side, ...] = SIDES if is_sided(m) else ("",)
+        for red in to_try:
             for side in sides:
                 try:
                     top = engine.infer(world, Draft(map_name=m.name, red=tuple(red), side=side),
