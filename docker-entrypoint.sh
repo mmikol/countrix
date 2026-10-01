@@ -77,6 +77,13 @@ case "$role" in
                 echo "data: schema behind the migrations - migrating in place"
                 if ! python -m door.mcp call db_migrate; then
                     echo "data: the migration failed (above) - a dump, then a rebuild from the caches" >&2
+                    # db_rebuild's own first check: a playbook that does not load
+                    # refuses it, and a dump asked for first is one more kept
+                    # on every restart
+                    python -c 'from inference import catalog; catalog.load()' || {
+                        echo "data: the playbook does not load (above) - no dump, no rebuild; the container retries on restart" >&2
+                        exit 1
+                    }
                     predump
                     rebuild
                 elif [ "$(db_state)" != current ]; then
