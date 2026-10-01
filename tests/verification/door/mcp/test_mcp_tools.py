@@ -20,7 +20,7 @@ from db.psql import schema
 from door.mcp import boards, lifecycle, solver, tools
 from facts import board_facts, tables
 from facts.draft import Draft
-from inference import catalog
+from inference import catalog, tune
 from tests.verification.inference import FIXTURE_PLAYBOOK
 
 # --- the tools against the built database ----------------------------------
@@ -190,6 +190,42 @@ def test_every_playbook_write_mirrors_the_catalog_once(tmp_path, monkeypatch):
         direction="maximize", weight=1)
     assert len(mirrored) == 3
     assert not [h.id for h in catalog.load() if h.pending]
+
+
+def test_a_playbook_write_reaches_the_database_before_it_moves_a_file(tmp_path, monkeypatch):
+    """tune, add_strategy and infer_strategy open the database before they
+    write, as db_rebuild does before it drops: with the database out of
+    reach each call fails with no strategy file, doc or log line moved, so
+    the same call succeeds once the database is back."""
+    for name in catalog.strategy_files(FIXTURE_PLAYBOOK):
+        shutil.copy(os.path.join(FIXTURE_PLAYBOOK, name), tmp_path / name)
+    monkeypatch.setenv("COUNTRIX_STRATEGIES", str(tmp_path))
+    monkeypatch.setattr(catalog, "mirror", lambda cx, cat, directory=None: None)
+    documented = []
+    monkeypatch.setattr(catalog, "write_docs", lambda cat, path=None: documented.append(len(cat)))
+    before = {path.name: path.read_bytes() for path in tmp_path.iterdir()}
+
+    class Unreachable(tools.Context):
+        def connect(self):
+            raise psql.NoDatabaseError("no database")
+
+    class Offline(tools.Context):
+        def connect(self):
+            return contextlib.nullcontext("cx")
+    heuristic = next(h for h in catalog.load() if h.kind == "heuristic")
+    calls = (
+        ("tune", {"id": heuristic.id, "field": "weight", "value": 3, "reason": "a test"}),
+        ("add_strategy", {"id": "a-draft", "name": "A draft", "kind": "heuristic",
+                          "body": "Prose to infer from.", "reason": "a test"}),
+        ("infer_strategy", {"id": heuristic.id, "reason": "a test", "weight": 2}))
+    for name, arguments in calls:
+        with pytest.raises(psql.NoDatabaseError):
+            Unreachable(dsn="postgresql://nowhere").call(name, **arguments)
+    assert {path.name: path.read_bytes() for path in tmp_path.iterdir()} == before
+    assert documented == []
+    for name, arguments in calls:
+        Offline(dsn="postgresql://nowhere").call(name, **arguments)
+    assert len(documented) == 3 and len(tune.log_tail(5)) == 3
 
 
 def test_add_strategy_stores_a_charge_with_a_numeric_penalty(tmp_path, monkeypatch):
