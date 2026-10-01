@@ -112,7 +112,7 @@ def test_the_board_scores_under_the_weights_it_is_given(synthetic_world, harbor_
     tilted = engine.board(synthetic_world,
                           Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm", "Anvil")),
                           catalog=fix,
-                          brief=engine.Brief(weights=weights, base=DEFAULT, swaps=False))
+                          brief=engine.Brief(weights=weights, base=DEFAULT, search_swaps=False))
     assert tilted.current.to_dict()["weights"][heuristic.id] == weights[heuristic.id]
     assert plain.current.to_dict()["weights"][heuristic.id] == heuristic.weight
     assert tilted.current.score != plain.current.score
@@ -468,7 +468,7 @@ def test_a_newer_board_from_the_same_client_supersedes_the_older_one(
     with pytest.raises(supersede.Superseded):
         engine.board(synthetic_world, Draft("Harbor Gate", ("Anvil",), ("Balm",)),
                      catalog=scratch_playbook, brief=engine.Brief(superseded=first, base=DEFAULT,
-                                                        swaps=False))
+                                                        search_swaps=False))
 
 
 def _shortfall(world, result):

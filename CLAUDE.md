@@ -206,8 +206,8 @@ db <- facts <- inference <- door <- ui.
   A swap needs its net to beat the six that keeps every pick; red is
   re-solved against the target for the odds after, and a suggestion that
   lowers them is withheld. Red is never searched for swaps. `BRIEF` in
-  tests/verification/inference/__init__.py turns them off (`Brief.swaps`); a
-  test that reads them names its cost.
+  tests/verification/inference/__init__.py turns them off
+  (`Brief.search_swaps`); a test that reads them names its cost.
 - **The plan runs stage by stage.** On a map with stages, `Board.stages`
   (`swaps.chain`) is a row a stage in play order from the six the board
   suggests: each phase of a route the exact best reachable from the phase
@@ -215,7 +215,7 @@ db <- facts <- inference <- door <- ui.
   stage the six itself, the phases before it played. Two stages with the
   same `Objective.ground_key` are one search. Each row's blurb is
   `plan.stage_blurb`, worded from the facts. `BRIEF` leaves it out too
-  (`Brief.stages`); test_stage_plan names its brief.
+  (`Brief.walk_stages`); test_stage_plan names its brief.
 - **The board** (`ui/board.py`, its pages in `ui/pages.py`) serves
   `/api/facts` and answers `/api/board`, `/api/strategies` and `/health`
   with `ui/serve.py`'s handlers, all in its own process - the
