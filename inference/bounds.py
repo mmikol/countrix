@@ -81,6 +81,15 @@ def _six_names(expr: Expr | None) -> set[str]:
     return {n for n in expr.names if n.split(".", 1)[0] in ("team", "matchup")}
 
 
+def _gate(gate: bool | None, when: Evaluator | None, env: Env) -> bool | None:
+    """A term's gate over a branch: the board's where it settles it, else
+    its `when` read off the branch - None where its sixes may go either
+    way - else open."""
+    if gate is not None:
+        return gate
+    return truth(when(env)) if when is not None else True
+
+
 class Bound:
     """The objective's bound over the walk's branches on one Space: the
     default engine's terms jointly, then every heuristic and scored term of
@@ -222,8 +231,7 @@ class Bound:
                 return None
         total = self.engine(frame, open_roles)
         for h in self.heuristics:
-            gate = h.gate if h.gate is not None else (
-                truth(h.when(env)) if h.when is not None else True)
+            gate = _gate(h.gate, h.when, env)
             if gate is False:
                 continue
             total += self._heuristic(h, env, gate)
@@ -252,7 +260,7 @@ class Bound:
         """A scored heuristic's most on the branch: its weight times the
         bonus's high end less the penalty's low end, where the gate holds;
         0 where it need not."""
-        gate = s.gate if s.gate is not None else truth(s.when(env)) if s.when else True
+        gate = _gate(s.gate, s.when, env)
         if gate is False:
             return 0.0
         bonus = s.bonus(env) if s.bonus is not None else FALSE

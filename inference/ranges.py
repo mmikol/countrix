@@ -853,8 +853,10 @@ def _range_diff() -> Spec:
 
         def read(branch: Branch, env: Env) -> Abstract:
             known, median = env["team.range_known"], env["team.range_median"]
-            if not red_known or not isinstance(known, Iv):
-                return FALSE if not red_known else ANY
+            if not red_known:
+                return FALSE
+            if not isinstance(known, Iv):
+                return ANY
             gap = subtract(median, Iv(red_median, red_median))
             if known.lo >= 1:
                 return gap
@@ -940,6 +942,3 @@ def evaluate(steps: Sequence[tuple[str, Rule]], branch: Branch) -> Env:
             value = Iv(value.lo - rule.slack, value.hi + rule.slack)
         env[key] = value
     return env
-
-
-# --- the objective's bound ------------------------------------------------------

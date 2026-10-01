@@ -266,7 +266,10 @@ class World:
             twice: list[str] = []
             for n in names:
                 hid = heroes[n].id
-                twice.append(n) if hid in seen else seen.add(hid)
+                if hid in seen:
+                    twice.append(n)
+                else:
+                    seen.add(hid)
             if twice:
                 raise Refusal(
                     "%s picks the same hero twice: %s" % (label, ", ".join(sorted(set(twice)))))

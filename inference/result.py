@@ -585,12 +585,11 @@ def _reasons(fs: FactSet, hero_name: str, locked: bool) -> tuple[str, list[str]]
     def own(key: str) -> list[Fact]:
         return [f for f in fs.find(key, hero_name) if f.team in (None, "blue")]
 
-    def cite(key: str, template: Callable[[Fact], str]) -> bool:
-        for f in own(key):
-            why.append(template(f))
-            evidence.append(f.id)
-            return True
-        return False
+    def cite(key: str, template: Callable[[Fact], str]) -> None:
+        found = own(key)
+        if found:
+            why.append(template(found[0]))
+            evidence.append(found[0].id)
 
     cite("hero.vs_answers", lambda f: "answers %s" % ", ".join(f.value))
     partners = own("hero.with_ally")

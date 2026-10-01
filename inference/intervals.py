@@ -323,6 +323,8 @@ def _extreme(args: Sequence[Abstract], lowest: bool) -> Abstract:
     if all(isinstance(x, Exact) for x in items):
         try:
             values = [x.value for x in items if isinstance(x, Exact)]
+            # Exact values are objects to mypy: one kind orders, and mixed
+            # kinds raise TypeError, caught below
             return lift(min(values) if lowest else max(values))  # type: ignore[type-var]
         except TypeError:
             return ANY
@@ -538,6 +540,3 @@ def abstract(
     keeps only its code object): the board's names fixed, the six's read
     from the branch's Env."""
     return _Compiler(params, static).compile(ast.parse(expr.source, mode="eval").body)
-
-
-# --- the space ------------------------------------------------------------------

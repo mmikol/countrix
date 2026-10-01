@@ -45,7 +45,7 @@ from facts.draft import Side
 from facts.model import ROLES, Hero, Map, World
 from facts.team import NUMBER_TYPES, MetricBag, MetricValue, number, team_metrics
 from inference.base import COUNTERS, RATES, READS, SYNERGY, Base, BaseWeights, Terms
-from inference.expr import Expr, Scope, Value, scope
+from inference.expr import Expr, ExprError, Scope, Value, scope
 from inference.shapes import is_shape_limit
 from inference.strategy import Strategy, settled_by_board
 
@@ -103,11 +103,12 @@ def _not_a_number(value: MetricValue | None) -> float:
     return 0.0
 
 
-def _amount(value: Value) -> float:
-    """A bonus or penalty expression's value, as the score adds it."""
-    if isinstance(value, (int, float, str)):          # a bool is an int
+def _amount(value: Value, source: str) -> float:
+    """A bonus or penalty expression's value, as the score adds it: a
+    number; anything else is the playbook's error, named by its `source`."""
+    if isinstance(value, (int, float)):               # a bool is an int
         return float(value)
-    raise TypeError("a bonus or penalty reads a number, got %r" % (value,))
+    raise ExprError("%r - a bonus or penalty is a number, got %r" % (source, value))
 
 
 def _slot_gate(held: list[bool | None], slot: int, s: Strategy, sc: Scope) -> bool:
@@ -592,9 +593,9 @@ class Objective:
             if applies:
                 sc["params"] = r.params_section
                 if r.bonus is not None:
-                    bonus = _amount(r.bonus.evaluate(sc))
+                    bonus = _amount(r.bonus.evaluate(sc), r.bonus.source)
                 if r.penalty is not None:
-                    penalty = _amount(r.penalty.evaluate(sc))
+                    penalty = _amount(r.penalty.evaluate(sc), r.penalty.source)
             weighted = r.weight * (bonus - penalty)
             total += weighted
             if out is not None:
