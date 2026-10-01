@@ -77,7 +77,7 @@ def parse_announcement(text: str) -> Announcement | None:
     """An article marked {{Upcoming}} -> {role, subrole, release_date} from
     its infobox and its release sentence; None for a released hero (no
     marker) or an infobox without a role."""
-    if not UPCOMING_RE.search(text or ""):
+    if not UPCOMING_RE.search(text):
         return None
     params = _infobox(text)
     if params is None:

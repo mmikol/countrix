@@ -157,6 +157,6 @@ def board(
         ctx: Context, draft: Draft, weights: Mapping[str, object] | None = None) -> ToolReply:
     with ctx.connect() as cx:
         world = tables.load(cx)
-    brief = engine.Brief(weights=catalog.parse_weights(weights or {}))
+    brief = engine.Brief(weights=catalog.parse_weights(weights))
     b = engine.board(world, draft, brief=brief)
     return ToolReply(b.rendered(), b.to_dict())

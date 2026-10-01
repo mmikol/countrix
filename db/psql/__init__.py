@@ -133,7 +133,7 @@ def identifier(name: str) -> Identifier:
     table in the statement itself composes it with psycopg.sql through here.
     The names all come from a literal or from the catalog today, and this is
     what keeps it so."""
-    if not IDENTIFIER_RE.match(name or ""):
+    if not IDENTIFIER_RE.match(name):
         raise ValueError("not a SQL identifier: %r" % (name,))
     return Identifier(name)
 
