@@ -35,11 +35,11 @@ class BusyError(Exception):
 
 
 class Admission:
-    """The boards solving in one process, each holding a share of `budget`:
-    the board's handler takes one of BOARDS_AT_ONCE. A board waits while
-    those in flight leave it less room than its share; a board alone is
-    always admitted. A waiting board a newer one from its client supersedes
-    stops waiting; one still waiting after `wait` seconds raises BusyError."""
+    """The boards solving in one process, at most `budget` at once: the
+    board's handler admits BOARDS_AT_ONCE. A board waits while `budget`
+    boards are in flight. A waiting board a newer one from its client
+    supersedes stops waiting; one still waiting after `wait` seconds raises
+    BusyError."""
 
     def __init__(self, budget: int = BOARDS_AT_ONCE, wait: float = ADMIT_WAIT) -> None:
         self.budget = budget
@@ -48,14 +48,14 @@ class Admission:
         self._held = 0
 
     def held(self) -> int:
-        """The shares the boards in flight hold."""
+        """The boards in flight."""
         with self._room:
             return self._held
 
-    def _take(self, share: int, superseded: Callable[[], bool]) -> None:
+    def _take(self, superseded: Callable[[], bool]) -> None:
         deadline = time.monotonic() + self.wait
         with self._room:
-            while self._held and self._held + share > self.budget:
+            while self._held >= self.budget:
                 if superseded():
                     raise supersede.Superseded(supersede.MESSAGE)
                 left = deadline - time.monotonic()
@@ -64,19 +64,18 @@ class Admission:
                 self._room.wait(min(left, ADMIT_POLL))
             if superseded():             # room came, but a newer board took the lane first
                 raise supersede.Superseded(supersede.MESSAGE)
-            self._held += share
+            self._held += 1
 
     @contextlib.contextmanager
-    def admitted(self, share: int, superseded: Callable[[], bool]) -> Iterator[None]:
-        """Hold `share` of the budget, at most all of it, while the block
-        runs; raise BusyError or Superseded, holding nothing, when no room comes."""
-        share = min(share, self.budget)
-        self._take(share, superseded)
+    def admitted(self, superseded: Callable[[], bool]) -> Iterator[None]:
+        """Hold one board's place while the block runs; raise BusyError or
+        Superseded, holding nothing, when no place comes."""
+        self._take(superseded)
         try:
             yield
         finally:
             with self._room:
-                self._held -= share
+                self._held -= 1
                 self._room.notify_all()
 
 
@@ -113,7 +112,7 @@ def handle_board(cx: psycopg.Connection, query: Query) -> web.Reply:
     weights = catalog_module.parse_weights(query.get("weights", []))
     superseded = supersede.LATEST.take(_first(query, "client") or "")
     try:
-        with ADMISSION.admitted(1, superseded):
+        with ADMISSION.admitted(superseded):
             world = tables.load(cx)
             brief = engine.Brief(weights=weights, countered=False, superseded=superseded)
             return web.Reply(engine.board(world, draft, brief=brief).to_dict(), 200)
