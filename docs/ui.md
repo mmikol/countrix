@@ -88,7 +88,8 @@ each at its pick's place), under the board's verdict; a click trades that
 pick in place, and the board solves again. The suggestion is one joint
 answer ([The swaps](inference.md#the-swaps)): taking one leaves the rest
 the board's answer from the new picks, and a half-drafted seat's empty
-slots show the rest of its six (`swaps.open`). Nothing is drawn for red.
+slots show the fill's heroes (`swaps.open`), as they do without a swap.
+Nothing is drawn for red.
 
 **The stage picker** beside the map lists the map's stages after WHOLE
 MAP, hidden on a map without stages and cleared when the map changes; a

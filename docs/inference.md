@@ -458,9 +458,9 @@ way back to an allowed six, and the verdict says so. Each dropped pick
 is paired with an incoming hero of its own role where the target has
 one, then with whichever is left, and carries its place among the picks
 as sent (`at`), so the page draws the incoming portrait over that slot
-and decides nothing; a half-drafted seat's other incoming heroes are the
-ones its empty slots show (`open`), the fill's where nothing is
-suggested.
+and decides nothing; a half-drafted seat's empty slots show the fill's
+heroes (`open`), whether or not a swap is suggested, as the rest of the
+board does.
 
 Where a swap is suggested, red's optimal, current comp and fill are
 solved again against the target, and the fight odds read off them as the

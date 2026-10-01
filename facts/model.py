@@ -167,10 +167,10 @@ class Map:
         self.stage_terrain: dict[str, dict[str, StageTerrain]] = {}   # stage -> feature; text only
         self.stage_z: dict[str, dict[str, float]] = {}          # stage -> {feature: z}
         self.terrain: dict[str, float] = {}     # feature -> mentions per thousand words, with text
-        self.terrain_z = dict.fromkeys(TERRAIN_FEATURES, 0.0)   # see tables.map_terrain
-        self.rate_lift: dict[str, float] = {}                   # style -> z: see tables.map_styles
-        self.terrain_lean: dict[str, float] = {}                # style -> z: see tables.map_terrain
-        self.styles: dict[str, float] = {}                      # style -> sd: see tables.map_styles
+        self.terrain_z = dict.fromkeys(TERRAIN_FEATURES, 0.0)   # see tables.derive_map_terrain
+        self.rate_lift: dict[str, float] = {}     # style -> z: see tables.derive_map_styles
+        self.terrain_lean: dict[str, float] = {}  # style -> z: see tables.derive_map_terrain
+        self.styles: dict[str, float] = {}        # style -> sd: see tables.derive_map_styles
 
     @property
     def style_top(self) -> str | None:

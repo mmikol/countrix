@@ -84,7 +84,7 @@ class Draft:
 # --- the board off the wire -----------------------------------------------------
 #
 # The board's two routes that read one - /api/facts in ui/board.py and
-# /api/board through inference/serve.py - read it off a query string with
+# /api/board through ui/serve.py - read it off a query string with
 # parse_board. The limits belong to Draft, so these routes and the MCP board
 # tools (door/mcp/boards.py) refuse the same boards. A Draft holds tuples: a
 # list in a field makes an equal-looking Draft compare unequal.
