@@ -117,7 +117,7 @@ def _meta_facts(fs: FactSet, world: World) -> None:
             "WARNING: %d patch(es) shipped since the rates were captured,"
             " newest %s (%s) - treat rates as pre-patch"
             % (len(world.newer_patches), name, released),
-            value=len(world.newer_patches), source="patches")
+            value=len(world.newer_patches), source="patches", warn=True)
 
 
 def _ban_facts(fs: FactSet, world: World, board: Resolved) -> None:

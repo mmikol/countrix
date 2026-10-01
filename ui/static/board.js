@@ -313,7 +313,7 @@ function renderFacts() {
     shown++;
     var head = x.scope === 'hero' ? (x.team + ' · ' + x.subject) : x.scope === 'team' ? (x.subject + ' team') : x.scope;
     if (head !== last) { out += "<tr class='h'><td colspan='3' class='head'>" + esc(head) + '</td></tr>'; last = head; }
-    var cls = (x.team || '') + (/^(WARNING|CAUTION)/.test(x.text) ? ' warn' : '') + (x.source.indexOf('derived:') === 0 ? ' derived' : '');
+    var cls = (x.team || '') + (x.warn ? ' warn' : '') + (x.source.indexOf('derived:') === 0 ? ' derived' : '');
     out += "<tr class='" + cls + "'><td class='tag'>[" + x.id + "]</td><td class='text'>" + esc(x.text) + "</td><td class='src'>" + esc(x.source) + '</td></tr>';
   });
   el('factbody').innerHTML = out || "<tr><td class='src'>nothing matches</td></tr>";

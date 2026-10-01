@@ -7,6 +7,7 @@ import pytest
 from db import Refusal
 from facts import board_facts
 from facts.draft import Draft
+from facts.records import Patch
 
 
 def test_every_fact_is_keyed_and_the_meta_comes_first(synthetic_world):
@@ -47,10 +48,16 @@ def test_team_facts_appear_per_side_and_matchup_only_with_both(synthetic_world):
 
 
 def test_board_context_facts_warn_and_cite(synthetic_world):
+    """A warning carries its flag, which the board marks it by; a patch
+    shipped since the rates is one."""
     w = synthetic_world
     fs = board_facts.generate(w, Draft(None, ("Anvil",), ("Mortar",)))
     assert [f.text for f in fs.find("hero.vs_answered_by", "Mortar")] == [
         "WARNING: blue Mortar is answered by red Anvil"]
+    assert [f.key for f in fs.facts if f.warn] == ["hero.vs_answered_by"]
+    w.newer_patches = [Patch("a patch", "2026-09-30")]
+    (vintage,) = board_facts.generate(w, Draft()).find("meta.vintage_warning")
+    assert vintage.warn and vintage.text.startswith("WARNING: 1 patch(es) shipped")
     fs = board_facts.generate(w, Draft("Harbor Gate", (), ("Balm", "Anvil")))
     assert [f.text for f in fs.find("hero.with_ally", "Balm")] == [
         "blue Balm + Anvil (2/2): the charm keeps the hammer swinging"]

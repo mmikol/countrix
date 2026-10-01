@@ -58,4 +58,4 @@ def test_a_fact_is_a_frozen_record_and_the_draft_serves_as_lists():
         ("King's Row", ["Zarya"], ["Ana"], ["Sombra"], "attack")
     assert served["facts"] == [{"id": "F1", "scope": "hero", "subject": "Ana", "team": "blue",
                                 "key": "hero.pool", "text": "Ana pool: 250", "value": 250,
-                                "unit": "hp", "source": "heroes"}]
+                                "unit": "hp", "source": "heroes", "warn": False}]

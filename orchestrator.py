@@ -287,12 +287,13 @@ def dotenv() -> dict[str, str]:
 
 def stale_mount(inf: dict[str, Any] | None) -> bool:
     """The playbook's folder reads as empty or missing inside the board's
-    container - a bind mount gone stale - rather than a file in it that does
-    not load, whose error the verdict prints as it is."""
+    container - a bind mount gone stale, in the catalog's own words for
+    either - rather than a file in it that does not load, whose error the
+    verdict prints as it is."""
     if not inf or inf.get("strategies"):
         return False
     error = str(inf.get("error", ""))
-    return "no strategies in " in error or "no strategies directory at " in error
+    return catalog.NO_STRATEGIES in error or catalog.NO_FOLDER in error
 
 
 def playbook_problem() -> str | None:

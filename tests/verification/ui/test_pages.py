@@ -212,7 +212,7 @@ def test_the_scripts_read_payload_keys_the_server_writes(synthetic_world, monkey
     read("strategies meta", playbook)
     read("meta rate synergy counter swap body", playbook["meta"])
     fact = board_facts.generate(synthetic_world, Draft()).to_dict()["facts"][0]
-    read("id key subject text scope team source", fact)
+    read("id key subject text scope team source warn", fact)
     monkeypatch.setattr(board.tables, "load", lambda cx: synthetic_world)
     synthetic_world.newer_patches = [Patch("a patch", "2026-09-30")]
     roster = board.api_roster(None).body
