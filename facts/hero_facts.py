@@ -66,7 +66,8 @@ def _hero_identity(fs: FactSet, world: World, h: Hero, team: Seat) -> None:
         fs.add("hero", name, "hero.announced", "CAUTION: %s is announced, not yet playable%s -"
             " the kit is the wiki's preview and there are no rates" % (
                 name, " (releases %s)" % h.release_date if h.release_date else ""),
-            value=str(h.release_date) if h.release_date else None, source="heroes", team=team)
+            value=str(h.release_date) if h.release_date else None, source="heroes", team=team,
+            warn=True)
     fs.add("hero", name, "hero.pool", "%s pool: %d (%d health, %d shield, %d armor)%s"
         % (name, h.pool, h.health, h.shield, h.armor,
             ", %g more armor from its forms, time-averaged" % h.form_armor
@@ -391,7 +392,7 @@ def _hero_versus(
         fs.add("hero", name, "hero.vs_answered_by", "%s: %s %s is answered by %s %s"
             % ("WARNING" if team == "blue" else "NOTE", team, name, other_side,
                 ", ".join(threats)), value=threats,
-            source="counters", team=team)
+            source="counters", team=team, warn=team == "blue")
     wins = [o.name for o in opponents if world.is_countered_by(o.id, h.id)]
     if wins:
         fs.add("hero", name, "hero.vs_answers", "%s %s answers %s %s"

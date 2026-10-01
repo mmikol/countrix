@@ -78,6 +78,10 @@ NOT_STRATEGIES = ("README.md", "tuning-log.md", META_FILE)
 # the ids no strategy may take: meta.md's name and the swap cost's, each a key
 # of a board's weights beside the heuristics' ids
 RESERVED = (META, SWAP)
+# the refusals of a folder with nothing to read - none at the path, or no
+# strategy file in it - which orchestrator.stale_mount reads as a stale mount
+NO_FOLDER = "no strategies directory at "
+NO_STRATEGIES = "no strategies in "
 
 
 def _read(directory: str, name: str) -> Strategy:
@@ -107,7 +111,7 @@ def strategy_files(directory: str) -> list[str]:
     the markdown that lives beside them. Everything that copies, reads or
     fingerprints a playbook takes its files from here."""
     if not os.path.isdir(directory):
-        raise CatalogError("no strategies directory at %s" % directory)
+        raise CatalogError(NO_FOLDER + directory)
     return sorted(name for name in os.listdir(directory)
                   if name.endswith(".md") and name not in NOT_STRATEGIES)
 
@@ -119,7 +123,7 @@ def load(directory: str | None = None) -> list[Strategy]:
     directory = directory or strategies_dir()
     out = [_read(directory, name) for name in strategy_files(directory)]
     if not out:
-        raise CatalogError("no strategies in %s" % directory)
+        raise CatalogError(NO_STRATEGIES + directory)
     out.sort(key=lambda s: (KINDS.index(s.kind), FORMS.index(s.form), s.category, s.id))
     return out
 
