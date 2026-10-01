@@ -10,7 +10,7 @@ and digest.
     ---
     meta: 1
     rate: 1
-    synergy: 0.1
+    synergy: 0.26
     counter: 0.05
     swap: 10
     ---

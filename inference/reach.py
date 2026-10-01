@@ -12,9 +12,8 @@ there, and re-solving that board shows it. A board not found is not a proof of t
 opposite - the search tries every map but a few reds, and a board it never visits could
 seat the hero. A hero it finds nothing for is one worth looking at: a wrong number, a
 tool no metric reads, a rule that charges it for what it is not, or a board this search
-does not reach. Under the shipped playbook, the default engine and the healing floor,
-forty-nine of the fifty-three released heroes have a board and four do not
-(tests/verification/inference/test_reach.py names them). Each board's optimal six is exact
+does not reach. The heroes it seats nowhere under the shipped playbook are named in
+tests/verification/inference/test_reach.py, as UNSEATED. Each board's optimal six is exact
 (inference.solver), so a board found is a proof of the hero's seat there. The
 `reach` tool runs the search; `.venv/bin/python -m tests.verification.inference.record_reach`
 records a board per released hero in tests/fixtures/reach.json beside the objective
