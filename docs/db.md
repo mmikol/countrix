@@ -59,8 +59,9 @@ a new pull or table.
 `wiki.heroes`, `wiki.maps`, `wiki.terrain`, `wiki.patches`,
 `blizzard.meta`, `wiki.playstyles`, `wiki.synergies`, `wiki.matchups` -
 then `load_authored`. Entity tables refresh in place;
-each rates pull appends a dated snapshot, the series the trend facts
-difference. The page caches (`.cache-blizzard/`, `.cache-wiki/` at the
+a rates pull of a new capture appends a snapshot dated by that capture,
+the series the trend facts difference, and a pull of pages already held
+stores nothing. The page caches (`.cache-blizzard/`, `.cache-wiki/` at the
 repo root) make every build after the first cost almost no requests.
 
 ```mermaid
@@ -73,7 +74,7 @@ stateDiagram-v2
     stale --> current: db_migrate<br/>keeps the data
     unfilled --> current: db_rebuild
     stale --> current: db_rebuild<br/>drops the rates history
-    current --> current: the refresher - pull_patches + pull_rates daily,<br/>sync_all weekly, entities upsert in place,<br/>rates APPEND a dated snapshot
+    current --> current: the refresher - pull_patches + pull_rates daily,<br/>sync_all weekly, entities upsert in place,<br/>rates APPEND a snapshot per new capture
 ```
 
 `db_rebuild` drops every table, reapplies the migrations and runs
