@@ -47,10 +47,6 @@ class Latest:
         return superseded
 
 
-# the page's boards, one lane per client
-LATEST = Latest()
-
-
 class Watch:
     """One board's check against being superseded. Every search the board
     runs calls check() as it goes: once a newer request has replaced the

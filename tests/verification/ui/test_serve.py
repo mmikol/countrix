@@ -55,8 +55,7 @@ def test_a_refused_board_supersedes_nothing():
     so a board its parse refuses - a junk weight, a seventh pick, a stage
     with no map - leaves the board still solving in that lane alone. No
     database is reached: each is refused before the World loads."""
-    from inference import supersede
-    ticket = supersede.LATEST.take("tab1")
+    ticket = serve.LATEST.take("tab1")
     seven = ["Ana", "Ashe", "Baptiste", "Cassidy", "Genji", "Kiriko", "Mercy"]
     for refused in ({"weights": ["junk"]}, {"red": seven}, {"stage": ["Well"]}):
         with pytest.raises(Refusal):

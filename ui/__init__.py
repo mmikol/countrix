@@ -5,8 +5,9 @@ layer's answer. It is the only presentation code, and no layer imports it.
                 the handler that routes to them, to serve.py's and to the
                 pages
     serve.py    the board's routes over the engine - the board, the
-                catalog and /health - and the admission that solves one
-                board at a time
+                catalog and /health - the admission that solves one board
+                at a time, and each client's lane, where a newer board
+                supersedes one still solving
     pages.py    the board's HTML - the page shell, styled like the game's
                 hero select, and the math page - and the static files they
                 load
