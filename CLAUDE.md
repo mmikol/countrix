@@ -85,12 +85,14 @@ db <- facts <- inference <- door <- ui.
   tool's schema by the same `Tool` wrapper on every path.
   The code that writes lives with what it writes - the pulls in `db/data`,
   the strategies table in `inference.catalog.mirror`, the playbook's files
-  in `inference.tune` - and only the tools call it. Reads bypass the door:
-  the board, `facts/` and `inference/` read through
-  `db.psql.default_dsn()` - `DATABASE_URL`, else the embedded pgserver
-  cluster at `db/psql/cluster`, started on first touch; only db_rebuild
-  creates it (`psql.boot`), and a read with neither raises
-  `psql.NoDatabaseError`.
+  in `inference.tune` - and only the tools call it. Reads need no door
+  tool: the board opens its own connection through
+  `db.psql.default_dsn()`, and a door tool opens one through its
+  `Context`; `facts.tables.load` reads over the connection it is handed,
+  and `inference/` reads only the World. `default_dsn()` is
+  `DATABASE_URL`, else the embedded pgserver cluster at `db/psql/cluster`,
+  started on first touch; only db_rebuild creates it (`psql.boot`), and a
+  read with neither raises `psql.NoDatabaseError`.
 - **One user input.** The strategies are the only data written by hand,
   and the only rows under the `user` source; every other table is pulled
   from Blizzard or the wiki.

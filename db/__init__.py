@@ -2,8 +2,10 @@
 
 `data/` and `psql/` are the layer itself: pull, clean, store. db/ is the
 bottom of the import graph and imports nothing above it: the door (door/)
-drives the pulls through its tools, and the facts and inference layers read
-the tables over db.psql.default_dsn().
+drives the pulls through its tools. Reads need no door tool: the board
+opens its own connection through db.psql.default_dsn(), and a door tool
+opens one through its Context; facts.tables.load reads over the connection
+it is handed, and inference/ reads only the World.
 
     data/         the sources, one package each (blizzard, wiki), and what
                   they share: the page cache (cache) and name matching
