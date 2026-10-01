@@ -150,9 +150,10 @@ def _one_seat_waits(cur: Result, red_cur: Result, blue_share: int | None, red_sh
     """Each seat on its own: a seat with picks has its share, unless its
     reason for none waits, or its picks are not allowed."""
     def waits(why: str | None) -> str:
-        if (why or "").startswith(NOT_ALLOWED):
-            return why or ""
-        return "unscored: " + (why or "").split(": ", 1)[-1]
+        why = why or ""
+        if why.startswith(NOT_ALLOWED):
+            return why
+        return "unscored: " + why.split(": ", 1)[-1]
     sides = [
         "no blue picks yet" if not cur.blue else
         "blue %d / 100 of its optimal" % blue_share if blue_share is not None else

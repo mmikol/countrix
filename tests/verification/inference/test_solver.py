@@ -2,7 +2,8 @@
 every legal six, element for element, on both seats, around locked picks,
 past bans, in the countered case and on a plateau where every six ties;
 a full six's rank; shape limits, a charge for a rule broken that never
-prunes, a need and its budget, partners that only pay together, the scale
+prunes, a bonus that reads a name refused by its expression, a need and
+its budget, partners that only pay together, the scale
 a ban leaves alone, the ranking order and its tie-breaks, the reference
 sample of a small roster, and the budget a search refuses past. Every
 board is the synthetic World's: no database."""
@@ -355,6 +356,23 @@ def test_a_charge_for_a_rule_broken_is_a_heuristic_and_never_prunes(synthetic_wo
     [term] = [c for c in cand.contributions if c["id"] == "anti-air"]
     assert (term["kind"], term["form"]) == ("heuristic", "scored") and "ok" not in term
     assert term["applies"] and term["penalty"] == 2.5 and term["weighted"] == -2.5
+
+
+def test_a_bonus_that_reads_a_name_is_refused_naming_its_expression(synthetic_world, tmp_path):
+    """A bonus or penalty is a number. One that reads a text metric passes
+    the catalog, which checks only that its names are registered, and the
+    score refuses it with an ExprError naming the expression."""
+    from inference import scoring
+    from inference.expr import ExprError
+    (tmp_path / "lean.md").write_text(
+        "---\nname: lean\nkind: heuristic\nbonus: team.style_lean\n---\nx\n", "utf-8")
+    w = synthetic_world
+    objective = scoring.Objective(w, w.map("Harbor Gate"), red=[],
+                                  catalog=catalog.load(str(tmp_path)), base=OFF)
+    cand = scoring.Candidate(
+        [w.hero(n) for n in ("Anvil", "Mortar", "Balm", "Myrrh", "Sorrel", "Tansy")])
+    with pytest.raises(ExprError, match=r"'team\.style_lean' - a bonus or penalty is a number"):
+        objective.score(objective.prepare(cand))
 
 
 def test_a_rule_guarded_on_the_six_itself_is_a_need_and_a_state_has_a_budget(

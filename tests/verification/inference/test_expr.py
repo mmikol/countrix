@@ -1,6 +1,8 @@
 """The expression language the frontmatter uses: dotted names read as numbers,
-nothing past the whitelist, and a sandbox that refuses what would hang or
-exhaust it. No database."""
+nothing past the whitelist, a failure as it runs named by its expression, and
+a sandbox that refuses what would hang or exhaust it. No database."""
+
+import re
 
 import pytest
 
@@ -40,6 +42,16 @@ def test_expressions_refuse_anything_beyond_the_whitelist():
     for bad, node in (("team.tanks | 1", "BinOp"), ("~team.tanks", "UnaryOp")):
         with pytest.raises(ExprError, match="unsupported syntax %s" % node):
             Expr(bad)
+
+
+def test_a_helper_that_fails_as_it_runs_names_its_expression():
+    """int() of a name and min() of nothing fail on their input as the
+    expression runs: each is an ExprError naming the expression, as a text
+    metric in arithmetic is."""
+    lean = scope({"team": {"style_lean": "dive"}})
+    for source in ("int(team.style_lean)", "min([])", "team.style_lean + 1"):
+        with pytest.raises(ExprError, match=re.escape(repr(source))):
+            Expr(source).evaluate(lean)
 
 
 def test_expression_names_are_the_full_dotted_keys():
