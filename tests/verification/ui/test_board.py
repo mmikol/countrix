@@ -1,6 +1,6 @@
 """The board's server: its roster and facts speak what the MCP tools serve.
-Its board and catalog are inference/serve.py's handlers, tested in
-tests/verification/inference/test_serve.py. No HTTP server is spun up - the handler is
+Its board and catalog are ui/serve.py's handlers, tested in
+tests/verification/ui/test_serve.py. No HTTP server is spun up - the handler is
 thin routing; tests/verification/ui/test_board_server.py serves it."""
 
 import pytest

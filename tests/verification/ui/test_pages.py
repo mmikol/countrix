@@ -18,12 +18,12 @@ import pytest
 
 from facts import board_facts, compute
 from facts.draft import Draft
-from inference import base, catalog, engine, scale, scoring, serve, solver
+from inference import base, catalog, engine, scale, scoring, solver
 from inference.result import Badge, Momentum, OpenSlot, Pick, StageRow, SwapPair, Swaps
 from inference.scoring import Contribution
 from inference.strategy import WEIGHT_RANGE, StrategyRecord
 from tests.verification.inference import BRIEF, FIXTURE_PLAYBOOK
-from ui import board, pages
+from ui import board, pages, serve
 
 
 def scripts():

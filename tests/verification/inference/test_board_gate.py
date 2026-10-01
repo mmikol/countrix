@@ -1,7 +1,8 @@
 """One gate for every door: the same over-limit board sent through the page's
 facts endpoint and its board handler, the three MCP board tools and the
-engine's two entry points is refused with the same message on each, and
-locked picks the playbook's limits rule out are refused by every infer.
+engine's two entry points is refused with the same message on each,
+locked picks the playbook's limits rule out are refused by every infer,
+and the alternatives a caller names meet the engine's one clamp.
 The page's board route is not listed: it opens a connection and hands the
 query to serve.handle_board, which is a door here. The synthetic World
 stands in for the database and the reference playbook for the live one,
@@ -17,9 +18,10 @@ from db import Refusal
 from door.mcp import tools
 from facts import tables
 from facts.draft import Draft
-from inference import catalog, engine, serve
+from inference import catalog, engine
 from tests.verification.inference import FIXTURE_PLAYBOOK
 from ui import board as page
+from ui import serve
 
 SEVEN = ("Balm", "Myrrh", "Sorrel", "Tansy", "Rook", "Needle", "Flint")
 
@@ -112,3 +114,18 @@ def test_every_infer_refuses_locked_picks_its_limits_rule_out(
     for door in ("mcp infer", "engine infer"):
         with pytest.raises(Refusal, match=r"^not allowed: breaks At most three supports$"):
             in_force.get(door, doors[door])(board)
+
+
+def test_both_doors_bound_the_alternatives_with_one_clamp():
+    """A caller naming top reaches the same bound through every door: the
+    engine owns the definition. Only a top left out takes the default; 0 is
+    a number like any other, clamped to the floor whether it comes as an int
+    or as a query string's text."""
+    from inference.engine import TOP_CEILING, TOP_DEFAULT, clamp_top
+    assert clamp_top(None) == TOP_DEFAULT == 5                 # the default
+    assert clamp_top(0) == clamp_top("0") == clamp_top(-3) == clamp_top(0.5) == 1
+    assert clamp_top(99) == TOP_CEILING == 20
+    assert clamp_top("3") == 3                                 # a query string is text
+    for junk in ("x", [1], [], object()):                      # a refusal, not a crash
+        with pytest.raises(Refusal, match="must be a number"):
+            clamp_top(junk)

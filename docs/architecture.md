@@ -55,7 +55,7 @@ subscription, and the board never calls a model.
 | `facts/` | **FACTS LAYER** - everything the database knows about a board: the World (the database in memory), the metrics registry, the FactSet. It imports only `db`; the solver, the door and the board read the same numbers through it | [`facts/__init__.py`](../facts/__init__.py) |
 | `inference/` | **INFERENCE LAYER** - the playbook of constraints, heuristics and assumptions in markdown, the solver, the tuning loop | [inference.md](inference.md) |
 | `door/` | **THE DOOR** over all three layers - `mcp/`, the MCP server and its tools, under which every write runs; `refresh.py`, the clock that runs the tools daily and weekly | [mcp.md](mcp.md) |
-| `ui/` | **THE BOARD** - the page (map, sides, bans, red and blue rosters) over the facts layer's facts and the inference layer's answer: `board.py`, `pages.py` and `static/` - the only presentation code | [ui.md](ui.md) |
+| `ui/` | **THE BOARD** - the page (map, sides, bans, red and blue rosters) over the facts layer's facts and the inference layer's answer: `board.py`, `serve.py`, `pages.py` and `static/` - the only presentation code | [ui.md](ui.md) |
 | `tests/` | three folders by what a test holds the code to: `qa/`, the repository's text against the house rules (the docs, the layers, the style, the stylesheet); `verification/`, the code against its spec, a folder per layer beside the orchestrator's tests; and `validation/`, the engine against the owner's recorded maps, empty until they exist. Beside them, `synthetic.py`, a World of twelve released heroes, one announced hero and three maps built by hand, so a test works out its expected values with no database; `tests/fixtures/playbook/`, the reference playbook of every kind and form of strategy that the solver tests run on in place of `inference/strategies/`; `tests/verification/inference/record_reach.py`, the recorder that writes `tests/fixtures/reach.json`, a board per released hero, run from the repo root as `.venv/bin/python -m tests.verification.inference.record_reach`; and `tests/verification/inference/prove_exact.py`, a brute force of every legal six on a board of the built database against the exact search, in slices run by hand | |
 | `.claude/skills/` | the skills a Claude Code session runs here, one `SKILL.md` each | [The skills](#the-skills) |
 | `pm/` | `backlog.md`: what is worth doing next, why and at what cost, in payoff order; the maintainer skill keeps it current | |
@@ -166,7 +166,7 @@ carries the state: compose's healthcheck holds `data` unhealthy until it
 is current, and `depends_on` starts `ui` and `refresher` only then. The
 board's `/health` is the engine's - the playbook and the database - and
 its healthcheck gates nothing. The board solves one board at a time
-(`serve.Admission`): a search is exact, holds its best sixes and not a
+(`serve.Admission` in `ui/serve.py`): a search is exact, holds its best sixes and not a
 field, and runs in the board's process, so memory sets no limit and a
 second board would only share the interpreter. `orchestrator.py` waits only for a first reply and
 reports the state in its verdict. [security.md](security.md) has
