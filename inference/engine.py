@@ -33,13 +33,14 @@ from facts.draft import (
     TEAM_SIZE,
     Draft,
     Seat,
+    Side,
     board_side,
     board_stage,
     check_tanks,
     opposite,
 )
 from facts.factset import FactSet
-from facts.model import ROLES, Hero, Map, World
+from facts.model import ROLES, Hero, Map, Resolved, World
 from inference import catalog as catalog_module
 from inference import supersede, swaps
 from inference.base import OFF, SWAP, BaseWeights
@@ -65,6 +66,34 @@ from inference.strategy import Strategy
 
 TOP_DEFAULT = 5             # alternatives when a caller names none
 TOP_CEILING = 20            # the most alternatives a caller may ask for
+
+
+class _SeatBoard(NamedTuple):
+    """A draft read for one seat: its names as the World's objects, and the
+    side and stage the board plays, each as the map keeps it."""
+    board: Resolved
+    side: Side
+    stage: str
+
+    def result(
+            self, kind: ResultKind, seat: Seat, *, catalog: list[Strategy],
+            base: BaseWeights, blue: list[str], locked: list[str],
+            partial: bool = False) -> Result:
+        """The seat's Result before its six is scored: the map, the other
+        side's picks, the bans, the side and the stage."""
+        m = self.board.map
+        return Result(kind=kind, map_name=m.name if m else None,
+                      red=[h.name for h in self.board.red], blue=blue, locked=locked,
+                      catalog=catalog, base=base, bans=[h.name for h in self.board.banned],
+                      side=self.side, stage=self.stage, seat=seat, partial=partial)
+
+
+def _seat_board(world: World, draft: Draft) -> _SeatBoard:
+    """The draft's names resolved - World.resolve's refusals - with the side
+    and stage the map keeps (board_side, board_stage)."""
+    board = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
+    return _SeatBoard(board, board_side(board.map, draft.side),
+                      board_stage(board.map, draft.stage))
 
 
 def clamp_top(top: str | float | None = None) -> int:
@@ -125,7 +154,7 @@ def _order(heroes: Iterable[Hero]) -> list[str]:
     return [h.name for h in sorted(heroes, key=lambda h: (ROLES.index(h.role), h.name))]
 
 
-def _board_facts(world: World, result: Result, side: str) -> FactSet:
+def _board_facts(world: World, result: Result, side: Side) -> FactSet:
     """The facts of the board a result stands on: its map and stage, both
     sides as it names them, its bans, and the side."""
     return board_facts.generate(world, Draft(
@@ -186,14 +215,13 @@ def _optimal(
     scale this search takes - a fill takes its seat's - and `check` is asked
     as the search runs whether the board was superseded."""
     started = time.time()
-    m, red_h, blue_h, bans_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
-    side, stage = board_side(m, draft.side), board_stage(m, draft.stage)
+    seated = _seat_board(world, draft)
+    m, red_h, blue_h, bans_h = seated.board
     _check_teams(red_h, blue_h, seat)
-    result = Result(kind=kind, map_name=m.name if m else None, red=[h.name for h in red_h],
-                    blue=[], locked=[h.name for h in blue_h], catalog=catalog, base=base,
-                    bans=[h.name for h in bans_h], side=side, stage=stage, seat=seat)
-    solver = Solver(world, m, red=red_h, locked=blue_h, banned=bans_h, side=side, stage=stage,
-                    catalog=catalog, base=base, check=check)
+    result = seated.result(kind, seat, catalog=catalog, base=base, blue=[],
+                           locked=[h.name for h in blue_h])
+    solver = Solver(world, m, red=red_h, locked=blue_h, banned=bans_h, side=seated.side,
+                    stage=seated.stage, catalog=catalog, base=base, check=check)
     if scale_of is not None:
         solver.adopt_scale(scale_of)
     solved = solver.solve(top=max(top, 1) + 1)
@@ -203,7 +231,7 @@ def _optimal(
                          % seat)
     best = solved.ranked[0]
     result.blue = _order(best.heroes)
-    fs = _board_facts(world, result, side)
+    fs = _board_facts(world, result, seated.side)
     result.record_candidate(best, fs, solver.considered)
     result.tied = solver.ties(solved)
     result.alternatives = [Alternative(blue=_order(c.heroes), score=round(c.score, 3),
@@ -224,20 +252,19 @@ def _evaluated(
     that breaks a limit is scored with its breaches listed: the board bars
     blue's before it gets here, and ranks red's."""
     started = time.time()
-    m, red_h, blue_h, bans_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
-    side, stage = board_side(m, draft.side), board_stage(m, draft.stage)
+    seated = _seat_board(world, draft)
+    m, red_h, blue_h, bans_h = seated.board
     _check_teams(red_h, blue_h, seat)
     if len(blue_h) != TEAM_SIZE:
         raise Refusal("evaluate needs exactly %d %s picks (got %d)"
                          % (TEAM_SIZE, seat, len(blue_h)))
-    result = Result(kind=kind, map_name=m.name if m else None, red=[h.name for h in red_h],
-                    blue=[h.name for h in blue_h], locked=[], catalog=catalog, base=base,
-                    bans=[h.name for h in bans_h], side=side, stage=stage, seat=seat)
+    result = seated.result(kind, seat, catalog=catalog, base=base,
+                           blue=[h.name for h in blue_h], locked=[])
     if solved is None:
-        solved = Solver(world, m, red=red_h, locked=[], banned=bans_h, side=side, stage=stage,
-                        catalog=catalog, base=base).solve(top=BOARD_TOP + 1)
+        solved = Solver(world, m, red=red_h, locked=[], banned=bans_h, side=seated.side,
+                        stage=seated.stage, catalog=catalog, base=base).solve(top=BOARD_TOP + 1)
     evaluated = evaluate_comp(solved, blue_h)
-    fs = _board_facts(world, result, side)
+    fs = _board_facts(world, result, seated.side)
     result.record_candidate(evaluated.target, fs, evaluated.solver.considered)
     result.rank, result.outranked = evaluated.rank, evaluated.outranked
     result.alternatives = [Alternative(blue=_order(c.heroes), score=round(c.score, 3),
@@ -272,18 +299,18 @@ def _current(
         result.scale_to(optimal.span)
         return result
     started = time.time()
-    m, red_h, blue_h, bans_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
-    side = board_side(m, draft.side)
-    result = Result(kind="evaluate" if full and kind == "current" else kind,
-                    map_name=m.name if m else None, red=[h.name for h in red_h],
-                    blue=[h.name for h in blue_h], locked=[] if full else [h.name for h in blue_h],
-                    catalog=catalog, base=base, bans=[h.name for h in bans_h], side=side,
-                    stage=board_stage(m, draft.stage), seat=seat, partial=not full)
+    seated = _seat_board(world, draft)
+    blue_h = seated.board.blue
+    picks = [h.name for h in blue_h]
+    result = seated.result("evaluate" if full and kind == "current" else kind, seat,
+                           catalog=catalog, base=base, blue=picks,
+                           locked=[] if full else list(picks), partial=not full)
     solver = optimal.solver
     if blue_h:
         cand = solver.prepare(Candidate(blue_h))
         solver.score(cand)
-        result.record_candidate(cand, _board_facts(world, result, side), solver.considered)
+        result.record_candidate(cand, _board_facts(world, result, seated.side),
+                                solver.considered)
     result.scale_to(optimal.span)
     if barred is not None:
         result.bar(barred)
@@ -308,9 +335,10 @@ def _ruled_out(world: World, draft: Draft, catalog: list[Strategy]) -> list[str]
     """The limits blue's picks (`draft.blue`) break as they stand - none where
     they break none alone - once the exact search has proved that no six on
     the whole roster that keeps them meets the limits."""
-    m, red_h, blue_h, bans_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
-    return _broken(Objective(world, m, red=red_h, banned=bans_h, side=board_side(m, draft.side),
-                             stage=board_stage(m, draft.stage), catalog=catalog, base=OFF),
+    seated = _seat_board(world, draft)
+    m, red_h, blue_h, bans_h = seated.board
+    return _broken(Objective(world, m, red=red_h, banned=bans_h, side=seated.side,
+                             stage=seated.stage, catalog=catalog, base=OFF),
                    blue_h)
 
 
@@ -389,9 +417,9 @@ def board(
         catalog_module.load() if catalog is None else catalog, brief.weights)
     base = weights_in_force(brief.base, brief.weights)
     watch = supersede.Watch(brief.superseded)
-    m, red_h, blue_h, bans_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
-    draft = dataclasses.replace(draft, side=board_side(m, draft.side),
-                                stage=board_stage(m, draft.stage))
+    seated = _seat_board(world, draft)
+    m, red_h, blue_h, bans_h = seated.board
+    draft = dataclasses.replace(draft, side=seated.side, stage=seated.stage)
     _check_teams(red_h, blue_h, "blue")
     expected = _expected(world, m, bans_h, draft, catalog, base)
     enemy = draft.red or tuple(expected.blue)
@@ -632,13 +660,11 @@ def _scored(world: World, draft: Draft, optimal: _Optimal, cand: Candidate,
     """Blue's six `cand` (`draft.blue`), scored on its optimal's objective,
     as a Result on the optimal's span: its picks, their reasons and its
     breakdown - `locked`, the picks it keeps, marked."""
-    m, red_h, blue_h, bans_h = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
-    result = Result(kind="evaluate", map_name=m.name if m else None,
-                    red=[h.name for h in red_h], blue=_order(blue_h),
-                    locked=[name for name in locked if name in set(draft.blue)],
-                    catalog=catalog, base=base, bans=[h.name for h in bans_h], side=draft.side,
-                    stage=draft.stage, seat="blue")
-    result.record_candidate(cand, _board_facts(world, result, draft.side),
+    seated = _seat_board(world, draft)
+    result = seated.result("evaluate", "blue", catalog=catalog, base=base,
+                           blue=_order(seated.board.blue),
+                           locked=[name for name in locked if name in set(draft.blue)])
+    result.record_candidate(cand, _board_facts(world, result, seated.side),
                             optimal.solver.considered)
     result.scale_to(optimal.span)
     return result

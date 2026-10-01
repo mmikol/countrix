@@ -11,7 +11,7 @@ from typing import NamedTuple
 
 from facts import compute
 from facts.board_facts import StageTerrainValue, TerrainValue
-from facts.draft import TEAM_SIZE
+from facts.draft import TEAM_SIZE, Side
 from facts.factset import FactSet
 from facts.model import Hero, Map, World
 from facts.team import team_metrics, text
@@ -265,7 +265,7 @@ def _family(world: World, m: Map | None, style: str, role: str,
 
 
 def plan(
-        world: World, m: Map | None, side: str, bans: Sequence[str],
+        world: World, m: Map | None, side: Side, bans: Sequence[str],
         red_h: Sequence[Hero], six: Result) -> str:
     """The game plan in prose for `six`, the six the comps tab shows for blue
     - blue's optimal before any blue pick, the fill around one to five, the
@@ -310,7 +310,7 @@ def _keeps(six: Result, yours: Sequence[str]) -> str | None:
     return None
 
 
-def _ground(m: Map | None, side: str, facts: FactSet | None) -> list[str]:
+def _ground(m: Map | None, side: Side, facts: FactSet | None) -> list[str]:
     """The ground: the map's mode, the terrain its facts stress, and the side."""
     if m is None:
         return ["No map yet, so this is the meta's best six: what is winning right now, built"
@@ -465,7 +465,7 @@ def _above_all(blue_r: Result, lean: str) -> str | None:
 
 
 def _basis(
-        m: Map | None, side: str, bans: Sequence[str], red_h: Sequence[Hero],
+        m: Map | None, side: Side, bans: Sequence[str], red_h: Sequence[Hero],
         queue: str, yours: int) -> str:
     """What the plan rests on, the rates named by the queue they were
     captured in, and blue's picks where the six keeps them."""

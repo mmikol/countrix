@@ -33,6 +33,7 @@ from collections.abc import Callable, Sequence
 from typing import NamedTuple
 
 from db import Refusal
+from facts.draft import Side
 from facts.model import ROLES, Hero, Map, World
 from inference import scale
 from inference.base import BaseWeights
@@ -182,7 +183,7 @@ class Solver(Objective):
     it is normalised on, and the exact search around the locked picks."""
 
     def __init__(self, world: World, m: Map | None, *, red: Sequence[Hero],
-                 locked: Sequence[Hero], banned: Sequence[Hero] = (), side: str = "",
+                 locked: Sequence[Hero], banned: Sequence[Hero] = (), side: Side = "",
                  stage: str = "", catalog: list[Strategy], base: BaseWeights,
                  check: Callable[[], None] | None = None,
                  keep: frozenset[int] = frozenset(), swap: float = 0.0) -> None:

@@ -30,7 +30,7 @@ it ran under, and the suite checks none is lost.
 from typing import NamedTuple, TypedDict
 
 from facts import counters
-from facts.draft import MAX_BANS, SIDES, Draft, is_sided
+from facts.draft import MAX_BANS, SIDES, Draft, Side, is_sided
 from facts.model import ROLES, Hero, Map, World
 from inference import engine
 from inference.solver import Infeasible, Unbounded
@@ -47,7 +47,7 @@ class Reach(TypedDict):
     hero: str
     seated: bool
     map: str
-    side: str
+    side: Side
     red: list[str]
     banned: list[str]
     six: list[str]
@@ -60,7 +60,7 @@ class _Near(NamedTuple):
     gap: float
     map_name: str
     red: list[str]
-    side: str
+    side: Side
 
 
 def maps(world: World, hero: Hero) -> list[Map]:
@@ -122,7 +122,8 @@ def search(world: World, name: str) -> Reach:
     fenced = past_budget = 0          # the misses, named in the refusal when nothing seats
     for m in boards:
         for red in reds(world, hero):
-            for side in (SIDES if is_sided(m) else ("",)):
+            sides: tuple[Side, ...] = SIDES if is_sided(m) else ("",)
+            for side in sides:
                 try:
                     top = engine.infer(world, Draft(map_name=m.name, red=tuple(red), side=side),
                                        top=1)
@@ -153,7 +154,7 @@ def search(world: World, name: str) -> Reach:
             "red": closest.red, "banned": [], "six": [], "gap": round(closest.gap, 3)}
 
 
-def _banning(world: World, hero: Hero, map_name: str, red: list[str], side: str) -> Reach | None:
+def _banning(world: World, hero: Hero, map_name: str, red: list[str], side: Side) -> Reach | None:
     """One board's ban search: each round bans the first rival that holds the
     hero's seat - a hero of the optimal six the best six holding the hero
     leaves out, of any role, its own role's first - up to MAX_BANS -> the

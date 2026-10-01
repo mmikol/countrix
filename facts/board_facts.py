@@ -32,7 +32,7 @@ from typing import Literal, NotRequired, TypedDict
 
 from facts import compute, hero_facts, team_facts
 from facts.compute import TERRAIN_STANDOUT
-from facts.draft import MAX_BANS, Draft, board_side, board_stage, is_sided, opposite
+from facts.draft import MAX_BANS, Draft, Side, board_side, board_stage, is_sided, opposite
 from facts.factset import FactSet
 from facts.model import TERRAIN_FEATURES, Map, Resolved, World
 
@@ -143,7 +143,7 @@ def _ban_facts(fs: FactSet, world: World, board: Resolved) -> None:
 
 # --- the map ---------------------------------------------------------------
 
-def _map_facts(fs: FactSet, world: World, m: Map, side: str = "", stage: str = "") -> None:
+def _map_facts(fs: FactSet, world: World, m: Map, side: Side = "", stage: str = "") -> None:
     """The map's own facts - its mode and sides, its ground and the ground
     in play, the styles it rewards - then the heroes who do well on it."""
     _map_mode(fs, m, side)
@@ -154,7 +154,7 @@ def _map_facts(fs: FactSet, world: World, m: Map, side: str = "", stage: str = "
     _map_heroes(fs, world, m)
 
 
-def _map_mode(fs: FactSet, m: Map, side: str) -> None:
+def _map_mode(fs: FactSet, m: Map, side: Side) -> None:
     """The mode, who attacks, and the stages or phases in play order."""
     fs.add("map", m.name, "map.mode", "%s is a %s map" % (m.name, m.mode),
         value=m.mode, source="map_modes")
