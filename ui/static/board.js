@@ -416,7 +416,7 @@ function start(d) {
   buildTeam('red'); buildTeam('blue'); buildBanPicker(); paint();
   var w = el('vintage'), newer = d.newer_patches || [];     /* the patches, or nothing: boot's failure note goes */
   w.style.display = newer.length ? 'block' : 'none';
-  w.textContent = newer.length ? newer.length + ' patch(es) since the rates were captured (newest ' + newer[0][0] + ') - run pull_rates' : '';
+  w.textContent = newer.length ? newer.length + ' patch(es) since the rates were captured (newest ' + newer[0].name + ') - run pull_rates' : '';
   el('mapsel').onchange = function () { st.map = this.value; st.stage = ''; save(); paint(); refresh(); };
   el('stagesel').onchange = function () { st.stage = this.value; save(); paint(); refresh(); };
   el('filter').oninput = renderFacts;

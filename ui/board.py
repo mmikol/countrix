@@ -48,7 +48,7 @@ def api_roster(cx: psycopg.Connection[TupleRow]) -> web.Reply:
     listed = roster_of(world)
     return web.Reply({"heroes": listed["heroes"], "maps": listed["maps"],
                       "role_icons": world.role_icons,
-                      "newer_patches": world.newer_patches}, 200)
+                      "newer_patches": [p._asdict() for p in world.newer_patches]}, 200)
 
 
 def api_facts(cx: psycopg.Connection[TupleRow], query: Query) -> web.Reply:

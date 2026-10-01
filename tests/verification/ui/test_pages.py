@@ -18,6 +18,7 @@ import pytest
 
 from facts import board_facts, compute
 from facts.draft import Draft
+from facts.records import Patch
 from inference import base, catalog, engine, scale, scoring, solver
 from inference.result import Badge, Momentum, OpenSlot, Pick, StageRow, SwapPair, Swaps
 from inference.scoring import Contribution
@@ -177,8 +178,8 @@ def test_the_scripts_write_the_ids_and_read_the_globals_the_shell_holds():
 def test_the_scripts_read_payload_keys_the_server_writes(synthetic_world, monkeypatch):
     """Each key a script reads off a payload is one the server writes: the
     board and a seat on it, a pick, a contribution, the momentum and a
-    badge, a strategy, a fact, and the roster with its heroes and maps. No
-    script reads the raw sum."""
+    badge, a strategy, a fact, and the roster with its heroes, maps and
+    patches. No script reads the raw sum."""
     script = scripts()
 
     def read(keys, written):
@@ -213,10 +214,12 @@ def test_the_scripts_read_payload_keys_the_server_writes(synthetic_world, monkey
     fact = board_facts.generate(synthetic_world, Draft()).to_dict()["facts"][0]
     read("id key subject text scope team source", fact)
     monkeypatch.setattr(board.tables, "load", lambda cx: synthetic_world)
+    synthetic_world.newer_patches = [Patch("a patch", "2026-09-30")]
     roster = board.api_roster(None).body
     read("heroes maps role_icons newer_patches", roster)
     read("name role subrole portrait status release_date", roster["heroes"][0])
     read("name mode style sided stages", roster["maps"][0])
+    read("name", roster["newer_patches"][0])
     assert not re.search(r"\.score\b", script)
 
 
