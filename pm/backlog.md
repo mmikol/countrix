@@ -6,6 +6,55 @@ keeps it current.
 
 ## Next
 
+- **Blue's seat reads red's likely six through the counter term alone.**
+  Until red reveals a pick, `engine.board` hands blue's seat, current,
+  fill, swaps and stages the likely six as red's picks (`enemy =
+  draft.red or tuple(expected.blue)`), so every `enemy.*` and `matchup.*`
+  metric reads it - `heal-rate`'s `matchup.heal_shortfall` among them -
+  and the scale's field ranks against it; `infer`, which reach proves
+  against, reads an empty red. docs/inference.md and the math page say
+  the counter term alone reads the likely six. The seats take
+  `draft.red` as it is, `base.opponent` alone falls back to the likely
+  six and its `same` check goes, and the plan says "counters" only where
+  the counter term read it; test_engine and test_base pin today's
+  reading and flip. Cost: half a day, and reach re-recorded if a board
+  moves.
+- **A text metric is refused as a bonus or penalty.** A strategy with
+  `bonus: map.side` loads as scored, so `add_strategy` writes it, and
+  every board where its guard holds then fails: `scoring._amount` reads
+  `float("attack")`, and a list raises. The catalog keeps text metrics
+  out of a heuristic's `metric:` and not out of an expression. Probe each
+  scored expression at load - each text metric read as empty and as a
+  name, each number as 0 and 1 - refuse one that does not come out a
+  number, and drop `str` from `_amount`. Cost: a morning.
+- **Red never reorders the scale's field.** `scale.board_prior` ranks the
+  heroes whose sixes fix a seat's scale with three points for each enemy
+  a hero answers, less three for each that answers it, read off
+  `objective.red`; its docstring says it reads no locked pick. A red
+  reveal can reorder the field, move the bounds the heuristics are
+  normalised on and so move the terms of a six that did not change. Rank
+  the field on the map alone (`board_prior` has no other caller) and hold
+  the bounds across reds on a widened roster in a test. Cost: half a day
+  and every share test.
+- **What the mechanics audit left.** The `mechanics` branch (2026-09-26,
+  deleted 2026-10-01; the three items above come from it) held four
+  smaller points. A need's budget keys on its guard's text while its
+  gate's slot keys on text and params, so one guard under two params
+  shares one budget, and a need whose guarded state no reference six
+  meets has no spread, reads 1 and costs nothing: key the budget on text
+  and params, and give such a need its metric's unguarded bounds. One
+  state written two ways (`team.supports <= 1`, `team.supports < 2`) is
+  two guards and two budgets until a guard is normalised to its compiled
+  comparison. `base.rate_edge` guards a missing rate and not a
+  non-finite one, which then carries into the score: read it as no
+  rate. `scoring.normalised` clamps to [0, 1], so a heuristic saturates
+  past the highest six the sample and the field saw: widen the bounds
+  with attainable extremes drawn once per board, keeping the clamp's
+  guarantee. And two docstrings misdescribe their code: `counters.derive`
+  keeps each loser's six best answers before it drops those the wiki
+  has an edge on (the module, the function and docs/inference.md say the
+  reverse), and `team.one_shots` counts picks with no melee weapon.
+  Cost: a day.
 - **Fuller stage texts.** 36 of the 64 stages have no text of their own
   on the wiki as the pull reads it, and most of the rest a few sentences,
   so the terrain rules score a six of their own on 8 stages of 5 maps.
@@ -72,7 +121,12 @@ keeps it current.
   on the math page where they cannot: the same board gives the same six;
   scaling every weight by one factor leaves the argmax unchanged; a
   normalised term stays within 0..1 and the reference sample bounds it;
-  fight odds split 100 exactly.
+  fight odds split 100 exactly; a rule at weight 0 is the objective
+  without it; the optimum moves with a rule's weight and never back;
+  every six's breakdown sums to its score, in every form; each seat of a
+  board is infer on that seat's draft, which holds once blue's seat reads
+  red as infer does (above). The mechanics branch held the last four and
+  the scaling as tests on the pooled search.
   Cost: (a) three to four days, the kit model most of it; (b) a day for
   the tests, a day for the page.
 - **Recorded matches, playbook validation and learned weights.** The
@@ -92,7 +146,9 @@ keeps it current.
   decided maps exist - enough to tell an even map from one won 60% of the
   time - the weights learn from them, the default engine's three
   included, the sliders the manual override and every change a
-  tuning-log line. Cost: a day to restore the removed code from the tree
+  tuning-log line. A fit only proposes: a weight changes when the owner
+  accepts it through `tune`, and a proposal that does not beat the
+  held-out score is refused. Cost: a day to restore the removed code from the tree
   before that commit - about 2,400 lines and 980 of tests - with a new
   migration for the two tables and the changes since; a day more for the
   learned weights once the maps exist.
