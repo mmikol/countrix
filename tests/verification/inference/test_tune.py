@@ -247,6 +247,21 @@ def test_a_file_whose_frontmatter_never_closes_is_refused():
         "---\nname: X\nweight: 2\n---\nbody\n", "1")
 
 
+def test_an_edit_sets_a_line_in_place_or_adds_it_where_the_header_keeps_it():
+    """A flat field is set in place or added above params:, a dial is set in
+    place or added at the end of its block, and a header with no params:
+    gains one before its trailing blank line."""
+    text = "---\nname: X\nweight: 1\nparams:\n  A: 1\n  B: 2\n---\nbody\n"
+    assert tune.edit_frontmatter(text, "weight", 2) == (text.replace("weight: 1", "weight: 2"), "1")
+    assert tune.edit_frontmatter(text, "metric", "team.tanks") == (
+        text.replace("params:", "metric: team.tanks\nparams:"), None)
+    assert tune.edit_frontmatter(text, "params.B", 3) == (text.replace("B: 2", "B: 3"), "2")
+    assert tune.edit_frontmatter(text, "params.C", 3) == (
+        text.replace("B: 2", "B: 2\n  C: 3"), None)
+    assert tune.edit_frontmatter("---\nname: X\n\n---\nbody\n", "params.A", 1) == (
+        "---\nname: X\nparams:\n  A: 1\n\n---\nbody\n", None)
+
+
 def test_a_catalog_error_is_the_operators_fault_and_a_tune_error_the_callers():
     """A tuning change the caller got wrong is a Refusal every door answers as
     the caller's error; a playbook that does not load is the operator's."""

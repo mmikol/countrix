@@ -43,6 +43,7 @@ one's by its first such change, and the log line says so. No strategy may
 take the name, nor swap's (catalog.RESERVED).
 """
 
+import functools
 import os
 import re
 import shutil
@@ -54,6 +55,7 @@ from typing import TypedDict
 from db import Refusal
 from inference import catalog as catalog_module
 from inference.base import FIELDS, META
+from inference.frontmatter import FrontmatterError, parse_frontmatter
 from inference.strategy import (
     FIELD_RULE,
     TUNABLE,
@@ -117,32 +119,62 @@ def _header_end(lines: list[str]) -> int:
     return len(lines) - (1 if lines and not lines[-1].strip() else 0)
 
 
+def _params_block(lines: list[str]) -> int | None:
+    """The index of the params: line, or None where the header has none."""
+    return next((i for i, line in enumerate(lines) if line.strip() == "params:"), None)
+
+
+def _dials(lines: list[str], block: int) -> range:
+    """The indices of the dials under the params: line at `block`: the
+    indented lines that follow it."""
+    end = block + 1
+    while end < len(lines) and lines[end][:1] in (" ", "\t"):
+        end += 1
+    return range(block + 1, end)
+
+
+def _dial_at(lines: list[str], block: int, name: str) -> int | None:
+    """The index of dial NAME under the params: line at `block`, or None."""
+    for i in _dials(lines, block):
+        if lines[i].strip().split(":")[0] == name:
+            return i
+    return None
+
+
+def _field_at(lines: list[str], field: str) -> int | None:
+    """The index of a flat field's line, one not indented, or None."""
+    for i, line in enumerate(lines):
+        if line[:1] not in (" ", "\t") and line.split(":")[0].strip() == field:
+            return i
+    return None
+
+
 def _set_param(lines: list[str], name: str, value: LineValue) -> str | None:
     """NAME set under params:, the block added when there is none -> the old value."""
-    block = next((i for i, line in enumerate(lines) if line.strip() == "params:"), None)
+    block = _params_block(lines)
     if block is None:
         block = _header_end(lines)
         lines.insert(block, "params:")
-    i = block + 1
-    while i < len(lines) and lines[i][:1] in (" ", "\t"):
-        if lines[i].strip().split(":")[0] == name:
-            old = lines[i].split(":", 1)[1].strip()
-            lines[i] = "  %s: %s" % (name, field_text(value))
-            return old
-        i += 1
-    lines.insert(i, "  %s: %s" % (name, field_text(value)))
+    line = "  %s: %s" % (name, field_text(value))
+    at = _dial_at(lines, block, name)
+    if at is not None:
+        old = lines[at].split(":", 1)[1].strip()
+        lines[at] = line
+        return old
+    lines.insert(_dials(lines, block).stop, line)
     return None
 
 
 def _set_scalar(lines: list[str], field: str, value: LineValue) -> str | None:
     """A flat field set in place, or added above params: -> the old value."""
-    for i, line in enumerate(lines):
-        if line[:1] not in (" ", "\t") and line.split(":")[0].strip() == field:
-            old = line.split(":", 1)[1].strip()
-            lines[i] = "%s: %s" % (field, field_text(value))
-            return old
-    at = next((i for i, line in enumerate(lines) if line.strip() == "params:"), _header_end(lines))
-    lines.insert(at, "%s: %s" % (field, field_text(value)))
+    line = "%s: %s" % (field, field_text(value))
+    at = _field_at(lines, field)
+    if at is not None:
+        old = lines[at].split(":", 1)[1].strip()
+        lines[at] = line
+        return old
+    block = _params_block(lines)
+    lines.insert(_header_end(lines) if block is None else block, line)
     return None
 
 
@@ -191,30 +223,18 @@ def _unset(lines: list[str], field: str) -> str | None:
     """A flat field, or params.NAME, removed -> its old value, None where it
     was not set; a params block left empty goes with its last dial."""
     if field.startswith("params."):
-        name = field[len("params."):]
-        block = next((i for i, line in enumerate(lines) if line.strip() == "params:"), None)
+        block = _params_block(lines)
         if block is None:
             return None
-        i = block + 1
-        while i < len(lines) and lines[i][:1] in (" ", "\t"):
-            if lines[i].strip().split(":")[0] == name:
-                old = lines.pop(i).split(":", 1)[1].strip()
-                if not (block + 1 < len(lines) and lines[block + 1][:1] in (" ", "\t")):
-                    lines.pop(block)
-                return old
-            i += 1
-        return None
-    for i, line in enumerate(lines):
-        if line[:1] not in (" ", "\t") and line.split(":")[0].strip() == field:
-            return lines.pop(i).split(":", 1)[1].strip()
-    return None
-
-
-def _unsetting(field: str) -> Callable[[list[str]], str | None]:
-    """The edit that removes one field (_unset), for _edited."""
-    def edit(lines: list[str]) -> str | None:
-        return _unset(lines, field)
-    return edit
+        at = _dial_at(lines, block, field[len("params."):])
+        if at is None:
+            return None
+        old = lines.pop(at).split(":", 1)[1].strip()
+        if not _dials(lines, block):
+            lines.pop(block)
+        return old
+    at = _field_at(lines, field)
+    return None if at is None else lines.pop(at).split(":", 1)[1].strip()
 
 
 # --- the values a field accepts -------------------------------------------------
@@ -396,9 +416,10 @@ def _strategy_prose(sid: str, text: str, value: object) -> tuple[str, str]:
     the old prose): three sentences at most, as a new strategy's are
     (_check_new), under the file's own title where the prose opens with
     none."""
-    if not text.startswith("---") or text.find("\n---", 3) < 0:
-        raise TuneError("no frontmatter")
-    old = text[text.find("\n---", 3) + len("\n---"):].strip("\n")
+    try:
+        old = parse_frontmatter(text).body
+    except FrontmatterError as error:
+        raise TuneError(str(error)) from error
     if isinstance(value, str) and sentence_count(value) > MAX_SENTENCES:
         raise TuneError("a strategy's prose is at most %d sentences; this has %d"
                         % (MAX_SENTENCES, sentence_count(value)))
@@ -467,7 +488,7 @@ def complete(
     for field, value in pairs:
         text, _ = edit_frontmatter(text, field, value)
     for field in gone:
-        text, _ = _edited(text, _unsetting(field))
+        text, _ = _edited(text, functools.partial(_unset, field=field))
     said = _pairs(pairs) + ("; unset %s" % ", ".join(gone) if gone else "")
     strategy, line = _commit(directory, strategy_id, text, lambda s: "inferred -> %s: %s" % (
         s.form, said), reason, by)
