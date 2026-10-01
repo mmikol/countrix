@@ -345,13 +345,13 @@ def _beam_rows(piece: KitPiece) -> tuple[float, float, float]:
     before the hps field, as the tick does (Mercy: 55, where the field says
     60)."""
     rates = [
-        (s.condition or "", s.per_second) for s in piece.stats.get("heal", ())
+        (s.condition, s.per_second) for s in piece.stats.get("heal", ())
         if s.per_second and s.den_value in (None, 1.0) and not on_self(s.condition)]
     rate = next((v for c, v in rates if not LINGERING_RE.search(c)), 0.0)
     hot = next((v for c, v in rates if LINGERING_RE.search(c)), 0.0)
     hot_s = max((
         s.value for s in piece.stats.get("duration", ())
-        if s.value is not None and LINGERING_RE.search(s.condition or "")), default=0.0)
+        if s.value is not None and LINGERING_RE.search(s.condition)), default=0.0)
     return rate, hot, hot_s
 
 
@@ -359,14 +359,14 @@ def _energy(piece: KitPiece) -> Energy | None:
     """The piece's energy rows, or None when it spends none. Of several regen
     rates the fastest: Moira's secondary fire refills it."""
     rates = [
-        ((s.condition or "").lower(), s.per_second) for s in piece.stats.get("energy", ())
+        (s.condition.lower(), s.per_second) for s in piece.stats.get("energy", ())
         if s.per_second]
     cost = [v for c, v in rates if "cost" in c]
     regen = [v for c, v in rates if "regen" in c or "recharge" in c]
     delay = [
         s.value for s in piece.stats.get("duration", ())
-        if s.value is not None and "delay" in (s.condition or "")
-        and ("regen" in (s.condition or "") or "recharge" in (s.condition or ""))]
+        if s.value is not None and "delay" in s.condition
+        and ("regen" in s.condition or "recharge" in s.condition)]
     if not (cost and regen):
         return None
     return Energy(max(cost), max(regen), max(delay, default=0.0))
@@ -388,8 +388,8 @@ def _weapon_heal(piece: KitPiece) -> float:
         if rate:
             return rate
     rate = piece.rate("hps", "heal") or 0.0
-    direct = [f.value for f in piece.flat("heal") if "direct" in (f.condition or "")]
-    splash = [f.value for f in piece.flat("heal") if "splash" in (f.condition or "")]
+    direct = [f.value for f in piece.flat("heal") if "direct" in f.condition]
+    splash = [f.value for f in piece.flat("heal") if "splash" in f.condition]
     radius = piece.plain_stat("radius")
     if direct and splash and radius and piece.name in AIMED:
         shot = max(direct) + max(splash)
@@ -434,8 +434,8 @@ def _cast_total(piece: KitPiece) -> float:
     every cast lands - 120 at low health and 100 under half are conditional;
     a heal per pulse counts every pulse of the duration."""
     flats = [f for f in piece.flat("heal") if not on_self(f.condition)]
-    instant = [f.value for f in flats if not LINGERING_RE.search(f.condition or "")]
-    lingering = [f.value for f in flats if LINGERING_RE.search(f.condition or "")]
+    instant = [f.value for f in flats if not LINGERING_RE.search(f.condition)]
+    lingering = [f.value for f in flats if LINGERING_RE.search(f.condition)]
     totals = [
         s.value for s in piece.stats.get("heal", ())
         if s.value is not None and s.den_value not in (None, 1.0) and s.unit_den == "seconds"
@@ -443,8 +443,8 @@ def _cast_total(piece: KitPiece) -> float:
     cast = min(instant, default=0.0) + sum(lingering) + sum(totals)
     pulses = [
         s.value for s in piece.stats.get("duration", ())
-        if s.value and "pulse" in (s.condition or "")]
-    if pulses and any("pulse" in (f.condition or "") for f in flats):
+        if s.value and "pulse" in s.condition]
+    if pulses and any("pulse" in f.condition for f in flats):
         cast *= math.floor((piece.max_stat("duration") or 0.0) / min(pulses))
     return cast
 
@@ -457,7 +457,7 @@ def _cast_heal(piece: KitPiece, fought: list[KitPiece]) -> float:
         return _shots(piece) * UPTIME[piece.name]
     if piece.name in TRIGGERED:
         return _triggered(piece, fought)
-    if any(BOUNCE_RE.search(f.condition or "") for f in piece.flat("heal")):
+    if any(BOUNCE_RE.search(f.condition) for f in piece.flat("heal")):
         return _bounces(piece)
     cycle = _cycle(piece)
     rate = _per_second(piece)
@@ -477,7 +477,7 @@ def _cap(piece: KitPiece) -> float | None:
     second , up to 300"."""
     caps = [
         float(found.group(1)) for s in piece.stats.get("heal", ())
-        for found in [CAP_RE.search(s.text or "")] if found]
+        for found in [CAP_RE.search(s.text)] if found]
     return max(caps, default=None)
 
 
@@ -540,10 +540,10 @@ def _bounces(piece: KitPiece) -> float:
     of the last, while one stands there."""
     chain = sorted(
         (int(found.group(1)), f.value) for f in piece.flat("heal")
-        for found in [BOUNCE_RE.search(f.condition or "")] if found)
+        for found in [BOUNCE_RE.search(f.condition)] if found)
     hop = max((
         s.value for s in piece.stats.get("range", ())
-        if s.value is not None and "bounce" in (s.condition or "")), default=0.0)
+        if s.value is not None and "bounce" in s.condition), default=0.0)
     near = p_within(hop)
     landed, total = 1.0, 0.0
     for order, (_, value) in enumerate(chain):
@@ -561,7 +561,7 @@ def _lock_on(piece: KitPiece) -> tuple[float, float] | None:
     teammate FORMATION_RADIUS away."""
     locks = [
         s.value for s in piece.stats.get("duration", ())
-        if s.value is not None and "lock-on" in (s.condition or "")]
+        if s.value is not None and "lock-on" in s.condition]
     span = piece.plain_stat("range") or 0.0
     wait = piece.max_stat("cooldown") or 0.0
     if not (locks and span > LOCK_NEAR and wait):
