@@ -11,7 +11,7 @@ import contextlib
 import threading
 import time
 from collections.abc import Callable, Iterator
-from typing import Literal, NotRequired, TypedDict
+from typing import NotRequired, TypedDict
 
 import psycopg
 
@@ -89,7 +89,7 @@ class Health(TypedDict):
     """What /health answers: ok or degraded; the strategy counts where the
     playbook and its meta.md load; the heroes where the database answers;
     and the error, naming each thing out of reach, where either does not."""
-    status: Literal["ok", "degraded"]
+    status: web.HealthStatus
     strategies: NotRequired[int]
     pending: NotRequired[int]
     heroes: NotRequired[int]

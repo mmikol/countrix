@@ -22,8 +22,8 @@ it is handed, and inference/ reads only the World.
 This file holds what the whole layer must agree on: where things live (ROOT
 and the paths under it), the shape of a `sources` row (Source), the roles
 the roster pull stores in role_id order (ROLES), the ability and perk
-vocabularies the migrations seed (ABILITY_KINDS, PERK_TIERS), the scope
-every rates snapshot is pinned to, the one error a caller can fix
+vocabularies the migrations seed (ABILITY_KINDS, PERK_TIERS, PerkTier),
+the scope every rates snapshot is pinned to, the one error a caller can fix
 (Refusal), which every layer raises and every door answers as the caller's,
 where a progress line goes (Log) and the stderr writer a pull, a Context
 and the MCP server default to (to_stderr), the hour every age is read in
@@ -41,6 +41,7 @@ import os
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Literal
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -96,8 +97,10 @@ KIND_WEAPON, KIND_ABILITY, KIND_ULTIMATE, KIND_PASSIVE = (
 ABILITY_KINDS = (KIND_WEAPON, KIND_ABILITY, KIND_ULTIMATE, KIND_PASSIVE)
 
 # The perk tiers: the ids 002_heroes.sql seeds into perk_tiers (1 minor, 2
-# major). Blizzard's pages and the wiki's rows both name a perk's tier by code.
-PERK_TIERS = {"minor": 1, "major": 2}
+# major). Blizzard's pages and the wiki's rows both name a perk's tier by
+# code, a PerkTier.
+type PerkTier = Literal["minor", "major"]
+PERK_TIERS: dict[PerkTier, int] = {"minor": 1, "major": 2}
 
 # The scope every rates snapshot is pinned to. Blizzard spells these its own
 # way (input=Console); these are the codes the database stores.
