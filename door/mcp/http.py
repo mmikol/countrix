@@ -9,6 +9,10 @@ of it runs. The door then asks for the bearer token when one is set,
 refuses a body not labelled application/json with 415, caps a body at
 MAX_BODY, and holds each client address to RATE_LIMIT tool calls a
 RATE_WINDOW.
+
+Each request runs on a thread of its own, but the messages are handled one
+at a time, as over stdio: a playbook write reads its file, edits it and
+writes it back whole, and two at once would lose one edit.
 """
 
 import hmac
@@ -85,7 +89,8 @@ class HttpHandler(web.Handler):
             self._admit(message)
         except _RejectedError as rejected:
             return self._json(rejected.payload, rejected.code, rejected.headers)
-        response = self.server.mcp.handle(message)
+        with self.server.one_at_a_time:
+            response = self.server.mcp.handle(message)
         self._json(response, 202 if response is None else 200)
 
     def _read_message(self) -> object:
@@ -125,7 +130,8 @@ class HttpHandler(web.Handler):
 
 class HttpServer(web.LocalServer):
     """The MCP server over HTTP: the door's token, the rate limit per client
-    address, and the status /health reports."""
+    address, the status /health reports, and the lock a message is handled
+    under, one at a time."""
 
     def __init__(
             self, address: tuple[str, int], mcp: Server,
@@ -138,6 +144,7 @@ class HttpServer(web.LocalServer):
         self.rate_limit = rate_limit
         self._calls: dict[str, list[float]] = {}
         self._lock = threading.Lock()
+        self.one_at_a_time = threading.Lock()
 
     def admit(self, client: str) -> bool:
         """One tool call against a sliding window of RATE_WINDOW seconds per

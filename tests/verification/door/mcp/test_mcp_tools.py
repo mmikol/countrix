@@ -1,9 +1,9 @@
 """The tools in-process: query, db_status, roster, the board tools, the
 compact infer, db_migrate and metrics against the built database; and,
 with no database, query's refusals, the playbook writes' mirror, the Draft
-a board tool hands its function, the readiness every door reports and how
-query turns a cell into JSON and pages its rows. The one registry's family
-order is test_mcp_registry's."""
+a board tool hands its function, the readiness every door reports, and
+how query turns a cell into JSON, pages its rows and words an empty
+result. The one registry's family order is test_mcp_registry's."""
 
 import contextlib
 import datetime
@@ -115,8 +115,10 @@ def test_query_runs_as_the_reader_role(ctx):
 
 def test_query_refuses_file_and_server_reaching_sql_before_connecting():
     nowhere = tools.Context(dsn="postgresql://nowhere")
+    # the three sleeps migration 012 revokes
     for sql in ("select pg_read_file('/etc/passwd')", "select * from pg_ls_dir('.')",
-                "COPY heroes TO PROGRAM 'id'", "select pg_sleep(10)"):
+                "COPY heroes TO PROGRAM 'id'", "select pg_sleep(10)",
+                "select pg_sleep_for('10 seconds')", "select pg_sleep_until(now() + '10s')"):
         with pytest.raises(Refusal, match=r"refuses|read-only"):
             nowhere.call("query", sql=sql)
     long = "select '%s'" % ("x" * (lifecycle.MAX_SQL_CHARS - 8))       # one character over
@@ -270,8 +272,9 @@ def test_the_tuning_log_tool_refuses_fewer_than_one_line(tmp_path, monkeypatch):
 
 def test_a_board_tool_hands_its_function_one_draft(tmp_path, monkeypatch):
     """The board tools share BOARD's six properties, first and in order, and
-    each function gets them as one Draft: tuples, with what the call left out
-    empty, and the stage as sent."""
+    each function gets them as one Draft: tuples, an empty name dropped as
+    the board's query string drops it, what the call left out empty, and
+    the stage as sent."""
     seen = []
 
     class Stub:
@@ -287,7 +290,7 @@ def test_a_board_tool_hands_its_function_one_draft(tmp_path, monkeypatch):
     monkeypatch.setattr(tables, "load", lambda cx: None)
     monkeypatch.setattr(board_facts, "generate", lambda world, draft: seen.append(draft) or Stub())
     Offline(dsn="postgresql://nowhere").call(
-        "facts", map="Ilios", red=["Ana"], bans=["Mei"])
+        "facts", map="Ilios", red=["", "Ana"], bans=["Mei", ""])
     Offline(dsn="postgresql://nowhere").call("facts", map="Ilios", stage="Well")
     assert seen == [Draft("Ilios", ("Ana",), (), ("Mei",), ""), Draft("Ilios", stage="Well")]
     assert list(boards.BOARD) == ["map", "red", "blue", "bans", "side", "stage"]
@@ -373,3 +376,15 @@ def test_a_query_page_says_truncated_exactly_when_a_row_is_left_out():
     rows, truncated = lifecycle._page([wide, wide, wide])
     assert len(rows) == 1 and truncated is True
     assert {len(cell) for cell in rows[0]} == {lifecycle.MAX_CELL + 1}
+
+
+def test_a_query_that_reads_no_row_says_so_under_its_header(monkeypatch):
+    """Every statement query admits names its columns, so the header always
+    leads, and a result with no row says so beneath it."""
+    nowhere = tools.Context(dsn="postgresql://nowhere")
+    monkeypatch.setattr(lifecycle, "_read_only", lambda dsn, body: (["name", "hero_id"], []))
+    text, data = nowhere.call("query", sql="select name, hero_id from heroes where false")
+    assert text == "name\thero_id\n(no rows)"
+    assert data == {"columns": ["name", "hero_id"], "rows": [], "truncated": False}
+    monkeypatch.setattr(lifecycle, "_read_only", lambda dsn, body: (["n"], [(1,), (2,)]))
+    assert nowhere.call("query", sql="select 1 union select 2")[0] == "n\n1\n2"

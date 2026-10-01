@@ -42,8 +42,9 @@ type BoardFn = Callable[..., ToolReply]
 
 
 def _names(value: object) -> tuple[str, ...]:
-    """An array of names the schema admitted, as the tuple a Draft holds."""
-    return tuple(str(v) for v in value) if isinstance(value, (list, tuple)) else ()
+    """An array of names the schema admitted, as the tuple a Draft holds,
+    its empty names dropped as facts.draft.parse_board drops them."""
+    return tuple(str(v) for v in value if v) if isinstance(value, (list, tuple)) else ()
 
 
 def _draft(arguments: dict[str, object]) -> Draft:
