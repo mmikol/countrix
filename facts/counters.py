@@ -595,7 +595,7 @@ def m_antiheal(win: Features, lose: Features) -> Reading:
 
 
 def m_burst(win: Features, lose: Features) -> Reading:
-    if lose.role == "tank" or not win.burst:
+    if lose.role == "tank" or not win.burst or not lose.pool:
         return NONE
     strength = (_clamp((win.burst / lose.pool - BURST_FROM) / BURST_SPAN)
                 * (MELEE_BURST if win.melee_only else 1.0) * (1.0 - MOBILE_DODGE * lose.mobile)
@@ -656,6 +656,8 @@ def m_armor(win: Features, lose: Features) -> Reading:
 
 
 def m_dive(win: Features, lose: Features) -> Reading:
+    if not lose.pool:
+        return NONE
     kill = _clamp(((win.dps * KILL_WINDOW + win.burst) / lose.pool - KILL_FROM) / KILL_SPAN)
     exposed = lose.backline * (1.0 - lose.mobility) * (ESCAPE_KEEPS if lose.escape else 1.0)
     return Reading(win.diver * win.mobility * exposed * kill * _reachable(win, lose),
