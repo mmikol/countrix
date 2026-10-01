@@ -232,12 +232,12 @@ per unit. The shipped file sets 1, 1, 0.26 and 0.05. `rate` is 1, so the
 rate term is in win-rate points; `synergy` and `counter` are set so that
 each term's median spread across a board's reference sample is about
 half the rate term's, about 2.1 points on a typical board; the module
-docstring holds the calibration, and [Why the weights are the
-playbook's](#why-the-weights-are-the-playbooks) why synergy moved from
-0.1. A heuristic still moves a six by its weight at most; the math page
-says how that compares with the base's spread. Each term is a bar of the
-breakdown, with the fact it read and its weight with the meta applied:
-the counter bar's fact names the six it read.
+docstring holds the rule, and [Why the weights are the
+playbook's](#why-the-weights-are-the-playbooks) what it measured and why
+synergy moved from 0.1. A heuristic still moves a six by its weight at
+most; the math page says how that compares with the base's spread. Each
+term is a bar of the breakdown, with the fact it read and its weight
+with the meta applied: the counter bar's fact names the six it read.
 
 A `BaseWeights` rides the `Brief`, and `infer`'s `base`, into every
 `Objective`. Left unset it is the playbook in
@@ -283,21 +283,21 @@ on, and making those dials is on the backlog, the owner's call.
 The synergy weight moved from 0.1 to 0.26 on the owner's word, by the
 calibration's own rule. At 0.1 the synergy score's median range over a
 board's reference sample was 21 while an unwritten pair read 0, so the
-term spread a typical board about 2.1 points, as the counter term does at
-0.05. Reading what no article writes as unknown moved that range: to
-12.8 when an unwritten pair read the written pairs' mean, where the rule
-gave 0.16, and to 8.1 once each unwritten cell reads the written cells'
-claim share ([Why an unwritten synergy pair is not
+term spread a typical board about 2.1 points, as the counter term does
+at 0.05: the counter graph's median range is 41 - the wiki's edges at 2
+and the kit's fill at 1. Reading what no article writes as unknown moved
+that range: to 12.8 when an unwritten pair read the written pairs' mean,
+where the rule gave 0.16, and to 8.1 once each unwritten cell reads the
+written cells' claim share ([Why an unwritten synergy pair is not
 zero](#why-an-unwritten-synergy-pair-is-not-zero)). A blank cell now
 reads close to a claim, so sixes differ less in synergy, and at 0.1 the
 term would have spread them about 0.8 points - two fifths of what the
 calibration aimed at, and short of what a heuristic at weight 1 moves.
 The rule, measured on the 30 maps with red's likely six against the
-seat, gives 2.1 / 8.1, 0.26, and the tune tool set it
-(`tuning-log.md`, which also records the 0.18 the half-mean reading
-briefly gave). The weight restores the term's say, not the zero's
-verdicts: a hero no article writes about still reads as the written
-heroes do on average.
+seat, gives 2.1 / 8.1, 0.26, and the tune tool set it (`tuning-log.md`,
+which also records the 0.18 the half-mean reading briefly gave). The
+weight restores the term's say, not the zero's verdicts: a hero no
+article writes about still reads as the written heroes do on average.
 
 ### Why an unwritten synergy pair is not zero
 
