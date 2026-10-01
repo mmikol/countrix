@@ -28,10 +28,10 @@ This module writes the meta, the bans and the map; facts.hero_facts writes
 a hero's facts, and facts.team_facts a team's and the matchup's.
 """
 
-from typing import Literal, NotRequired, TypedDict
+from typing import NotRequired, TypedDict
 
 from facts import compute, hero_facts, team_facts
-from facts.compute import TERRAIN_STANDOUT
+from facts.compute import TERRAIN_STANDOUT, GroundSource
 from facts.draft import MAX_BANS, Draft, Side, board_side, board_stage, is_sided, opposite
 from facts.factset import FactSet
 from facts.model import TERRAIN_FEATURES, Map, Resolved, World
@@ -59,7 +59,7 @@ class GroundValue(TypedDict):
     ground in play, and whose text it was read off (compute.ground)."""
     feature: str
     z: float
-    source: Literal["stage", "map"]
+    source: GroundSource
 
 
 class GroundFact(TypedDict):

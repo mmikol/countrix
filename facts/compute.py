@@ -281,12 +281,16 @@ def stage_standouts(m: Map, stage: str) -> list[Standout]:
     return sorted(found, key=lambda s: (-s.z, s.feature))[:STAGE_FEATURES]
 
 
+# whose text a feature on the ground in play was read off
+type GroundSource = Literal["stage", "map"]
+
+
 class Ground(NamedTuple):
     """A terrain feature on the ground in play: its z, and whose text it was
     read off - the stage's own, or the map's article."""
     feature: str
     z: float
-    source: Literal["stage", "map"]
+    source: GroundSource
 
 
 def ground(m: Map, stage: str, feature: str) -> Ground:

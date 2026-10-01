@@ -56,11 +56,15 @@ from inference.scoring import Objective
 SLACK = 1e-12              # a float computation's slack per unit of its addends' magnitude
 
 
+# the roles still open at a node: (role, first candidate, picks left)
+type Open = tuple[tuple[int, int, int], ...]
+
+
 class Branch(NamedTuple):
     """A node of the walk: the picks so far, locked ones included, by dense
-    index, and each role still open as (role, first candidate, picks left)."""
+    index, and the roles still open."""
     picks: tuple[int, ...]
-    open: tuple[tuple[int, int, int], ...]
+    open: Open
 
 
 # per role, per start: a value over the candidates from there on

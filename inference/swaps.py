@@ -50,7 +50,7 @@ the next phase goes on from the last six that was.
 """
 
 from collections.abc import Sequence
-from typing import Literal, NamedTuple
+from typing import NamedTuple
 
 from facts import compute
 from facts.board_facts import GroundValue
@@ -63,6 +63,7 @@ from inference.result import (
     Pick,
     Result,
     Span,
+    StageKind,
     StageRow,
     StageRules,
     StageSwap,
@@ -172,9 +173,6 @@ def _swaps(pairs: Sequence[SwapPair]) -> str:
 
 
 # --- the stage plan -----------------------------------------------------------
-
-type StageKind = Literal["phase", "arena"]
-
 
 class Leg(NamedTuple):
     """One stage's answer from a reference six: the six to play there and

@@ -29,6 +29,8 @@ from inference.strategy import Strategy
 type Payload = dict[str, object]
 # what a result is, which its heading names
 type ResultKind = Literal["infer", "evaluate", "current", "countered", "fill", "expected"]
+# a stage of the plan: a phase of one route or an arena of its own
+type StageKind = Literal["phase", "arena"]
 
 
 class Pick(TypedDict):
@@ -134,7 +136,7 @@ class StageRow(TypedDict):
     terrain at or over the standout on its ground, the rules it turns on
     and off, the blurb, and whether its search finished within budget."""
     stage: str
-    kind: Literal["phase", "arena"]
+    kind: StageKind
     current: bool
     played: bool
     six: list[str]
