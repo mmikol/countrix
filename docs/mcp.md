@@ -22,10 +22,10 @@ in the repo:
 They expose the same tools. The skills prefer `countrix-docker` when the
 stack is up, so what a session changes is what the board shows.
 
-The HTTP door listens on `0.0.0.0:8020` inside the `data` container, so
-every container on the stack's network reaches it as `data`; only the
-published port is on 127.0.0.1. What it checks before a message reaches
-the server is in [security.md](security.md).
+The HTTP door listens on `0.0.0.0:8020` inside the `data` container and
+answers to the local names alone; only the published port is on
+127.0.0.1, and on the stack's network the token is the control. What it
+checks before a message reaches the server is in [security.md](security.md).
 
 ## The protocol
 

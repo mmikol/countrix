@@ -16,7 +16,7 @@ and the board is reachable from this machine only.
 | **the door and the board** | any process on this machine calling every tool on the MCP door, the writes, refreshes and rebuilds included; a browser page trying the same through DNS rebinding, or reading the board, the playbook and the solver's answers from either HTTP server |
 | **SQL** | the `query` tool: the project's database users are superusers, and a superuser's `SELECT` can read files off the disk it runs on |
 | **files** | tools that write into the playbook: a path that escapes the folder, a file the catalog would refuse, an oversized body |
-| **the containers** | a compromised process inside one reaching the internet, escalating, filling the host, or calling every tool on the door, which answers the whole stack network as `data:8020` |
+| **the containers** | a compromised process inside one reaching the internet, escalating, filling the host, or calling every tool on the door, which listens on the whole stack network |
 | **your account** | the CLI signed in on the host, whose sessions call the tools |
 
 ## What stands in the way
@@ -32,19 +32,23 @@ person or through `/strategy`.
 
 **The board writes nothing.** It answers `GET` alone, so a slider's
 weight stays in the session. Its code writes no playbook file and no row,
-and its container mounts the playbook read-only.
+its container mounts the playbook read-only, and it connects as
+`matrix_reader`, which the database holds to `SELECT` - against a
+compromised board too, once `POSTGRES_PASSWORD` is set (below).
 
 **Every server answers only to its own names.** The door and the board
 stand on `db/web.py`, which checks each request's `Host` and `Origin`
 before any route runs, on every method. Each must be a local name
-(`db.web.LOCAL_HOSTS`) or one the server was started with: its compose
-service name (`data`) or a published board's public name. Anything else
-is 403, a missing `Host` and `Origin: null` included.
+(`db.web.LOCAL_HOSTS`) or one the server was started with, a published
+board's public name. Anything else is 403, a missing `Host` and
+`Origin: null` included.
 A page rebound by DNS sends its own host name, so the Host check stops it.
 
 **The door checks who is knocking.** It listens on 0.0.0.0:8020 inside
-its container, so every container on the stack network reaches it as
-`data`. `door/mcp/http.py` takes one JSON-RPC message a request, caps it
+its container and answers to the local names alone; a process on the
+stack network can still claim one in its `Host`, so there the token is
+the control.
+`door/mcp/http.py` takes one JSON-RPC message a request, caps it
 at one megabyte, refuses a body not labelled `application/json` with
 415, allows 120 tool calls per client address a minute and answers 429
 past that, and asks for `Authorization: Bearer <token>` when
