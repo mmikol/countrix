@@ -328,7 +328,7 @@ function renderFacts() {
 function paintSuggestions() {
   var slots = el('blueslots').children, d = INF;
   var src = !d || d.error ? null : (st.blue.length ? d.fill : d.blue);
-  var sw = answered() ? d.swaps : null;         /* a suggested swap names the rest of its six */
+  var sw = answered() ? d.swaps : null;         /* the swaps' empty slots show the fill's heroes */
   var free = function (p) { return st.blue.indexOf(p.hero) < 0; };
   var open = sw && sw.open && sw.open.length ? sw.open.filter(free)
            : src && src.picks ? src.picks.filter(function (p) { return !p.locked && free(p); }) : [];

@@ -520,12 +520,13 @@ def stage_blurb(
         read.append("Swap %s%s" % (said, ": the six gains most on %s" % _and(gains)
                                    if gains else ""))
     else:
-        read.append("Keep the six: no swap pays for its cost (%s)" % _cost(cost))
+        read.append("Keep the six: no swap pays for its cost (%s)" % cost_text(cost))
     if lean in STYLE_PLAY:
         read.append("The six turns %s here: %s" % (lean, STYLE_PLAY[lean]))
     return " ".join(_sentence(r) for r in read)
 
 
-def _cost(value: float) -> str:
-    """A cost as the blurb writes it: whole where it is whole."""
+def cost_text(value: float) -> str:
+    """A swap cost as the blurb and the swaps' verdict write it: whole where
+    it is whole."""
     return "%d" % value if value == int(value) else "%g" % value

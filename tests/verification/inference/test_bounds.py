@@ -213,7 +213,7 @@ def test_every_bound_holds_every_completion_of_random_branches(
                        if e is not None]
         for walk, frame, open_roles in branches(solver, rng, 60):
             branch = ranges.Branch(frame.picks, open_roles)
-            env = ranges.evaluate(ranges.plan(walk.space, keys), branch)
+            env = ranges.evaluate(ranges.rule_order(walk.space, keys), branch)
             top = walk.of(frame, open_roles)
             tiebreak = walk.tiebreak(frame, open_roles)
             for six in completions(walk, frame, open_roles):

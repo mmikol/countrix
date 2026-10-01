@@ -10,7 +10,7 @@ can take these names from it.
 """
 
 from collections.abc import Iterable, Mapping, Sequence, Sized
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal
 
 from db import Refusal
@@ -74,6 +74,11 @@ class Draft:
         as_side(self.side)
         if self.stage and not self.map_name:
             raise Refusal("a stage is one of a map's: name the map for stage %r" % self.stage)
+
+    def flipped(self) -> "Draft":
+        """The same board from the other seat: red's picks and blue's swapped,
+        the side opposite, the map, the bans and the stage kept."""
+        return replace(self, red=self.blue, blue=self.red, side=opposite(self.side))
 
 
 # --- the board off the wire -----------------------------------------------------
