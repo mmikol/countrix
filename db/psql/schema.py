@@ -37,17 +37,19 @@ MIGRATIONS_DIR = os.path.join(ROOT, "db", "psql", "migrations")
 
 # Which domain the data dictionary files a table under, keyed by the migration
 # that last created it. A migration that creates no surviving table needs no
-# entry; a table with none falls to "foundation".
+# entry; a table with none falls to "foundation". RELATIONS is the wiki's word
+# on heroes together - counters, synergies and their cells, playstyles;
+# PLAYBOOK is the mirror of the strategy files.
 DOC_DOMAIN = {
     "001_initial_schema.sql": "foundation", "002_heroes.sql": "HEROES",
     "003_maps.sql": "MAPS", "004_meta.sql": "META",
-    "005_playbook.sql": "PLAYBOOK",
+    "005_playbook.sql": "RELATIONS",
     "008_schema_migrations.sql": "foundation",
-    "010_constraints_and_heuristics.sql": "INFERENCE",
+    "010_constraints_and_heuristics.sql": "PLAYBOOK",
     "020_map_terrain.sql": "MAPS", "021_stage_terrain.sql": "MAPS",
-    "025_kit_6v6.sql": "HEROES", "029_synergy_cells.sql": "PLAYBOOK"}
+    "025_kit_6v6.sql": "HEROES", "029_synergy_cells.sql": "RELATIONS"}
 # The domains in the order the dictionary lists them.
-DOMAINS = ("HEROES", "MAPS", "META", "PLAYBOOK", "INFERENCE")
+DOMAINS = ("HEROES", "MAPS", "META", "RELATIONS", "PLAYBOOK")
 
 
 class SchemaError(Exception):

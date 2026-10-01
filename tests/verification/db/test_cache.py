@@ -84,6 +84,19 @@ def test_refresh_refetches_a_page_written_before_it_began_and_rewrites_the_cache
     assert cache.cached_get(newest, "u", "k", policy=INSTANT) == "newest page"
 
 
+def test_a_write_cut_short_leaves_the_cached_copy_whole(tmp_path):
+    """A page is written beside its cached copy and renamed over it once
+    whole: a write that fails raises and leaves the old copy as it was,
+    never a truncated page a later build reads as whole. A lone surrogate
+    stands in for a full disk: it fails the write after the file opens."""
+    write_aged(tmp_path / "k.html", "yesterday")
+    pull = cache.PullContext(str(tmp_path), session=FakeSession("half a page \ud800"),
+                             cutoff=time.time())
+    with pytest.raises(UnicodeEncodeError):
+        cache.cached_get(pull, "u", "k", policy=INSTANT)
+    assert (tmp_path / "k.html").read_text(encoding="utf-8") == "yesterday"
+
+
 def test_a_failed_refetch_keeps_the_cached_copy(tmp_path):
     """The stale copy is read, named in the pull's stale and warned of in its
     log; with nothing cached the failure surfaces and nothing is listed."""
