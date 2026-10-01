@@ -33,7 +33,16 @@ from facts.draft import TEAM_SIZE
 from facts.model import ROLES, Hero, World
 from inference.expr import Expr
 from inference.intervals import FALSE, INF, Abstract, Env, Evaluator, Iv, abstract, lift, truth
-from inference.ranges import SLACK, Branch, Open, Space, evaluate, rule_order
+from inference.ranges import (
+    PAIR_COUNT,
+    SLACK,
+    Branch,
+    Open,
+    Space,
+    evaluate,
+    pair_halves,
+    rule_order,
+)
 from inference.scoring import Norm, Objective, normalised
 from inference.shapes import is_shape_limit
 
@@ -121,17 +130,13 @@ class Bound:
             weight = base.scaled.synergy
             if weight:
                 self.pairs = [[weight * v for v in row] for row in space.pairs()]
-                for k in range(TEAM_SIZE):
-                    row = []
-                    for x in range(len(heroes)):
-                        others = sorted((self.pairs[x][y] for y in pool if y != x), reverse=True)
-                        row.append(sum(others[:k]) / 2)
-                    self.halves.append(row)
+                self.halves = [[best for best, _ in row]
+                               for row in pair_halves(self.pairs, pool, len(heroes))]
         if self.own is not None:
             largest = sorted((abs(v) for v in self.own), reverse=True)[:TEAM_SIZE]
             spread = max((abs(v) for row in self.pairs for v in row), default=0.0) \
                 if self.pairs else 0.0
-            self.engine_slack = SLACK * (1.0 + sum(largest) + 15 * spread)
+            self.engine_slack = SLACK * (1.0 + sum(largest) + PAIR_COUNT * spread)
             potential = [self.own[x] + (self.halves[TEAM_SIZE - 1][x] if self.halves else 0.0)
                          for x in range(len(heroes))]
         else:
@@ -206,14 +211,14 @@ class Bound:
         """The default engine's bound: the picks' own parts and pairs, then
         each open role's best few by their own part, their pairs with the
         picks and half their best pairs among the rest."""
-        if self.own is None:
+        tops = self._own_tops
+        if self.own is None or tops is None:
             return 0.0
         total = frame.own + frame.paired
         m = sum(n for _, _, n in open_roles)
-        if frame.partners is None or self._own_tops is None or not m:
-            if self._own_tops is not None:
-                for r, start, n in open_roles:
-                    total += self._own_tops[r][start][n]
+        if frame.partners is None or not m:
+            for r, start, n in open_roles:
+                total += tops[r][start][n]
             return total + self.engine_slack
         own, partners, half = self.own, frame.partners, self.halves[m - 1]
         for r, start, n in open_roles:

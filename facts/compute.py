@@ -27,6 +27,7 @@ from facts.model import ROLES, TERRAIN_FEATURES, Hero, Map, World
 from facts.team import TEAM_METRICS, VERSUS_METRICS, MetricBag, number
 
 TREND_POINTS = 1.5
+CHEW_UNKNOWN = 999.0      # the seconds a chew time reads where a side's pool or damage is 0
 TERRAIN_STANDOUT = 0.75   # sd from the ordinary map at which a terrain feature is a fact
 STAGE_MENTIONS = 2        # mentions a stage's text must hold of a feature to stand out on it
 STAGE_FEATURES = 2        # standout features a stage fact names, largest first
@@ -37,7 +38,8 @@ MATCHUP_METRICS = OrderedDict([
     ("hps_diff", "blue healing floor minus red"),
     ("burst_vs_heal", "blue's biggest hit minus red's biggest single save"),
     ("heal_vs_burst", "blue's biggest single save minus red's biggest hit"),
-    ("chew_time_ours", "seconds of blue's floor damage to chew red's pool (999 if unknown)"),
+    ("chew_time_ours", "seconds of blue's floor damage to chew red's pool (%g if unknown)"
+                       % CHEW_UNKNOWN),
     ("chew_time_theirs", "seconds of red's floor damage to chew blue's pool"),
     ("tempo_diff", "red median cooldown minus blue's (positive: blue cycles faster)"),
     ("range_diff", "blue median reach minus red's; 0 where a side's picks publish none:"
@@ -238,8 +240,8 @@ def matchup_metrics(world: World, blue_t: MetricBag, red_t: MetricBag) -> Metric
     matchup["hps_diff"] = number(blue_t["hps_floor"]) - number(red_t["hps_floor"])
     matchup["burst_vs_heal"] = blue_burst - red_heal
     matchup["heal_vs_burst"] = blue_heal - red_burst
-    matchup["chew_time_ours"] = red_pool / blue_dps if blue_dps and red_pool else 999.0
-    matchup["chew_time_theirs"] = blue_pool / red_dps if red_dps and blue_pool else 999.0
+    matchup["chew_time_ours"] = red_pool / blue_dps if blue_dps and red_pool else CHEW_UNKNOWN
+    matchup["chew_time_theirs"] = blue_pool / red_dps if red_dps and blue_pool else CHEW_UNKNOWN
     matchup["tempo_diff"] = number(red_t["cooldown_median"]) - number(blue_t["cooldown_median"])
     # a side none of whose picks publishes a range has no median: unknown, not
     # 0 m, so there is no gap to read
