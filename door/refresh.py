@@ -98,7 +98,7 @@ def refresh_once(ctx: tools.Context, log: tools.Log = print) -> Refreshed:
     (every source), as full_due decides from the context's wiki cache - its
     text each tool's headline, joined by "; ". Never raises; a failure
     returns (False, the error)."""
-    started = time.time()
+    started = time.monotonic()
     try:
         # inside the try: full_due() lists and stats the page cache, which can
         # raise OSError like the refresh it decides, and the promise above has to hold
@@ -115,9 +115,9 @@ def refresh_once(ctx: tools.Context, log: tools.Log = print) -> Refreshed:
     except Exception as error:  # noqa: BLE001  # a failed refresh leaves yesterday's data in place
         log(traceback.format_exc().rstrip())
         log("refresh: FAILED after %.0fs: %s: %s"
-            % (time.time() - started, type(error).__name__, error))
+            % (time.monotonic() - started, type(error).__name__, error))
         return Refreshed(False, str(error))
-    log("refresh: done in %.0fs - %s" % (time.time() - started, text))
+    log("refresh: done in %.0fs - %s" % (time.monotonic() - started, text))
     return Refreshed(True, text)
 
 
