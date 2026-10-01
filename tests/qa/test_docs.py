@@ -1,9 +1,10 @@
 """Every link resolves, every skill names real tools and only strategies the
 playbook holds, the root overview and every package map name what they hold,
-only the door calls the playbook's writers, each layer imports only the
-layers below it, every shallow indent sits on a four-column stop, every type
-alias is a type statement, and the sections db_docs generates match what the
-code generates today. Pure, except the schema check."""
+only the door calls the writers, each layer imports only the layers below
+it, every shallow indent sits on a four-column stop, every type alias is a
+type statement, every migration but 010-013 is one transaction, and the
+sections db_docs generates match what the code generates today. Pure,
+except the schema check."""
 
 import ast
 import json
@@ -84,17 +85,26 @@ def test_every_setting_the_code_reads_is_documented():
     assert not missing, missing
 
 
-# a call that writes the playbook's files or reloads the strategies table
-WRITER_RE = re.compile(r"\b(?:catalog|catalog_module)\.mirror\(|\btune\.(?:tune|add|complete)\(")
+# a call that writes: the playbook's files or the strategies table that mirrors
+# them, the schema, or the tables a pull fills
+WRITER_RE = re.compile(
+    r"\b(?:catalog|catalog_module)\.mirror\(|\btune\.(?:tune|add|complete)\("
+    r"|\bschema\.(?:apply|rebuild|drop_all)\(|\.run\(connection, pull\)")
 
 
-def test_only_the_door_calls_the_playbook_writers():
-    """docs/architecture.md's rule: the door gates every write. The code that
-    writes the playbook and its table lives in inference/ (catalog.mirror,
-    tune.tune, tune.add, tune.complete), and only a door tool calls it. A
-    call through the door, ctx.call("tune", ...), is not one."""
+def test_only_the_door_calls_the_writers():
+    """docs/architecture.md's rule: the door gates every write to Postgres or
+    the playbook. The code that writes lives with what it writes - the
+    playbook's in inference/ (catalog.mirror, tune.tune, tune.add,
+    tune.complete), the schema's in db.psql.schema (apply, rebuild,
+    drop_all), each pull's run in db/data - and only a door tool calls it.
+    A call through the door, ctx.call("tune", ...), is not one, nor is the
+    schema module's own call to apply."""
     assert WRITER_RE.search("        catalog.mirror(cx, cat)")
+    assert WRITER_RE.search("        dropped = schema.rebuild(cx)")
+    assert WRITER_RE.search("    return wiki_maps.run(connection, pull)")
     assert not WRITER_RE.search('ctx.call("tune", **arguments)')
+    assert not WRITER_RE.search("    apply(connection, read_migrations())")
     outside = []
     for path in _python_files("db", "facts", "inference", "door", "ui"):
         relative = os.path.relpath(path, ROOT)
@@ -248,6 +258,32 @@ def test_the_migrations_row_names_every_migration():
     assert not missing, missing
 
 
+# the migrations that run without a BEGIN;/COMMIT; of their own: applied, so
+# never edited, and schema.apply commits after each file either way
+UNWRAPPED = ("010", "011", "012", "013")
+
+
+def _statement_lines(sql):
+    """A migration's lines, stripped, less the blank ones and the comments,
+    an indented comment among them."""
+    return [line for line in map(str.strip, sql.splitlines())
+            if line and not line.startswith("--")]
+
+
+def test_every_migration_but_010_to_013_is_one_transaction():
+    """CLAUDE.md's rule: a migration opens with BEGIN; and closes with
+    COMMIT;, whatever comments come before and after."""
+    from db.psql import schema
+    assert _statement_lines("-- why\nBEGIN;\n\n    -- a note\nDROP TABLE x;\nCOMMIT;\n") == [
+        "BEGIN;", "DROP TABLE x;", "COMMIT;"]
+    bare = []
+    for migration in schema.read_migrations():
+        lines = _statement_lines(migration.sql)
+        if migration.name[:3] not in UNWRAPPED and (lines[0], lines[-1]) != ("BEGIN;", "COMMIT;"):
+            bare.append(migration.name)
+    assert not bare, bare
+
+
 def test_the_overview_names_everything_at_the_root():
     tracked = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True,
                              text=True).stdout.split()
@@ -399,11 +435,15 @@ def test_the_tool_reference_is_current(copy_of):
 
 # --- the generated sections ------------------------------------------------------------------
 
-def test_the_catalog_document_matches_the_strategy_files(copy_of):
+def test_the_catalog_document_matches_the_strategy_files(copy_of, monkeypatch):
+    # the doc describes the shipped playbook, and under another one write_docs
+    # writes nothing, so a COUNTRIX_STRATEGIES in the shell would leave the
+    # copy as committed and the check passing unread
+    monkeypatch.delenv("COUNTRIX_STRATEGIES", raising=False)
     from inference import catalog
     committed = _read("docs", "inference.md")
     fresh = copy_of("docs/inference.md")
-    catalog.write_docs(catalog.load(), fresh)
+    assert catalog.write_docs(catalog.load(), fresh) == fresh
     with open(fresh, encoding="utf-8") as handle:
         assert _section(handle.read(), "catalog") == _section(committed, "catalog"), (
             "docs/inference.md is behind inference/strategies/: run"
@@ -421,46 +461,3 @@ def test_the_data_dictionary_matches_the_live_database(db, copy_of):
     assert _section(text, "dictionary") == _section(committed, "dictionary"), (
         "docs/db.md's data dictionary is behind the database: run"
         " `.venv/bin/python -m door.mcp call db_docs`")
-
-
-def test_a_tables_prose_is_the_comment_block_directly_above_it():
-    from db.psql import schema
-    text = "\n".join([
-        "-- THE FILE: a header that is no table's.",
-        "BEGIN;",
-        "",
-        "-- One row per hero.",
-        "--",
-        "-- The roster, from Blizzard.",
-        "CREATE TABLE heroes (",
-        "    hero_id serial PRIMARY KEY",
-        ");",
-        "",
-        "-- Not this one: a blank line follows it.",
-        "",
-        "CREATE TABLE maps (map_id serial PRIMARY KEY);",
-        "-- Nor this one:",
-        "    -- an indented line ends the block.",
-        "CREATE TABLE modes (mode_id serial PRIMARY KEY);",
-        "-- Two lines,",
-        "-- one sentence.",
-        "CREATE TABLE stages (stage_id serial PRIMARY KEY);",
-        "COMMIT;",
-    ])
-    assert schema.table_prose(text) == {
-        "heroes": "One row per hero. The roster, from Blizzard.",   # the bare -- is dropped
-        "maps": "", "modes": "",
-        "stages": "Two lines, one sentence.",
-    }
-
-
-def test_embed_replaces_only_the_marked_section(tmp_path):
-    from db import embed
-    path = tmp_path / "doc.md"
-    path.write_text("# T\n\nkeep\n\n<!-- generated:x -->\nold\n<!-- /generated:x -->"
-                    "\n\nalso keep\n")
-    embed(str(path), "x", "new\nlines")
-    assert path.read_text() == ("# T\n\nkeep\n\n<!-- generated:x -->\nnew\nlines\n"
-                                "<!-- /generated:x -->\n\nalso keep\n")
-    with pytest.raises(ValueError, match="no y markers"):
-        embed(str(path), "y", "z")

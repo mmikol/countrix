@@ -252,9 +252,11 @@ db <- facts <- inference <- door <- ui.
   row, the one inventory of the schema's steps. The whole chain must build
   an empty database: an invariant test applies it to a scratch database
   on the target server and compares the tables with the built one.
-- Only a door tool in `door/mcp/` calls the playbook's writers -
-  `catalog.mirror` and `tune.tune`/`add`/`complete`. A new call site
-  elsewhere fails the test; route it through a tool.
+- Only a door tool in `door/mcp/` calls a writer - the playbook's,
+  `catalog.mirror` and `tune.tune`/`add`/`complete`, and the database's,
+  `schema.apply`/`rebuild`/`drop_all` and a pull's `run(connection, pull)`.
+  A new call site elsewhere fails `test_only_the_door_calls_the_writers`;
+  route it through a tool.
 - Each layer imports only the layers below it: `db/` imports nothing above
   it, `facts/` only `db/`, `inference/` `db/` and `facts/`, `door/` all
   three; `ui/`, `tests/` and `orchestrator.py` import any of them. An
@@ -293,11 +295,14 @@ db <- facts <- inference <- door <- ui.
 - `tests/verification/ui/test_pages.py` pins the scripts at their seams
   (routes, query keys, element ids, the payload keys they read against what
   the server writes), and `tests/qa/test_stylesheet.py` holds that every
-  `board.css` class is used; a decision worth pinning is made on the
-  server, as the seat badge is
-  (`momentum.badges`). The math page renders the code constants it quotes
-  (`view_math` fills them in), so a literal percent in `ui/static/math.html`
-  is written `%%`.
+  `board.css` class is used. A decision only the client can make is pinned
+  in the script's source - the stale-reply guard, the HTML escape, the meta
+  and swap-cost weights never pruned, the swaps and suggested slots drawn
+  only for the picks the board in hand answered, a taken swap checked
+  against the bans and the role caps; any other decision worth pinning is
+  made on the server, as the seat badge is (`momentum.badges`). The math
+  page renders the code constants it quotes (`view_math` fills them in), so
+  a literal percent in `ui/static/math.html` is written `%%`.
 - `test_the_search_reaches_the_enumerated_maximum` in
   `tests/verification/inference/test_solver.py` is the regression gate on
   the search: synthetic boards - red revealed, locks, bans, a pair that pays
