@@ -33,7 +33,7 @@ from facts.draft import TEAM_SIZE
 from facts.model import ROLES, Hero, World
 from inference.expr import Expr
 from inference.intervals import FALSE, INF, Abstract, Env, Evaluator, Iv, abstract, lift, truth
-from inference.ranges import SLACK, Branch, Space, evaluate, plan
+from inference.ranges import SLACK, Branch, Space, evaluate, rule_order
 from inference.scoring import Norm, Objective, normalised
 from inference.shapes import is_shape_limit
 
@@ -170,7 +170,7 @@ class Bound:
             reads |= _six_names(r.when if gate is None else None)
             reads |= _six_names(r.bonus) | _six_names(r.penalty)
             self.scored.append(_Scored(r.weight, gate, *compiled))
-        self.steps = plan(self.space, sorted(reads))
+        self.steps = rule_order(self.space, sorted(reads))
 
     # --- the walk's state ---------------------------------------------------
 

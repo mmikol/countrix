@@ -11,7 +11,7 @@ which the bound (inference.bounds) reads as the search walks.
                           answered, the distinct subroles, the claimed synergy
                           graph's isolated picks and largest group, or fixed by
                           the shape
-    plan, evaluate        the rules a search reads, each after the rules it
+    rule_order, evaluate  the rules a search reads, each after the rules it
                           reads, and their values over one branch
 
 A metric a rule sums in another order than the metric itself carries a
@@ -913,7 +913,7 @@ RULES: dict[str, Spec] = {
     **{"matchup." + k: v for k, v in MATCHUP_RULES.items()}}
 
 
-def plan(space: Space, keys: Sequence[str]) -> list[tuple[str, Rule]]:
+def rule_order(space: Space, keys: Sequence[str]) -> list[tuple[str, Rule]]:
     """The rules for `keys` and what they read, each after its needs."""
     ordered: list[tuple[str, Rule]] = []
     seen: set[str] = set()

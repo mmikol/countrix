@@ -8,6 +8,7 @@ board's payload. Scratch rules on map.objective and map.hazards make the
 stages score apart. No database."""
 
 import copy
+import dataclasses
 import os
 
 import pytest
@@ -18,7 +19,7 @@ from inference.base import OFF
 from inference.result import StageRules
 from inference.scoring import Candidate, Objective, quantized
 from inference.solver import Solver
-from tests.verification.inference import ASSUMPTIONS_ONLY, DEFAULT
+from tests.verification.inference import ASSUMPTIONS_ONLY, DEFAULT, FIXTURE_PLAYBOOK
 from tests.verification.inference.test_swaps import netted, plain_seat
 
 COST = 5.0                  # share points of blue's span a hero changed costs
@@ -61,8 +62,8 @@ def planned(world, draft, playbook, base, origin, memo=None):
     raw = swaps.raw_cost(COST, span) or 0.0
     whole = Objective(world, plain.m, red=plain.red, side=plain.side, catalog=playbook, base=OFF)
     six = world.resolve(None, (), tuple(origin)).blue
-    rows = swaps.chain(swaps.Plan(plain=plain, whole=whole, chosen=draft.stage, origin=six,
-                                  raw=raw, cost=COST), memo)
+    rows = swaps.chain(swaps.ChainStart(plain=plain, whole=whole, chosen=draft.stage,
+                                        origin=six, raw=raw, cost=COST), memo)
     return rows, plain, raw
 
 
@@ -130,6 +131,34 @@ def test_the_chosen_stage_is_the_origin_and_the_phases_before_it_are_played(
     assert "Play the six the board suggests here" in escort["blurb"]
 
 
+def test_a_withheld_swap_leaves_the_chosen_stage_the_origin(synthetic_world, monkeypatch):
+    """A swap the fight odds hold back is no answer on the board's chosen
+    stage: its row plays the six the board suggests, as a board that
+    searched no swap reads, and never says no swap pays for its cost."""
+    draft = Draft("Harbor Gate", ("Mortar", "Gale"), ORIGIN, side="attack", stage="Escort")
+    worse = {"odds": {"blue": 0, "red": 100}}
+    monkeypatch.setattr(engine._Pass, "_against", lambda self, draft, six, blue: worse)
+    board = engine.board(synthetic_world, draft, catalog=catalog.load(FIXTURE_PLAYBOOK),
+                         brief=engine.Brief(base=DEFAULT, countered=False, swap=COST))
+    assert board.swaps["status"] == "withheld"
+    [escort] = [r for r in board.stages if r["current"]]
+    assert sorted(escort["six"]) == sorted(ORIGIN) and escort["swaps"] == []
+    assert "Play the six the board suggests here" in escort["blurb"]
+    assert "no swap pays" not in escort["blurb"]
+
+
+def test_an_unscored_seat_walks_its_stages_at_no_cost(synthetic_world):
+    """A seat nothing scores has no span to take a share of: its stages are
+    walked at no swap cost, and each row that keeps the six quotes that
+    cost, not the one the board was asked for."""
+    draft = Draft("Harbor Gate", ("Mortar",), ORIGIN, side="attack")
+    board = engine.board(synthetic_world, draft, catalog=ASSUMPTIONS_ONLY,
+                         brief=engine.Brief(base=OFF, countered=False, swap=COST))
+    assert board.swaps["status"] == "none" and len(board.stages) == 2
+    for row in board.stages:
+        assert "Keep the six: no swap pays for its cost (0)." in row["blurb"], row
+
+
 def test_two_stages_on_one_ground_are_one_search(forged, staged):
     """Courtyard has no text and Spire's names its high ground one mention
     short, so both read as Ember Ruins and score every six alike: from the
@@ -172,7 +201,7 @@ def test_the_board_carries_the_plan_on_a_staged_map_and_none_elsewhere(synthetic
                         catalog=staged, brief=brief)
     assert flat.stages == []
     off = engine.board(synthetic_world, Draft("Harbor Gate", ("Mortar",), ORIGIN, side="attack"),
-                       catalog=staged, brief=brief._replace(stages=False))
+                       catalog=staged, brief=dataclasses.replace(brief, stages=False))
     assert off.stages == []
 
 

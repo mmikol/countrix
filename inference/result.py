@@ -74,8 +74,8 @@ SwapPair = TypedDict("SwapPair", {
 
 
 class OpenSlot(TypedDict):
-    """A hero the board draws in one of blue's empty slots: the swap's six
-    where a swap is suggested, else the fill's."""
+    """A hero the board draws in one of blue's empty slots: the fill's,
+    whether or not a swap is suggested, as the rest of the board shows it."""
     hero: str
     role: str
     portrait: str | None

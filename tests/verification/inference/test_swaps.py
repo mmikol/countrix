@@ -208,11 +208,13 @@ def test_the_swap_cost_in_force_is_the_weights_then_the_brief_then_meta_md():
 
 
 def test_the_raw_cost_is_share_points_of_the_span():
-    """A share point is a hundredth of the optimal's lead over the floor; a
+    """A share point is a hundredth of the optimal's lead over the floor,
+    zero where no reference six was legal, as a Result reads the span; a
     seat with no lead is unscored and has no raw cost."""
     assert swaps.raw_cost(10.0, Span(best=3.0, floor=1.0)) == pytest.approx(0.2)
     assert swaps.raw_cost(10.0, Span(best=1.0, floor=1.0)) is None
-    assert swaps.raw_cost(10.0, Span(best=1.0, floor=None)) is None
+    assert swaps.raw_cost(10.0, Span(best=1.0, floor=None)) == pytest.approx(0.1)
+    assert swaps.raw_cost(10.0, Span(best=-1.0, floor=None)) is None
 
 
 def test_the_search_ranks_a_kept_hero_first_with_the_engine_off(synthetic_world):
