@@ -7,7 +7,7 @@ scored. No sentence comes from anywhere else.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 from facts import compute
 from facts.board_facts import StageTerrainValue, TerrainValue
@@ -482,15 +482,18 @@ def _basis(
 def stage_blurb(
         m: Map, stage: str, index: tuple[int, int], rules: StageRules,
         swaps: Sequence[StageSwap], gains: Sequence[str], cost: float, *,
-        origin: bool = False, solved: bool = True, infeasible: bool = False,
+        outcome: Literal["origin", "solved", "unsolved", "infeasible"] = "solved",
         lean: str = "") -> str:
     """A stage of the plan in four sentences at most, each dropped when it
     has nothing to say: the ground - the stage, its place on the route
     (`index`, phase and phases; (0, 0) for an arena), and what its own text
     stresses, else that it reads as the map; what changes here - the rules
-    its ground turns on and off; the swaps and what the six gains most on
-    (`gains`, titled), or the six kept under the cost; and how to play it,
-    where the six's lean turns (`lean`, empty where it holds)."""
+    its ground turns on and off; what came of its search (`outcome`): the
+    six the board suggests played as it is (origin), no six within the
+    search's budget (unsolved) or the stage's limits (infeasible), else the
+    swaps and what the six gains most on (`gains`, titled), or the six kept
+    under the cost; and how to play it, where the six's lean turns (`lean`,
+    empty where it holds)."""
     place = ", phase %d of %d" % index if index[1] > 1 else ""
     stressed = compute.stage_standouts(m, stage)[:TERRAIN_NAMED]
     if stressed:
@@ -505,11 +508,11 @@ def stage_blurb(
         changes.append("%s drop%s out" % (_and(rules["off"]), "" if len(rules["off"]) > 1 else "s"))
     if changes:
         read.append("; ".join(changes))
-    if origin:
+    if outcome == "origin":
         read.append("Play the six the board suggests here")
-    elif infeasible:
+    elif outcome == "infeasible":
         read.append("No six keeps this stage's limits: keep the six before it")
-    elif not solved:
+    elif outcome == "unsolved":
         read.append("Not solved within the search's budget: keep the six before it")
     elif swaps:
         said = _and("%s for %s" % (s["out"], s["in"]) for s in swaps)
