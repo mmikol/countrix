@@ -82,8 +82,8 @@ flowchart LR
         HEROES["HEROES<br/>roster, kits, stats,<br/>keywords, portraits"]
         MAPS["MAPS"]
         META["META<br/>dated snapshots"]
-        PLAYBOOK["PLAYBOOK<br/>counters, synergies,<br/>styles"]
-        INF["INFERENCE<br/>the strategies mirror"]
+        RELATIONS["RELATIONS<br/>counters, synergies,<br/>styles"]
+        PLAYBOOK["PLAYBOOK<br/>the strategies mirror"]
     end
 
     subgraph USER["FACTS LAYER - facts/, and the board - ui/board.py"]
@@ -99,7 +99,7 @@ flowchart LR
 
     BLZ & WIKI --> PULL
     HEUR --> PLAY
-    PLAY --> INF
+    PLAY --> PLAYBOOK
     PULL & PLAY --> PG
     PG --> WORLD --> FACTS --> BOARD
     WORLD --> SOLVER
@@ -152,14 +152,16 @@ flowchart LR
     BAK --> DBC
 ```
 
-The containers share one network; only `data` and `refresher` ever open a
-connection out. `docker-entrypoint.sh` takes the role as its argument
-(`data`, `ui`, `refresh`); `backup` runs its own sh loop on postgres's
-image. `data` migrates a stale schema in place, and only a rebuild after
-a failed migration waits on `backup`, up to five minutes for the dump it
-asks for through `backups/`. Readiness has one definition,
-`db.psql.schema.state`: empty, stale (a migration the ledger lacks),
-unfilled (no heroes) or current. The entrypoint asks it through
+The containers sit on two networks: `stack` joins every container but
+`ui`, and `reader` joins `ui` to `db` alone, so the board reaches the
+database and never the door ([security.md](security.md)). Only `data`
+and `refresher` ever open a connection out. `docker-entrypoint.sh` takes
+the role as its argument (`data`, `ui`, `refresh`); `backup` runs its own
+sh loop on postgres's image. `data` migrates a stale schema in place, and
+only a rebuild after a failed migration waits on `backup`, up to five
+minutes for the dump it asks for through `backups/`. Readiness has one
+definition, `db.psql.schema.state`: empty, stale (a migration the ledger
+lacks), unfilled (no heroes) or current. The entrypoint asks it through
 `python -m db.psql.schema`; `ui` and `refresh` wait for current, up to the
 data healthcheck's 900 s, then exit. The data container's `/health`
 carries the state: compose's healthcheck holds `data` unhealthy until it
