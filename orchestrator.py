@@ -8,10 +8,10 @@
     python orchestrator.py status     what is running, how fresh the data is, the URLs
     python orchestrator.py down       stop everything (the database volume stays)
 
-It imports the standard library, db's ROOT, db.web's JSON reader and the
-catalog, to check the playbook before the stack starts; run it with
-.venv/bin/python, since the catalog loads psycopg. Exit code 0 means
-everything answered.
+It imports the standard library, db's ROOT, db.web's JSON reader,
+facts.draft's TEAM_SIZE and the catalog, to check the playbook before the
+stack starts; run it with .venv/bin/python, since the catalog loads
+psycopg. Exit code 0 means everything answered.
 """
 
 import json
@@ -23,6 +23,7 @@ from collections.abc import Callable
 from typing import Any, NamedTuple, NotRequired, TypedDict
 
 from db import ROOT, web
+from facts.draft import TEAM_SIZE
 from inference import catalog
 from inference.strategy import CatalogError
 
@@ -161,7 +162,7 @@ def probe() -> Probe | None:
     started = time.monotonic()
     data = get_json(PROBE, timeout=2 * MINUTE)
     picks = (data or {}).get("blue", {}).get("blue") or []
-    if len(picks) != 6:                            # a six, or the solve failed
+    if len(picks) != TEAM_SIZE:                    # a six, or the solve failed
         return None
     return Probe(seconds=round(time.monotonic() - started, 1), picks=picks)
 

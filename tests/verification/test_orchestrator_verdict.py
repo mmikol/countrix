@@ -1,12 +1,14 @@
 """orchestrator.py's verdict on the stack: the three health replies read into
-lines, the data layer's state, a layer that answers with an error, the one
-board the readiness probe solves, an image older than the checkout, and the
-backup container as compose reports it. The network and docker are stubbed
-out."""
+lines, by keys the servers declare, the data layer's state, a layer that
+answers with an error, the one board the readiness probe solves, an image
+older than the checkout, and the backup container as compose reports it.
+The network and docker are stubbed out."""
 
 import json
 
 import orchestrator
+from door.mcp import lifecycle
+from ui import serve
 
 
 def test_verdict_reads_the_three_health_replies():
@@ -52,6 +54,17 @@ def test_the_verdict_waits_on_the_data_layers_state():
             data["state"] = state
         ok, lines = orchestrator.verdict(dict(served, data=data))
         assert not ok and any(said in line for line in lines), state
+
+
+def test_the_verdict_reads_only_keys_the_servers_declare():
+    """The verdict reads each /health reply by key, and every key it reads is
+    one the server's own shape declares - the door's lifecycle.DataHealth,
+    the board's serve.Health - so a key renamed there fails here, not as a
+    verdict that prints 0 tables or rates captured never."""
+    assert {"status", "state", "pending_migrations", "table_count", "heroes", "announced",
+            "newest_capture", "error"} <= set(lifecycle.DataHealth.__annotations__)
+    assert {"status", "strategies", "pending", "heroes", "error"} <= set(
+        serve.Health.__annotations__)
 
 
 def test_health_urls_cover_every_served_layer():

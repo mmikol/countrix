@@ -33,8 +33,12 @@ person or through `/strategy`.
 **The board writes nothing.** It answers `GET` alone, so a slider's
 weight stays in the session. Its code writes no playbook file and no row,
 its container mounts the playbook read-only, and it connects as
-`matrix_reader`, which the database holds to `SELECT` - against a
-compromised board too, once `POSTGRES_PASSWORD` is set (below).
+`matrix_reader`, which the database holds to `SELECT`. Its network,
+`reader`, joins it to `db` alone, so it cannot reach the door on
+`data:8020`. That holds against a compromised board too, once
+`POSTGRES_PASSWORD` and `COUNTRIX_MCP_TOKEN` are set (below): on Docker
+Desktop a container can still reach the host's published 127.0.0.1:8020
+through `host.docker.internal`, and there the token is the control.
 
 **Every server answers only to its own names.** The door and the board
 stand on `db/web.py`, which checks each request's `Host` and `Origin`
@@ -101,8 +105,9 @@ a burst of boards queues instead of starving the page; a search that
 cannot prove its answer within its budget refuses (`solver.Unbounded`)
 instead of holding the solver.
 
-**Two containers reach out.** All five share one network: Docker
-publishes a port only for a container on a routable network. What keeps
+**Two containers reach out.** Both networks are routable: Docker
+publishes a port only for a container on one. `stack` joins every
+container but `ui`; `reader` joins `ui` to `db` alone. What keeps
 `ui`, `db` and `backup` off the internet is that their code opens no
 connection out; `backup` connects to `db` alone. `data` and
 `refresher` fetch from two fixed hosts, Blizzard's site and the wiki. The
