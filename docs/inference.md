@@ -485,11 +485,11 @@ scored, and the engine "needs to be dynamic". A six is not held for the
 map: players trade heroes as a match turns, so the board prices a trade
 against what it gains, and the plan below prices it from stage to stage.
 
-`tests/inference/test_swaps.py` holds the search to a full enumeration
-of the net on the synthetic World - a full, a half-drafted and a
+`tests/verification/inference/test_swaps.py` holds the search to a full
+enumeration of the net on the synthetic World - a full, a half-drafted and a
 not-allowed reference, the default engine on and off, the cost from 0 to
-50 - and `tests/inference/prove_exact.py`'s swap boards hold it to a
-brute force of every legal six on the built database, around locks that
+50 - and `tests/verification/inference/prove_exact.py`'s swap boards hold it
+to a brute force of every legal six on the built database, around locks that
 keep some of the reference and with nothing locked, as a board runs it.
 
 ## The plan stage by stage
@@ -540,8 +540,8 @@ partly offsets: the first 1000 of barrier health nets half a weight, and
 past 2000 nothing; the melee pair nets three quarters of a weight across
 the scale's range of melee picks.
 
-`tests/inference/test_stage_plan.py` holds each phase and each arena to
-an enumeration on the synthetic World.
+`tests/verification/inference/test_stage_plan.py` holds each phase and each
+arena to an enumeration on the synthetic World.
 
 ## The search
 
@@ -624,13 +624,13 @@ another; a board asks its client's lane (`inference/supersede.py`) every
 
 The suite holds the search to enumeration:
 `test_the_search_reaches_the_enumerated_maximum` and its neighbours in
-`tests/inference/test_solver.py` compare the best sixes, the score floats
-and the ranks with a full enumeration's on synthetic boards - both seats,
-the fill, the countered case, bans, locks and plateaus - and
-`tests/inference/test_bounds.py` holds every rule and the whole bound to
-every completion of random branches. On the built database,
-`.venv/bin/python -m tests.inference.prove_exact` brute-forces every
-legal six of a real board, in slices, against the search.
+`tests/verification/inference/test_solver.py` compare the best sixes, the
+score floats and the ranks with a full enumeration's on synthetic boards -
+both seats, the fill, the countered case, bans, locks and plateaus - and
+`tests/verification/inference/test_bounds.py` holds every rule and the whole
+bound to every completion of random branches. On the built database,
+`.venv/bin/python -m tests.verification.inference.prove_exact` brute-forces
+every legal six of a real board, in slices, against the search.
 
 ### Why the search is exact
 
@@ -720,8 +720,9 @@ whatever the stage. The field is 12,038 sixes on an open board; where
 every heuristic on a metric reads a team key under a gate the board
 settles, and every limit is a shape limit, each is read on the sections
 of `team_metrics` those keys live in alone (`Objective.lean_keys`), the
-same values at a third of the cost, and `tests/inference/test_scale.py`
-holds the two readings to the same bounds and floor.
+same values at a third of the cost, and
+`tests/verification/inference/test_scale.py` holds the two readings to the
+same bounds and floor.
 
 A strategy's prose is three sentences at most (`add_strategy` refuses
 more): the claim, why and when, what is measured.

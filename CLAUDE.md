@@ -22,8 +22,10 @@ python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 .venv/bin/python -m pytest -q -p no:cacheprovider --cov                         # full suite, 75% bar, needs the built database
 COUNTRIX_NO_DATABASE=1 .venv/bin/python -m pytest -q -rs -p no:cacheprovider --cov --cov-fail-under=78   # what CI sees: no database
-.venv/bin/python -m pytest -q tests/test_docs.py                                # one file
-.venv/bin/python -m pytest -q 'tests/test_docs.py::test_the_overview_names_everything_at_the_root'   # one test
+.venv/bin/python -m pytest -q tests/qa                                          # the house rules: docs, layers, style
+.venv/bin/python -m pytest -q tests/verification                                # the code against its spec
+.venv/bin/python -m pytest -q tests/qa/test_docs.py                             # one file
+.venv/bin/python -m pytest -q 'tests/qa/test_docs.py::test_the_overview_names_everything_at_the_root'   # one test
 .venv/bin/python -m pytest -q -m 'not invariant'                                # everything that needs no database
 
 .venv/bin/python -m door.mcp call db_rebuild      # build the database: the embedded cluster at db/psql/cluster
@@ -38,6 +40,15 @@ Pulls and `db_rebuild` read the page caches, which keep a page forever;
 `'{"refresh": true}'` refetches everything from the network, minutes at the
 polite pace. The stack's `refresher` container refreshes the data daily.
 
+The tests sit in three folders, mapped in tests/__init__.py. `tests/qa/`
+holds the repository's text to the house rules: the docs current, every
+name documented, the layers, the style, nothing dead. `tests/verification/`
+holds the code to its spec, a folder per layer, with the hand-run provers
+in its `inference/`. `tests/validation/` is for the engine against the
+owner's recorded maps and stays empty until they exist. A test of a house
+rule goes in qa; a test of what the code does, or of what two of its parts
+agree on (the scripts and the server), goes in verification.
+
 Tests marked `invariant` need the database and skip without one, through
 the `db` fixture. The suite targets `db/psql/cluster` when that
 cluster is built and `DATABASE_URL` is unset; `DATABASE_URL` or
@@ -46,9 +57,9 @@ variable: it has no cluster and no pgserver.
 
 The solver searches exactly, in the process that calls it: a board is a
 few searches of tens of milliseconds each, one after another, and spawns
-no worker. `.venv/bin/python -m tests.inference.prove_exact` checks it
-by hand against a brute force of every legal six on a board of the built
-database, in slices under five minutes each (its docstring says how).
+no worker. `.venv/bin/python -m tests.verification.inference.prove_exact`
+checks it by hand against a brute force of every legal six on a board of the
+built database, in slices under five minutes each (its docstring says how).
 
 Without the database, two generated sections regenerate on their own:
 `.venv/bin/python -c "from door.mcp import tools; tools.REGISTRY.write_docs()"`
@@ -114,8 +125,8 @@ db <- facts <- inference <- door <- ui.
   it is rebuilt rule by rule from the citation record in
   `inference/README.md`. Solver behaviour is tested against the 19-file
   reference playbook in `tests/fixtures/playbook/` and its own `meta.md`
-  (`DEFAULT` and `BRIEF` in tests/inference/__init__.py), or its four
-  assumptions alone (`ASSUMPTIONS_ONLY` there) where a test needs a
+  (`DEFAULT` and `BRIEF` in tests/verification/inference/__init__.py), or
+  its four assumptions alone (`ASSUMPTIONS_ONLY` there) where a test needs a
   playbook that scores nothing; no solver test reads
   `inference/strategies/`.
 - **The default engine scores first.** `inference/base.py` scores every six
@@ -176,11 +187,11 @@ db <- facts <- inference <- door <- ui.
   many sixes share its score (`Solver.ties`), and the `ties-are-drawn`
   assumption says so in the playbook.
   A new metric or expression construct needs a bound rule, and
-  `tests/inference/test_bounds.py` fails without one. Blue's picks the
-  limits rule out - a full six that breaks one, or picks the fill's search
-  proves no six completes - are not allowed: no score, no share, no odds;
-  red's picks are never ruled out. A search past its budget refuses
-  (`solver.Unbounded`), never guesses.
+  `tests/verification/inference/test_bounds.py` fails without one. Blue's
+  picks the limits rule out - a full six that breaks one, or picks the
+  fill's search proves no six completes - are not allowed: no score, no
+  share, no odds; red's picks are never ruled out. A search past its budget
+  refuses (`solver.Unbounded`), never guesses.
 - **Blue's swaps are one joint answer.** With blue picks, `Board.swaps`
   (`inference/swaps.py`) is the best legal six reachable from them when
   each pick dropped costs the swap cost - `weights=swap:<v>`, else
@@ -192,8 +203,8 @@ db <- facts <- inference <- door <- ui.
   A swap needs its net to beat the six that keeps every pick; red is
   re-solved against the target for the odds after, and a suggestion that
   lowers them is withheld. Red is never searched for swaps. `BRIEF` in
-  tests/inference/__init__.py turns them off (`Brief.swaps`); a test that
-  reads them names its cost.
+  tests/verification/inference/__init__.py turns them off (`Brief.swaps`); a
+  test that reads them names its cost.
 - **The plan runs stage by stage.** On a map with stages, `Board.stages`
   (`swaps.chain`) is a row a stage in play order from the six the board
   suggests: each phase of a route the exact best reachable from the phase
@@ -222,7 +233,7 @@ db <- facts <- inference <- door <- ui.
 
 ## What the tests hold you to
 
-`tests/test_docs.py` and friends fail on ordinary changes. Before committing:
+`tests/qa/` and friends fail on ordinary changes. Before committing:
 
 - A new tracked file or folder at the root must be named in
   `docs/architecture.md` - a file in The files, a folder in The folders. The
@@ -258,8 +269,8 @@ db <- facts <- inference <- door <- ui.
   (a `@tool` description, strategy frontmatter, a migration comment) and
   regenerate.
 - Adding or renaming an MCP tool: regenerate docs/mcp.md; each house skill
-  must still name the tools `MUST_NAME` (tests/test_docs.py) lists;
-  tests/door/mcp/test_mcp.py holds the tool set too.
+  must still name the tools `MUST_NAME` (tests/qa/test_docs.py) lists;
+  tests/verification/door/mcp/test_mcp.py holds the tool set too.
 - A new strategy file is cited as a ``- `id` `` line in `inference/README.md`.
   A house skill or a doc names a strategy only by an id the playbook
   holds: a backticked id the record cites and `inference/strategies/`
@@ -273,21 +284,23 @@ db <- facts <- inference <- door <- ui.
   reads the other side), `MATCHUP_METRICS`, `MAP_METRICS` or
   `WORLD_METRICS` and the key its function computes (the namespace must
   equal the registry), and in `TEXT_METRICS` when its value is a name or a
-  list - `tests/facts/test_metrics.py` checks every registry key's kind
-  against it - and a bound rule in `inference/bounds.py` (its aggregate: a
-  sum, a mean, a count, fixed by the shape), which
-  `tests/inference/test_bounds.py` fails a key without; then regenerate
-  the catalog vocabulary in docs/inference.md.
-- `tests/ui/test_pages.py` pins the scripts at their seams (routes, query
-  keys, element ids, the payload keys they read against what the server
-  writes) and holds that every `board.css` class is used; a decision worth
-  pinning is made on the server, as the seat badge is (`momentum.badges`).
-  The math page renders the code constants it quotes (`view_math` fills
-  them in), so a literal percent in `ui/static/math.html` is written `%%`.
+  list - `tests/verification/facts/test_metrics.py` checks every registry
+  key's kind against it - and a bound rule in `inference/bounds.py` (its
+  aggregate: a sum, a mean, a count, fixed by the shape), which
+  `tests/verification/inference/test_bounds.py` fails a key without; then
+  regenerate the catalog vocabulary in docs/inference.md.
+- `tests/verification/ui/test_pages.py` pins the scripts at their seams
+  (routes, query keys, element ids, the payload keys they read against what
+  the server writes), and `tests/qa/test_stylesheet.py` holds that every
+  `board.css` class is used; a decision worth pinning is made on the
+  server, as the seat badge is
+  (`momentum.badges`). The math page renders the code constants it quotes
+  (`view_math` fills them in), so a literal percent in `ui/static/math.html`
+  is written `%%`.
 - `test_the_search_reaches_the_enumerated_maximum` in
-  `tests/inference/test_solver.py` is the regression gate on the search:
-  synthetic boards - red revealed, locks, bans, a pair that pays only
-  together, a widened roster - under the reference playbook with a role
+  `tests/verification/inference/test_solver.py` is the regression gate on
+  the search: synthetic boards - red revealed, locks, bans, a pair that pays
+  only together, a widened roster - under the reference playbook with a role
   queue and with the open queue's shapes, the default engine on and off,
   the search's best six sixes against a full enumeration's, element for
   element, with no database, so CI runs it. A board it misses is a solver
@@ -296,8 +309,8 @@ db <- facts <- inference <- door <- ui.
   seats it, beside the objective it was recorded under - the playbook's
   digest (`catalog.playbook_digest`) and the default engine's stamp
   (`base.stamp`). After a deliberate change to the objective,
-  `.venv/bin/python -m tests.inference.record_reach` re-records it, and
-  the commit says what moved.
+  `.venv/bin/python -m tests.verification.inference.record_reach` re-records
+  it, and the commit says what moved.
 
 ## House rules
 

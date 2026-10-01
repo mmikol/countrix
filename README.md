@@ -92,6 +92,8 @@ the solver reads nothing else.
 - **895 tests.** CI runs ruff, mypy and the 775 that need no database on
   every push to main and every pull request; they cover 93% of the lines,
   held to 78%. With the database built, all of them run against a 75% floor.
+  They sit in three folders: QA (the house rules), verification (the code
+  against its spec) and validation (against recorded games, empty for now).
 - **The search is held to brute force.** A CI gate enumerates every legal six
   on small synthetic boards and fails unless the search returns the true best
   sixes in order, and a fuzz holds every bound to the sixes it covers; on the

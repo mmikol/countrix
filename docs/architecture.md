@@ -5,7 +5,7 @@ Three layers over one database, each a folder at the root: `db/` (DATA),
 `inference/` each have a document in `docs/`; `facts/` has its package
 docstring, and no doc. `ui/` is the board over them, and `door/` stands
 over all three. Imports run db <- facts <- inference <- door, and
-`tests/test_docs.py` holds that; `ui/` sits on top and may import any layer.
+`tests/qa/test_docs.py` holds that; `ui/` sits on top and may import any layer.
 
 ```
 DATA           = HEROES ∪ MAPS ∪ META              the tables, as pulled and set
@@ -56,7 +56,7 @@ subscription, and the board never calls a model.
 | `inference/` | **INFERENCE LAYER** - the playbook of constraints, heuristics and assumptions in markdown, the solver, the tuning loop | [inference.md](inference.md) |
 | `door/` | **THE DOOR** over all three layers - `mcp/`, the MCP server and its tools, under which every write runs; `refresh.py`, the clock that runs the tools daily and weekly | [mcp.md](mcp.md) |
 | `ui/` | **THE BOARD** - the page (map, sides, bans, red and blue rosters) over the facts layer's facts and the inference layer's answer: `board.py`, `pages.py` and `static/` - the only presentation code | [ui.md](ui.md) |
-| `tests/` | one folder per layer beside the root files' tests, with `synthetic.py`, a World of twelve released heroes, one announced hero and three maps built by hand, so a test works out its expected values with no database; `tests/fixtures/playbook/`, the reference playbook of every kind and form of strategy that the solver tests run on in place of `inference/strategies/`; `tests/inference/record_reach.py`, the recorder that writes `tests/fixtures/reach.json`, a board per released hero, run from the repo root as `.venv/bin/python -m tests.inference.record_reach`; and `tests/inference/prove_exact.py`, a brute force of every legal six on a board of the built database against the exact search, in slices run by hand | |
+| `tests/` | three folders by what a test holds the code to: `qa/`, the repository's text against the house rules (the docs, the layers, the style, the stylesheet); `verification/`, the code against its spec, a folder per layer beside the orchestrator's tests; and `validation/`, the engine against the owner's recorded maps, empty until they exist. Beside them, `synthetic.py`, a World of twelve released heroes, one announced hero and three maps built by hand, so a test works out its expected values with no database; `tests/fixtures/playbook/`, the reference playbook of every kind and form of strategy that the solver tests run on in place of `inference/strategies/`; `tests/verification/inference/record_reach.py`, the recorder that writes `tests/fixtures/reach.json`, a board per released hero, run from the repo root as `.venv/bin/python -m tests.verification.inference.record_reach`; and `tests/verification/inference/prove_exact.py`, a brute force of every legal six on a board of the built database against the exact search, in slices run by hand | |
 | `.claude/skills/` | the skills a Claude Code session runs here, one `SKILL.md` each | [The skills](#the-skills) |
 | `pm/` | `backlog.md`: what is worth doing next, why and at what cost, in payoff order; the maintainer skill keeps it current | |
 | `.github/workflows/` | `ci.yml`: lint, the types (mypy) and the tests that need no built database, held to 78% coverage, on pushes to `main` and on pull requests | |

@@ -344,7 +344,7 @@ VERSUS_KEYS = frozenset(VERSUS_METRICS)
 
 # Metrics whose value is a name or a list, not a number: a heuristic may not
 # maximize them, but a constraint may compare them ("team.style_lean == 'dive'").
-# Registry keys only: tests/facts/test_metrics.py reads every key's kind against it
+# Registry keys only: tests/verification/facts/test_metrics.py reads every key's kind against it
 TEXT_METRICS = {
     "team.subroles", "team.shape_flags", "team.style_counts", "team.style_top",
     "team.style_lean", "team.weakest", "team.squishies", "team.burst_hero",

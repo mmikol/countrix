@@ -791,8 +791,8 @@ The tool reference is [docs/mcp.md](../../docs/mcp.md).
 
 ## The tests
 
-`tests/db/` mirrors the folder. No test here touches the network, and all
-but one run without a database.
+`tests/verification/db/` mirrors the folder. No test here touches the
+network, and all but one run without a database.
 
 | file | what it holds |
 | --- | --- |
@@ -805,14 +805,14 @@ but one run without a database.
 | `test_sources_from_cache.py` | invariant: every pull run from the real page caches in a transaction rolled back at the end; skipped without the caches or the database |
 
 ```bash
-.venv/bin/python -m pytest -q tests/db -m 'not invariant'   # the folder's tests, no database
+.venv/bin/python -m pytest -q tests/verification/db -m 'not invariant'   # the folder's tests, no database
 ```
 
 ## The checklist for a new pull or table
 
 A new source is not on it: the pulls read Blizzard's site and the wiki,
-with no API key, and `tests/db/test_authored_inputs.py` holds that every
-pull reads one of the two.
+with no API key, and `tests/verification/db/test_authored_inputs.py` holds
+that every pull reads one of the two.
 
 ### The steps for a new pull
 
@@ -832,11 +832,11 @@ pull reads one of the two.
    or column only through `psql.identifier()`, passes every value as a
    parameter, commits once and logs through `pull.log`.
 6. A line for it in its package's `__init__.py` map: indented, the name,
-   two spaces or more, then what it is. `tests/test_docs.py` fails a file
+   two spaces or more, then what it is. `tests/qa/test_docs.py` fails a file
    the map leaves out.
 7. A tool in `door/mcp/pulls.py`, `@pull_tool(...)`, placed in dependency
    order. Regenerate docs/mcp.md, and add the tool to the set
-   `tests/door/mcp/test_mcp.py` holds.
+   `tests/verification/door/mcp/test_mcp.py` holds.
 
    ```bash
    .venv/bin/python -c "from door.mcp import tools; tools.REGISTRY.write_docs()"
@@ -844,9 +844,10 @@ pull reads one of the two.
 
 8. A row in docs/db.md's table of the `data/` modules, and its place in
    [The order of a build](../../docs/db.md#the-order-of-a-build).
-9. Tests in `tests/db/`, under its source's folder: its readers against
-   a page the test holds, and its `run()` in `test_pull_stores.py` over
-   the recording connection. Side effects are stubbed with `monkeypatch`.
+9. Tests in `tests/verification/db/`, under its source's folder: its readers
+   against a page the test holds, and its `run()` in `test_pull_stores.py`
+   over the recording connection. Side effects are stubbed with
+   `monkeypatch`.
 
 ### The steps for a new table
 

@@ -3,7 +3,7 @@ reach scores, read off the picks made so far and the candidates each open
 role has left. The walk (inference.solver) drops a branch whose bound cannot
 enter the top K, so a bound that ever read below a six it covers would lose
 that six without a word: every rule here is sound by construction, and
-tests/inference/test_bounds.py holds each to it on random branches.
+tests/verification/inference/test_bounds.py holds each to it on random branches.
 
     Iv, Exact, Seq, Top   what a value can be over a branch: every number
                           lo..hi (a bool is 0 or 1), one value known exactly

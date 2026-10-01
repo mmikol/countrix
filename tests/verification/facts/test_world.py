@@ -1,0 +1,136 @@
+"""The World itself: every data table the load reads, the names a hero or a
+map resolves by, one hero to a seat, and the model's own lookups and
+derivations on the synthetic World. The kits the load reads are
+tests/verification/facts/test_world_kits.py's, the maps test_world_maps.py's."""
+
+import itertools
+import pathlib
+import re
+
+import pytest
+
+from db import Refusal
+from facts import tables
+from facts.model import Hero, Map
+from facts.records import Rates
+from facts.team import pair_score
+
+
+@pytest.mark.invariant
+def test_every_data_table_is_read_by_the_load(world, rows):
+    """Every data table is named in the load, and read whole: the ledger and
+    the playbook's mirror, which are not data, aside."""
+    src = pathlib.Path(tables.__file__).read_text(encoding="utf-8")
+    unread = [
+        t for (t,) in rows("select tablename from pg_tables where schemaname='public'")
+        if t not in ("schema_migrations", "strategies") and not re.search(r"\b%s\b" % t, src)]
+    assert unread == [], unread
+    perks = sum(len(h.perks) for h in world.heroes.values())
+    assert perks == rows("select count(*) from perks")[0][0]
+
+
+@pytest.mark.invariant
+def test_a_synergy_pair_reads_higher_with_every_cell_an_article_claims(world):
+    """A pair's two cells read 1 claimed, 0 written off and the written
+    cells' claim share where no article writes one, so the reading rises
+    with every cell claimed and falls with every cell written off: a pair
+    one article claims and the other leaves blank reads above a pair
+    neither writes, and that pair reads the mean of the written pairs as
+    they read, so a hero no article writes about is charged nothing."""
+    released = sorted(h.id for h in world.heroes.values() if h.released)
+    read: dict[tuple[int, int], set[float]] = {}
+    written = []
+    for a, b in itertools.combinations(released, 2):
+        edge = world.synergy(a, b)
+        kind = ((edge.score or 0) if edge else 0, world.unwritten_cells(a, b))
+        read.setdefault(kind, set()).add(pair_score(world, a, b))
+        if kind[1] < 2 or edge:
+            written.append(pair_score(world, a, b))
+    cell = world.synergy_cell
+    assert 0.5 < cell < 1
+    assert all(scores == {claims + blank * cell} for (claims, blank), scores in read.items())
+    assert read[(0, 2)] == {2 * cell} and sum(written) / len(written) == pytest.approx(2 * cell)
+    assert 2 > 1 + cell > 2 * cell > 1 > cell > 0
+    assert {(1, 1), (0, 2), (0, 1)} <= set(read)
+
+
+@pytest.mark.invariant
+def test_names_resolve_across_spellings(world):
+    assert world.hero("lucio").name == "Lúcio"
+    assert world.hero("D.VA").name == "D.Va"
+    assert world.map("kings row").name == "King's Row"
+    with pytest.raises(Refusal, match="unknown heroes"):
+        world.resolve(None, ["Goku"], [])
+    with pytest.raises(Refusal, match="unknown map"):
+        world.resolve("Atlantis", [], [])
+
+
+@pytest.mark.invariant
+def test_the_tiers_are_read_up_the_ladder_with_their_names(world, rows):
+    """Every tier's name, and each hero's rates per tier in the ladder's
+    order, which the alphabet's is not (diamond, emerald, gold)."""
+    ladder = rows("select code, name from competitive_tiers order by rank_order")
+    assert list(world.tier_names.items()) == ladder
+    rated = [h for h in world.heroes.values() if h.by_tier]
+    order = [code for code, _ in ladder]
+    assert rated and all(
+        list(h.by_tier) == [code for code in order if code in h.by_tier] for h in rated)
+
+
+def test_one_hero_cannot_hold_two_seats(synthetic_world):
+    """A six with a hero twice is a five, and team_metrics would count it
+    twice; a hero may play for both teams."""
+    world = synthetic_world
+    for red, blue, bans in ((["Anvil", "Anvil"], [], []), ([], ["Balm", "Balm"], []),
+                            ([], [], ["Needle", "Needle"])):
+        with pytest.raises(Refusal, match="same hero twice"):
+            world.resolve("Harbor Gate", red, blue, bans)
+    world.resolve("Harbor Gate", ["Anvil"], ["Anvil"], [])
+
+
+def test_a_board_names_only_what_the_world_holds_and_may_pick(synthetic_world):
+    """An unknown map, a banned pick and an announced hero are each refused
+    by name; the announced hero only where the caller does not allow it."""
+    world = synthetic_world
+    assert world.hero("anvil").name == "Anvil" and world.map("HARBOR GATE").name == "Harbor Gate"
+    assert world.hero("Nemo") is None and world.map("Atlantis") is None
+    with pytest.raises(Refusal, match="unknown map: Atlantis"):
+        world.resolve("Atlantis", [], [])
+    with pytest.raises(Refusal, match="banned this match, cannot be picked: Balm"):
+        world.resolve(None, [], ["Balm"], ["Balm"])
+    with pytest.raises(Refusal, match=r"announced, not yet playable: Wisp \(releases 2026-12-01\)"):
+        world.resolve(None, ["Wisp"], [])
+    board = world.resolve("Harbor Gate", ["Wisp"], ["Anvil"], ["Needle"], allow_announced=True)
+    assert [h.name for h in board.red] == ["Wisp"] and board.map.name == "Harbor Gate"
+    assert [h.name for h in board.banned] == ["Needle"]
+
+
+def test_the_models_lookups_and_derivations(synthetic_world):
+    """The roster by role then name and the maps by name; a hero's rank spread
+    and trend from its rates, its ultimate under the roster's cap; a map's top
+    style and margin with no style, one, or a tie."""
+    world = synthetic_world
+    roster = [h.name for h in world.heroes_by_role()]
+    assert roster[:5] == ["Anvil", "Kite", "Mortar", "Quarry", "Flint"] and roster[-1] == "Wisp"
+    assert [m.name for m in world.maps_sorted()] == ["Ember Ruins", "Harbor Gate", "Salt Flats"]
+    assert world.synergy(world.hero("Anvil").id, world.hero("Balm").id).score == 2
+    assert world.is_countered_by(world.hero("Mortar").id, world.hero("Anvil").id)
+    hero = Hero(id=99, name="Probe", role="damage", subrole="Flanker", win=51.0, prev_win=49.5,
+                by_tier={"bronze": Rates(48.0, 5.0, 1.0), "gold": Rates(None, 5.0, 1.0),
+                         "grandmaster": Rates(55.0, 5.0, 1.0)},
+                ult_damage_raw=900.0)
+    hero.derive_rates()
+    assert (hero.rank_spread, hero.trend) == (7.0, 1.5)
+    hero.cap_ult(600.0)
+    assert hero.ult_damage == 600.0
+    hero.cap_ult(0.0)                         # no cap on record: the raw figure
+    assert hero.ult_damage == 900.0
+    alone = Hero(id=98, name="Lone", role="tank", subrole="Stalwart", win=50.0)
+    alone.derive_rates()
+    assert (alone.rank_spread, alone.trend) == (0.0, None)
+    m = Map(9, "Test Site", "Push")
+    assert m.style_top is None and m.style_margin == 0
+    m.styles = {"poke": 1.5}
+    assert m.style_top == "poke" and m.style_margin == 1.5
+    m.styles["brawl"] = 1.5     # a tie goes to the name
+    assert m.style_top == "brawl" and m.style_margin == 0

@@ -34,7 +34,7 @@ change only what a check or the user points at, and leave a report.
    pass - a test that cannot fail (`or True`, a comparison that always
    skips) is deleted, not kept.
 
-2. **The documentation is current.** `tests/test_docs.py` fails when the
+2. **The documentation is current.** `tests/qa/test_docs.py` fails when the
    generated sections of `docs/` are behind the code; the fix is the
    `db_docs` tool (`.venv/bin/python -m door.mcp call db_docs`, or the tool
    on the MCP server), which rewrites the data dictionary in
@@ -46,7 +46,7 @@ change only what a check or the user points at, and leave a report.
    skills; `docs/db.md` and `docs/inference.md` for their layers (`facts/`
    has its package docstring, and no doc); `docs/ui.md`, `docs/mcp.md`,
    `docs/security.md`. A new skill gets a row in `docs/architecture.md`'s
-   skills table and in `tests/test_docs.py`'s MUST_NAME map.
+   skills table and in `tests/qa/test_docs.py`'s MUST_NAME map.
 
 3. **Nothing stale.** Grep the tree for names that no longer exist: old
    module paths, renamed tools, renamed folders, old counts ("42 tables",
