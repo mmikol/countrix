@@ -141,9 +141,11 @@ def pull_patches(connection: psycopg.Connection, pull: cache.PullContext) -> Pul
 
 
 @pull_tool(
-    "pull_rates", "Blizzard's win/pick/ban rates as a NEW dated snapshot,"
-    " by rank tier and by map (Competitive Role Queue - the page offers no"
-    " Open Queue - console, Americas). Slow when uncached: ~40 pages, 5s apart.",
+    "pull_rates", "Blizzard's win/pick/ban rates by rank tier and by map as a"
+    " NEW snapshot (Competitive Role Queue - the page offers no Open Queue -"
+    " console, Americas), dated by when its pages were fetched; the pages of"
+    " a stored snapshot store nothing again. Slow when uncached: ~40 pages,"
+    " 5s apart.",
     source="blizzard", stored="snapshot stored")
 def pull_rates(connection: psycopg.Connection, pull: cache.PullContext) -> PullSummary:
     return blizzard_meta.run(connection, pull)
@@ -200,7 +202,7 @@ def load_authored(ctx: Context) -> ToolReply:
 @tool(
     "sync_all", "Every pull_* tool in dependency order, then the strategies"
     " mirror. On a populated database this is an update: entities refresh in"
-    " place, rates append a snapshot.", REFRESH)
+    " place, rates append a snapshot of a new capture.", REFRESH)
 def sync_all(ctx: Context, refresh: bool = False) -> ToolReply:
     results: dict[str, Mapping[str, object]] = {}
     pulls = ctx.tools.pulls()

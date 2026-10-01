@@ -94,10 +94,12 @@ What a run takes beside its connection, a frozen dataclass in `cache.py`:
 | `log` | where progress lines go | `db.to_stderr` |
 | `cutoff` | a `time.time()` stamp: a page written before it is stale | None |
 | `stale` | 'file: error' for each page whose refetch failed and whose cached copy was read | an empty list |
+| `captured` | the write time of each page served, a `time.time()` stamp: what the rates pull dates its snapshot by | an empty list |
 
-The context is frozen; only the contents of `stale` change. The log
-defaults to stderr because over stdio, stdout is the MCP wire: a pull
-never prints. The door passes the log of the call the pull runs under.
+The context is frozen; only the contents of `stale` and `captured`
+change. The log defaults to stderr because over stdio, stdout is the MCP
+wire: a pull never prints. The door passes the log of the call the pull
+runs under.
 
 ### The summaries
 
@@ -168,7 +170,7 @@ wrote and read.
 | upsert in place | pull_heroes, pull_maps, pull_patches, and the heroes pull_kits announces | an entity keeps its id, and the rows that hang off it survive |
 | fill in | pull_kits, on the hero, ability and perk rows pull_heroes owns | Blizzard's text stays; the wiki adds kinds, keywords, pools and what Blizzard omits |
 | reload whole | pull_kits's weapon, stat and 6v6 tables (`stat_keys` is upserted), pull_terrain, pull_playstyles, pull_synergies, pull_counters | the page is the whole truth: a row the source dropped goes |
-| append | pull_rates | each run is one more dated snapshot, and the series is history |
+| append | pull_rates | each new capture is one more dated snapshot, and the series is history |
 
 pull_maps never deletes: the rates snapshots hang off `maps`, and a
 `DELETE` there would cascade through every older snapshot's rows. Nothing
@@ -207,6 +209,10 @@ A-Z, a-z and 0-9 becomes one underscore, so "King's Row" is
 3. When the fetch fails with a `FetchError` and a copy exists, the copy is
    read, named in `pull.stale` and logged with its age in hours.
 4. With no copy at all, the failure surfaces.
+
+Whichever copy is served, its write time joins `pull.captured`: a cached
+copy's, or a fetched page's as it was written, the time a later build
+from the cache reads.
 
 `cached_get` is `cached` over one GET under a policy, which Blizzard's
 pages use; the wiki's `cargo_query` and `fetch_wikitext` run `cached` over
@@ -426,10 +432,14 @@ the roster lacks, in `unmatched`.
 
 It stores the region and the tiers, upserted; one `meta_snapshots` row
 stamped with the capture time, the queue, the platform and input, and
-the current patch; `hero_meta` per tier and `map_meta`
+the patch live at capture; `hero_meta` per tier and `map_meta`
 per map, all ranks, each row under the region, with no stage, since
-Blizzard's map filter stops at whole maps. Nothing is deleted, and a stale
-page stamps no snapshot.
+Blizzard's map filter stops at whole maps. The capture time is the
+pages', not the run's: the write time of the oldest page read
+(`PullContext.captured`), so a build from a week-old cache stores the
+week-old capture under the patch live then. A capture is one snapshot:
+the pages a stored snapshot was built from store nothing again. Nothing
+is deleted, and a stale page stamps no snapshot.
 
 **The rates licence.** Blizzard's rates page licenses its win, pick and ban
 rates for personal use only. The page caches are gitignored, and nothing
@@ -738,9 +748,9 @@ Three tools wear a name other than their module's: pull_kits runs
 `sync_all` runs every `pull_*` tool in that order, then `load_authored`,
 the strategies mirror, which is the inference layer's and not this
 folder's. On a populated database it is an update: entities refresh in
-place, the rates append a snapshot. With refresh on it runs every pull
-under one cutoff, the moment it began, so a page one pull fetched is read
-from the cache by the next.
+place, the rates append a snapshot of a new capture. With refresh on it
+runs every pull under one cutoff, the moment it began, so a page one pull
+fetched is read from the cache by the next.
 `db_rebuild` drops every table, reapplies the migrations and runs
 `sync_all`; without refresh it rebuilds from the caches at almost no
 requests.

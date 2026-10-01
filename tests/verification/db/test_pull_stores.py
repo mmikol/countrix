@@ -9,6 +9,7 @@ counts it."""
 import datetime
 import html
 import json
+import os
 import time
 
 import pytest
@@ -56,6 +57,13 @@ def _cache(tmp_path, pages, hours=0):
     """Each page written into the cache under its file name, `hours` old."""
     for name, text in pages.items():
         write_aged(tmp_path / name, text, hours=hours)
+
+
+def _cache_at(tmp_path, pages, when):
+    """Each page written into the cache under its file name at `when`."""
+    for name, text in pages.items():
+        (tmp_path / name).write_text(text, encoding="utf-8")
+        os.utime(tmp_path / name, (when.timestamp(), when.timestamp()))
 
 
 def _writes_at_fetch(monkeypatch, module, connection):
@@ -110,15 +118,18 @@ RATES_READS = [
     ('SELECT "name", "map_id" FROM "maps"', [("King's Row", 7)]),
     ('SELECT "name", "hero_id" FROM "heroes"', [("Lúcio", 1)]),
     ("SELECT patch_id FROM patches", []),
+    ("SELECT snapshot_id FROM meta_snapshots", []),           # no snapshot holds the capture
     ("SELECT count(*) FROM meta_snapshots", [(3,)]),
 ]
+# the baseline: every tier together, its rows and the filters
+BASELINE = "rates_input_Console_region_Americas_rq_2.html"
 
 
 def test_the_rates_pull_stores_one_snapshot_of_every_tier_and_map_it_read(tmp_path):
     """Lucio is on the roster, as Lúcio, and Tracer is not; Kings Row is in
     the map pool, as King's Row, and Busan is not, so Busan's slice is never
-    asked for."""
-    _cache(tmp_path, RATES_PAGES)
+    asked for. The pages were fetched as the pull runs, at CAO."""
+    _cache_at(tmp_path, RATES_PAGES, CAO)
     connection, lines = RecordingConnection(RATES_READS), []
     pull = _pull(tmp_path, lines)
     summary = meta.run(connection, pull)
@@ -166,6 +177,45 @@ def test_a_rates_pull_that_read_a_stale_page_stamps_no_snapshot(tmp_path, monkey
     assert pull.session.calls == len(RATES_PAGES)             # each refetch asked for once
     assert connection.commits == 2
     assert "rates: 4 pages from the stale cache; no snapshot stamped" in lines
+
+
+def test_a_snapshot_is_dated_by_its_pages_capture_not_by_the_pull(tmp_path):
+    """A build from the caches reads pages a refresh fetched a week before
+    the pull, the baseline an hour before the rest: the snapshot is dated
+    by the oldest page and stamped with the patch live then, so the board's
+    capture date and its warning of patches shipped since read the rates'
+    age, not the build's. The source row is read at the pull's time."""
+    fetched = CAO - datetime.timedelta(days=7)
+    oldest = fetched - datetime.timedelta(hours=1)
+    _cache_at(tmp_path, RATES_PAGES, fetched)
+    os.utime(tmp_path / BASELINE, (oldest.timestamp(), oldest.timestamp()))
+    connection, lines = RecordingConnection(RATES_READS), []
+    summary = meta.run(connection, _pull(tmp_path, lines))
+    [cursor] = connection.cursors
+    assert cursor.written("SELECT patch_id FROM patches") == [(oldest,)]
+    assert cursor.written("INSERT INTO meta_snapshots") == [
+        (oldest, "competitive_role_queue", PLATFORM, INPUT_DEVICE, None, 1)]
+    assert cursor.written("INSERT INTO sources")[0][-1] == CAO
+    assert summary["snapshot_id"] == 5 and summary["hero_rows"] == 2
+
+
+def test_the_pages_of_a_stored_snapshot_stamp_none(tmp_path):
+    """A second build from the same caches reads the same capture, which a
+    snapshot already holds: the capture is one snapshot, so nothing is
+    written, the source's row included, and the log names the snapshot."""
+    _cache_at(tmp_path, RATES_PAGES, CAO)
+    held = [("SELECT snapshot_id FROM meta_snapshots", [(2,)]), *RATES_READS]
+    connection, lines = RecordingConnection(held), []
+    summary = meta.run(connection, _pull(tmp_path, lines))
+    [cursor] = connection.cursors
+    assert cursor.written("SELECT snapshot_id FROM meta_snapshots") == [
+        (CAO, "competitive_role_queue", PLATFORM, INPUT_DEVICE)]
+    assert cursor.written("INSERT") == [] and cursor.written("UPDATE") == []
+    assert summary["snapshot_id"] is None and summary["tables"] == []
+    assert summary["hero_rows"] == summary["map_rows"] == 0
+    assert connection.commits == 2
+    assert ("rates: the capture of 2026-09-24T05:00:00+00:00 is snapshot 2 already;"
+            " no snapshot stamped") in lines
 
 
 # --- the map pool: the Maps article, each map's and the Hybrid article -------

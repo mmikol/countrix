@@ -19,7 +19,9 @@ every source.
                      page that fails to refetch keeps its cached copy and is
                      listed in the context's stale, so a flaky source
                      degrades to yesterday's numbers, never to an empty
-                     table, and the pull says so
+                     table, and the pull says so. Every page served adds
+                     its write time to the context's captured, so a pull
+                     dates what it read by when its pages were fetched
 
 Each source package (blizzard, wiki) names its own endpoints
 and its own `sources` row, so provenance lives with the source. Fetching
@@ -89,13 +91,17 @@ class PullContext:
     from the caches).
 
     stale holds 'name: error' for each page whose refetch failed and whose
-    cached copy was read instead. The context stays frozen: only the list's
+    cached copy was read instead. captured holds the write time of each
+    page served, a time.time() stamp: a cached copy's, or a fetched page's
+    as it was written, so a build from the caches dates a page as the
+    refresh that fetched it did. The context stays frozen: only the lists'
     contents change."""
     cache_dir: str
     session: requests.Session = dataclasses.field(default_factory=session)
     log: Log = to_stderr
     cutoff: float | None = None
     stale: list[str] = dataclasses.field(default_factory=list)
+    captured: list[float] = dataclasses.field(default_factory=list)
 
 
 def _age(path: str) -> float:
@@ -174,18 +180,21 @@ def cached(pull: PullContext, name: str, produce: Callable[[], str]) -> str:
     is read and nothing is asked for. Otherwise produce() runs and its text
     is written. When it fails with a FetchError, the stale copy is kept and
     named in the pull's stale, and the failure surfaces only when there is
-    none.
+    none. The write time of the copy served joins the pull's captured.
     """
     path = os.path.join(pull.cache_dir, name)
     if os.path.exists(path) and (pull.cutoff is None or os.path.getmtime(path) >= pull.cutoff):
-        return _read_cache(path)
-    try:
-        text = produce()
-    except FetchError as error:
-        if os.path.exists(path):
-            return _keep_stale(pull, path, error)
-        raise
-    _write_cache(path, text)
+        text = _read_cache(path)
+    else:
+        try:
+            text = produce()
+        except FetchError as error:
+            if not os.path.exists(path):
+                raise
+            text = _keep_stale(pull, path, error)
+        else:
+            _write_cache(path, text)
+    pull.captured.append(os.path.getmtime(path))
     return text
 
 
