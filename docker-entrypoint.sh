@@ -56,6 +56,14 @@ predump() {
     esac
 }
 
+# exit 0 when the database holds no rates history to keep: no meta_snapshots
+# table, or no row in it - what a rebuild that failed leaves, so a migration
+# that fails on a fresh schema too asks for no dump on every restart. A check
+# that cannot tell exits 1, and the dump is asked for
+no_history() {
+    python -c 'import sys, psycopg; from db import psql; cx = psycopg.connect(psql.default_dsn()); sys.exit(1 if cx.execute("select to_regclass(%s)", ("meta_snapshots",)).fetchone()[0] and cx.execute("select 1 from meta_snapshots limit 1").fetchone() else 0)'
+}
+
 # a refused rebuild - a playbook that does not load - ends the container, and
 # the restart tries again once the file loads
 rebuild() {
@@ -84,7 +92,12 @@ case "$role" in
                         echo "data: the playbook does not load (above) - no dump, no rebuild; the container retries on restart" >&2
                         exit 1
                     }
-                    predump
+                    # a rebuild that failed before left no history to dump
+                    if no_history; then
+                        echo "data: no rates history to keep - no dump first"
+                    else
+                        predump
+                    fi
                     rebuild
                 elif [ "$(db_state)" != current ]; then
                     echo "data: migrated, no heroes yet - running the first build"
