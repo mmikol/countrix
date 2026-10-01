@@ -32,14 +32,15 @@ checks before a message reaches the server is in [security.md](security.md).
 The protocol (`door/mcp/server.py`) and its transports are
 dependency-free: a few hundred lines instead of the SDK. JSON-RPC 2.0 goes
 one message per line over stdio (`stdio.py`) and one message a POST over
-HTTP (`http.py`), with no batches and no sessions. HTTP adds `405` on a
-bare `GET /mcp`, and `GET /health` for the healthchecks: the database's
-state (`db.psql.schema.state`) and counts, read directly and not through
-a tool. The methods: `initialize`, `ping`, `tools/list` and
-`tools/call`, at protocol version `2025-06-18` alone, whatever an
-`initialize` asks for: Claude Code speaks it, and a client pinned to an
-older revision is not served. The server logs to stderr, since stdout is
-the wire.
+HTTP (`http.py`), with no batches and no sessions, and either transport
+handles one message at a time, so two tool calls through one door never
+run at once. HTTP adds `405` on a bare `GET /mcp`, and `GET /health` for
+the healthchecks: the database's state (`db.psql.schema.state`) and
+counts, read directly and not through a tool. The methods: `initialize`,
+`ping`, `tools/list` and `tools/call`, at protocol version `2025-06-18`
+alone, whatever an `initialize` asks for: Claude Code speaks it, and a
+client pinned to an older revision is not served. The server logs to
+stderr, since stdout is the wire.
 
 Every call, in-process too, is checked against the tool's schema before
 the tool runs. What goes wrong is answered by its cause:

@@ -1,7 +1,8 @@
 """The door over Streamable HTTP, the data-layer container's: the real
 server spawned on a free port, and an in-process HttpServer for the guards -
 the origin check, the bearer token, the JSON label, the body cap, the rate
-limit per client address, and /health's 500 for a status that raises."""
+limit per client address, and /health's 500 for a status that raises - and
+for the one message it handles at a time."""
 
 import http.client
 import json
@@ -176,6 +177,30 @@ def test_a_post_that_does_not_claim_json_is_refused():
     httpd, url = _http_server()
     assert _knock(url, {"jsonrpc": "2.0", "id": 1, "method": "ping"},
                   {"Content-Type": "text/plain"}) == (415, {"error": "a JSON body is required"})
+    httpd.shutdown()
+
+
+def test_the_door_handles_one_message_at_a_time():
+    """Each request runs on a thread of its own, but the messages are handled
+    one after another, as over stdio: two playbook writes at once would lose
+    one edit."""
+    httpd, url = _http_server()
+    events = []
+    handle = httpd.mcp.handle
+
+    def slow(message):
+        events.append("in")
+        time.sleep(0.1)
+        events.append("out")
+        return handle(message)
+    httpd.mcp.handle = slow
+    message = {"jsonrpc": "2.0", "method": "ping"}
+    pings = [threading.Thread(target=_knock, args=(url, dict(message, id=n))) for n in range(3)]
+    for ping in pings:
+        ping.start()
+    for ping in pings:
+        ping.join()
+    assert events == ["in", "out"] * 3
     httpd.shutdown()
 
 

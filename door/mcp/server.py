@@ -90,13 +90,14 @@ class Server:
         self.log: Log = log or to_stderr
 
     def handle(self, message: object) -> Response | None:
-        """One decoded message -> a response, or None for a notification. A
-        message that is not an object or names no string method is
-        INVALID_REQUEST, and a request the wire cannot serve - its params not
-        an object, a field missing or of the wrong type - INVALID_PARAMS;
-        anything else that escapes a method is the server's fault, INTERNAL
-        with its type and message, and its traceback goes to the log, never
-        to the caller."""
+        """One decoded message -> a response, or None for a notification or
+        for a message with no method (a response to a request this server
+        never sent). A message that is not an object, or whose method is not
+        a string, is INVALID_REQUEST, and a request the wire cannot serve -
+        its params not an object, a field missing or of the wrong type -
+        INVALID_PARAMS; anything else that escapes a method is the server's
+        fault, INTERNAL with its type and message, and its traceback goes to
+        the log, never to the caller."""
         if not isinstance(message, dict):
             return error_response(None, INVALID_REQUEST, "expected an object")
         msg_id: object = message.get("id")

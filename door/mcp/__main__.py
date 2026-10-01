@@ -15,21 +15,21 @@ from door.mcp import http, lifecycle, stdio, tools
 from door.mcp.server import Server
 
 
-def _status(ctx: tools.Context) -> Callable[[], dict[str, object]]:
+def _status(ctx: tools.Context) -> Callable[[], lifecycle.DataHealth]:
     """The data container's /health: the database's state and counts, or
     degraded with the reason when the database is out of reach. It reads
     the database directly, not through the door: a read writes nothing."""
-    def status() -> dict[str, object]:
+    def status() -> lifecycle.DataHealth:
         try:
             found = lifecycle.read_status(ctx)
-            return {"status": "ok", "state": found["state"],
-                    "table_count": found["table_count"],
-                    "pending_migrations": found["pending_migrations"],
-                    "heroes": found["counts"].get("heroes", 0),
-                    "announced": found["counts"].get("announced", 0),
-                    "newest_capture": found["newest_capture"]}
+            return lifecycle.DataHealth(
+                status="ok", state=found["state"], table_count=found["table_count"],
+                pending_migrations=found["pending_migrations"],
+                heroes=found["counts"].get("heroes", 0),
+                announced=found["counts"].get("announced", 0),
+                newest_capture=found["newest_capture"])
         except psql.UNREACHABLE as error:     # the server is up even if the DB is not
-            return {"status": "degraded", "error": str(error)}
+            return lifecycle.DataHealth(status="degraded", error=str(error))
     return status
 
 

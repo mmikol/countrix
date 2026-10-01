@@ -71,6 +71,20 @@ def test_health_is_degraded_when_the_database_is_out_of_reach_and_crashes_otherw
         status()
 
 
+def test_health_carries_every_key_data_health_declares_but_the_error(monkeypatch):
+    """An ok /health is read_status reshaped into DataHealth: the state
+    compose's healthcheck waits on, and the counts orchestrator.py prints."""
+    monkeypatch.setattr(lifecycle, "read_status", lambda ctx: lifecycle.DbStatus(
+        dsn="postgresql://db/overwatch", state="current", table_count=33,
+        counts={"heroes": 50, "announced": 1}, snapshots=[], newest_capture="2026-09-30",
+        pending_migrations=[]))
+    reply = _status(tools.Context(dsn="postgresql://nowhere"))()
+    assert reply == {"status": "ok", "state": "current", "table_count": 33,
+                     "pending_migrations": [], "heroes": 50, "announced": 1,
+                     "newest_capture": "2026-09-30"}
+    assert set(reply) == set(lifecycle.DataHealth.__annotations__) - {"error"}
+
+
 def test_an_in_process_call_is_validated_against_the_tools_schema():
     """The shell, the refresher and the board call through the same wrapper
     as either door, so a call the schema refuses never reaches the tool."""
