@@ -122,8 +122,8 @@ def _remirror(cx: psycopg.Connection) -> None:
         "field": {
             "type": "string",
             "description": "%s; for id %s: %s" % (
-                " | ".join((*TUNABLE, "params.NAME", tune.META_PROSE)), META,
-                " | ".join((*base.FIELDS, tune.META_PROSE)))},
+                " | ".join((*TUNABLE, "params.NAME", tune.PROSE_FIELD)), META,
+                " | ".join((*base.FIELDS, tune.PROSE_FIELD)))},
         "value": {"description": "the new value: a number, a word (kind, category, metric,"
                                  " direction) or an expression; meta.md's weights are"
                                  " numbers within %g..%g, its swap cost one within"
@@ -196,8 +196,8 @@ def infer_strategy(
 
 
 @tool(
-    "tuning_log", "The record of every change to the playbook's frontmatter -"
-    " the strategies' and meta.md's - newest last.",
+    "tuning_log", "The record of every change to the playbook - a strategy's"
+    " frontmatter or prose, a strategy added, meta.md - newest last.",
     {"lines": {"type": "integer", "description": "how many, 1 or more (default 20)"}})
 def tuning_log(ctx: Context, lines: int = 20) -> ToolReply:
     if lines < 1:

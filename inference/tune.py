@@ -68,7 +68,7 @@ from inference.strategy import (
 )
 
 MAX_PROSE = 20000          # characters in a strategy's prose, or meta.md's
-META_PROSE = "body"        # the prose, a strategy's or meta.md's, as tune names it
+PROSE_FIELD = "body"       # the prose, a strategy's or meta.md's, as tune names it
 MAX_SENTENCES = 3          # a strategy's prose is three sentences at most
 MAX_BY = 40                # characters of who asked, in a log line
 BY_SESSION = "claude-code-session"    # who asked, when the caller does not say
@@ -271,8 +271,9 @@ def _flatten(fields: Mapping[str, object] | None) -> list[tuple[str, object]]:
 def _log(log_path: str, line: str) -> None:
     if not os.path.exists(log_path):
         with open(log_path, "w", encoding="utf-8") as handle:
-            handle.write("# Tuning log\n\nEvery change to a strategy's frontmatter,"
-                         " newest last: when, what, why, and who.\n\n")
+            handle.write("# Tuning log\n\nEvery change to the playbook - a strategy's frontmatter"
+                         " or prose, a strategy added, meta.md - newest last: when, what, why,"
+                         " and who.\n\n")
     with open(log_path, "a", encoding="utf-8") as handle:
         handle.write(line + "\n")
 
@@ -347,17 +348,18 @@ def tune(
         strategy_id: str, field: str, value: object, reason: str, directory: str | None = None,
         by: str = BY_SESSION) -> Change:
     """Apply one change -> the field's old and new text and the log line.
-    The id META changes one of meta.md's weights (_tune_meta)."""
+    The id META changes one of meta.md's fields - a weight or the swap
+    cost - or its prose (_tune_meta)."""
     directory = _where(directory)[0]
     _reason(reason, "a tuning change needs a reason")
     if strategy_id == META:
         return _tune_meta(directory, field, value, reason, by)
     path = _existing(directory, strategy_id)
-    if field == META_PROSE:
+    if field == PROSE_FIELD:
         with open(path, encoding="utf-8") as handle:
             rewritten, prose = _strategy_prose(strategy_id, handle.read(), value)
         strategy, line = _commit(directory, strategy_id, rewritten,
-                                 lambda _: "%s: rewritten" % META_PROSE, reason, by)
+                                 lambda _: "%s: rewritten" % PROSE_FIELD, reason, by)
         return {"id": strategy_id, "field": field, "old": prose, "new": strategy.body,
                 "line": line}
     checked = _coerce(field, value)
@@ -393,7 +395,7 @@ def _prose(text: str, value: object, owner: str, old: str, title: str) -> str:
     `title` - where it opens with none. `owner` names the file in a
     refusal."""
     if not isinstance(value, str) or not value.strip():
-        raise TuneError("%s's %s is its prose, as text" % (owner, META_PROSE))
+        raise TuneError("%s's %s is its prose, as text" % (owner, PROSE_FIELD))
     if len(value) > MAX_PROSE:
         raise TuneError("%s's prose is under %d characters" % (owner, MAX_PROSE))
     prose = value.strip("\n")
@@ -427,24 +429,24 @@ def _strategy_prose(sid: str, text: str, value: object) -> tuple[str, str]:
 
 
 def _tune_meta(directory: str, field: str, value: object, reason: str, by: str) -> Change:
-    """One of meta.md's weights set, or its prose rewritten -> the change:
-    a weight checked by the rule the reader keeps (catalog.meta_dial), the
-    new text read back through catalog.parse_meta and the strategies loaded
-    before anything is written, then the file written - seeded from the
-    shipped playbook's where the folder has none (_meta_text) - the docs
-    regenerated and one line logged, which names a rewritten prose and
-    does not quote it."""
+    """One of meta.md's fields set - a weight or the swap cost - or its
+    prose rewritten -> the change: a field checked by the rule the reader
+    keeps (catalog.meta_dial), the new text read back through
+    catalog.parse_meta and the strategies loaded before anything is
+    written, then the file written - seeded from the shipped playbook's
+    where the folder has none (_meta_text) - the docs regenerated and one
+    line logged, which names a rewritten prose and does not quote it."""
     path = os.path.join(directory, catalog_module.META_FILE)
-    if field != META_PROSE and field not in FIELDS:
+    if field != PROSE_FIELD and field not in FIELDS:
         raise TuneError("%s's fields are %s" % (catalog_module.META_FILE,
-                                                ", ".join((*FIELDS, META_PROSE))))
+                                                ", ".join((*FIELDS, PROSE_FIELD))))
     text, seeded = _meta_text(directory)
     old: str | None
     try:
-        if field == META_PROSE:
+        if field == PROSE_FIELD:
             text, old = _meta_prose(text, value)
             new = catalog_module.parse_meta(text).body
-            what = "%s: rewritten" % META_PROSE
+            what = "%s: rewritten" % PROSE_FIELD
         else:
             checked = catalog_module.meta_dial(field, value)
             text, old = _edited(text, lambda lines: _set_scalar(lines, field, checked))
