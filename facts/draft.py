@@ -21,10 +21,14 @@ TEAM_SIZE = 6             # 6v6 Open Queue
 MAX_TANKS = 2             # the queue's own limit, whatever the playbook holds
 MAX_BANS = 5              # each team's two and the lobby's
 SIDED_MODES = ("Escort", "Hybrid")   # modes with an attacking and a defending side
-SIDES = ("attack", "defense")
+# a board's side: attack or defense on a sided map, none on any other
+type Side = Literal["attack", "defense", ""]
+SIDES: tuple[Side, Side] = ("attack", "defense")
 # the two seats: blue is the owner's, red the other side's
 type Seat = Literal["blue", "red"]
 EXPECTED_SHAPE = {"tank": 2, "damage": 2, "support": 2}   # what a lobby fields: two of each
+_SIDE_NAMES: dict[str, Side] = {"attack": "attack", "defense": "defense", "": ""}
+_OPPOSITE: dict[Side, Side] = {"attack": "defense", "defense": "attack", "": ""}
 # The format the kit is read in. The shipped playbook's open-queue-ranked
 # assumption makes 6v6 Open Queue the target, so the load lays the wiki's 6v6
 # figures over the 5v5 ones the kit tables hold (facts.kit_format)
@@ -59,7 +63,7 @@ class Draft:
     red: tuple[str, ...] = ()
     blue: tuple[str, ...] = ()
     bans: tuple[str, ...] = ()
-    side: str = ""
+    side: Side = ""
     stage: str = ""
 
     def __post_init__(self) -> None:
@@ -67,8 +71,7 @@ class Draft:
         check_team_size(self.blue, "blue")
         if len(self.bans) > MAX_BANS:
             raise Refusal("more than %d bans" % MAX_BANS)
-        if self.side not in ("", *SIDES):
-            raise Refusal("side must be attack or defense, got %r" % self.side)
+        as_side(self.side)
         if self.stage and not self.map_name:
             raise Refusal("a stage is one of a map's: name the map for stage %r" % self.stage)
 
@@ -94,7 +97,7 @@ def parse_board(query: Query) -> Draft:
                  red=tuple(x for x in query.get("red", ()) if x),
                  blue=tuple(x for x in query.get("blue", ()) if x),
                  bans=tuple(x for x in query.get("bans", ()) if x),
-                 side=sides[0] if sides else "",
+                 side=as_side(sides[0]) if sides else "",
                  stage=stages[0] if stages else "")
 
 
@@ -103,7 +106,15 @@ def is_sided(m: Map | None) -> bool:
     return m is not None and (m.mode or "") in SIDED_MODES
 
 
-def board_side(m: Map | None, side: str) -> str:
+def as_side(value: str) -> Side:
+    """A side as a request names it, checked: attack, defense or none."""
+    side = _SIDE_NAMES.get(value)
+    if side is None:
+        raise Refusal("side must be attack or defense, got %r" % value)
+    return side
+
+
+def board_side(m: Map | None, side: Side) -> Side:
     """The side a board keeps: the draft's side where the map has sides, none
     on any other map."""
     return side if is_sided(m) else ""
@@ -126,6 +137,6 @@ def board_stage(m: Map | None, stage: str) -> str:
     raise Refusal("%s has no stage %r; its stages: %s" % (m.name, stage, ", ".join(m.stages)))
 
 
-def opposite(side: str) -> str:
+def opposite(side: Side) -> Side:
     """The other seat's side; no side stays none."""
-    return {"attack": "defense", "defense": "attack"}.get(side, "")
+    return _OPPOSITE[side]

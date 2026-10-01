@@ -9,7 +9,7 @@ from collections.abc import Callable
 
 from door.mcp.registry import Context, tool
 from door.mcp.schema import Properties, ToolReply
-from facts.draft import Draft
+from facts.draft import Draft, as_side
 
 BOARD: Properties = {
     "map": {"type": "string", "description": "map name (any spelling)"},
@@ -55,7 +55,7 @@ def _draft(arguments: dict[str, object]) -> Draft:
                  red=_names(arguments.pop("red", ())),
                  blue=_names(arguments.pop("blue", ())),
                  bans=_names(arguments.pop("bans", ())),
-                 side=str(arguments.pop("side", "")),
+                 side=as_side(str(arguments.pop("side", ""))),
                  stage=str(arguments.pop("stage", "")))
 
 

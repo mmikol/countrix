@@ -41,6 +41,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from typing import Literal, NamedTuple, NotRequired, TypedDict
 
 from facts import compute, counters
+from facts.draft import Side
 from facts.model import ROLES, Hero, Map, World
 from facts.team import NUMBER_TYPES, MetricBag, MetricValue, number, team_metrics
 from inference.base import COUNTERS, RATES, READS, SYNERGY, Base, BaseWeights, Terms
@@ -231,7 +232,7 @@ def rank_key(c: Candidate) -> tuple[float, float, list[str]]:
     return (-quantized(c.score), -c.tiebreak, sorted(c.names))
 
 
-def board_seed(m: Map | None, side: str) -> str:
+def board_seed(m: Map | None, side: Side) -> str:
     """The seed a board's tie-break draws from: its map and its side. Red's
     picks, the bans and the locks leave it alone, so the six a tie settles
     holds still as the draft fills in."""
@@ -277,7 +278,7 @@ class Objective:
     whole map."""
 
     def __init__(self, world: World, m: Map | None, *, red: Sequence[Hero],
-                 banned: Sequence[Hero] = (), side: str = "", stage: str = "",
+                 banned: Sequence[Hero] = (), side: Side = "", stage: str = "",
                  catalog: list[Strategy], base: BaseWeights,
                  keep: frozenset[int] = frozenset(), swap: float = 0.0) -> None:
         self.world, self.m, self.red = world, m, list(red)

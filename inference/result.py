@@ -12,8 +12,9 @@ from dataclasses import dataclass, field
 from typing import Literal, NotRequired, TypedDict
 
 from facts.board_facts import GroundValue
-from facts.draft import TEAM_SIZE, Seat
+from facts.draft import TEAM_SIZE, Seat, Side
 from facts.factset import Fact, FactSet
+from facts.hero_facts import RateValue
 from facts.model import ROLES, TERRAIN_FEATURES
 from facts.records import Snapshot
 from facts.team import SPECIALIST_DELTA, text
@@ -237,7 +238,7 @@ class Result:
     catalog: list[Strategy]
     base: BaseWeights                  # the default engine's weights it was scored under
     bans: list[str] = field(default_factory=list)
-    side: str = ""
+    side: Side = ""
     stage: str = ""                    # the stage in play; empty for the whole map
     seat: Seat = "blue"
     partial: bool = False
@@ -502,7 +503,7 @@ class Board:
     Carries the same to_dict()/rendered() pair as Result, so the shells hand a
     board to the caller the way they hand a single seat."""
     map_name: str | None
-    side: str
+    side: Side
     stage: str
     bans: list[str]
     blue: Result
@@ -604,8 +605,12 @@ def _reasons(fs: FactSet, hero_name: str, locked: bool) -> tuple[str, list[str]]
     cite("hero.map_style_fit", lambda f: "fits the %s style" % f.value)
     cite("hero.home_map", lambda f: "top-%d map by rate" % f.value)
     cite("hero.vs_answered_by", lambda f: "CAUTION: answered by %s" % ", ".join(f.value))
+    def overall(f: Fact) -> str:
+        rate: RateValue = f.value
+        return "wins %.1f%% across all ranks%s" % (rate["win"], rated)
+
     if not evidence:
-        cite("hero.rate", lambda f: "wins %.1f%% across all ranks%s" % (f.value["win"], rated))
+        cite("hero.rate", overall)
     if locked:
         why.insert(0, "locked")
     return "; ".join(why), evidence

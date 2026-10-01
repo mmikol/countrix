@@ -22,7 +22,7 @@ from collections import OrderedDict
 from collections.abc import Sequence
 from typing import Literal, NamedTuple, TypedDict
 
-from facts.draft import EXPECTED_SHAPE, is_sided
+from facts.draft import EXPECTED_SHAPE, Side, is_sided
 from facts.model import ROLES, TERRAIN_FEATURES, Hero, Map, World
 from facts.team import TEAM_METRICS, VERSUS_METRICS, MetricBag, number
 
@@ -317,7 +317,7 @@ def objective(m: Map | None, stage: str = "") -> str:
     return OBJECTIVES.get(m.mode or "", "")
 
 
-def map_metrics(m: Map | None, side: str = "", *, ban_count: int, stage: str = "") -> MetricBag:
+def map_metrics(m: Map | None, side: Side = "", *, ban_count: int, stage: str = "") -> MetricBag:
     """MAP_METRICS on the ground in play: the map, or `stage`, one the map
     lists (facts.draft.board_stage), where a board names one."""
     if m is None:

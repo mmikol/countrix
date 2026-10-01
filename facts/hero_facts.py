@@ -6,6 +6,8 @@ only this board has: on this map, against these opponents, beside these
 teammates. facts.board_facts calls write() once per pick, red first.
 """
 
+from typing import TypedDict
+
 from facts import counters
 from facts.compute import TREND_POINTS
 from facts.draft import KIT_FORMAT, Seat
@@ -234,6 +236,14 @@ def _hero_perks(fs: FactSet, h: Hero, team: Seat) -> None:
 
 # --- the rates ----------------------------------------------------------------
 
+class RateValue(TypedDict):
+    """The hero.rate fact's value: the all-ranks win, pick and ban rates, a
+    pick or a ban the source leaves out read as None."""
+    win: float
+    pick: float | None
+    ban: float | None
+
+
 def _hero_rates(fs: FactSet, world: World, h: Hero, team: Seat) -> None:
     """The all-ranks rates, then each tier's up the ladder, named as Blizzard
     names it."""
@@ -242,7 +252,7 @@ def _hero_rates(fs: FactSet, world: World, h: Hero, team: Seat) -> None:
         fs.add("hero", name, "hero.rate", "%s across all ranks: wins %.1f%%, picked %.1f%%%s"
             % (name, h.win, h.pick or 0,
                 ", banned %.1f%%" % h.ban if h.ban is not None else ""),
-            value={"win": h.win, "pick": h.pick, "ban": h.ban}, source="hero_meta",
+            value=RateValue(win=h.win, pick=h.pick, ban=h.ban), source="hero_meta",
             team=team)
     for tier, (win, pick, ban) in h.by_tier.items():
         if win is not None:
