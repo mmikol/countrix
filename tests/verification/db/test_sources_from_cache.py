@@ -4,7 +4,9 @@ for real inside one transaction that is rolled back at the end, so the
 built database is exactly as it was (a rates pull would otherwise append a
 dated snapshot every run). Skipped without the caches or the database."""
 
+import glob
 import os
+import shutil
 
 import psycopg
 import pytest
@@ -64,13 +66,24 @@ def test_blizzard_roster_pulls_from_the_cache(ctx):
     assert data["missing"] == []                 # every hero page read from the cache
 
 
+@pytest.fixture()
+def rates_pages(tmp_path):
+    """The cached rates pages, copied as written now: a capture no database
+    holds, so the pull stores it whichever snapshots the database keeps - a
+    build from the caches themselves holds their capture already."""
+    for page in glob.glob(os.path.join(CACHE_DIRS["blizzard"], "rates_*.html")):
+        shutil.copyfile(page, tmp_path / os.path.basename(page))
+    return str(tmp_path)
+
+
 @needs_caches
-def test_blizzard_rates_pull_from_the_cache_and_leave_no_snapshot(ctx, snapshots, db, monkeypatch):
+def test_blizzard_rates_pull_from_the_cache_and_leave_no_snapshot(
+        dsn, rates_pages, snapshots, db, monkeypatch):
     # a page missing from the cache fails at once: the request loop retries
     # only a requests failure, so the pull neither waits out six attempts nor
     # reads the live site at 5 s a page
     monkeypatch.setattr(requests.Session, "get", _offline)
-    text, data = ctx.call("pull_rates")
+    text, data = Sandbox(dsn=dsn, caches={"blizzard": rates_pages}).call("pull_rates")
     assert text.startswith("pull_rates: snapshot stored")
     assert data["tables"] == ["regions", "competitive_tiers", "meta_snapshots",
                               "hero_meta", "map_meta"]

@@ -182,11 +182,13 @@ def register_source(cursor: psycopg.Cursor, source: Source, cao: datetime) -> in
     return scalar(cursor)
 
 
-def current_patch(cursor: psycopg.Cursor) -> int | None:
-    """The most recent released patch, to stamp on a capture's snapshot."""
+def current_patch(cursor: psycopg.Cursor, captured: datetime) -> int | None:
+    """The patch live at a capture, to stamp on its snapshot: the most recent
+    released on or before the capture's date, taken in the session's time
+    zone, as a snapshot's captured_at::date reads it."""
     row = cursor.execute(
-        "SELECT patch_id FROM patches WHERE released <= CURRENT_DATE"
-        " ORDER BY released DESC, patch_id DESC LIMIT 1"
+        "SELECT patch_id FROM patches WHERE released <= %s::date"
+        " ORDER BY released DESC, patch_id DESC LIMIT 1", (captured,)
     ).fetchone()
     return row[0] if row else None
 

@@ -116,6 +116,23 @@ def test_a_failed_refetch_keeps_the_cached_copy(tmp_path):
     assert len(pull.stale) == 1
 
 
+def test_each_page_served_adds_its_write_time_to_the_pulls_captured(tmp_path):
+    """What a pull dates its pages by: a cached copy's write time, a fetched
+    page's as the cache wrote it - the time a later build from the cache
+    reads - and a stale copy's when its refetch fails."""
+    write_aged(tmp_path / "kept.html", "cached", hours=48)
+    write_aged(tmp_path / "stale.html", "yesterday", hours=24)
+    pull = cache.PullContext(str(tmp_path), session=FakeSession())
+    assert cache.cached_get(pull, "u", "kept", policy=INSTANT) == "cached"
+    assert cache.cached_get(pull, "u", "fetched", policy=INSTANT) == "new page"
+    down = cache.PullContext(str(tmp_path), session=FakeSession(fail=True), cutoff=time.time())
+    assert cache.cached_get(down, "u", "stale", policy=INSTANT) == "yesterday"
+    kept, fetched, stale = (os.path.getmtime(tmp_path / name)
+                            for name in ("kept.html", "fetched.html", "stale.html"))
+    assert pull.captured == [kept, fetched] and down.captured == [stale]
+    assert kept < stale < fetched
+
+
 def test_attempts_count_every_request_the_first_included(tmp_path):
     session = FakeSession(fail=True)
     with pytest.raises(cache.FetchError, match="after 3 attempts"):

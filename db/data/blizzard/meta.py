@@ -16,7 +16,7 @@ vocabularies as ordinary select options.
 
 import json
 from collections.abc import Iterator, Mapping
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import NamedTuple
 
 import psycopg
@@ -115,8 +115,9 @@ def fetch_slice(pull: cache.PullContext, params: dict[str, str], rq: str) -> str
 
 
 class RatesSummary(PullSummary):
-    """The pull's counts. A pull that read a page from the stale cache stores
-    nothing: snapshot_id is None, every count 0 and tables empty."""
+    """The pull's counts. A pull that read a page from the stale cache, or
+    whose capture the database already holds, stores nothing: snapshot_id
+    is None, every count 0 and tables empty."""
     queue: str
     platform: str
     region: str
@@ -158,12 +159,33 @@ def _hero_rows(
         yield hero_id, win, pick, ban
 
 
+def _no_snapshot(
+        cursor: psycopg.Cursor, pull: cache.PullContext, captured: datetime) -> str | None:
+    """Why the pages a run read stamp no snapshot, or None when they do. A
+    page from the stale cache would date its old rates as a new capture; and
+    a capture is one snapshot - `captured` is its key with the queue, the
+    platform and the input - so pages a stored snapshot was built from are
+    not stored again."""
+    if pull.stale:
+        return "%d pages from the stale cache" % len(pull.stale)
+    held = cursor.execute(
+        "SELECT snapshot_id FROM meta_snapshots WHERE captured_at = %s AND queue = %s"
+        " AND platform = %s AND input IS NOT DISTINCT FROM %s",
+        (captured, QUEUE_NAME, PLATFORM, INPUT_DEVICE)).fetchone()
+    if held is None:
+        return None
+    return "the capture of %s is snapshot %d already" % (
+        captured.isoformat(timespec="seconds"), held[0])
+
+
 def _store(
         cursor: psycopg.Cursor, tiers: list[tuple[str, str]],
         rows_by_tier: dict[str, list[RateRow]], rows_by_map: dict[int, list[RateRow]],
-        cao: datetime) -> RatesWritten:
+        cao: datetime, captured: datetime) -> RatesWritten:
     """Stamp one new snapshot and write its rows: the region and the tiers
-    upserted, each tier's hero rows, and each map's across all ranks."""
+    upserted under the source read at `cao`, the snapshot dated `captured`,
+    its pages' capture, with the patch live then, each tier's hero rows, and
+    each map's across all ranks."""
     source_id = psql.register_source(cursor, BLIZZARD, cao)
     cursor.execute(
         "INSERT INTO regions (code, name, source_id) VALUES (%s, %s, %s)"
@@ -184,11 +206,12 @@ def _store(
         )
         tier_ids[code] = psql.scalar(cursor)
 
+    patch_id = current_patch(cursor, captured)
     cursor.execute(
         "INSERT INTO meta_snapshots (captured_at, queue, platform, input,"
         " patch_id, source_id)"
         " VALUES (%s, %s, %s, %s, %s, %s) RETURNING snapshot_id",
-        (cao, QUEUE_NAME, PLATFORM, INPUT_DEVICE, current_patch(cursor), source_id),
+        (captured, QUEUE_NAME, PLATFORM, INPUT_DEVICE, patch_id, source_id),
     )
     snapshot_id = psql.scalar(cursor)
 
@@ -228,8 +251,12 @@ def _store(
 def run(connection: psycopg.Connection, pull: cache.PullContext) -> RatesSummary:
     """Fetch the rates page by tier and by map, then store it as one new
     dated snapshot in one transaction -> the rows written, the snapshots
-    held, the misses. A page read from the stale cache stamps no snapshot:
-    nothing is written, so the newest capture stays the last real one."""
+    held, the misses. The snapshot is dated by its pages, not by the run:
+    the write time of the oldest page read, so a build from a week-old
+    cache stamps the week-old capture and the patch live then. A page read
+    from the stale cache stamps no snapshot, so the newest capture stays
+    the last real one; nor do the pages of a capture the database already
+    holds, which stays their one snapshot."""
     cao = psql.now()
     cursor = connection.cursor()
     # a map the database lacks is never fetched; the read's transaction ends
@@ -260,12 +287,14 @@ def run(connection: psycopg.Connection, pull: cache.PullContext) -> RatesSummary
             continue
         rows_by_map[map_id] = parse_rows(fetch_slice(pull, {"map": slug}, rq))
 
-    if pull.stale:
-        pull.log("rates: %d pages from the stale cache; no snapshot stamped" % len(pull.stale))
+    captured = datetime.fromtimestamp(min(pull.captured), UTC) if pull.captured else cao
+    why = _no_snapshot(cursor, pull, captured)
+    if why:
+        pull.log("rates: %s; no snapshot stamped" % why)
         written = RatesWritten(snapshot_id=None, tiers=0, maps=0, hero_rows=0, map_rows=0,
                                unmatched=[])
     else:
-        written = _store(cursor, tiers, rows_by_tier, rows_by_map, cao)
+        written = _store(cursor, tiers, rows_by_tier, rows_by_map, cao, captured)
     connection.commit()
     snapshots = psql.scalar(cursor.execute("SELECT count(*) FROM meta_snapshots"))
     pull.log("hero/tier rows: %d" % written.hero_rows)
