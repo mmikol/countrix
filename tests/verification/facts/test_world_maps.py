@@ -70,7 +70,7 @@ def test_the_terrain_and_the_style_are_the_same_on_every_load(world, db):
         assert (list(compute.map_metrics(m, ban_count=0))
                 == list(compute.map_metrics(other, ban_count=0)))
     before = {m.id: (dict(m.terrain_z), dict(m.terrain_lean)) for m in world.maps.values()}
-    tables.map_terrain(world)
+    tables.derive_map_terrain(world)
     assert before == {m.id: (dict(m.terrain_z), dict(m.terrain_lean)) for m in world.maps.values()}
 
 
@@ -113,5 +113,5 @@ def test_stage_terrain_is_z_scored_across_the_stages_with_text(world, rows):
     assert world.map("Ilios").stage_terrain["Well"]["hazards"] == (float(rate), mentions)
     # the same on every pass
     before = {m.id: {s: dict(z) for s, z in m.stage_z.items()} for m in world.maps.values()}
-    tables.stage_terrain(world)
+    tables.derive_stage_terrain(world)
     assert before == {m.id: m.stage_z for m in world.maps.values()}
