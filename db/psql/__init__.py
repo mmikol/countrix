@@ -57,9 +57,10 @@ class NoDatabaseError(Exception):
 
 # Every way the database can be out of reach, which a health endpoint reports
 # as degraded: the connection and its queries (psycopg.Error); no DATABASE_URL
-# and no cluster to use (NoDatabaseError, from default_dsn); the embedded
-# cluster's files and socket (OSError); and pgserver's .handle_pids.json,
-# left empty by a process killed while writing it (JSONDecodeError).
+# and no cluster to use, or an embedded cluster that would not start
+# (NoDatabaseError, from default_dsn); the embedded cluster's files and socket
+# (OSError); and pgserver's .handle_pids.json, left empty by a process killed
+# while writing it (JSONDecodeError).
 UNREACHABLE = (psycopg.Error, NoDatabaseError, OSError, json.JSONDecodeError)
 
 # pgserver's own lock (fasteners, over fcntl) excludes other processes but
@@ -100,13 +101,26 @@ def boot() -> str:
 def _embedded() -> str:
     """The embedded cluster's URI: pgserver starts the cluster when it is not
     running and runs initdb when it is not built. A host without pgserver
-    has none to run: NoDatabaseError, naming DATABASE_URL."""
+    has none to run: NoDatabaseError, naming DATABASE_URL. A start that
+    fails in a way UNREACHABLE does not name - pg_ctl's error or its
+    ten-second timeout, a pid file with no socket or port, the handle a
+    failed start leaves cached for the rest of the process - is
+    NoDatabaseError too, so every reader reports it as the database out of
+    reach."""
     if pgserver is None:
         raise NoDatabaseError("no DATABASE_URL and no embedded cluster: pgserver is not"
                               " installed here (the image and CI filter it out; linux/arm64"
                               " has no wheel) - set DATABASE_URL")
     with _FIRST_TOUCH:
-        return pgserver.get_server(DEFAULT_DB_DIR).get_uri()
+        try:
+            return pgserver.get_server(DEFAULT_DB_DIR).get_uri()
+        except UNREACHABLE:
+            raise
+        except Exception as error:      # any other pgserver failure: the cluster is out of reach
+            raise NoDatabaseError(
+                "the embedded cluster at db/psql/cluster did not start (%s - %s) - see"
+                " db/psql/cluster/log and restart this process after a failed start"
+                % (type(error).__name__, error)) from error
 
 
 IDENTIFIER_RE = re.compile(r"[a-z_][a-z0-9_]*\Z")

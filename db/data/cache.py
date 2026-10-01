@@ -110,9 +110,13 @@ def _read_cache(path: str) -> str:
 
 
 def _write_cache(path: str, text: str) -> None:
-    """A page's text into the cache, over any older copy."""
-    with open(path, "w", encoding="utf-8") as handle:
+    """A page's text into the cache: written into a .part file beside it and
+    renamed over any older copy once whole, so a write cut short raises and
+    leaves the old copy - never half a page a later build reads as whole."""
+    part = path + ".part"
+    with open(part, "w", encoding="utf-8") as handle:
         handle.write(text)
+    os.replace(part, path)
 
 
 def _keep_stale(pull: PullContext, path: str, error: Exception) -> str:
