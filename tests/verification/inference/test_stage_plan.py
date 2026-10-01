@@ -137,7 +137,7 @@ def test_a_withheld_swap_leaves_the_chosen_stage_the_origin(synthetic_world, mon
     searched no swap reads, and never says no swap pays for its cost."""
     draft = Draft("Harbor Gate", ("Mortar", "Gale"), ORIGIN, side="attack", stage="Escort")
     worse = {"odds": {"blue": 0, "red": 100}}
-    monkeypatch.setattr(engine._Pass, "_against", lambda self, draft, six, blue: worse)
+    monkeypatch.setattr(engine._Pass, "_against", lambda self, draft, six: worse)
     board = engine.board(synthetic_world, draft, catalog=catalog.load(FIXTURE_PLAYBOOK),
                          brief=engine.Brief(base=DEFAULT, countered=False, swap=COST))
     assert board.swaps["status"] == "withheld"

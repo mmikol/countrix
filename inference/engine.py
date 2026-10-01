@@ -27,7 +27,6 @@ import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import NamedTuple
 
-from db import Refusal
 from facts import board_facts, compute
 from facts.draft import (
     TEAM_SIZE,
@@ -95,18 +94,14 @@ def _seat_board(world: World, draft: Draft) -> _SeatBoard:
                       board_stage(board.map, draft.stage))
 
 
-def clamp_top(top: str | float | None = None) -> int:
+def clamp_top(top: int | None = None) -> int:
     """The alternatives a caller asks for, 1..TOP_CEILING: left out (None),
-    TOP_DEFAULT; any number, 0 and negatives included, clamped into the
-    range, so an MCP tool's 0 and a query string's "0" both read as the
-    floor. The search has no width to choose - it is exact - so this is its
-    one knob, and every door that takes it from a caller passes it through
-    here. Anything else, [] included, raises Refusal, which every door
-    answers as the caller's error."""
-    try:
-        return max(1, min(int(TOP_DEFAULT if top is None else top), TOP_CEILING))
-    except (TypeError, ValueError) as error:
-        raise Refusal("top must be a number: %s" % error) from error
+    TOP_DEFAULT; any other number, 0 and negatives included, clamped into
+    the range, so the MCP infer tool's 0 reads as the floor. The search has
+    no width to choose - it is exact - so this is its one knob, and the tool
+    passes a caller's through here once its schema has checked it is an
+    integer."""
+    return max(1, min(TOP_DEFAULT if top is None else top, TOP_CEILING))
 
 
 BOARD_TOP = 5               # the alternatives each of a board's seats keeps
@@ -241,29 +236,27 @@ def _optimal(
 
 def _evaluated(
         world: World, draft: Draft, *, catalog: list[Strategy], base: BaseWeights,
-        seat: Seat, kind: ResultKind, solved: Solved) -> Result:
+        seat: Seat, kind: ResultKind, optimal: _Optimal) -> Result:
     """`seat`'s full six (`draft.blue`), scored and ranked against every
-    legal six, labelled `kind`, through `solved`, the seat's own search on
-    this board. A six that breaks a limit is scored with its breaches
-    listed: the board bars blue's before it gets here, and ranks red's."""
+    legal six, labelled `kind`, through the search of `optimal`, the seat's
+    own on this board, and read on its span. A six that breaks a limit is
+    scored with its breaches listed: the board bars blue's before it gets
+    here, and ranks red's."""
     started = time.monotonic()
     seated = _seat_board(world, draft)
     red_h, blue_h = seated.board.red, seated.board.blue
     _check_teams(red_h, blue_h, seat)
     result = seated.result(kind, seat, catalog=catalog, base=base,
                            blue=[h.name for h in blue_h], locked=[])
-    evaluated = evaluate_comp(solved, blue_h)
+    evaluated = evaluate_comp(optimal.solved, blue_h)
     fs = _board_facts(world, result, seated.side)
     result.record_candidate(evaluated.target, fs, evaluated.solver.considered)
     result.rank, result.outranked = evaluated.rank, evaluated.outranked
     result.alternatives = [Alternative(blue=_order(c.heroes), score=round(c.score, 3),
                                        normalized=None)
                            for c in evaluated.field[:3]]
+    result.scale_to(optimal.span)
     result.seconds = time.monotonic() - started
-    # the board's best known six is the 100, not this comp's own best rival: a
-    # beaten six must not read 100 because nothing it was compared against beat it
-    result.scale_to(Span(best=max([result.score] + [a["score"] for a in result.alternatives]),
-                         floor=evaluated.solver.floor))
     return result
 
 
@@ -281,18 +274,15 @@ def _current(
     comp is not allowed (_barred): it is scored nowhere and ranked against
     nothing, and says why."""
     full = len(draft.blue) == TEAM_SIZE
+    label: ResultKind = "evaluate" if full and kind == "current" else kind
     if full and barred is None:
-        result = _evaluated(world, draft, catalog=catalog, base=base, seat=seat,
-                            kind="evaluate" if kind == "current" else kind,
-                            solved=optimal.solved)
-        result.scale_to(optimal.span)
-        return result
+        return _evaluated(world, draft, catalog=catalog, base=base, seat=seat, kind=label,
+                          optimal=optimal)
     started = time.monotonic()
     seated = _seat_board(world, draft)
     blue_h = seated.board.blue
     picks = [h.name for h in blue_h]
-    result = seated.result("evaluate" if full and kind == "current" else kind, seat,
-                           catalog=catalog, base=base, blue=picks,
+    result = seated.result(label, seat, catalog=catalog, base=base, blue=picks,
                            locked=[] if full else list(picks), partial=not full)
     solver = optimal.solver
     if blue_h:
@@ -452,8 +442,8 @@ def board(
         # a what-if: where no six answers red's six around blue's picks, it is not solved
         with contextlib.suppress(Infeasible, Unbounded):
             countered = solve.countered(dataclasses.replace(draft, red=tuple(red.result.blue)))
-    seats = Seats(current=cur, red_current=red_cur, blue=blue.result, red=red.result,
-                  fill=fill, red_fill=red_fill, countered=countered)
+    seats = Seats(current=cur, red_current=red_cur, fill=fill, red_fill=red_fill,
+                  countered=countered)
     mo = momentum(seats)
     # the swap cost, read once: the swaps above the picks and the chosen
     # stage's row are one answer
@@ -569,23 +559,21 @@ class _Pass:
                          [p for p in fill.picks if not p["locked"]] if fill is not None else []),
                      before=before, after=before, odds=SwapOdds(before=odds, after=odds),
                      verdict=swaps.verdict([], cost, before, 0, None, partial=not full))
+
+        def none(why: str) -> Swaps:
+            kept["status"] = "none"
+            kept["verdict"] = "no swaps: " + why
+            return kept
         raw = swaps.raw_cost(cost, blue.span)
         if seat.unsolved:
-            kept["status"] = "none"
-            kept["verdict"] = "no swaps: the fill around the picks was not solved within the" \
-                              " search's budget"
-            return kept
+            return none("the fill around the picks was not solved within the search's budget")
         if raw is None:
-            kept["status"] = "none"
-            kept["verdict"] = "no swaps: " + (blue.result.waiting() or "the seat is unscored")
-            return kept
+            return none(blue.result.waiting() or "the seat is unscored")
         self.watch.check()
         try:
             target = swaps.search(blue.solver, picks, raw, keeper)
         except (Infeasible, Unbounded) as error:
-            kept["status"] = "none"
-            kept["verdict"] = "no swaps: %s" % error
-            return kept
+            return none(str(error))
         if not target.gains:
             return kept
         ours = dataclasses.replace(draft, red=enemy, blue=tuple(h.name for h in target.six.heroes))
@@ -593,20 +581,20 @@ class _Pass:
                       locked=[h.name for h in picks])
         pairs = swaps.paired(picks, target.six.heroes, six)
         after = six.share()
-        odds_after = self._against(draft, six, blue)["odds"] if draft.red else None
+        odds_after = self._against(draft, six)["odds"] if draft.red else None
+        # blue's fight odds before and after, where both are read
+        both = ((odds["blue"], odds_after["blue"])
+                if odds is not None and odds_after is not None else None)
         # the owner's rule: a swap raises the score and the odds of winning a
         # fight, so a swap the odds read and do not rise on is withheld
-        if odds is not None and odds_after is not None and odds_after["blue"] <= odds["blue"]:
+        if both is not None and both[1] <= both[0]:
             kept["status"] = "withheld"
-            kept["verdict"] = swaps.withheld(pairs, (odds["blue"], odds_after["blue"]))
+            kept["verdict"] = swaps.withheld(pairs, both)
             return kept
         return Swaps(status="suggested", stage=draft.stage, cost=cost, six=list(six.blue),
                      pairs=pairs, open=kept["open"], before=before, after=after,
                      odds=SwapOdds(before=odds, after=odds_after),
-                     verdict=swaps.verdict(pairs, cost, before, after, (
-                         (odds["blue"], odds_after["blue"])
-                         if odds is not None and odds_after is not None else None),
-                         partial=not full))
+                     verdict=swaps.verdict(pairs, cost, before, after, both, partial=not full))
 
     def stages(
             self, m: Map | None, draft: Draft, blue: _Optimal, origin: Sequence[str],
@@ -638,10 +626,10 @@ class _Pass:
         return swaps.chain(swaps.ChainStart(plain=plain, whole=whole, chosen=draft.stage,
                                             origin=six, raw=raw, cost=cost, taken=taken))
 
-    def _against(self, draft: Draft, six: Result, blue: _Optimal) -> Momentum:
-        """The momentum were blue to field `six`: red's optimal, current comp
-        and fill solved again against it, and read with blue's six on blue's
-        optimal, as the board's own is."""
+    def _against(self, draft: Draft, six: Result) -> Momentum:
+        """The momentum were blue to field `six`, a Result on blue's
+        optimal's span: red's optimal, current comp and fill solved again
+        against it, and read with blue's six, as the board's own is."""
         theirs = dataclasses.replace(draft, blue=tuple(six.blue)).flipped()
         red = self.optimal(dataclasses.replace(theirs, blue=()), seat="red")
         red_cur = self.current(theirs, red, seat="red")
@@ -649,8 +637,7 @@ class _Pass:
             red_fill = self.filled(theirs, seat="red", of=red)
         except (Infeasible, Unbounded):
             red_fill = None
-        return momentum(Seats(current=six, red_current=red_cur, blue=blue.result,
-                              red=red.result, red_fill=red_fill))
+        return momentum(Seats(current=six, red_current=red_cur, red_fill=red_fill))
 
 
 def _scored(world: World, draft: Draft, optimal: _Optimal, cand: Candidate,

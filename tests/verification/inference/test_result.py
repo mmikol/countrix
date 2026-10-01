@@ -12,8 +12,10 @@ from tests.verification.inference import BRIEF, FIXTURE_PLAYBOOK, evaluated
 def test_a_playbook_that_scores_nothing_reads_unscored(synthetic_world):
     """With the default engine off, limits and prose alone tie every
     legal six at zero: the results carry no share of a best, say so, and the
-    verdict is the one line."""
+    verdict is the one line; red's likely six says it is a likelihood, as it
+    does with the engine on."""
     from inference import engine
+    from inference.result import LIKELIHOOD
     world = synthetic_world
     reference = catalog.load(FIXTURE_PLAYBOOK)
     assert any(s.weighs for s in reference)
@@ -27,6 +29,7 @@ def test_a_playbook_that_scores_nothing_reads_unscored(synthetic_world):
     for key in ("current", "red_current", "fill", "countered"):
         assert d[key]["scoring"] is False and d[key]["normalized"] is None
         assert all(a["normalized"] is None for a in d[key]["alternatives"])
+    assert d["expected"]["unscored"] == LIKELIHOOD and d["expected"]["normalized"] is None
     assert d["momentum"]["verdict"].startswith("unscored") and d["momentum"]["blue"] is None
     assert {badge["label"] for badge in d["momentum"]["badges"].values()} == {"unscored"}
     assert "(unscored)" in b.current.rendered() and "UNSCORED:" in b.current.rendered()
