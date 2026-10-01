@@ -1,7 +1,6 @@
 """The board's routes over the engine, ui/serve.py, which run in the
 board's process: they speak the results the engine returns, admit boards
-a share of the room at a time, and report the catalog and the database's
-health."""
+one at a time, and report the catalog and the database's health."""
 
 import pytest
 
@@ -66,30 +65,32 @@ def test_a_refused_board_supersedes_nothing():
 
 
 def test_a_board_waits_for_room_and_holds_none_once_it_leaves():
-    """Admission counts the share of its room each board in flight holds: a
-    board alone is admitted whatever its share, a second waits until the
-    first leaves room, and nothing stays held after a board ends - raising
-    included. The board's handler takes one of serve.BOARDS_AT_ONCE."""
+    """Admission counts the boards in flight against its budget: two fit in
+    a budget of two, a third waits until one leaves, and nothing stays held
+    after a board ends - raising included. The board's handler admits
+    serve.BOARDS_AT_ONCE."""
     import threading
-    admission = serve.Admission(budget=100, wait=5)
+    admission = serve.Admission(budget=2, wait=5)
     order, inside, leave = [], threading.Event(), threading.Event()
 
-    def second():
-        with admission.admitted(60, lambda: False):
-            order.append("second in")
+    def third():
+        with admission.admitted(lambda: False):
+            order.append("third in")
             inside.set()
             leave.wait(5)
-    with admission.admitted(500, lambda: False):        # alone: in, at most the budget
-        assert admission.held() == 100
-        waiter = threading.Thread(target=second)
-        waiter.start()
-        assert not inside.wait(0.2)                     # no room while the first holds it all
-        order.append("first out")
-    assert inside.wait(5) and order == ["first out", "second in"]
-    assert admission.held() == 60
-    with pytest.raises(ValueError), admission.admitted(40, lambda: False):  # room beside it
+    with admission.admitted(lambda: False):
+        with admission.admitted(lambda: False):         # the second fits beside the first
+            assert admission.held() == 2
+            waiter = threading.Thread(target=third)
+            waiter.start()
+            assert not inside.wait(0.2)                 # no room while two are in flight
+            order.append("second out")
+        assert inside.wait(5) and order == ["second out", "third in"]
+        assert admission.held() == 2
+    assert admission.held() == 1
+    with pytest.raises(ValueError), admission.admitted(lambda: False):  # room beside the third
         raise ValueError("the solve failed")
-    assert admission.held() == 60
+    assert admission.held() == 1
     leave.set()
     waiter.join(5)
     assert admission.held() == 0
@@ -100,11 +101,11 @@ def test_a_waiting_board_stops_when_superseded_or_turned_away():
     newer board from its client supersedes it, 429 once the wait runs out -
     and handle_board says so before the World is read."""
     from inference import supersede
-    admission = serve.Admission(budget=10, wait=0.05)
-    with admission.admitted(10, lambda: False):
-        with pytest.raises(supersede.Superseded), admission.admitted(5, lambda: True):
+    admission = serve.Admission(budget=1, wait=0.05)
+    with admission.admitted(lambda: False):
+        with pytest.raises(supersede.Superseded), admission.admitted(lambda: True):
             pass
-        with pytest.raises(serve.BusyError), admission.admitted(5, lambda: False):
+        with pytest.raises(serve.BusyError), admission.admitted(lambda: False):
             pass
     assert admission.held() == 0
 
@@ -115,16 +116,16 @@ def test_a_board_superseded_while_it_waits_is_not_admitted_when_room_comes():
     import threading
 
     from inference import supersede
-    admission, lanes, caught = serve.Admission(budget=10, wait=5), supersede.Latest(), []
+    admission, lanes, caught = serve.Admission(budget=1, wait=5), supersede.Latest(), []
     stale = lanes.take("tab1")
 
     def waiter():
         try:
-            with admission.admitted(8, stale):
+            with admission.admitted(stale):
                 caught.append("admitted")
         except supersede.Superseded:
             caught.append("superseded")
-    with admission.admitted(8, lambda: False):
+    with admission.admitted(lambda: False):
         thread = threading.Thread(target=waiter)
         thread.start()
         thread.join(0.1)
@@ -135,9 +136,9 @@ def test_a_board_superseded_while_it_waits_is_not_admitted_when_room_comes():
 
 def test_a_board_with_no_room_answers_429(monkeypatch):
     """No database is reached: the board is turned away before the World loads."""
-    admission = serve.Admission(budget=10, wait=0)
+    admission = serve.Admission(budget=1, wait=0)
     monkeypatch.setattr(serve, "ADMISSION", admission)
-    with admission.admitted(10, lambda: False):
+    with admission.admitted(lambda: False):
         data, code = serve.handle_board(None, {"map": ["Ilios"], "client": ["tab9"]})
     assert code == 429 and "busy" in data["error"]
 
