@@ -121,7 +121,7 @@ services:
   ui:
     <<: *app
     deploy:                          # the engine in the board's process, one board
-      resources:                     # solving at a time (inference/serve.py)
+      resources:                     # solving at a time (ui/serve.py)
         limits:
           memory: 2g
           pids: 256
