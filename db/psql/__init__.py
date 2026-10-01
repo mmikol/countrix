@@ -28,7 +28,6 @@
 Nothing here knows a particular source.
 """
 
-import json
 import os
 import re
 import threading
@@ -57,23 +56,22 @@ class NoDatabaseError(Exception):
 
 # Every way the database can be out of reach, which a health endpoint reports
 # as degraded: the connection and its queries (psycopg.Error); no DATABASE_URL
-# and no cluster to use, or an embedded cluster that would not start
-# (NoDatabaseError, from default_dsn); the embedded cluster's files and socket
-# (OSError); and pgserver's .handle_pids.json, left empty by a process killed
-# while writing it (JSONDecodeError).
-UNREACHABLE = (psycopg.Error, NoDatabaseError, OSError, json.JSONDecodeError)
+# and no cluster to use, or an embedded cluster that would not start, an
+# emptied pid file among the causes (NoDatabaseError, from default_dsn); and
+# the embedded cluster's files and socket (OSError).
+UNREACHABLE = (psycopg.Error, NoDatabaseError, OSError)
 
 # pgserver's own lock (fasteners, over fcntl) excludes other processes but
 # not this process's threads, and get_server reads its instance cache before
 # taking it, so two first touches from a threaded server (ui/board.py) could
 # interleave the read-truncate-write of the pid file. The first touch is
 # serialised here. What remains: a .handle_pids.json left empty by a process
-# killed mid-write makes the first touch in each later process raise
-# JSONDecodeError, reported as degraded, and later touches in that process
-# get pgserver's cached handle, with the process unregistered. The file is
-# pgserver's and is not repaired here; removing it while no process uses the
-# cluster clears the fault (pgserver 0.1.4's DiskList reads a missing file
-# as []).
+# killed mid-write makes pgserver's first touch in each later process raise
+# JSONDecodeError, which _embedded reports as NoDatabaseError, degraded, and
+# later touches in that process get pgserver's cached handle, with the
+# process unregistered. The file is pgserver's and is not repaired here;
+# removing it while no process uses the cluster clears the fault (pgserver
+# 0.1.4's DiskList reads a missing file as []).
 _FIRST_TOUCH = threading.Lock()
 
 
@@ -103,10 +101,10 @@ def _embedded() -> str:
     running and runs initdb when it is not built. A host without pgserver
     has none to run: NoDatabaseError, naming DATABASE_URL. A start that
     fails in a way UNREACHABLE does not name - pg_ctl's error or its
-    ten-second timeout, a pid file with no socket or port, the handle a
-    failed start leaves cached for the rest of the process - is
-    NoDatabaseError too, so every reader reports it as the database out of
-    reach."""
+    ten-second timeout, a pid file with no socket or port, an emptied
+    .handle_pids.json, the handle a failed start leaves cached for the rest
+    of the process - is NoDatabaseError too, so every reader reports it as
+    the database out of reach."""
     if pgserver is None:
         raise NoDatabaseError("no DATABASE_URL and no embedded cluster: pgserver is not"
                               " installed here (the image and CI filter it out; linux/arm64"

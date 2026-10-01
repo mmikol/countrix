@@ -236,7 +236,7 @@ def _load_perks(store_pass: _StorePass, hero_id: int, perks: list[PerkEntry]) ->
         # Blizzard has not published the hero yet: the wiki's perks are the
         # only ones, so they get rows of their own (blizzard.heroes replaces
         # them once the hero's page parses)
-        position = {"minor": 0, "major": 0}
+        position = dict.fromkeys(PERK_TIERS, 0)
         for entry in perks:
             tier = entry["tier"]
             position[tier] += 1
