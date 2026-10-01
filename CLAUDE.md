@@ -177,7 +177,8 @@ db <- facts <- inference <- door <- ui.
   of their scores under the board's own gates is the seat's floor, a
   share's 0, as its optimal is the 100. current shares blue's optimal's scale, red_current red's, so within
   a seat infer, the fill and current are comparable. The search is exact
-  (`inference/solver.py`, its bounds in `inference/bounds.py`): every
+  (`inference/solver.py`, its bounds in `inference/bounds.py` over
+  `inference/intervals.py` and `inference/ranges.py`): every
   legal six of the released, unbanned roster, each once, by branch and
   bound, in one total order - the score to `SCORE_PLACES` decimals, then
   the six's tie-break draws, then sorted names - each six scored in one
@@ -285,7 +286,7 @@ db <- facts <- inference <- door <- ui.
   `WORLD_METRICS` and the key its function computes (the namespace must
   equal the registry), and in `TEXT_METRICS` when its value is a name or a
   list - `tests/verification/facts/test_metrics.py` checks every registry
-  key's kind against it - and a bound rule in `inference/bounds.py` (its
+  key's kind against it - and a range rule in `inference/ranges.py` (its
   aggregate: a sum, a mean, a count, fixed by the shape), which
   `tests/verification/inference/test_bounds.py` fails a key without; then
   regenerate the catalog vocabulary in docs/inference.md.
