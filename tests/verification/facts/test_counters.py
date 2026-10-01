@@ -193,6 +193,18 @@ def test_a_mobile_flanker_dives_an_immobile_back_line():
     assert _fired(diver, backline)["dive"] == pytest.approx((0.85 - 0.4) / 0.6)
 
 
+def test_a_hero_with_no_hit_points_on_record_takes_no_burst_or_dive():
+    """A pull that lands no health leaves a pool of 0: burst and dive, which
+    divide by the loser's pool, read nothing against it, as the features'
+    pool shares do, rather than fail the load of every board."""
+    diver = _hero("Blink", subrole="Flanker", weapons=[_gun(dps=100.0, range=15.0)],
+                  abilities=[_piece("Leap", keywords="strong movement", cooldown=6.0)])
+    empty = _hero("Scope", subrole="Sharpshooter", pool=0)
+    for winner in (SNIPER, diver):
+        fired = _fired(winner, empty)
+        assert "burst" not in fired and "dive" not in fired
+
+
 def test_a_cleanse_saves_against_anti_heal():
     cleanser = _hero("Suzu", role="support", abilities=[
         _piece("Suzu", keywords="lesser cleanse", cooldown=10.0)])
