@@ -294,9 +294,9 @@ class Features:
     mobility_pieces: tuple[str, ...]
     diver: float
     escape: tuple[str, ...]
-    cc_int: float
+    cc_interrupt: float
     cc_deny: float
-    cc_int_pieces: tuple[str, ...]
+    cc_interrupt_pieces: tuple[str, ...]
     cc_deny_pieces: tuple[str, ...]
     channel: float
     channel_pieces: tuple[str, ...]
@@ -306,7 +306,7 @@ class Features:
     antiheal_piece: str
     self_sustain: float
     heal_out: float
-    heal_rel: float
+    heal_reliance: float
     barrier: float
     barrier_piece: str
     barrier_share: float
@@ -427,6 +427,19 @@ def _eater(h: Hero) -> tuple[float, str, str | None]:
     return best
 
 
+def _antiheal(h: Hero) -> tuple[float, str]:
+    """The hero's strongest anti-heal: its strength (the share of healing
+    received it takes away, an ultimate's times ULT) and its evidence."""
+    best, where = 0.0, ""
+    for a in h.abilities:
+        for s in a.stats.get("healing_mod", ()):
+            if s.value is not None and s.value < 0 and s.condition != "allies":
+                strength = -s.value / 100.0 * (ULT if a.kind == KIND_ULTIMATE else 1.0)
+                if strength > best:
+                    best, where = strength, "%s (%+g%% healing received)" % (a.name, s.value)
+    return best, where
+
+
 def features(h: Hero, support_hps: float) -> Features:
     """The facts every mechanism reads of one hero. support_hps is the
     roster's best support's sustained healing, which heal_out is a share of."""
@@ -440,7 +453,7 @@ def features(h: Hero, support_hps: float) -> Features:
     tools = mobility_tools(h.abilities)
     mobility = _clamp(sum(STRONG_MOVE if a.keywords & MOVE_STRONG else WEAK_MOVE for a in tools)
                       / MOBILITY_FULL)
-    cc_int, cc_deny, int_pieces, deny_pieces = _control(h)
+    cc_interrupt, cc_deny, interrupt_pieces, deny_pieces = _control(h)
     ult_channels = [a.name for a in h.abilities
                     if a.kind == KIND_ULTIMATE and "channel" in a.keywords]
     channels = [a.name for a in h.abilities if a.kind == KIND_ABILITY and "channel" in a.keywords
@@ -449,14 +462,7 @@ def features(h: Hero, support_hps: float) -> Features:
                 and a.keywords & (SAVE | CLEANSE)]
     save = _clamp(sum((CLEANSE_SAVE if a.keywords & CLEANSE else INVULN_SAVE)
                       * _cd_weight(a, SAVE_CD_FULL) for a in saves))
-    antiheal, antiheal_piece = 0.0, ""
-    for a in h.abilities:
-        for s in a.stats.get("healing_mod", ()):
-            if s.value is not None and s.value < 0 and s.condition != "allies":
-                strength = -s.value / 100.0 * (ULT if a.kind == KIND_ULTIMATE else 1.0)
-                if strength > antiheal:
-                    antiheal, antiheal_piece = strength, "%s (%+g%% healing received)" % (
-                        a.name, s.value)
+    antiheal, antiheal_piece = _antiheal(h)
     own = h.self_heal + SELF_HPS_SECONDS * h.self_hps + LIFESTEAL_SECONDS * h.lifesteal * h.dps
     self_sustain = _clamp(own / h.pool) if h.pool else 0.0
     heal_out = _clamp(h.hps / support_hps) if support_hps else 0.0
@@ -466,16 +472,24 @@ def features(h: Hero, support_hps: float) -> Features:
     barrier, barrier_piece = max(barriers, default=(0.0, ""))
     pierce, pierce_piece = _pierce(steady, h.abilities)
     eater, eater_piece, eater_family = _eater(h)
-    hit = (max(main.hits() or [0.0]) or _per_hit(main) or 0.0) if main else 0.0
-    instance = (_per_hit(main) or hit or 1.0) if main else 0.0
-    main_kind = _kind(main) if main else "none"
+    # the main weapon's hit, and what armor and each eater family take of it
+    if main is not None:
+        hit = max(main.hits() or [0.0]) or _per_hit(main) or 0.0
+        instance = _per_hit(main) or hit or 1.0
+        main_kind = _kind(main)
+        armor_loss = _armor_loss(main, main_kind, instance)
+        taken = _clamp(hit / EAT_FULL_HIT, EAT_SMALL_SHARE)
+        eaten = _flag(main, "ignores_matrix") * taken
+        deflected = _flag(main, "ignores_deflect") * taken
+    else:
+        hit = instance = armor_loss = eaten = deflected = 0.0
+        main_kind = "none"
     armor = h.armor + h.form_armor
     return Features(
         id=h.id, name=h.name, role=h.role, subrole=h.subrole, pool=h.pool, armor=armor,
         armor_share=armor / (h.pool + h.form_armor) if h.pool else 0.0, dps=h.dps,
         burst=burst, burst_piece=burst_piece, melee_only=h.melee_only, main=main,
-        main_kind=main_kind, main_hit=hit, instance=instance,
-        armor_loss=_armor_loss(main, main_kind, instance) if main else 0.0,
+        main_kind=main_kind, main_hit=hit, instance=instance, armor_loss=armor_loss,
         range=reach, range_weapon=range_weapon, aa=aa, aa_weapon=aa_weapon, aa_kind=aa_kind,
         aa_reach=aa_reach, flight=flight, flight_piece=flight_piece, mobility=mobility,
         mobile=_clamp((mobility - MOBILE_FROM) / (1.0 - MOBILE_FROM)),
@@ -483,20 +497,17 @@ def features(h: Hero, support_hps: float) -> Features:
         diver=1.0 if h.subrole in DIVERS else 0.0,
         escape=tuple(sorted(a.name for a in h.abilities if a.kind == KIND_ABILITY
                             and a.keywords & SAVE and not a.for_allies)),
-        cc_int=cc_int, cc_deny=cc_deny, cc_int_pieces=int_pieces, cc_deny_pieces=deny_pieces,
+        cc_interrupt=cc_interrupt, cc_deny=cc_deny, cc_interrupt_pieces=interrupt_pieces,
+        cc_deny_pieces=deny_pieces,
         channel=CHANNEL_ULT * bool(ult_channels) + CHANNEL_ABILITY * bool(channels),
         channel_pieces=tuple(ult_channels + channels), save=save,
         save_pieces=tuple(a.name for a in saves),
         antiheal=_clamp(antiheal), antiheal_piece=antiheal_piece, self_sustain=self_sustain,
-        heal_out=heal_out, heal_rel=max(self_sustain, heal_out), barrier=barrier,
+        heal_out=heal_out, heal_reliance=max(self_sustain, heal_out), barrier=barrier,
         barrier_piece=barrier_piece,
         barrier_share=barrier / (barrier + h.pool) if barrier else 0.0, pierce=pierce,
         pierce_piece=pierce_piece, eater=eater, eater_piece=eater_piece,
-        eater_family=eater_family,
-        eaten=_flag(main, "ignores_matrix") * _clamp(hit / EAT_FULL_HIT, EAT_SMALL_SHARE)
-        if main else 0.0,
-        deflected=_flag(main, "ignores_deflect") * _clamp(hit / EAT_FULL_HIT, EAT_SMALL_SHARE)
-        if main else 0.0,
+        eater_family=eater_family, eaten=eaten, deflected=deflected,
         projectile_main=main_kind == "projectile",
         percent_ult=next((u.name for u in h.ults if any(
             s.unit_num == "percent" for s in u.stats.get("damage", ()))), ""),
@@ -579,7 +590,7 @@ def m_antiheal(win: Features, lose: Features) -> Reading:
     what = ("self-sustain %.0f%% of its pool" % (100 * lose.self_sustain)
             if lose.self_sustain >= lose.heal_out else "healing %.0f%% of the best support's"
             % (100 * lose.heal_out))
-    return Reading(win.antiheal * lose.heal_rel, "anti-heal against its healing",
+    return Reading(win.antiheal * lose.heal_reliance, "anti-heal against its healing",
                    "%s; %s's %s" % (win.antiheal_piece, lose.name, what))
 
 
@@ -595,11 +606,11 @@ def m_burst(win: Features, lose: Features) -> Reading:
 
 
 def m_cc(win: Features, lose: Features) -> Reading:
-    interrupt = win.cc_int * lose.channel * _reachable(win, lose)
+    interrupt = win.cc_interrupt * lose.channel * _reachable(win, lose)
     deny = win.cc_deny * lose.mobile * _reachable(win, lose)
     if interrupt >= deny:
         return Reading(interrupt, "control against its channel", "%s; %s channels %s" % (
-            ", ".join(win.cc_int_pieces), lose.name, ", ".join(lose.channel_pieces)))
+            ", ".join(win.cc_interrupt_pieces), lose.name, ", ".join(lose.channel_pieces)))
     return Reading(deny, "control against its mobility", "%s; %s moves with %s" % (
         ", ".join(win.cc_deny_pieces), lose.name, ", ".join(lose.mobility_pieces)))
 
@@ -656,11 +667,11 @@ def m_dive(win: Features, lose: Features) -> Reading:
 
 
 def m_save(win: Features, lose: Features) -> Reading:
-    reliance = max(lose.antiheal, lose.cc_int, BURST_SAVE * lose.oneshot_risk)
+    reliance = max(lose.antiheal, lose.cc_interrupt, BURST_SAVE * lose.oneshot_risk)
     if reliance == lose.antiheal:
         phrase, what = "saves against its anti-heal", lose.antiheal_piece
-    elif reliance == lose.cc_int:
-        phrase, what = "saves against its control", ", ".join(lose.cc_int_pieces)
+    elif reliance == lose.cc_interrupt:
+        phrase, what = "saves against its control", ", ".join(lose.cc_interrupt_pieces)
     else:
         phrase, what = "saves against its burst", "a %.0f hit" % lose.burst
     return Reading(win.save * reliance, phrase, "%s; %s's %s" % (
