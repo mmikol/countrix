@@ -253,7 +253,7 @@ class Solver(Objective):
             where = ("around the locked picks" if self.locked
                      else "on this stage" if self.stage else "on this board")
             raise Infeasible("no composition satisfies the limits %s - relax a constraint in"
-                             " inference/strategies/" % where)
+                             " the playbook" % where)
         return Solved(self, [self.hydrate(c) for _, c in goal.items], goal.k)
 
     def outranking(self, target: Candidate, cap: int | None = None) -> int | None:
@@ -337,7 +337,7 @@ class Solver(Objective):
         if self.leaves > SCORE_BUDGET:
             raise Unbounded("the search scored %d sixes without proving its answer - a"
                             " playbook term the bound cannot narrow; tighten it in"
-                            " inference/strategies/" % SCORE_BUDGET)
+                            " the playbook" % SCORE_BUDGET)
         cand = self.prepare(Candidate(walk.space.heroes[i] for i in frame.picks))
         if cand.violations:
             return
@@ -351,7 +351,7 @@ class Solver(Objective):
         if self.nodes > NODE_BUDGET:
             raise Unbounded("the search walked %d branches without proving its answer - a"
                             " playbook term the bound cannot narrow; tighten it in"
-                            " inference/strategies/" % NODE_BUDGET)
+                            " the playbook" % NODE_BUDGET)
 
 
 def evaluate_comp(solved: Solved, heroes: Sequence[Hero]) -> Evaluated:
