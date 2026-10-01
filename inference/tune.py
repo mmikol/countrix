@@ -282,10 +282,15 @@ def _stamp() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%MZ")
 
 
-def _where(directory: str | None) -> tuple[str, str]:
-    """The playbook in force and its log: (directory, log path)."""
-    directory = directory or catalog_module.strategies_dir()
-    return directory, os.path.join(directory, "tuning-log.md")
+def _playbook_dir(directory: str | None) -> str:
+    """The playbook in force: `directory`, else the folder the catalog
+    reads (catalog.strategies_dir)."""
+    return directory or catalog_module.strategies_dir()
+
+
+def _log_path(directory: str | None) -> str:
+    """The tuning log beside the playbook in force."""
+    return os.path.join(_playbook_dir(directory), "tuning-log.md")
 
 
 def _document(directory: str, loaded: list[Strategy]) -> None:
@@ -294,13 +299,13 @@ def _document(directory: str, loaded: list[Strategy]) -> None:
         catalog_module.write_docs(loaded)
 
 
-def _reason(reason: str, message: str) -> None:
+def _check_reason(reason: str, message: str) -> None:
     """Every change is logged with why: a blank reason is refused."""
     if not reason or not reason.strip():
         raise TuneError(message)
 
 
-def _existing(directory: str, sid: str) -> str:
+def _strategy_path(directory: str, sid: str) -> str:
     """The path of the strategy file sid names, or a TuneError."""
     if not catalog_module.ID_RE.fullmatch(sid or ""):
         raise TuneError("no strategy %r" % sid)          # ids are kebab: no paths here
@@ -310,51 +315,61 @@ def _existing(directory: str, sid: str) -> str:
     return path
 
 
+def _write_whole(path: str, text: str) -> None:
+    """A playbook file's new text, written into a .part file beside it and
+    renamed over it once whole: a write cut short raises and leaves the old
+    file as it was. The .part name is no strategy file's, so the catalog
+    never reads it."""
+    part = path + ".part"
+    with open(part, "w", encoding="utf-8") as handle:
+        handle.write(text)
+    os.replace(part, path)
+
+
 def _commit(directory: str, sid: str, text: str,
             what: Callable[[Strategy], str], reason: str,
             by: str) -> tuple[Strategy, str]:
     """The one write order: the catalog loaded with the new text, the file
-    written, the docs regenerated, one line logged -> (the strategy as loaded,
-    the line). `what` words the change from the loaded strategy; it is a
-    callable because a pair's text can hold an expression's %, which a
-    %-template would misread. A file the catalog never reads, the markdown
-    beside the playbook, is refused before anything is written. The reason
-    and who asked are folded onto one line, as str.split() splits - every
-    break str.splitlines() knows included - so neither opens a second log
-    line; who asked is cut to MAX_BY characters, and a blank one is
-    BY_SESSION."""
+    written whole, the docs regenerated, one line logged (_append_log_line)
+    -> (the strategy as loaded, the line). `what` words the change from the
+    loaded strategy; it is a callable because a pair's text can hold an
+    expression's %, which a %-template would misread. A file the catalog
+    never reads, the markdown beside the playbook, is refused before
+    anything is written."""
     loaded = _trial_load(directory, sid, text)
     strategy = next((s for s in loaded if s.id == sid), None)
     if strategy is None:
         raise TuneError("%s.md lives beside the playbook and is not a strategy" % sid)
-    with open(os.path.join(directory, sid + ".md"), "w", encoding="utf-8") as handle:
-        handle.write(text)
+    _write_whole(os.path.join(directory, sid + ".md"), text)
     _document(directory, loaded)
-    return strategy, _logged(directory, sid, what(strategy), reason, by)
+    return strategy, _append_log_line(directory, sid, what(strategy), reason, by)
 
 
-def _logged(directory: str, sid: str, what: str, reason: str, by: str) -> str:
+def _append_log_line(directory: str, sid: str, what: str, reason: str, by: str) -> str:
     """One accepted change's line, appended to the log beside the playbook
-    -> the line: the reason and who asked folded onto it (_commit)."""
+    -> the line. The reason and who asked are folded onto it, as str.split()
+    splits - every break str.splitlines() knows included - so neither opens
+    a second log line; who asked is cut to MAX_BY characters, and a blank
+    one is BY_SESSION."""
     by = " ".join(by.split())[:MAX_BY] or BY_SESSION
     line = "- %s `%s` %s (%s) [%s]" % (_stamp(), sid, what, " ".join(reason.split()), by)
-    _log(_where(directory)[1], line)
+    _log(_log_path(directory), line)
     return line
 
 
 # --- the three changes -------------------------------------------------------------
 
 def tune(
-        strategy_id: str, field: str, value: object, reason: str, directory: str | None = None,
-        by: str = BY_SESSION) -> Change:
+        strategy_id: str, field: str, value: object, reason: str, *,
+        directory: str | None = None, by: str = BY_SESSION) -> Change:
     """Apply one change -> the field's old and new text and the log line.
     The id META changes one of meta.md's fields - a weight or the swap
     cost - or its prose (_tune_meta)."""
-    directory = _where(directory)[0]
-    _reason(reason, "a tuning change needs a reason")
+    directory = _playbook_dir(directory)
+    _check_reason(reason, "a tuning change needs a reason")
     if strategy_id == META:
         return _tune_meta(directory, field, value, reason, by)
-    path = _existing(directory, strategy_id)
+    path = _strategy_path(directory, strategy_id)
     if field == PROSE_FIELD:
         with open(path, encoding="utf-8") as handle:
             rewritten, prose = _strategy_prose(strategy_id, handle.read(), value)
@@ -456,15 +471,14 @@ def _tune_meta(directory: str, field: str, value: object, reason: str, by: str) 
         loaded = catalog_module.load(directory)
     except CatalogError as error:
         raise TuneError(str(error)) from error
-    with open(path, "w", encoding="utf-8") as handle:
-        handle.write(text)
+    _write_whole(path, text)
     _document(directory, loaded)
-    line = _logged(directory, META, seeded + what, reason, by)
+    line = _append_log_line(directory, META, seeded + what, reason, by)
     return {"id": META, "field": field, "old": old, "new": new, "line": line}
 
 
 def complete(
-        strategy_id: str, fields: Mapping[str, object] | None, reason: str,
+        strategy_id: str, fields: Mapping[str, object] | None, reason: str, *,
         directory: str | None = None, by: str = BY_SESSION,
         unset: Sequence[str] = ()) -> Completion:
     """Set several frontmatter fields at once - what /strategy infers for a
@@ -473,9 +487,9 @@ def complete(
     and what went. A heuristic moving from a metric to a bonus or penalty
     drops its metric and direction in the same write, so no half-moved file
     is ever read; its name and kind stay."""
-    directory = _where(directory)[0]
-    _reason(reason, "an inferred strategy needs a reason")
-    path = _existing(directory, strategy_id)
+    directory = _playbook_dir(directory)
+    _check_reason(reason, "an inferred strategy needs a reason")
+    path = _strategy_path(directory, strategy_id)
     pairs = [(f, _coerce(f, v)) for f, v in _flatten(fields)]
     gone = list(dict.fromkeys(unset))
     removable = [f for f in TUNABLE if f not in ("kind", "category")]
@@ -533,8 +547,8 @@ def add(strategy_id: str, name: str, kind: str, body: str, fields: Mapping[str, 
     validated through the catalog before it exists and logged with its reason
     -> its form, path and log line. The file opens in category general; a
     category among the fields sets it in place, like any other field."""
-    directory = _where(directory)[0]
-    _reason(reason, "a new strategy needs a reason")
+    directory = _playbook_dir(directory)
+    _check_reason(reason, "a new strategy needs a reason")
     _check_new(strategy_id, name, kind, body)
     path = os.path.join(directory, strategy_id + ".md")
     if os.path.exists(path):
@@ -552,10 +566,11 @@ def add(strategy_id: str, name: str, kind: str, body: str, fields: Mapping[str, 
     return {"id": strategy_id, "form": strategy.form, "path": path, "line": line}
 
 
-def log_tail(n: int = 20, log_path: str | None = None) -> list[str]:
-    """The last n lines of the log beside the playbook in force; none for n
-    below 1."""
-    log_path = log_path or _where(None)[1]
+def log_tail(n: int = 20, directory: str | None = None) -> list[str]:
+    """The last n lines of the log beside `directory`, else beside the
+    playbook in force, located as the writers locate it; none for n below
+    1."""
+    log_path = _log_path(directory)
     if not os.path.exists(log_path):
         return []
     with open(log_path, encoding="utf-8") as handle:
