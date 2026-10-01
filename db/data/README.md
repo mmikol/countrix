@@ -23,7 +23,7 @@ the rows land, this folder is how they get there.
 | --- | --- |
 | [door/mcp/pulls.py](../../door/mcp/pulls.py) | calls every `run()`: one `pull_*` tool per source and domain, and `sync_all` over them all. Outside the tests, nothing else calls one |
 | `db/psql/` | lends the runs the helpers they write with: `register_source`, `lookup_ids`, `identifier`, `scalar`, `now` and `current_patch` |
-| `facts/` | imports only `normalizer` from this folder - `name_key` in `tables.py` and `model.py`, `ability_key` in `kit_format.py` - to key a name the way the pulls keyed it |
+| `facts/` | imports only `normalizer` from this folder - `name_key` in `draft.py`, `tables.py` and `model.py`, `ability_key` in `kit_format.py` - to key a name the way the pulls keyed it |
 | the rest | reads the tables over `db.psql.default_dsn()`, never this folder |
 
 The layer rule has three consequences here. Nothing in this folder imports
@@ -70,42 +70,10 @@ the rows in one transaction and returns a summary of what it wrote.
 
 ## The files
 
-```
-db/data/
-  __init__.py             the package map; PullSummary, ArticlePullSummary
-  README.md               this file
-  cache.py                the page cache, its freshness, the request loop
-  normalizer.py           one hero, map or ability name across sources
-  blizzard/               overwatch.blizzard.com
-    __init__.py           the endpoints, the sources row, BlizzardError
-    heroes.py             pull_heroes: the roster and each hero page
-    meta.py               pull_rates: the rates page as a dated snapshot
-  wiki/                   overwatch.fandom.com, through its MediaWiki API
-    __init__.py           the client: Cargo, wikitext, fetch_articles
-    markup.py             the wiki's two markups, and the tidying both need
-    matchup_tables.py     a hero article's Match-Ups and Team Synergy tables
-    strategy_sections.py  a hero article's Strategy section, as edges
-    heroes.py             pull_kits: the Cargo kit table and hero articles
-    maps.py               pull_maps: modes, maps and stages
-    terrain.py            pull_terrain: each map article's ground, counted
-    patches.py            pull_patches: the game versions
-    playstyles.py         pull_playstyles: dive, brawl, poke
-    synergies.py          pull_synergies: the Team Synergy column
-    matchups.py           pull_counters: the Match-Up column and Strategy
-    kits/                 the kit pipeline pull_kits runs
-      __init__.py         the pipeline's map
-      kit_rows.py         a Cargo row -> a weapon, ability or perk entry
-      hero_articles.py    an article -> the stats Cargo lacks, the pools
-      six_a_side.py       an article -> its 6v6 kit
-      measurements.py     a stat value -> its measurements
-      weapons.py          firing modes grouped into weapons
-      kit_store.py        the kits into the tables
-```
-
-A module a pull tool runs ends in `run()`. The others read markup or
-serve the one that stores, and hold no `run()` of their own. Every
-package's `__init__.py` maps its files, and every module's docstring says
-what it reads.
+Each package's `__init__.py` maps its files - `db/data/`, `blizzard/`,
+`wiki/` and `wiki/kits/` - and every module's docstring says what it
+reads. A module a pull tool runs ends in `run()`. The others read markup
+or serve the one that stores, and hold no `run()` of their own.
 
 ## The pull contract
 
@@ -385,7 +353,7 @@ an ability kind, a perk tier - needs no key.
 
 | name | used by |
 | --- | --- |
-| `name_key` | `blizzard/meta.py` (heroes and maps), `wiki/heroes.py`, `wiki/playstyles.py`, `wiki/synergies.py`, `wiki/matchups.py`, `wiki/strategy_sections.py`, `wiki/kits/kit_store.py`; `facts/tables.py` and `facts/model.py` |
+| `name_key` | `blizzard/meta.py` (heroes and maps), `wiki/heroes.py`, `wiki/playstyles.py`, `wiki/synergies.py`, `wiki/matchups.py`, `wiki/strategy_sections.py`, `wiki/kits/kit_store.py`; `facts/draft.py`, `facts/tables.py` and `facts/model.py` |
 | `index` | `blizzard/meta.py`, `wiki/heroes.py`, `wiki/playstyles.py`, `wiki/synergies.py`, `wiki/matchups.py`: every pull that looks a name up against a table |
 | `hero_key` | `wiki/synergies.py` and `wiki/matchups.py`, for a teammate or an enemy the wiki writes by a former name |
 | `RENAMED`, `unaccented` | `wiki/matchups.py`: the names the prose may call a hero |
@@ -793,18 +761,13 @@ The tool reference is [docs/mcp.md](../../docs/mcp.md).
 
 ## The tests
 
-`tests/verification/db/` mirrors the folder. No test here touches the
-network, and all but one run without a database.
-
-| file | what it holds |
-| --- | --- |
-| `test_cache.py` | the page cache and the request loop: refetch before a cutoff, the stale copy kept, a rate limit retried, an article asked for once |
-| `blizzard/`, `wiki/` | one file per reader or pull |
-| `recording.py` | `RecordingCursor` and its connection: a stand-in for Postgres that records every statement a store issues, with its parameters |
-| `test_pull_stores.py` | every pull's `run()` over a recording connection and a page cache in `tmp_path`: the parameters it writes, its commits, its summary |
-| `test_transforms.py` | the pure functions the pulls lean on: the measurement, name and map readers |
-| `test_authored_inputs.py` | the two hand-written inputs, and that no pull reads a third source |
-| `test_sources_from_cache.py` | invariant: every pull run from the real page caches in a transaction rolled back at the end; skipped without the caches or the database |
+`tests/verification/db/` holds the layer's tests, one file per reader or
+pull under `blizzard/` and `wiki/`. `test_pull_stores.py` runs every
+pull's `run()` over `recording.py`'s connection, a stand-in for Postgres
+that records every statement a store issues with its parameters, and
+`test_sources_from_cache.py` runs every pull from the real page caches in
+a transaction rolled back at the end. No test touches the network. A test
+marked `invariant` needs the built database and skips without one.
 
 ```bash
 .venv/bin/python -m pytest -q tests/verification/db -m 'not invariant'   # the folder's tests, no database

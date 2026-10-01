@@ -55,7 +55,8 @@ def copy_of(tmp_path):
 
 def test_every_relative_link_in_the_docs_resolves():
     broken = []
-    for doc in ["README.md", *sorted("docs/" + n for n in os.listdir(DOCS) if n.endswith(".md"))]:
+    docs = sorted("docs/" + n for n in os.listdir(DOCS) if n.endswith(".md"))
+    for doc in ["README.md", "db/data/README.md", *docs]:
         base = os.path.dirname(os.path.join(ROOT, doc))
         for target in LINK_RE.findall(_read(doc)):
             if target.startswith(("http://", "https://", "mailto:")):
