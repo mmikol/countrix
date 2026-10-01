@@ -22,7 +22,8 @@ def test_a_playbook_that_scores_nothing_reads_unscored(synthetic_world):
     limit_only = [h for h in reference if h.form == "limit"]
     assert limit_only and not any(s.weighs for s in limit_only)
     draft = Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm", "Anvil"))
-    b = engine.board(world, draft, catalog=limit_only, brief=engine.Brief(base=OFF, swaps=False))
+    b = engine.board(world, draft, catalog=limit_only,
+                     brief=engine.Brief(base=OFF, search_swaps=False))
     d = b.to_dict()
     for key in ("blue", "red"):                     # the optimal is the reference: 100, always
         assert d[key]["scoring"] is True and d[key]["normalized"] == 100

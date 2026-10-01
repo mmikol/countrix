@@ -193,7 +193,7 @@ def test_every_seat_of_a_board_is_the_enumerated_maximum(synthetic_world, base):
     for draft in (Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm", "Rook"), side="attack"),
                   Draft("Ember Ruins", ("Anvil",), ("Needle",), ("Myrrh",))):
         board = engine.board(synthetic_world, draft, catalog=playbook,
-                             brief=engine.Brief(base=base, swaps=False))
+                             brief=engine.Brief(base=base, search_swaps=False))
         blue_seat = dataclasses.replace(draft, blue=())
         red_seat = Draft(draft.map_name, draft.blue, (), draft.bans, opposite(draft.side))
         blue = seated(synthetic_world, blue_seat, playbook, base)

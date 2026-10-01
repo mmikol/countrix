@@ -195,7 +195,7 @@ def test_a_board_without_blue_picks_or_asked_for_none_has_no_swaps(synthetic_wor
                               catalog=playbook, brief=engine.Brief(base=DEFAULT, swap=5.0))
     assert open_board.swaps is None and open_board.to_dict()["swaps"] is None
     off = engine.board(synthetic_world, BOARDS["full"], catalog=playbook,
-                       brief=engine.Brief(base=DEFAULT, swap=5.0, swaps=False))
+                       brief=engine.Brief(base=DEFAULT, swap=5.0, search_swaps=False))
     assert off.swaps is None
 
 

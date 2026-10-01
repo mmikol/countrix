@@ -116,7 +116,7 @@ def handle_board(cx: psycopg.Connection, query: Query) -> web.Reply:
     try:
         with ADMISSION.admitted(superseded):
             world = tables.load(cx)
-            brief = engine.Brief(weights=weights, countered=False, superseded=superseded)
+            brief = engine.Brief(weights=weights, solve_countered=False, superseded=superseded)
             return web.Reply(engine.board(world, draft, brief=brief).to_dict(), 200)
     except BusyError as busy:
         return web.Reply({"error": str(busy)}, 429)

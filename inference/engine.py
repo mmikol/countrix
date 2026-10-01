@@ -119,12 +119,12 @@ class Brief:
     points, meta.md's (None) unless a caller names another, whether to
     search blue's swaps, and whether to walk the plan stage by stage."""
     weights: Mapping[str, float] | None = None
-    countered: bool = True
+    solve_countered: bool = True
     superseded: Callable[[], bool] | None = None
     base: BaseWeights | None = None
     swap: float | None = None
-    swaps: bool = True
-    stages: bool = True
+    search_swaps: bool = True
+    walk_stages: bool = True
 
 
 def weights_in_force(
@@ -438,7 +438,7 @@ def board(
         # a limit they already break no fill exists, and red is read off its picks
         red_fill = None
     countered = None
-    if cur.barred is None and brief.countered and draft.blue:
+    if cur.barred is None and brief.solve_countered and draft.blue:
         # a what-if: where no six answers red's six around blue's picks, it is not solved
         with contextlib.suppress(Infeasible, Unbounded):
             countered = solve.countered(dataclasses.replace(draft, red=tuple(red.result.blue)))
@@ -447,15 +447,15 @@ def board(
     mo = momentum(seats)
     # the swap cost, read once: the swaps above the picks and the chosen
     # stage's row are one answer
-    cost = swap_in_force(brief) if brief.swaps or brief.stages else 0.0
+    cost = swap_in_force(brief) if brief.search_swaps or brief.walk_stages else 0.0
     suggested = None
-    if brief.swaps and draft.blue:
+    if brief.search_swaps and draft.blue:
         suggested = solve.swaps(draft, enemy, blue, _Seat(cur, fill, mo, unsolved), cost)
     # the six the comps tab shows for blue, which the plan describes: a comp
     # that is not allowed is described by the optimal instead
     held = len(draft.blue) == TEAM_SIZE and cur.barred is None
     shown = fill if fill is not None else cur if held else blue.result
-    staged = solve.stages(m, draft, blue, shown.blue, cost, suggested) if brief.stages else []
+    staged = solve.stages(m, draft, blue, shown.blue, cost, suggested) if brief.walk_stages else []
     return Board(map_name=expected.map_name, side=draft.side, stage=draft.stage,
                  bans=list(draft.bans),
                  blue=blue.result, red=red.result, current=cur, red_current=red_cur,

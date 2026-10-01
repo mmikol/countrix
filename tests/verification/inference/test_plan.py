@@ -265,7 +265,8 @@ def test_the_plan_describes_the_six_the_comps_tab_shows(synthetic_world, scratch
 
     def board(red, blue):
         return engine.board(synthetic_world, Draft("Harbor Gate", red, blue, side="attack"),
-                            catalog=scratch_playbook, brief=engine.Brief(base=OFF, swaps=False))
+                            catalog=scratch_playbook,
+                            brief=engine.Brief(base=OFF, search_swaps=False))
     none = board(("Anvil",), ())
     assert "your pick" not in none.plan and "The six keeps" not in none.plan
     one = board(("Anvil",), ("Balm",))
