@@ -307,7 +307,7 @@ def _check_reason(reason: str, message: str) -> None:
 
 def _strategy_path(directory: str, sid: str) -> str:
     """The path of the strategy file sid names, or a TuneError."""
-    if not catalog_module.ID_RE.fullmatch(sid or ""):
+    if not catalog_module.ID_RE.fullmatch(sid):
         raise TuneError("no strategy %r" % sid)          # ids are kebab: no paths here
     path = os.path.join(directory, sid + ".md")
     if not os.path.exists(path):
@@ -514,7 +514,7 @@ def complete(
 
 def sentence_count(body: str) -> int:
     """How many sentences the prose holds - the title line and code spans aside."""
-    text = "\n".join(line for line in (body or "").splitlines() if not line.startswith("#"))
+    text = "\n".join(line for line in body.splitlines() if not line.startswith("#"))
     text = re.sub(r"`[^`]*`", "code", text)                 # `require: a == 2.` is one token
     return len(_SENTENCE_END.findall(text.strip()))
 
@@ -523,13 +523,13 @@ def _check_new(sid: str, name: str, kind: str, body: str) -> None:
     """What a new strategy must be before any file exists: a kebab id, a known
     kind, a name and prose, the name one line by the rule every field keeps,
     the prose within its length and three sentences at most."""
-    if not catalog_module.ID_RE.fullmatch(sid or ""):
+    if not catalog_module.ID_RE.fullmatch(sid):
         raise TuneError("id must be lowercase-kebab, got %r" % sid)
     if sid in catalog_module.RESERVED:
         raise TuneError("%s is %s's, the default engine's weights and the swap cost, and no"
                         " strategy's: tune changes them" % (sid, catalog_module.META_FILE))
     _coerce("kind", kind)
-    if not (name or "").strip() or not (body or "").strip():
+    if not name.strip() or not body.strip():
         raise TuneError("a strategy needs a name and its prose")
     _coerce("name", name)
     if len(body) > MAX_PROSE:

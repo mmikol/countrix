@@ -207,19 +207,18 @@ def test_the_first_sentence_is_read_uncut_whatever_its_length():
 
 def test_pairs_are_stored_once_and_scored_by_how_many_articles_claim_them():
     ids = {"ana": 1, "genji": 2, "dva": 3, "cassidy": 4}
-    pairs, unmatched = synergies.pair_up({
+    pairs = synergies.pair_up({
         "Ana": [("Genji", "Nano-Blade."), ("Ana", "Two of you."), ("Sym", "Teleport.")],
         "Genji": [("ana", "Ask for Nano Boost before you draw the blade.")],
         "D.Va": [("McCree", "Matrix his Deadeye.")],
         "Cassidy": [],
     }, ids)
     assert pairs == {(1, 2): (2, "Nano-Blade"), (3, 4): (1, "Matrix his Deadeye")}
-    assert unmatched == ["Ana: Sym"]
 
 
 def test_a_rating_alone_takes_the_note_only_where_no_claim_writes_advice():
     ids = {"ana": 1, "genji": 2, "dva": 3}
-    pairs, _ = synergies.pair_up({
+    pairs = synergies.pair_up({
         "Ana": [("Genji", ""), ("D.Va", "")],
         "Genji": [("Ana", "Ask for Nano Boost before you draw the blade.")],
     }, ids)
