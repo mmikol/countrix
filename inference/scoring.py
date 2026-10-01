@@ -284,11 +284,16 @@ class Objective:
         self.world, self.m, self.red = world, m, list(red)
         # the keep term: `swap` points for each hero of `keep`, by id, a six holds
         self.keep, self.swap = keep, swap
+        # the bans as given, which a sibling objective on this board is built
+        # from, and their ids, which the roster and the map's ban count read
+        self.banned_heroes = tuple(banned)
         self.banned = {h.id for h in banned}
         self.side, self.stage = side, stage
         self.catalog = catalog
-        # the default engine on this board; None while it is off
-        self.base = Base(world, m, red=self.red, banned=banned, weights=base) if base.on else None
+        # the default engine's weights as given, and the engine on this board,
+        # None while it is off
+        self.weights = base
+        self.engine = Base(world, m, red=self.red, banned=banned, weights=base) if base.on else None
         # each hero's tie-break draw on this board (draw)
         seed = board_seed(m, side)
         self.draws = {h.id: draw(seed, h.id) for h in world.heroes.values()}
@@ -400,8 +405,8 @@ class Objective:
             else:
                 keep(None)
         cand.raw = raw
-        if self.base is not None:
-            cand.terms = self.base.terms(cand.heroes, number(ns["team"]["synergy_score"]))
+        if self.engine is not None:
+            cand.terms = self.engine.terms(cand.heroes, number(ns["team"]["synergy_score"]))
         cand.tiebreak = sum(self.draws[h.id] for h in cand.heroes)
         return cand
 
@@ -530,7 +535,7 @@ class Objective:
         held: list[bool | None] = [None] * self.gate_slots
         contributions: list[Contribution] = []
         out = contributions if detail else None
-        total = 0.0 if self.base is None else _score_base(self.base, cand, out)
+        total = 0.0 if self.engine is None else _score_base(self.engine, cand, out)
         if self.keep:
             total += self.swap * sum(1 for h in cand.heroes if h.id in self.keep)
         if out is not None:

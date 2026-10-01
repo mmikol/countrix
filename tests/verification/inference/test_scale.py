@@ -46,10 +46,10 @@ def test_the_lean_field_measures_what_the_whole_one_does(synthetic_world, tmp_pa
     lean = seated(synthetic_world, draft, rules, DEFAULT)
     assert lean.lean_keys() == frozenset({"cc_count", "mobility_count", "range_min",
                                           "barrier_hp", "flyers"})
-    lean.freeze_bounds()
+    lean.freeze_scale()
     monkeypatch.setattr(Objective, "lean_keys", lambda self: None)
     whole = seated(synthetic_world, draft, rules, DEFAULT)
-    whole.freeze_bounds()
+    whole.freeze_scale()
     assert lean.bounds == whole.bounds and lean.floor == whole.floor
 
 

@@ -56,9 +56,8 @@ def netted(plain, picks, raw):
     for each pick it drops, best first: the answer, found without the keep
     term or the search."""
     keep = {h.id for h in picks}
-    banned = [plain.world.heroes[i] for i in plain.banned]
     out = []
-    for six in legal_sixes(plain.world, plain.catalog, (), banned):
+    for six in legal_sixes(plain.world, plain.catalog, (), plain.banned_heroes):
         cand = plain.score(plain.prepare(Candidate(six)), detail=False)
         if not cand.violations:
             out.append((cand.score - raw * len(keep - set(cand.key)), cand))
@@ -223,7 +222,7 @@ def test_the_search_ranks_a_kept_hero_first_with_the_engine_off(synthetic_world)
     playbook = catalog.load(FIXTURE_PLAYBOOK)
     draft = Draft("Harbor Gate", ("Mortar", "Gale"), ("Kite",), side="attack")
     solver = seated(synthetic_world, draft, playbook, OFF)
-    solver.freeze_bounds()
+    solver.freeze_scale()
     picks = synthetic_world.resolve(None, (), ("Kite", "Rook", "Balm", "Myrrh")).blue
     from inference.solver import Solver
     m, red, locked, banned = synthetic_world.resolve(draft.map_name, draft.red, draft.blue, ())

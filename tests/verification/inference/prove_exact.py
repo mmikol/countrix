@@ -131,7 +131,7 @@ def _solver(world: World, name: str) -> Solver:
     if not board.keep:
         solver = Solver(world, m, red=red, locked=locked, banned=banned, side=board.side,
                         catalog=catalog.load(), base=weights)
-        solver.freeze_bounds()
+        solver.freeze_scale()
         return solver
     plain = Solver(world, m, red=red, locked=(), banned=banned, side=board.side,
                    catalog=catalog.load(), base=weights)

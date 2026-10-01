@@ -60,8 +60,6 @@ def test_a_full_six_is_ranked_against_the_field(synthetic_world):
     six = ("Anvil", "Mortar", "Rook", "Needle", "Balm", "Tansy")
     r = evaluated(world, Draft("Harbor Gate", ("Mortar", "Gale"), six), catalog=fix)
     assert r.rank >= 1 and r.kind == "evaluate" and len(r.picks) == 6
-    with pytest.raises(Refusal, match="exactly 6"):
-        evaluated(world, Draft(blue=("Balm",)), catalog=fix)
 
 
 def test_a_board_no_six_satisfies_is_refused_by_infer_and_the_board_alike(

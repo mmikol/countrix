@@ -94,12 +94,10 @@ def keeping(plain: Solver, picks: Sequence[Hero], cost: float,
     nothing locked - with `cost` points, the raw cost, for each of `picks`
     a six keeps, on `plain`'s scale: its bounds and its floor; on `stage`
     where given, else on `plain`'s."""
-    solver = Solver(plain.world, plain.m, red=plain.red, locked=(),
-                    banned=[plain.world.heroes[i] for i in sorted(plain.banned)],
+    solver = Solver(plain.world, plain.m, red=plain.red, locked=(), banned=plain.banned_heroes,
                     side=plain.side, stage=plain.stage if stage is None else stage,
-                    catalog=plain.catalog,
-                    base=plain.base.weights if plain.base is not None else OFF,
-                    check=plain.check, keep=frozenset(h.id for h in picks), swap=cost)
+                    catalog=plain.catalog, base=plain.weights, check=plain.check,
+                    keep=frozenset(h.id for h in picks), swap=cost)
     solver.adopt_scale(plain)
     return solver
 
@@ -114,11 +112,7 @@ def search(
     search is exact over every legal six; Unbounded past its budget."""
     solver = keeping(plain, picks, cost)
     keep = solver.keep
-    solved = solver.solve(top=1)
-    if not solved.ranked:
-        raise Infeasible("no composition satisfies the limits on this board - relax a"
-                         " constraint in inference/strategies/")
-    best = solved.ranked[0]
+    best = solver.solve(top=1).ranked[0]
     gains = not keep <= set(best.key)
     if gains and keeper is not None:
         kept = solver.score(solver.prepare(Candidate(keeper)), detail=False)
@@ -227,10 +221,7 @@ def leg(solver: Solver, reference: Sequence[Hero], memo: Memo) -> Leg:
     if key in memo:
         return memo[key]
     ref = solver.score(solver.prepare(Candidate(reference)))
-    solved = solver.solve(top=1)
-    if not solved.ranked:
-        raise Infeasible("no composition satisfies the limits on this stage")
-    best = solved.ranked[0]
+    best = solver.solve(top=1).ranked[0]
     gains = not solver.keep <= set(best.key) and (
         bool(ref.violations) or quantized(best.score) > quantized(ref.score))
     six = solver.score(solver.prepare(Candidate(best.heroes))) if gains else ref
@@ -344,9 +335,8 @@ def chain(p: Plan, memo: Memo | None = None) -> list[StageRow]:
         reference = previous if kind == "phase" else p.origin
         index = (phases.index(name) + 1, len(phases)) if kind == "phase" else (0, 0)
         if current:
-            here = Objective(p.plain.world, m, red=p.plain.red, banned=[
-                p.plain.world.heroes[i] for i in sorted(p.plain.banned)],
-                side=p.plain.side, stage=name, catalog=p.plain.catalog, base=OFF)
+            here = Objective(p.plain.world, m, red=p.plain.red, banned=p.plain.banned_heroes,
+                             side=p.plain.side, stage=name, catalog=p.plain.catalog, base=OFF)
             rules = ruled(here, p.whole)
             # the board's own swap answer on this stage, one answer with the
             # swaps above the picks; where none was searched, the origin

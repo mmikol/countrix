@@ -61,8 +61,7 @@ def enumerated(solver):
     """Every legal six of a solver's board that keeps the limits, scored by
     the solver's own objective and ranked: the answer the search must give,
     found without it."""
-    banned = [solver.world.heroes[i] for i in solver.banned]
-    sixes = legal_sixes(solver.world, solver.catalog, solver.locked, banned)
+    sixes = legal_sixes(solver.world, solver.catalog, solver.locked, solver.banned_heroes)
     scored = [solver.score(solver.prepare(Candidate(six)), detail=False) for six in sixes]
     return sorted((c for c in scored if not c.violations), key=rank_key)
 
@@ -170,7 +169,7 @@ def test_the_search_reaches_the_enumerated_maximum(synthetic_world, catalog_copy
                 missed.append("%s, keeping %s: %s" % (draft, KEEP, verdicts(ranked)[:2]))
             pruned = pruned or solver.leaves < len(full)
             assert solver.considered == len(legal_sixes(
-                world, playbook, solver.locked, [world.heroes[i] for i in solver.banned]))
+                world, playbook, solver.locked, solver.banned_heroes))
             if world is together:
                 assert {a.name, b.name} <= set(full[0].names)   # the pair pays, and is fielded
             top = engine.infer(world, draft, catalog=playbook, top=K - 1, base=base)
@@ -198,12 +197,12 @@ def test_every_seat_of_a_board_is_the_enumerated_maximum(synthetic_world, base):
         red_seat = Draft(draft.map_name, draft.blue, (), draft.bans, opposite(draft.side))
         blue = seated(synthetic_world, blue_seat, playbook, base)
         red = seated(synthetic_world, red_seat, playbook, base)
-        blue.freeze_bounds()
-        red.freeze_bounds()
+        blue.freeze_scale()
+        red.freeze_scale()
         theirs = Draft(draft.map_name, draft.blue, draft.red, draft.bans, opposite(draft.side))
         against = dataclasses.replace(draft, red=tuple(board.red.blue), blue=())
         countered = seated(synthetic_world, against, playbook, base)
-        countered.freeze_bounds()
+        countered.freeze_scale()
         seats = [(board.blue, blue), (board.red, red),
                  (board.fill, seated(synthetic_world, draft, playbook, base, blue)),
                  (board.countered, seated(synthetic_world, dataclasses.replace(
@@ -472,7 +471,7 @@ def test_a_ban_does_not_rescale_the_board(synthetic_world):
         m, red_h, _, bans_h = world.resolve("Harbor Gate", red, [], bans)
         solver = solver_module.Solver(world, m, red=red_h, locked=[], banned=bans_h,
                                       side="attack", catalog=catalog, base=DEFAULT)
-        solver.freeze_bounds()
+        solver.freeze_scale()
         cand = solver.prepare(scoring.Candidate([world.hero(n) for n in six]))
         return solver.score(cand, detail=False).score
 
@@ -566,7 +565,7 @@ def test_the_floor_is_the_lowest_reference_six(synthetic_world):
     playbook = catalog.load(FIXTURE_PLAYBOOK)
     solver = solver_module.Solver(world, m, red=red, locked=[], side="attack",
                                   catalog=playbook, base=DEFAULT)
-    solver.freeze_bounds()
+    solver.freeze_scale()
     scores = [solver.score(c, detail=False).score for c in scale._prepared(solver)]
     assert solver.floor == min(scores) < max(scores)
     fill = solver_module.Solver(world, m, red=red, locked=locked, side="attack",
@@ -613,7 +612,7 @@ def test_every_stage_of_a_map_shares_one_scale_and_reads_its_own_floor(
                                     base=DEFAULT)
         for stage in ("", "Courtyard", "Forge")}
     for solver in solvers.values():
-        solver.freeze_bounds()
+        solver.freeze_scale()
     assert [solvers[s].gates["hazard-cc"] for s in solvers] == [False, False, True]
     assert [solvers[s].reads_the_stage() for s in solvers] == [False, False, True]
     assert solvers[""].bounds == solvers["Courtyard"].bounds == solvers["Forge"].bounds
