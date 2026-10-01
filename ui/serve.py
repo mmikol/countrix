@@ -2,9 +2,9 @@
 process: handle_board, both seats and the current comp; handle_strategies,
 the catalog and the default engine's weights; and handle_health, the
 catalog's size and the database's state. ADMISSION holds the boards in
-flight to BOARDS_AT_ONCE, and a newer board from the same client
-supersedes one still solving. A handler that raises is answered at
-the board's request boundary, by db.web.failure.
+flight to BOARDS_AT_ONCE, and LATEST keeps a lane per client, where a newer
+board from the client supersedes one still solving. A handler that raises
+is answered at the board's request boundary, by db.web.failure.
 """
 
 import contextlib
@@ -81,6 +81,8 @@ class Admission:
 
 # the boards in flight in the board's process
 ADMISSION = Admission()
+# the page's boards, one lane per client
+LATEST = supersede.Latest()
 
 
 class Health(TypedDict):
@@ -110,7 +112,7 @@ def handle_board(cx: psycopg.Connection, query: Query) -> web.Reply:
     the lane is taken, so a malformed one supersedes nothing."""
     draft = parse_board(query)
     weights = catalog_module.parse_weights(query.get("weights", []))
-    superseded = supersede.LATEST.take(_first(query, "client") or "")
+    superseded = LATEST.take(_first(query, "client") or "")
     try:
         with ADMISSION.admitted(superseded):
             world = tables.load(cx)
