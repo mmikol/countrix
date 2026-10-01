@@ -154,4 +154,4 @@ def handle_health() -> web.Reply:
         errors.append(str(error))
     if errors:
         out["status"], out["error"] = "degraded", "; ".join(errors)
-    return web.Reply(dict(out), 200)
+    return web.Reply(out, 200)

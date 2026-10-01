@@ -39,8 +39,9 @@ LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "0.0.0.0"})  # nosec B
 
 class Reply(NamedTuple):
     """A JSON reply: its body, a JSON object, and its HTTP status - what every
-    JSON route of the board answers, and failure()."""
-    body: dict[str, object]
+    JSON route of the board answers, and failure(). The body is a Mapping,
+    so a route's typed record rides as it is, uncopied."""
+    body: Mapping[str, object]
     status: int
 
 
