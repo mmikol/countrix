@@ -98,7 +98,7 @@ class Bound:
     def __init__(self, objective: Objective, space: Space) -> None:
         self.space = space
         heroes = space.heroes
-        base = objective.base
+        base = objective.engine
         pool = space.candidates
         self.own: list[float] | None = None
         self.pairs: list[list[float]] | None = None

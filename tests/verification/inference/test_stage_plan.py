@@ -71,8 +71,7 @@ def reachable(plain, stage, reference, raw):
     of the stage scored on the board's scale less `raw` a reference hero
     dropped; the reference itself where no six beats it."""
     solver = Solver(plain.world, plain.m, red=plain.red, locked=(), side=plain.side,
-                    stage=stage, catalog=plain.catalog,
-                    base=plain.base.weights if plain.base is not None else OFF)
+                    stage=stage, catalog=plain.catalog, base=plain.weights)
     solver.adopt_scale(plain)
     heroes = plain.world.resolve(None, (), tuple(reference)).blue
     ref = solver.score(solver.prepare(Candidate(heroes)), detail=False)

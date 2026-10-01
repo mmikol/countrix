@@ -204,9 +204,9 @@ class Solver(Objective):
 
     # --- the scale ----------------------------------------------------------------
 
-    def freeze_bounds(self) -> None:
-        """Bounds per heuristic from the reference sample and the field, and
-        the sample's floor."""
+    def freeze_scale(self) -> None:
+        """The board's scale: each heuristic's low and high from the
+        reference sample and the field, and the sample's floor."""
         self.floor = scale.freeze(self)
         self._frozen, self._bound = True, None
 
@@ -230,7 +230,7 @@ class Solver(Objective):
     def _walker(self) -> Bound:
         """The bound over this board's space, built once the scale is frozen."""
         if not self._frozen:
-            self.freeze_bounds()
+            self.freeze_scale()
         if self._bound is None:
             space = Space(self, self.locked, roster(self.world, self.locked, self.banned))
             self._bound = Bound(self, space)
@@ -249,9 +249,15 @@ class Solver(Objective):
     # --- the search -------------------------------------------------------------------
 
     def solve(self, top: int = 5) -> Solved:
-        """The `top` best legal sixes, exactly, in rank order, hydrated."""
+        """The `top` best legal sixes, exactly, in rank order, hydrated;
+        Infeasible where the search proves there is none."""
         goal = _Best(max(1, top))
         self._search(goal)
+        if not goal.items:
+            where = ("around the locked picks" if self.locked
+                     else "on this stage" if self.stage else "on this board")
+            raise Infeasible("no composition satisfies the limits %s - relax a constraint in"
+                             " inference/strategies/" % where)
         return Solved(self, [self.hydrate(c) for _, c in goal.items], goal.k)
 
     def outranking(self, target: Candidate, cap: int | None = None) -> int | None:
@@ -357,12 +363,8 @@ def evaluate_comp(solved: Solved, heroes: Sequence[Hero]) -> Evaluated:
     six in the order the search lists them (scoring.rank_key): from the
     search's own top K where the six reaches it, else by outranking(); a
     count past its budget leaves it unranked. A six that ties the optimal's
-    score but loses the tie-break is not first. A board with no feasible
-    six is Infeasible, as infer refuses it."""
+    score but loses the tie-break is not first."""
     solver = solved.solver
-    if not solved.ranked:
-        raise Infeasible("no composition satisfies the limits on this board - relax a"
-                         " constraint in inference/strategies/")
     target = solver.score(solver.prepare(Candidate(heroes)))
     key = rank_key(target)
     ranked = solved.ranked

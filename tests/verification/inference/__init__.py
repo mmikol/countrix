@@ -8,6 +8,7 @@ one in force, evaluated(), a full six scored as the board scores its current com
 timeless(), a board's payload less the seconds each result took, for comparing two
 solves."""
 
+import dataclasses
 import json
 import os
 import re
@@ -92,10 +93,12 @@ def evaluated(
         world: World, draft: Draft, *, catalog: list[Strategy],
         base: base.BaseWeights = DEFAULT) -> Result:
     """Blue's full six (`draft.blue`) scored and ranked against every legal
-    six, as the board scores its current comp, without the board's other
-    seats."""
+    six, as the board scores its current comp - through blue's optimal's
+    search - without the board's other seats."""
+    optimal = engine._optimal(world, dataclasses.replace(draft, blue=()), catalog=catalog,
+                              base=base, top=engine.BOARD_TOP, seat="blue", kind="infer")
     return engine._evaluated(world, draft, catalog=catalog, base=base, seat="blue",
-                             kind="evaluate", solved=None)
+                             kind="evaluate", solved=optimal.solved)
 
 
 def timeless(payload: dict[str, Any]) -> dict[str, Any]:

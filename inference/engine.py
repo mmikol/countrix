@@ -225,10 +225,6 @@ def _optimal(
     if scale_of is not None:
         solver.adopt_scale(scale_of)
     solved = solver.solve(top=max(top, 1) + 1)
-    if not solved.ranked:
-        raise Infeasible("no composition satisfies the limits around the"
-                         " locked %s picks - relax a constraint in inference/strategies/"
-                         % seat)
     best = solved.ranked[0]
     result.blue = _order(best.heroes)
     fs = _board_facts(world, result, seated.side)
@@ -245,24 +241,17 @@ def _optimal(
 
 def _evaluated(
         world: World, draft: Draft, *, catalog: list[Strategy], base: BaseWeights,
-        seat: Seat, kind: ResultKind, solved: Solved | None) -> Result:
+        seat: Seat, kind: ResultKind, solved: Solved) -> Result:
     """`seat`'s full six (`draft.blue`), scored and ranked against every
-    legal six, labelled `kind`. `solved` takes the seat's own search from a
-    caller that already ran it on this board; None searches it here. A six
-    that breaks a limit is scored with its breaches listed: the board bars
-    blue's before it gets here, and ranks red's."""
+    legal six, labelled `kind`, through `solved`, the seat's own search on
+    this board. A six that breaks a limit is scored with its breaches
+    listed: the board bars blue's before it gets here, and ranks red's."""
     started = time.time()
     seated = _seat_board(world, draft)
-    m, red_h, blue_h, bans_h = seated.board
+    red_h, blue_h = seated.board.red, seated.board.blue
     _check_teams(red_h, blue_h, seat)
-    if len(blue_h) != TEAM_SIZE:
-        raise Refusal("evaluate needs exactly %d %s picks (got %d)"
-                         % (TEAM_SIZE, seat, len(blue_h)))
     result = seated.result(kind, seat, catalog=catalog, base=base,
                            blue=[h.name for h in blue_h], locked=[])
-    if solved is None:
-        solved = Solver(world, m, red=red_h, locked=[], banned=bans_h, side=seated.side,
-                        stage=seated.stage, catalog=catalog, base=base).solve(top=BOARD_TOP + 1)
     evaluated = evaluate_comp(solved, blue_h)
     fs = _board_facts(world, result, seated.side)
     result.record_candidate(evaluated.target, fs, evaluated.solver.considered)
@@ -631,8 +620,7 @@ class _Pass:
                 if suggested["status"] == "suggested" else six,
                 swaps=[StageSwap({"out": p["out"], "in": p["in"]}) for p in suggested["pairs"]])
         plain = blue.solver
-        whole = Objective(self.world, m, red=plain.red,
-                          banned=[self.world.heroes[i] for i in sorted(plain.banned)],
+        whole = Objective(self.world, m, red=plain.red, banned=plain.banned_heroes,
                           side=plain.side, catalog=plain.catalog, base=OFF)
         raw = swaps.raw_cost(cost, blue.span)
         self.watch.check()

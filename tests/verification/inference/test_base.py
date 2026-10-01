@@ -105,7 +105,7 @@ def test_the_synergy_and_counter_terms_read_the_wikis_pairs_and_edges(synthetic_
     assert cand.terms.synergy == team["synergy_score"] == 4
     assert (cand.terms.answers, cand.terms.exposures) == (4, 2)
     assert cand.terms.counters == counters.WIKI_WEIGHT * team["net_edges"] == 2
-    assert objective.base.opponent == base.Opponent(
+    assert objective.engine.opponent == base.Opponent(
         heroes=tuple(heroes(synthetic_world, ("Mortar", "Gale"))), likely=False)
     terms = {c["id"]: c for c in cand.contributions}
     assert list(terms) == [base.RATES, base.SYNERGY, base.COUNTERS]    # nothing else scores
@@ -126,11 +126,11 @@ def test_off_adds_nothing_and_the_playbook_scores_alone(synthetic_world):
     fix = catalog.load(FIXTURE_PLAYBOOK)
     off_objective, off = prepared(synthetic_world, "Harbor Gate", ("Mortar", "Gale"), SIX, fix,
                                   OFF)
-    assert off_objective.base is None and off.terms is None
+    assert off_objective.engine is None and off.terms is None
     assert not any(c["kind"] == "base" for c in off.contributions)
     on_objective, on = prepared(synthetic_world, "Harbor Gate", ("Mortar", "Gale"), SIX, fix)
     on_objective.adopt_bounds(off_objective.bounds)
-    assert on.score - off.score == pytest.approx(on_objective.base.value(on.terms))
+    assert on.score - off.score == pytest.approx(on_objective.engine.value(on.terms))
 
 
 def test_the_counters_read_the_likely_six_until_the_other_side_locks_a_pick(synthetic_world):
@@ -143,8 +143,8 @@ def test_the_counters_read_the_likely_six_until_the_other_side_locks_a_pick(synt
                                                         banned=heroes(w, ("Needle",)))]
     assert "Needle" not in likely and len(likely) == 6
     objective, cand = prepared(w, "Harbor Gate", (), SIX, banned=("Needle",))
-    assert objective.base.opponent.likely and objective.red == []
-    assert [h.name for h in objective.base.opponent.heroes] == likely
+    assert objective.engine.opponent.likely and objective.red == []
+    assert [h.name for h in objective.engine.opponent.heroes] == likely
     answers = sum(counters.WIKI_WEIGHT for e in likely for h in SIX
                   if w.is_countered_by(w.hero(e).id, w.hero(h).id))
     exposures = sum(counters.WIKI_WEIGHT for h in SIX for e in likely
@@ -160,7 +160,7 @@ def test_the_counters_read_the_likely_six_until_the_other_side_locks_a_pick(synt
     # handed exactly the likely six as picks, as the board hands blue's seat, it is
     # the likely six still
     objective, _ = prepared(w, "Harbor Gate", likely, SIX[:1], banned=("Needle",))
-    assert objective.base.opponent.likely
+    assert objective.engine.opponent.likely
 
 
 def test_each_seat_reads_the_other_sides_likely_six_or_its_picks(synthetic_world):
@@ -358,8 +358,8 @@ def test_the_meta_scales_every_term_and_nothing_else(synthetic_world):
     one_objective, one = prepared(synthetic_world, "Harbor Gate", ("Mortar", "Gale"), SIX, fix)
     two_objective, two = prepared(synthetic_world, "Harbor Gate", ("Mortar", "Gale"), SIX, fix,
                                   doubled)
-    assert two_objective.base.value(two.terms) == 2 * one_objective.base.value(one.terms)
-    assert two.score - one.score == pytest.approx(one_objective.base.value(one.terms))
+    assert two_objective.engine.value(two.terms) == 2 * one_objective.engine.value(one.terms)
+    assert two.score - one.score == pytest.approx(one_objective.engine.value(one.terms))
     ones = {c["id"]: c for c in one.contributions}
     for c in two.contributions:
         if c["kind"] == "base":

@@ -118,7 +118,7 @@ def _sixes(solver: Solver) -> Iterator[list[Hero]]:
 
 
 def _enumerated(solver: Solver) -> list[Candidate]:
-    solver.freeze_bounds()
+    solver.freeze_scale()
     scored = [solver.score(solver.prepare(Candidate(six)), detail=False)
         for six in _sixes(solver)]
     return sorted((c for c in scored if not c.violations), key=rank_key)[:K]
