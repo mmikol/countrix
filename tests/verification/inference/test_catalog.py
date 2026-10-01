@@ -357,7 +357,8 @@ def test_meta_md_holds_the_engines_weights_and_is_no_strategy(catalog_copy):
     assert catalog.engine_weights(catalog_copy).rate == 2.0
     assert catalog.playbook_digest(catalog_copy) == digest
     assert catalog.meta_record(catalog.read_meta(catalog_copy))["rate"] == 2.0
-    assert catalog.meta_rendered(meta.weights) == "meta 1 x (rate 1, synergy 0.1, counter 0.05)"
+    assert catalog.meta_rendered(meta.weights, 10.0) == (
+        "meta 1 x (rate 1, synergy 0.1, counter 0.05); swap cost 10")
     assert catalog.read_meta(catalog.SHIPPED_DIR).weights.on
 
 

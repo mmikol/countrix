@@ -128,19 +128,27 @@ def load(directory: str | None = None) -> list[Strategy]:
     return out
 
 
-class Meta(NamedTuple):
-    """meta.md, read: the default engine's weights, the swap cost - None
-    where the file leaves it out and nothing has seeded it (parse_meta) -
-    and the prose that says what they do and why."""
+class MetaFile(NamedTuple):
+    """meta.md's text, parsed (parse_meta): the default engine's weights,
+    the swap cost - None where the file leaves it out - and the prose."""
     weights: BaseWeights
     swap: float | None
+    body: str
+
+
+class Meta(NamedTuple):
+    """meta.md, read (read_meta): the default engine's weights, the swap
+    cost - the shipped meta.md's where the folder's sets none - and the
+    prose that says what they do and why."""
+    weights: BaseWeights
+    swap: float
     body: str
 
 
 class MetaRecord(BaseRecord):
     """meta.md as the tools and the board serve it: the weights, the swap
     cost and the prose."""
-    swap: float | None
+    swap: float
     body: str
 
 
@@ -157,7 +165,7 @@ def meta_dial(field: str, value: object) -> float:
     return number
 
 
-def parse_meta(text: str) -> Meta:
+def parse_meta(text: str) -> MetaFile:
     """meta.md's text -> its weights, swap cost and prose: the four weights
     set, each by meta_dial, the swap cost where the file sets it, and no
     other key; else a CatalogError naming the file."""
@@ -175,10 +183,10 @@ def parse_meta(text: str) -> Meta:
         cost = None if swap is None else meta_dial(SWAP, swap)
     except (CatalogError, FrontmatterError) as error:
         raise CatalogError("%s: %s" % (META_FILE, error)) from error
-    return Meta(weights=BaseWeights(**dials), swap=cost, body=parsed.body)
+    return MetaFile(weights=BaseWeights(**dials), swap=cost, body=parsed.body)
 
 
-def _meta_file(directory: str) -> Meta:
+def _meta_file(directory: str) -> MetaFile:
     """The meta.md in `directory`, parsed; a folder without one is a
     CatalogError: the default engine has no weights there."""
     try:
@@ -196,13 +204,11 @@ def read_meta(directory: str | None = None) -> Meta:
     meta.md's where it sets none: a folder written before the dial existed
     reads the shipped cost. The shipped file without one is a CatalogError."""
     meta = _meta_file(directory or strategies_dir())
-    if meta.swap is None:
-        shipped = _meta_file(SHIPPED_DIR).swap
-        if shipped is None:
-            raise CatalogError("%s: %s unset - the shipped %s sets the swap cost"
-                               % (META_FILE, SWAP, META_FILE))
-        meta = meta._replace(swap=shipped)
-    return meta
+    swap = meta.swap if meta.swap is not None else _meta_file(SHIPPED_DIR).swap
+    if swap is None:
+        raise CatalogError("%s: %s unset - the shipped %s sets the swap cost"
+                           % (META_FILE, SWAP, META_FILE))
+    return Meta(weights=meta.weights, swap=swap, body=meta.body)
 
 
 def engine_weights(directory: str | None = None) -> BaseWeights:
@@ -213,7 +219,7 @@ def engine_weights(directory: str | None = None) -> BaseWeights:
 def swap_cost(directory: str | None = None) -> float:
     """The swap cost in force, in share points: meta.md's, else the shipped
     meta.md's (read_meta)."""
-    return read_meta(directory).swap or 0.0
+    return read_meta(directory).swap
 
 
 def meta_record(meta: Meta) -> MetaRecord:
@@ -221,12 +227,12 @@ def meta_record(meta: Meta) -> MetaRecord:
     return MetaRecord(**meta.weights.record(), swap=meta.swap, body=meta.body)
 
 
-def meta_rendered(weights: BaseWeights, swap: float | None = None) -> str:
+def meta_rendered(weights: BaseWeights, swap: float) -> str:
     """The weights as one line of text: the meta, and each dial under it,
-    then the swap cost where one is given."""
+    then the swap cost."""
     line = "meta %s x (rate %s, synergy %s, counter %s)" % tuple(
         field_text(getattr(weights, field)) for field in DIALS)
-    return line if swap is None else "%s; swap cost %s" % (line, field_text(swap))
+    return "%s; swap cost %s" % (line, field_text(swap))
 
 
 def parse_weights(items: Mapping[str, object] | Iterable[object] | None) -> dict[str, float]:
@@ -322,8 +328,11 @@ class MirrorSummary(KindCounts):
 
 def mirror(cx: psycopg.Connection, catalog: Sequence[Strategy]) -> MirrorSummary:
     """Reload the strategies table from the files (whole truth), each row
-    naming the playbook in force."""
+    naming the playbook in force. The table is locked first, so a mirror
+    from another process - the refresher's load_authored, in its own
+    container - waits for this one rather than interleaving with it."""
     cursor = cx.cursor()
+    cursor.execute("LOCK TABLE strategies IN SHARE ROW EXCLUSIVE MODE")
     source_id = register_source(cursor, AUTHORED, now())
     cursor.execute("DELETE FROM strategies")
     for s in catalog:
