@@ -62,7 +62,7 @@ class Interval(NamedTuple):
 
 # The records the objective passes around. A namespace is the metric bags by
 # section.
-type Bounds = dict[str, Interval]               # heuristic id -> low, high
+type Scale = dict[str, Interval]                # heuristic id -> low, high
 type Namespace = dict[str, MetricBag]
 
 
@@ -249,34 +249,34 @@ def draw(seed: str, hero_id: int) -> float:
     return float(int.from_bytes(digest.digest(), "big"))
 
 
-def _score_base(base: Base, cand: Candidate, out: list[Contribution] | None) -> float:
+def _score_base(engine: Base, cand: Candidate, out: list[Contribution] | None) -> float:
     """The default engine's value; with `out`, a breakdown term per part, the
     counter term naming the side it read and the edges each way."""
     terms = cand.terms
     if terms is None:
         raise RuntimeError("score() takes a prepared candidate: its base terms are unset")
     if out is not None:
-        w = base.scaled                     # each term's weight, the meta applied
+        w = engine.scaled                   # each term's weight, the meta applied
         for key, weight, raw in ((RATES, w.rate, terms.rates), (SYNERGY, w.synergy, terms.synergy),
                                  (COUNTERS, w.counter, float(terms.counters))):
             out.append({"id": key, "kind": "base", "form": "base", "applies": bool(weight),
                         "raw": raw, "weight": weight, "weighted": weight * raw,
                         "metric": READS[key]})
-        out[-1].update({"against": [h.name for h in base.opponent.heroes],
-                        "likely": base.opponent.likely, "answers": terms.answers,
+        out[-1].update({"against": [h.name for h in engine.opponent.heroes],
+                        "likely": engine.opponent.likely, "answers": terms.answers,
                         "exposures": terms.exposures,
-                        "derived": [counters.said(base.world, edge)
-                                    for edge in base.derived(cand.heroes)]})
-    return base.value(terms)
+                        "derived": [counters.said(engine.world, edge)
+                                    for edge in engine.derived(cand.heroes)]})
+    return engine.value(terms)
 
 
 class Objective:
     """The part of a board's search that scores a six: the default engine and
     the playbook's objective against this enemy, on this map, side, stage and
-    bans, with every `when` the board settles read once and each heuristic's
-    bounds, once frozen, turned into the norms the scoring loop reads. The
-    stage is one the map lists (facts.draft.board_stage), empty for the
-    whole map."""
+    bans, with every `when` the board settles read once and the scale - each
+    heuristic's low and high - once frozen, turned into the norms the scoring
+    loop reads. The stage is one the map lists (facts.draft.board_stage),
+    empty for the whole map."""
 
     def __init__(self, world: World, m: Map | None, *, red: Sequence[Hero],
                  banned: Sequence[Hero] = (), side: Side = "", stage: str = "",
@@ -293,7 +293,7 @@ class Objective:
         self.catalog = catalog
         # the default engine's weights as given, and the engine on this board,
         # None while it is off
-        self.weights = base
+        self.base = base
         self.engine = Base(world, m, red=self.red, banned=banned, weights=base) if base.on else None
         # each hero's tie-break draw on this board (draw)
         seed = board_seed(m, side)
@@ -311,7 +311,7 @@ class Objective:
         # every stage of a map shares one scale (prepare's `measure`)
         self.measured: Namespace = self.static if not stage else dict(
             self.static, map=compute.map_metrics(m, side, ban_count=len(self.banned)))
-        self.bounds: Bounds = {}             # heuristic id -> (min, max)
+        self.scale: Scale = {}               # heuristic id -> (min, max)
         self._norms: list[Norm] = []
         # each strategy's gate - True or False where `when` is settled for the
         # whole board, None where the candidate decides it; each heuristic
@@ -489,10 +489,10 @@ class Objective:
 
     # --- the frozen scale ------------------------------------------------------
 
-    def adopt_bounds(self, bounds: Mapping[str, Interval]) -> None:
+    def set_scale(self, scale: Mapping[str, Interval]) -> None:
         """Each heuristic's low and high on this board, frozen here or
         elsewhere: inference.scale draws them, and a fill takes its seat's."""
-        self.bounds = dict(bounds)
+        self.scale = dict(scale)
         self._freeze_norms()
 
     @property
@@ -506,7 +506,7 @@ class Objective:
         the sample never moved - normalises everything to 0.5."""
         self._norms = []
         for g in self.heuristics:
-            lo, hi = self.bounds.get(g.id, Interval(low=0.0, high=0.0))
+            lo, hi = self.scale.get(g.id, Interval(low=0.0, high=0.0))
             self._norms.append(Norm(
                 strategy=g, low=lo, span=hi - lo if hi > lo else None,
                 weight=g.weight * self._needs.get(g.id, 1.0),
@@ -515,7 +515,7 @@ class Objective:
     # --- the score -------------------------------------------------------------
 
     def score(self, cand: Candidate, detail: bool = True) -> Candidate:
-        """Score with the frozen bounds; with detail, fill the breakdown too.
+        """Score on the frozen scale; with detail, fill the breakdown too.
 
         The default engine's value comes first, where it is on; it reads no
         scale. The keep term follows it where a reference six is set, and

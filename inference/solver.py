@@ -207,9 +207,10 @@ class Solver(Objective):
         self._frozen, self._bound = True, None
 
     def adopt_scale(self, other: "Solver") -> None:
-        """The scale another solver on the same board froze - its bounds and
-        its floor: a fill takes its seat's, and draws no sample."""
-        self.adopt_bounds(other.bounds)
+        """The scale another solver on the same board froze - each
+        heuristic's low and high, and its floor: a fill takes its seat's, and
+        draws no sample."""
+        self.set_scale(other.scale)
         self.floor = other.floor
         self._frozen, self._bound = True, None
 

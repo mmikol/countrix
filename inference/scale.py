@@ -24,7 +24,7 @@ import random
 from collections.abc import Iterable, Iterator, Sequence
 
 from facts.model import ROLES, Hero
-from inference.scoring import Bounds, Candidate, Interval, Objective, SixKey
+from inference.scoring import Candidate, Interval, Objective, Scale, SixKey
 from inference.shapes import legal_shapes
 
 REFERENCE_SIZE = 1200
@@ -103,11 +103,11 @@ def _on_board(objective: Objective, measured: list[Candidate]) -> list[Candidate
     return measured
 
 
-def _bounds_over(objective: Objective, prepared: Sequence[Candidate]) -> Bounds:
+def _scale_over(objective: Objective, prepared: Sequence[Candidate]) -> Scale:
     """{heuristic id: Interval(low, high)} over prepared sixes. A heuristic
     no six here values is left out: the objective reads a missing id as
     (0, 0)."""
-    out: Bounds = {}
+    out: Scale = {}
     for i, g in enumerate(objective.heuristics):
         values = [value for c in prepared if (value := c.raw[i]) is not None]
         if values:
@@ -148,10 +148,10 @@ def _board_field(objective: Objective) -> Iterator[list[Hero]]:
     nothing locked: each role's top SCALE_POOL by the board's own prior,
     over every legal shape.
 
-    It must not read the locked picks. The bounds it feeds are the board's
-    one scale: `infer`, the fill and `current` run with different locks on
-    the same board, and a scale that moved with them would make a current
-    comp and the optimal it is a share of two different numbers."""
+    It must not read the locked picks. The lows and highs it feeds are the
+    board's one scale: `infer`, the fill and `current` run with different
+    locks on the same board, and a scale that moved with them would make a
+    current comp and the optimal it is a share of two different numbers."""
     tanks, damage, supports = [_board_pool(objective, role) for role in ROLES]
     for t, d, s in legal_shapes(objective.catalog):
         if t > len(tanks) or d > len(damage) or s > len(supports):
@@ -186,16 +186,16 @@ def _field_sample(objective: Objective) -> list[Candidate]:
 
 
 def freeze(objective: Objective) -> float | None:
-    """Bounds per heuristic from the reference sample and the field, adopted
-    by the objective; -> the floor, the lowest score among the reference
-    sixes under them, None where no legal six is drawn. The sample is drawn
-    once here. The field is read only where a heuristic on a metric exists:
-    the bounds read nothing else, so a playbook without one skips it and
-    lands on the same scale. Both are measured on the whole map; the floor
-    is read on the board's stage."""
+    """The scale - each heuristic's low and high - from the reference sample
+    and the field, set on the objective; -> the floor, the lowest score
+    among the reference sixes on it, None where no legal six is drawn. The
+    sample is drawn once here. The field is read only where a heuristic on a
+    metric exists: the lows and highs read nothing else, so a playbook
+    without one skips it and lands on the same scale. Both are measured on
+    the whole map; the floor is read on the board's stage."""
     measured = _prepared(objective, measure=True)
     field = _field_sample(objective) if objective.heuristics else []
-    objective.adopt_bounds(_bounds_over(objective, measured + field))
+    objective.set_scale(_scale_over(objective, measured + field))
     return _floor(objective, _on_board(objective, measured))
 
 

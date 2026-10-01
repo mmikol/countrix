@@ -129,7 +129,7 @@ def test_off_adds_nothing_and_the_playbook_scores_alone(synthetic_world):
     assert off_objective.engine is None and off.terms is None
     assert not any(c["kind"] == "base" for c in off.contributions)
     on_objective, on = prepared(synthetic_world, "Harbor Gate", ("Mortar", "Gale"), SIX, fix)
-    on_objective.adopt_bounds(off_objective.bounds)
+    on_objective.set_scale(off_objective.scale)
     assert on.score - off.score == pytest.approx(on_objective.engine.value(on.terms))
 
 
