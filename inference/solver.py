@@ -38,7 +38,7 @@ from facts.model import ROLES, Hero, Map, World
 from inference import scale
 from inference.base import BaseWeights
 from inference.bounds import Bound, Frame, roster
-from inference.ranges import Space
+from inference.ranges import Open, Space
 from inference.scoring import Candidate, Objective, quantized, rank_key
 from inference.shapes import Shape, legal_shapes
 from inference.strategy import Strategy
@@ -87,10 +87,6 @@ class Evaluated(NamedTuple):
     rank: int | None
     outranked: bool
     solver: "Solver"
-
-
-# the roles still open at a node: (role, first candidate, picks left)
-type Open = tuple[tuple[int, int, int], ...]
 
 
 def _open(slots: Sequence[int], j: int, start: int) -> Open:

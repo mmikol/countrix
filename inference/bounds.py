@@ -33,7 +33,7 @@ from facts.draft import TEAM_SIZE
 from facts.model import ROLES, Hero, World
 from inference.expr import Expr
 from inference.intervals import FALSE, INF, Abstract, Env, Evaluator, Iv, abstract, lift, truth
-from inference.ranges import SLACK, Branch, Space, evaluate, rule_order
+from inference.ranges import SLACK, Branch, Open, Space, evaluate, rule_order
 from inference.scoring import Norm, Objective, normalised
 from inference.shapes import is_shape_limit
 
@@ -202,7 +202,7 @@ class Bound:
 
     # --- the bound ------------------------------------------------------------
 
-    def engine(self, frame: Frame, open_roles: tuple[tuple[int, int, int], ...]) -> float:
+    def engine(self, frame: Frame, open_roles: Open) -> float:
         """The default engine's bound: the picks' own parts and pairs, then
         each open role's best few by their own part, their pairs with the
         picks and half their best pairs among the rest."""
@@ -222,7 +222,7 @@ class Bound:
             total += sum(values[:n])
         return total + self.engine_slack
 
-    def of(self, frame: Frame, open_roles: tuple[tuple[int, int, int], ...]) -> float | None:
+    def of(self, frame: Frame, open_roles: Open) -> float | None:
         """The most any completion of the branch scores; None where a limit
         fails on every completion."""
         env = evaluate(self.steps, Branch(frame.picks, open_roles))
@@ -274,7 +274,7 @@ class Bound:
             return INF
         return max(0.0, top) if gate is None else top
 
-    def tiebreak(self, frame: Frame, open_roles: tuple[tuple[int, int, int], ...]) -> float:
+    def tiebreak(self, frame: Frame, open_roles: Open) -> float:
         """The highest tie-break any completion of the branch holds: the
         picks' draws, then each open role's largest from its start on - exact,
         as the draws are whole numbers far below 2**53."""

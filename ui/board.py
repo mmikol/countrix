@@ -31,7 +31,6 @@ import argparse
 from urllib.parse import parse_qs, urlsplit
 
 import psycopg
-from psycopg.rows import TupleRow
 
 from db import psql, web
 from facts import board_facts, tables
@@ -41,7 +40,7 @@ from ui import pages, serve
 
 # --- JSON endpoints ---------------------------------------------------------
 
-def api_roster(cx: psycopg.Connection[TupleRow]) -> web.Reply:
+def api_roster(cx: tables.Connection) -> web.Reply:
     """The roster the door's roster tool lists, with the role icons and the
     patches newer than the rates the page draws beside it."""
     world = tables.load(cx)
@@ -51,7 +50,7 @@ def api_roster(cx: psycopg.Connection[TupleRow]) -> web.Reply:
                       "newer_patches": [p._asdict() for p in world.newer_patches]}, 200)
 
 
-def api_facts(cx: psycopg.Connection[TupleRow], query: Query) -> web.Reply:
+def api_facts(cx: tables.Connection, query: Query) -> web.Reply:
     draft = parse_board(query)
     world = tables.load(cx)
     return web.Reply(board_facts.generate(world, draft).to_dict(), 200)
