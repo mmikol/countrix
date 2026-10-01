@@ -20,9 +20,10 @@ DROP TABLE strategies;
 -- The mirror of the playbook: one row per markdown file in
 -- inference/strategies/ - its kind (constraint | heuristic | assumption, the last added by 013), the frontmatter
 -- a machine scores by (metric, direction, weight, expressions, params) and
--- the prose body a person argues with. Reloaded whole by load_authored so a
--- recommendation can cite the ids it was scored under; the files remain the
--- truth.
+-- the prose body a person argues with. Reloaded whole by load_authored and
+-- after every playbook write (tune, add_strategy, infer_strategy), so
+-- db_status and the query tool see the playbook as rows under the user
+-- source; the files remain the truth.
 CREATE TABLE strategies (
     strategy_id text PRIMARY KEY,        -- the file's id (its stem)
     name         text NOT NULL,
