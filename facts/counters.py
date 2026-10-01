@@ -203,7 +203,7 @@ def _flag(piece: KitPiece, code: str) -> float:
     first = rows[0]
     if first.value is not None:
         return 0.0 if first.value >= 1 else 1.0
-    return PARTIAL if (first.text or "").strip().lower() == "partial" else 1.0
+    return PARTIAL if first.text.strip().lower() == "partial" else 1.0
 
 
 def _per_hit(piece: KitPiece) -> float | None:
@@ -211,7 +211,7 @@ def _per_hit(piece: KitPiece) -> float | None:
     bullet, a shot - not a sum, a damage over time or a row on the hero."""
     values = [s.value for s in piece.stats.get("damage", ())
                 if s.value is not None and s.unit_den is None and s.unit_num != "percent"
-                and not SUMMED_RE.search("%s %s" % (s.condition or "", s.text or ""))]
+                and not SUMMED_RE.search("%s %s" % (s.condition, s.text))]
     if not values:
         return None
     pellets = piece.max_stat("pellets") or 1
@@ -239,7 +239,7 @@ def _reach(piece: KitPiece) -> Reach:
     if "shotgun" in piece.weapon_kind and not piece.stats.get("range"):
         starts = [s.value for s in piece.stats.get("damage_falloff_range", ())
                   if s.value is not None and s.value >= MIN_FALLOFF_START
-                  and "min" in (s.condition or "") and "simultaneous" not in (s.condition or "")]
+                  and "min" in s.condition and "simultaneous" not in s.condition]
         if starts:
             return Reach(min(starts), True)
     if piece.reach:
@@ -452,7 +452,7 @@ def features(h: Hero, support_hps: float) -> Features:
     antiheal, antiheal_piece = 0.0, ""
     for a in h.abilities:
         for s in a.stats.get("healing_mod", ()):
-            if s.value is not None and s.value < 0 and (s.condition or "") != "allies":
+            if s.value is not None and s.value < 0 and s.condition != "allies":
                 strength = -s.value / 100.0 * (ULT if a.kind == KIND_ULTIMATE else 1.0)
                 if strength > antiheal:
                     antiheal, antiheal_piece = strength, "%s (%+g%% healing received)" % (
