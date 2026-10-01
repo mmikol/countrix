@@ -1,29 +1,15 @@
-"""The engine's handlers, which the board runs in its own process: they
-speak the results the engine returns, bound the alternatives with the
-engine's clamp, admit boards a share of the room at a time, and report the
-catalog and the database's health."""
+"""The board's routes over the engine, ui/serve.py, which run in the
+board's process: they speak the results the engine returns, admit boards
+a share of the room at a time, and report the catalog and the database's
+health."""
 
 import pytest
 
 from db import Refusal
 from facts import tables
-from inference import catalog, serve
+from inference import catalog
 from tests.verification.inference import FIXTURE_PLAYBOOK
-
-
-def test_both_doors_bound_the_alternatives_with_one_clamp():
-    """A caller naming top reaches the same bound through every door: the
-    engine owns the definition. Only a top left out takes the default; 0 is
-    a number like any other, clamped to the floor whether it comes as an int
-    or as a query string's text."""
-    from inference.engine import TOP_CEILING, TOP_DEFAULT, clamp_top
-    assert clamp_top(None) == TOP_DEFAULT == 5                 # the default
-    assert clamp_top(0) == clamp_top("0") == clamp_top(-3) == clamp_top(0.5) == 1
-    assert clamp_top(99) == TOP_CEILING == 20
-    assert clamp_top("3") == 3                                 # a query string is text
-    for junk in ("x", [1], [], object()):                      # a refusal, not a crash
-        with pytest.raises(Refusal, match="must be a number"):
-            clamp_top(junk)
+from ui import serve
 
 
 def test_the_strategies_handler_lists_the_playbook_in_force():

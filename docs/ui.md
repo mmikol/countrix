@@ -15,12 +15,13 @@ An `http.server` handler over psycopg, no web framework, no build step.
 The board computes the facts and the comps in its own process, as the
 compose stack's `ui` container does. It writes nothing.
 
-## `board.py` and `pages.py` - the page and its endpoints
+## `board.py`, `serve.py` and `pages.py` - the page and its endpoints
 
 `pages.py` renders the page, a shell over the static files that injects
 only `TEAM` (six) and `BANS` (five). `board.py` serves it and the JSON
 endpoints behind the host guard `db/web.py` puts on both servers
-([security.md](security.md)).
+([security.md](security.md)); `serve.py` answers the board, the catalog
+and the health for it.
 
 | route | serves |
 | --- | --- |

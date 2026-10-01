@@ -90,7 +90,7 @@ mounts to ask for a dump before it rebuilds.
 
 **The board holds its time.** The ui container solves in the page's own
 process, one board at a time. A board waits for the one in flight, and
-answers 429 after a minute (`serve.Admission` in `inference/serve.py`), so
+answers 429 after a minute (`serve.Admission` in `ui/serve.py`), so
 a burst of boards queues instead of starving the page; a search that
 cannot prove its answer within its budget refuses (`solver.Unbounded`)
 instead of holding the solver.

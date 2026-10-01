@@ -1,4 +1,4 @@
-"""The engine's handlers, which the board (ui/board.py) runs in its own
+"""The board's routes over the engine, which ui/board.py answers in its own
 process: handle_board, both seats and the current comp; handle_strategies,
 the catalog and the default engine's weights; and handle_health, the
 catalog's size and the database's state. ADMISSION holds the boards in

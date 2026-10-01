@@ -60,5 +60,4 @@ The search, which reads the playbook:
     supersede     latest wins: a board a newer request replaced stops at its
                   next check
     reach         the board each released hero is optimal on, within a match's bans
-    serve         the engine's handlers, which the board runs in-process
 """
