@@ -281,8 +281,7 @@ HEADINGS: dict[ResultKind, str] = {
     "infer": "optimal comp", "evaluate": "evaluation", "current": "current comp",
     "countered": "if countered optimally", "fill": "your picks, the rest filled",
     "expected": "their likely starting comp"}
-# the reason red's likely six carries no share while the default engine is on:
-# it is drawn, never scored
+# the reason red's likely six carries no share: it is drawn, never scored
 LIKELIHOOD = (
     "unscored - a likelihood from the map's pick rates and the wiki's synergies, which"
     " nothing scores")
@@ -376,16 +375,16 @@ class Result:
         """Why the result carries no share of a best, or None when it does.
         A comp its own picks rule out says so first (bar). The optimal six is
         100 by definition - it is the reference, and scored always; red's
-        likely six is a likelihood, never scored, and says so while the
-        default engine is on; any other comp reads unscored when nothing can
-        be a share of anything: the best six scores no higher than the seat's
+        likely six is a likelihood, never scored, and says so, the default
+        engine on or off; any other comp reads unscored when nothing can be a
+        share of anything: the best six scores no higher than the seat's
         floor, as every six does with the default engine off under a playbook
         that scores nothing."""
         if self.barred is not None:
             return self.barred
         if self.kind == "infer":
             return None
-        if self.kind == "expected" and self.base.on:
+        if self.kind == "expected":
             return LIKELIHOOD
         return self.waiting()
 

@@ -98,7 +98,7 @@ def evaluated(
     optimal = engine._optimal(world, dataclasses.replace(draft, blue=()), catalog=catalog,
                               base=base, top=engine.BOARD_TOP, seat="blue", kind="infer")
     return engine._evaluated(world, draft, catalog=catalog, base=base, seat="blue",
-                             kind="evaluate", solved=optimal.solved)
+                             kind="evaluate", optimal=optimal)
 
 
 def timeless(payload: dict[str, Any]) -> dict[str, Any]:

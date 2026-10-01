@@ -249,7 +249,7 @@ def test_a_swap_that_does_not_raise_the_fight_odds_is_withheld(synthetic_world, 
     assert offered["pairs"] and odds["after"]["blue"] > odds["before"]["blue"]
     assert offered["status"] == "suggested"
     worse = {"odds": {"blue": 0, "red": 100}}
-    monkeypatch.setattr(engine._Pass, "_against", lambda self, draft, six, blue: worse)
+    monkeypatch.setattr(engine._Pass, "_against", lambda self, draft, six: worse)
     held = engine.board(synthetic_world, draft, catalog=playbook, brief=brief).swaps
     assert held["pairs"] == [] and sorted(held["six"]) == sorted(draft.blue)
     assert held["status"] == "withheld"

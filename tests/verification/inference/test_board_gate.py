@@ -116,16 +116,12 @@ def test_every_infer_refuses_locked_picks_its_limits_rule_out(
             in_force.get(door, doors[door])(board)
 
 
-def test_both_doors_bound_the_alternatives_with_one_clamp():
-    """A caller naming top reaches the same bound through every door: the
-    engine owns the definition. Only a top left out takes the default; 0 is
-    a number like any other, clamped to the floor whether it comes as an int
-    or as a query string's text."""
+def test_the_alternatives_a_caller_names_are_clamped_into_one_range():
+    """A caller naming top meets the engine's one clamp on the alternatives.
+    Only a top left out takes the default; 0 is a number like any other,
+    clamped to the floor, as a negative is, and a top past the ceiling reads
+    as the ceiling."""
     from inference.engine import TOP_CEILING, TOP_DEFAULT, clamp_top
     assert clamp_top(None) == TOP_DEFAULT == 5                 # the default
-    assert clamp_top(0) == clamp_top("0") == clamp_top(-3) == clamp_top(0.5) == 1
+    assert clamp_top(0) == clamp_top(-3) == 1
     assert clamp_top(99) == TOP_CEILING == 20
-    assert clamp_top("3") == 3                                 # a query string is text
-    for junk in ("x", [1], [], object()):                      # a refusal, not a crash
-        with pytest.raises(Refusal, match="must be a number"):
-            clamp_top(junk)

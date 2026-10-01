@@ -32,13 +32,10 @@ from inference.result import (
 
 class Seats(NamedTuple):
     """What the verdict reads off a board: the two current comps; the two
-    optimals, whose reason a seat with no picks is read by; the two fills,
-    the best six reachable from a half-drafted seat's picks, which that seat
-    is read through; and blue's picks against red's best counter."""
+    fills, the best six reachable from a half-drafted seat's picks, which
+    that seat is read through; and blue's picks against red's best counter."""
     current: Result
     red_current: Result
-    blue: Result | None = None
-    red: Result | None = None
     fill: Result | None = None
     red_fill: Result | None = None
     countered: Result | None = None
@@ -47,8 +44,7 @@ class Seats(NamedTuple):
 def momentum(seats: Seats) -> Momentum:
     """Who the picks favour, read off the two current comps on their own
     optimals' scales: blue's share of its best counter to red's selection,
-    red's share of its best counter to blue's. A seat with no picks has no
-    comp to read, so its reason is read off its optimal instead.
+    red's share of its best counter to blue's.
 
     A half-drafted seat is read through its fill - the best six reachable from
     what it has - on both sides alike. Scoring the picks alone sums over a
@@ -59,8 +55,7 @@ def momentum(seats: Seats) -> Momentum:
     page shows the engine's words and decides nothing."""
     cur, red_cur = seats.current, seats.red_current
     badges = Badges(blue=_badge(cur, seats.fill), red=_badge(red_cur, seats.red_fill))
-    blue_why = cur.unscored() if cur.blue or seats.blue is None else seats.blue.waiting()
-    red_why = red_cur.unscored() if red_cur.blue or seats.red is None else seats.red.waiting()
+    blue_why, red_why = cur.unscored(), red_cur.unscored()
     if blue_why and red_why:                       # neither seat can be a share of anything
         return Momentum(blue=None, red=None, countered=None, partial=False, odds=None,
                         verdict=blue_why, badges=badges)
