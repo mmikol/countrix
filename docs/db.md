@@ -43,6 +43,10 @@ steps.
 `wiki/matchup_tables.py` and `wiki/strategy_sections.py` read the wiki's
 markup and store nothing.
 
+[db/data/README.md](../db/data/README.md) says how a pull is written:
+its contract, the page cache, the request policies and the checklist for
+a new pull or table.
+
 ### `psql/migrations/` - the schema as a sequence
 
 | folder | what it holds |
