@@ -25,8 +25,10 @@ from facts.team import (
     team_metrics,
 )
 
-# the support healing ratio under which the board flags a line: the playbook's
-# HEAL_MARGIN (two-light-healers-lose) and the lifelines-cover-thin-heals guard
+# a line of two or more supports whose sustained healing is under this share
+# of the roster's two-support bench (team.hps_ratio) is flagged UNDER-HEALED:
+# the board's own read, which no shipped rule scores (heal-rate reads
+# matchup.heal_shortfall)
 UNDER_HEALED = 0.7
 
 

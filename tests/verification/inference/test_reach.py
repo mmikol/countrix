@@ -132,10 +132,11 @@ def test_a_hero_no_board_fits_is_infeasible_not_a_crash(synthetic_world, monkeyp
     assert reach.seated(synthetic_world, recorded_board) is False
 
 
-def test_a_hero_its_best_map_favours_is_seated_there_with_no_ban(synthetic_world):
+def test_a_hero_its_best_map_favours_is_seated_there_with_no_ban(synthetic_world, monkeypatch):
     """Anvil's map rates lift it most on Harbor Gate: the search tries that map
     first, finds Anvil in the optimal six against red's likely six, and the
     board it records seats Anvil again when it is solved afresh."""
+    monkeypatch.setenv("COUNTRIX_STRATEGIES", FIXTURE_PLAYBOOK)
     anvil = synthetic_world.hero("Anvil")
     assert reach.maps(synthetic_world, anvil)[0].name == "Harbor Gate"
     assert reach.reds(synthetic_world, anvil)[0] == []

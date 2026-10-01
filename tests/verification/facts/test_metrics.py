@@ -156,22 +156,22 @@ def test_the_map_metrics_carry_the_style_on_top_and_its_margin(synthetic_world):
     assert (none["known"], none["style_top"], none["style_margin"], none["bans"]) == (0, "", 0, 1)
 
 
-def test_map_stages_counts_arenas_and_map_phases_counts_parts_of_a_route(synthetic_world):
-    """`map.stages >= 3` guards rules about separate arenas (Control, Flashpoint):
-    a Hybrid map's two phases count as map.phases and leave map.stages at 0."""
+def test_map_arenas_counts_arenas_and_map_phases_counts_parts_of_a_route(synthetic_world):
+    """`map.arenas >= 3` guards rules about separate arenas (Control, Flashpoint):
+    a Hybrid map's two phases count as map.phases and leave map.arenas at 0."""
     w = synthetic_world
     readings = {}
     for name in ("Harbor Gate", "Ember Ruins", "Salt Flats"):
         x = compute.map_metrics(w.map(name), ban_count=0)
-        readings[name] = (x["sided"], x["stages"], x["phases"])
+        readings[name] = (x["sided"], x["arenas"], x["phases"])
     assert readings == {
         "Harbor Gate": (1, 0, 2), "Ember Ruins": (0, 3, 0), "Salt Flats": (0, 0, 0)}
     none = compute.map_metrics(None, ban_count=0)
-    assert (none["sided"], none["stages"], none["phases"]) == (0, 0, 0)
+    assert (none["sided"], none["arenas"], none["phases"]) == (0, 0, 0)
     assert compute.arenas(w.map("Ember Ruins")) == ["Courtyard", "Forge", "Spire"]
     assert compute.phases(w.map("Harbor Gate")) == ["Assault", "Escort"]
-    assert {"map.stages", "map.phases"} <= set(compute.registry())
-    assert not {"map.stages", "map.phases"} & compute.TEXT_METRICS
+    assert {"map.arenas", "map.phases"} <= set(compute.registry())
+    assert not {"map.arenas", "map.phases"} & compute.TEXT_METRICS
 
 
 def test_a_seat_has_a_side_only_on_a_sided_map(synthetic_world):
