@@ -9,7 +9,7 @@ from collections.abc import Callable
 
 from door.mcp.registry import Context, tool
 from door.mcp.schema import Properties, ToolReply
-from facts.draft import Draft, as_side
+from facts.draft import SIDES, Draft, as_side
 
 BOARD: Properties = {
     "map": {"type": "string", "description": "map name (any spelling)"},
@@ -25,7 +25,7 @@ BOARD: Properties = {
                        " the lobby's), more refused; all optional; neither"
                        " team can pick them"},
     "side": {
-        "type": "string", "enum": ["attack", "defense", ""],
+        "type": "string", "enum": [*SIDES, ""],
         "description": "blue's side on an Escort or Hybrid map (red gets"
                        " the other); ignored on Control, Push, Flashpoint"},
     "stage": {

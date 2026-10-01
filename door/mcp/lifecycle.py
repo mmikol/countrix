@@ -18,12 +18,12 @@ import datetime
 import os
 import re
 from collections.abc import Mapping, Sequence
-from typing import Literal, NotRequired, TypedDict
+from typing import NotRequired, TypedDict
 
 import psycopg
 from psycopg.sql import SQL
 
-from db import ROOT, Refusal, psql
+from db import ROOT, Refusal, psql, web
 from db.psql import schema
 from door.mcp.registry import REFRESH, Context, tool
 from door.mcp.schema import ToolReply
@@ -58,7 +58,7 @@ class DataHealth(TypedDict):
     state and counts as read_status reads them, or degraded with the error
     when the database is out of reach. compose.yaml's healthcheck reads the
     state, and orchestrator.py the rest."""
-    status: Literal["ok", "degraded"]
+    status: web.HealthStatus
     state: NotRequired[schema.State]
     table_count: NotRequired[int]
     pending_migrations: NotRequired[list[str]]
