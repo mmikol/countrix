@@ -287,7 +287,7 @@ def test_every_migration_but_010_to_013_is_one_transaction():
 
 def test_the_overview_names_everything_at_the_root():
     tracked = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True,
-                             text=True).stdout.split()
+                             text=True, check=True).stdout.split()
     entries = {p.split("/")[0] for p in tracked} - {"README.md", "docs"}
     overview = _read("docs", "architecture.md")
     missing = sorted(e for e in entries if e not in overview)
@@ -310,7 +310,7 @@ def test_every_package_map_names_what_the_package_holds():
     assert not _maps("    board.py    the board's endpoints over the\n"
                      "                facts and the inference layer", "facts")
     tracked = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True,
-                             text=True).stdout.split()
+                             text=True, check=True).stdout.split()
     packages = sorted({os.path.dirname(p) for p in tracked
                        if os.path.basename(p) == "__init__.py" and not p.startswith("tests/")})
     assert "db/data/wiki" in packages
