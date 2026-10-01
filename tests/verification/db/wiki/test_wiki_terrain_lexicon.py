@@ -1,13 +1,11 @@
 """The terrain lexicon: each feature's pattern on inline text, the terrain
-sense matched and the wrong senses not, and the fixed set of features."""
+sense matched and the wrong senses not, and the fixed set of features, the
+facts layer's."""
 
 import pytest
 
 from db.data.wiki import terrain
-
-FEATURES = {"chokes", "interiors", "high_ground", "flanks", "sightlines",
-            "open_ground", "hazards", "cover"}
-
+from facts.model import TERRAIN_FEATURES
 
 # --- the lexicon: the terrain sense, and the wrong senses --------------------------
 
@@ -111,4 +109,6 @@ def test_a_pattern_matches_the_terrain_sense_only(feature, text, found):
 
 
 def test_the_lexicon_is_the_fixed_set_of_features():
-    assert set(terrain.FEATURES) == FEATURES
+    """The pull counts the features the facts layer z-scores: one that only
+    the pull names would be stored and read by no map.* metric."""
+    assert set(terrain.FEATURES) == set(TERRAIN_FEATURES)
