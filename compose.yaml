@@ -132,6 +132,9 @@ services:
       - "127.0.0.1:8017:8017"
     environment:
       <<: *env
+      # the board reads as matrix_reader (migrations 011 and 012), a login
+      # the database holds to SELECT, each statement under 10 s
+      DATABASE_URL: postgresql://matrix_reader:matrix_reader@db/overwatch
     depends_on:
       data:
         condition: service_healthy

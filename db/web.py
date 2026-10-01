@@ -78,8 +78,7 @@ def request_allowed(headers: Message, allowed: frozenset[str]) -> bool:
 
 class LocalServer(ThreadingHTTPServer):
     """A threading HTTP server that answers to the local names and to any
-    `allowed_hosts` it is published under - the compose service name another
-    container calls it by, or a public host name."""
+    `allowed_hosts`: a public host name it is published under."""
 
     def __init__(
             self, address: tuple[str, int], handler: type[BaseHTTPRequestHandler],

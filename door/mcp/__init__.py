@@ -6,7 +6,7 @@ one of them.
 
     .venv/bin/python -m door.mcp                  serve over stdio (what .mcp.json launches)
     python -m door.mcp --http --port 8020         serve over HTTP on 127.0.0.1 (the data
-                                                  container adds --host and --allow-host)
+                                                  container adds --host)
     .venv/bin/python -m door.mcp list             print the tools
     .venv/bin/python -m door.mcp call pull_maps   run one tool from the shell
 

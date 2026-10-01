@@ -171,8 +171,8 @@ def test_a_missing_content_length_is_refused_as_required():
 
 
 def test_a_post_that_does_not_claim_json_is_refused():
-    """The board's rule on its writes holds at the door: a body not labelled
-    application/json is 415 before it is read."""
+    """A body not labelled application/json is 415 before it is read: the
+    door reads nothing but JSON-RPC."""
     httpd, url = _http_server()
     assert _knock(url, {"jsonrpc": "2.0", "id": 1, "method": "ping"},
                   {"Content-Type": "text/plain"}) == (415, {"error": "a JSON body is required"})
