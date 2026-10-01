@@ -18,8 +18,9 @@ compose stack's `ui` container does. It writes nothing.
 ## `board.py`, `serve.py` and `pages.py` - the page and its endpoints
 
 `pages.py` renders the page, a shell over the static files that injects
-only `TEAM` (six) and `BANS` (five). `board.py` serves it and the JSON
-endpoints behind the host guard `db/web.py` puts on both servers
+only `TEAM` (six), `BANS` (five) and `SWAP_MAX` (the swap cost's ceiling,
+`base.SWAP_RANGE`). `board.py` serves it and the JSON endpoints behind
+the host guard `db/web.py` puts on both servers
 ([security.md](security.md)); `serve.py` answers the board, the catalog
 and the health for it.
 
