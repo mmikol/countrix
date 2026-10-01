@@ -391,8 +391,10 @@ class Result:
     def waiting(self) -> str | None:
         """The reason nothing on this board scores, or None: the optimal six
         scores no higher than the seat's floor, so no comp is a share of it.
-        Read off any result, the optimal included (a seat with no picks has no
-        comp to read it from)."""
+        Read off any result, the optimal included: unscored() gives it for
+        every allowed comp but the optimal and red's likely six, and the
+        swaps read it off blue's optimal, whose own unscored() is None by
+        definition."""
         best, floor = self._hundred(), self._zero()
         if best > floor:
             return None
