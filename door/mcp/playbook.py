@@ -143,8 +143,9 @@ def tune_tool(      # _tool: inference.tune holds the bare name
 
 
 @tool(
-    "add_strategy", "Store a new strategy in inference/strategies/ from its name,"
-    " kind and prose plus the frontmatter /strategy inferred - a constraint's"
+    "add_strategy", "Store a new strategy in the playbook in force"
+    " (inference/strategies/ unless COUNTRIX_STRATEGIES names another folder) from"
+    " its name, kind and prose plus the frontmatter /strategy inferred - a constraint's"
     " require, a limit that always holds and is never weighted; a heuristic's"
     " metric/direction/weight, or its when/bonus/penalty and weight; params for"
     " either. An assumption is prose and needs nothing. The prose is three"

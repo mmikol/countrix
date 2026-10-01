@@ -141,7 +141,7 @@ def search(world: World, name: str) -> Reach:
     if not near:
         raise Infeasible("reach: no board the search tries seats %s within the playbook's"
                          " limits (%d allow no six with it, %d refuse past the search's budget)"
-                         " - relax a constraint in inference/strategies/"
+                         " - relax a constraint in the playbook"
                          % (hero.name, fenced, past_budget))
     near.sort(key=lambda n: (n.gap, n.map_name, n.side))
     for board in near[:CLOSEST]:

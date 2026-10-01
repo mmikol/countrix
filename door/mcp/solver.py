@@ -50,9 +50,10 @@ class CompactInfer(TypedDict):
 
 @board_tool(
     "infer", "The INFERENCE LAYER: the optimal six for this board under"
-    " the default engine (win rates, synergies, counters) and the"
-    " markdown strategies in inference/strategies/ on top (players assumed"
-    " to play optimally). Locked blue picks are kept; the rest is"
+    " the default engine (win rates, synergies, counters) and, on top, the"
+    " markdown strategies in the playbook in force (inference/strategies/"
+    " unless COUNTRIX_STRATEGIES names another folder), players assumed to"
+    " play optimally. Locked blue picks are kept; the rest is"
     " searched exactly - every legal six of the released, unbanned roster,"
     " by branch and bound - and picks no six completes within the playbook's"
     " limits are refused as not allowed, the limits named. Returns the comp,"
@@ -134,8 +135,9 @@ def reach_tool(ctx: Context, hero: str) -> ToolReply:   # _tool: inference.reach
     " each other), the swaps from blue's picks that pay for the swap cost - one"
     " joint answer, the best six reachable from the picks when each pick"
     " dropped costs that many share points, with blue's share and the fight"
-    " odds before and after - the game plan in prose, the shapes the queue and the"
-    " playbook's limits allow, and red's likely six"
+    " odds before and after - the game plan in prose and, on a map with stages,"
+    " the plan stage by stage, the shapes the queue and the playbook's limits"
+    " allow, and red's likely six"
     " from the data alone (a two-two-two from the map's pick rates and the"
     " wiki's synergies, past the bans; static for the board, no strategy read).",
     {

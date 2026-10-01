@@ -377,6 +377,10 @@ def board(
                      the comps tab shows for blue: its optimal before any
                      blue pick, the fill around one to five, the picks
                      themselves at six
+        stages       the plan stage by stage on a map with stages
+                     (inference.swaps.chain), from the six the comps tab
+                     shows for blue; empty on a map without stages, or when
+                     the brief leaves it out
         shapes       the (tanks, damage, supports) triples the queue and the
                      playbook's shape limits allow - what the roster enforces
                      as you pick; a team past six picks or two tanks is refused
@@ -614,7 +618,7 @@ class _Pass:
         the picks kept - solved on that stage, so its row and the swaps above
         the picks are one answer; a swap withheld or not searched leaves the
         row the origin's. An unscored seat's stages swap at no cost, and say
-        so. None on a map without stages."""
+        so. Empty on a map without stages."""
         if m is None or not m.stages or not origin:
             return []
         six = self.world.resolve(None, (), tuple(origin)).blue

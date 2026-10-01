@@ -181,7 +181,8 @@ def pull_counters(connection: psycopg.Connection, pull: cache.PullContext) -> Pu
 
 @tool(
     "load_authored", "Store the playbook, the one input a user writes: the mirror"
-    " of the strategies in inference/strategies/. A whole-truth reload; a draft"
+    " of the strategies in the playbook in force (inference/strategies/ unless"
+    " COUNTRIX_STRATEGIES names another folder). A whole-truth reload; a draft"
     " is mirrored as it is and counted, for /strategy to complete.")
 def load_authored(ctx: Context) -> ToolReply:
     with ctx.connect() as cx:
