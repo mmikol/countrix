@@ -90,7 +90,6 @@ PRONOUN_RE = (r"he|she|him|her(?= (?:an?|the|to|at|in|on|with|from|for"
         r"|can|would|should|has|does)\b|[.,;:!?]|$)|(?P<possessive>his|hers?)")
 HE_RE = re.compile(r"\b(?:he|him|his|himself)\b", re.I)
 SHE_RE = re.compile(r"\b(?:she|hers?|herself)\b", re.I)
-SECOND_PERSON_RE = re.compile(r"\byou(?:r|rself)?\b", re.I)
 
 FOE = r"(?:the |an? )?(?:enemy )?foe"
 # A subject with what it owns: "foe", "foe's Defense Matrix".
@@ -325,7 +324,7 @@ def normalise(text: str, hero: str, other: str, pronouns: Pronouns = (None, None
                      for i, (_, _, names) in enumerate(sides))
     token = re.compile(r"\b(?:(?:%s)|%s)(?P<owns>'s)?(?!\w)" % (named, PRONOUN_RE), re.I)
     text = text.replace("\u2019", "'")
-    second_person = bool(SECOND_PERSON_RE.search(text))
+    second_person = bool(strategy_sections.SECOND_PERSON_RE.search(text))
     last = sides[-1]
 
     def replace(match: re.Match[str]) -> str:

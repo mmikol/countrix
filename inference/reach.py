@@ -119,6 +119,7 @@ def search(world: World, name: str) -> Reach:
         raise RuntimeError("reach: no board to search for %s: the database holds no maps"
                            % hero.name)
     near: list[_Near] = []
+    fenced = past_budget = 0          # the misses, named in the refusal when nothing seats
     for m in boards:
         for red in reds(world, hero):
             for side in (SIDES if is_sided(m) else ("",)):
@@ -130,12 +131,18 @@ def search(world: World, name: str) -> Reach:
                                 "red": red, "banned": [], "six": top.blue, "gap": 0.0}
                     held = engine.infer(world, Draft(map_name=m.name, red=tuple(red),
                                                      blue=(hero.name,), side=side), top=1)
-                except (Infeasible, Unbounded):
+                except Infeasible:
+                    fenced += 1
+                    continue
+                except Unbounded:
+                    past_budget += 1
                     continue
                 near.append(_Near(top.score - held.score, m.name, red, side))
     if not near:
         raise Infeasible("reach: no board the search tries seats %s within the playbook's"
-                         " limits - relax a constraint in inference/strategies/" % hero.name)
+                         " limits (%d allow no six with it, %d refuse past the search's budget)"
+                         " - relax a constraint in inference/strategies/"
+                         % (hero.name, fenced, past_budget))
     near.sort(key=lambda n: (n.gap, n.map_name, n.side))
     for board in near[:CLOSEST]:
         found = _banning(world, hero, board.map_name, board.red, board.side)
