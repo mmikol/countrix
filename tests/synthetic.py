@@ -21,8 +21,8 @@ in each.
 
 world() fills the World the way tables.load's reads do, sets heal_bench,
 hps_bench, pool_medians and ult_cap as inputs, then runs what load runs after
-its reads, in its order: derive_rates, best_maps, the terrain, the stages'
-terrain, the styles and the ultimate cap. derive_scalars does not run: there
+its reads, in its order: derive_rates, derive_best_maps, the terrain, the
+stages' terrain, the styles and the ultimate cap. derive_scalars does not run: there
 are no kit rows, so a hero's kit numbers are given whole.
 """
 
@@ -252,10 +252,10 @@ def world() -> World:
     w.pool_medians = {"tank": 650.0, "damage": 237.5, "support": 237.5}
     for hero in w.heroes.values():
         hero.derive_rates()
-    tables.best_maps(w)
-    tables.map_terrain(w)
-    tables.stage_terrain(w)
-    tables.map_styles(w)
+    tables.derive_best_maps(w)
+    tables.derive_map_terrain(w)
+    tables.derive_stage_terrain(w)
+    tables.derive_map_styles(w)
     for hero in w.heroes.values():
         hero.cap_ult(w.ult_cap)
     return w
