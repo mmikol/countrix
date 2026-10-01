@@ -429,7 +429,7 @@ def combine(readings_by_hero: Mapping[str, list[tuple[str, Reading]]],
             hero_ids: Mapping[str, int]) -> tuple[set[Edge], list[tuple[int, int]], list[str]]:
     """Readings per article -> ({Edge}, contradicted pairs, unresolved names).
     hero_ids is {name_key: hero_id}."""
-    seats: set[Edge] = set()
+    verdict_edges: set[Edge] = set()
     unmatched: list[str] = []
     for hero in sorted(readings_by_hero):
         hero_id = hero_ids[name_key(hero)]
@@ -440,10 +440,11 @@ def combine(readings_by_hero: Mapping[str, list[tuple[str, Reading]]],
             elif other_id != hero_id and reading.verdict:
                 winner, loser = ((hero_id, other_id) if reading.verdict > 0
                                  else (other_id, hero_id))
-                seats.add((loser, winner))
+                verdict_edges.add((loser, winner))
 
-    contradicted = sorted({(min(pair), max(pair)) for pair in seats if pair[::-1] in seats})
-    edges = {pair for pair in seats if pair[::-1] not in seats}
+    contradicted = sorted({(min(pair), max(pair))
+                           for pair in verdict_edges if pair[::-1] in verdict_edges})
+    edges = {pair for pair in verdict_edges if pair[::-1] not in verdict_edges}
     return edges, contradicted, unmatched
 
 

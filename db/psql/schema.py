@@ -51,7 +51,8 @@ DOMAINS = ("HEROES", "MAPS", "META", "PLAYBOOK", "INFERENCE")
 
 
 class SchemaError(Exception):
-    """No migrations where the schema should be."""
+    """A migration that will not apply, named with Postgres's reason, or no
+    migrations where the schema should be."""
 
 
 @dataclass(frozen=True)
@@ -78,18 +79,27 @@ def read_migrations() -> list[Migration]:
 
 
 def apply(connection: psycopg.Connection, migrations: Sequence[Migration]) -> None:
-    """Run each migration and commit it, then record them all in the ledger
-    once the ledger exists."""
+    """Run each migration and commit it with its row in the ledger, once the
+    ledger exists; the files before the ledger's own are recorded with it.
+    A file that fails is rolled back and raised as a SchemaError naming it,
+    and every file before it stays applied and recorded, so a retry starts
+    at the file that broke."""
+    unrecorded: list[str] = []
     for migration in migrations:
-        with connection.cursor() as cursor:
-            cursor.execute(migration.sql)
-        connection.commit()
-    if psql.scalar(connection.execute("select to_regclass('schema_migrations')")):
-        for migration in migrations:
-            connection.execute(
-                "INSERT INTO schema_migrations (filename) VALUES (%s)"
-                " ON CONFLICT (filename) DO NOTHING", (migration.name,))
-        connection.commit()
+        unrecorded.append(migration.name)
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(migration.sql)
+            if psql.scalar(connection.execute("select to_regclass('schema_migrations')")):
+                for name in unrecorded:
+                    connection.execute(
+                        "INSERT INTO schema_migrations (filename) VALUES (%s)"
+                        " ON CONFLICT (filename) DO NOTHING", (name,))
+                unrecorded.clear()
+            connection.commit()
+        except psycopg.Error as error:
+            connection.rollback()
+            raise SchemaError("%s: %s" % (migration.name, error)) from error
 
 
 def applied(connection: psycopg.Connection) -> list[str]:
