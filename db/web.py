@@ -9,7 +9,7 @@ and logs one line on stderr for a request that failed or took a timed route.
 A request that raised is answered by failure(): a Refusal is the caller's
 error, 400 with its message; anything else is the server's fault, 500 with
 the error's type and message, and the traceback goes to stderr, never to the
-caller.
+caller. Each server's /health answers a HealthStatus, ok or degraded.
 
 read_json() is the one HTTP reader - the status and the decoded body of any
 answer - under orchestrator.py's calls to the stack's servers.
@@ -28,13 +28,15 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from email.message import Message
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 from urllib.parse import urlsplit
 
 from db import Refusal
 
 # the names a request may call a local server by: an allowlisted Host, not a bind
 LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "0.0.0.0"})  # nosec B104
+# what each server's /health says of itself: ok, or degraded with the error
+type HealthStatus = Literal["ok", "degraded"]
 
 
 class Reply(NamedTuple):
