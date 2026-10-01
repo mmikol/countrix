@@ -4,15 +4,43 @@ A Fact is one sentence and the structured claim behind it (scope, subject,
 key, value, unit, source), and whether it warns; the FactSet numbers them
 in emission order and files each under the metrics it states, so the
 inference layer finds a fact by metric and a person reads the same facts
-as numbered sentences.
-facts.board_facts writes a board's facts into one.
+as numbered sentences. Both serve as JSON through to_dict: a Fact as a
+FactRecord, and the FactSet as a FactSetRecord, the payload of /api/facts
+and of the facts tool. facts.board_facts writes a board's facts into one.
 """
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, TypedDict
 
-from facts.draft import Draft, Seat
+from facts.draft import Draft, Seat, Side
+
+
+class FactRecord(TypedDict):
+    """A fact as to_dict serves it: its fields, the value made plain JSON."""
+    id: str
+    scope: str
+    subject: str
+    team: Seat | None
+    key: str
+    text: str
+    value: Any                  # arbitrary JSON, as Fact.value is
+    unit: str | None
+    source: str
+    warn: bool
+
+
+class FactSetRecord(TypedDict):
+    """A board's facts as to_dict serves them: the board they describe, its
+    names resolved, how many facts it holds, and each fact in id order."""
+    map: str | None
+    red: list[str]
+    blue: list[str]
+    bans: list[str]
+    side: Side
+    stage: str
+    count: int
+    facts: list[FactRecord]
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,7 +62,7 @@ class Fact:
     source: str
     warn: bool = False
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> FactRecord:
         return {"id": self.id, "scope": self.scope, "subject": self.subject,
                 "team": self.team, "key": self.key, "text": self.text,
                 "value": _plain(self.value), "unit": self.unit,
@@ -91,7 +119,7 @@ class FactSet:
     def rendered(self) -> str:
         return "\n".join("[%s] %s" % (f.id, f.text) for f in self.facts)
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> FactSetRecord:
         draft = self.draft
         return {"map": draft.map_name, "red": list(draft.red), "blue": list(draft.blue),
                 "bans": list(draft.bans), "side": draft.side, "stage": draft.stage,

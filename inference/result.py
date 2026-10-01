@@ -4,7 +4,8 @@ A Result is one seat's six on one board: who is in it and why, each pick
 citing the board facts that justify it, the score and its breakdown per
 strategy, and the runners-up. A Board holds the seven Results board()
 solves, with the verdict, the seat badges, the plan and blue's swaps read
-off them. Both render as JSON-ready data (to_dict) and as text (rendered).
+off them. Both render as JSON-ready data (to_dict: a ResultRecord, a
+BoardRecord) and as text (rendered).
 """
 
 from collections.abc import Callable, Iterable
@@ -20,13 +21,12 @@ from facts.records import Snapshot
 from facts.team import SPECIALIST_DELTA, text
 from inference import base as base_module
 from inference import catalog as catalog_module
-from inference.base import BaseWeights
+from inference.base import BaseRecord, BaseWeights
+from inference.catalog import KindCounts
 from inference.scoring import Candidate, Contribution
 from inference.solver import RANK_CAP, Tied
 from inference.strategy import Strategy
 
-# A result or a board as to_dict() serves it: a JSON object, read by the shells.
-type Payload = dict[str, object]
 # what a result is, which its heading names
 type ResultKind = Literal["infer", "evaluate", "current", "countered", "fill", "expected"]
 # a stage of the plan: a phase of one route or an arena of its own
@@ -171,6 +171,72 @@ class Momentum(TypedDict):
     odds: Odds | None
     verdict: str
     badges: Badges
+
+
+class ResultRecord(TypedDict):
+    """A result as to_dict() serves it, the JSON the shells read: the board
+    it was solved on, the score - None where the comp is not allowed -
+    whether it scores and why not, the heuristics' weights and the default
+    engine's it was scored under, its share of the seat's best - None where
+    it is partial or unscored - the picks, the breakdown, the breaches, the
+    runners-up, its rank, the sixes tied at its score and the words for it,
+    the search's size and time, the playbook's counts, the facts it cites,
+    id to text, and the assumptions and drafts."""
+    kind: ResultKind
+    seat: Seat
+    map: str | None
+    red: list[str]
+    blue: list[str]
+    locked: list[str]
+    bans: list[str]
+    side: Side
+    stage: str
+    partial: bool
+    score: float | None
+    scoring: bool
+    unscored: str | None
+    weights: dict[str, float]
+    base: BaseRecord
+    normalized: int | None
+    playstyle: str
+    picks: list[Pick]
+    contributions: list[Contribution]
+    violations: list[str]
+    alternatives: list[Alternative]
+    rank: int | None
+    outranked: bool
+    tied: int
+    tie: str | None
+    considered: int
+    seconds: float
+    strategies: KindCounts
+    cited: dict[str, str]
+    considerations: list[Consideration]
+    pending: list[str]
+
+
+class BoardRecord(TypedDict):
+    """A board as to_dict() serves it, the JSON the shells read: the board
+    it was solved on, the plan, blue's swaps and the plan stage by stage,
+    each seat's results - the countered case and the fill None where the
+    board has none - the momentum, the shapes the roster allows, and red's
+    likely six."""
+    map: str | None
+    side: Side
+    stage: str
+    bans: list[str]
+    plan: str
+    swaps: Swaps | None
+    stages: list[StageRow]
+    blue: ResultRecord
+    red: ResultRecord
+    current: ResultRecord
+    red_current: ResultRecord
+    countered: ResultRecord | None
+    fill: ResultRecord | None
+    momentum: Momentum
+    shapes: list[list[int]]
+    expected: ResultRecord
 
 
 @dataclass(frozen=True, slots=True)
@@ -377,7 +443,7 @@ class Result:
             likely=c.get("likely", False), answers=c.get("answers", 0),
             exposures=c.get("exposures", 0), derived=c.get("derived", []))
 
-    def to_dict(self) -> Payload:
+    def to_dict(self) -> ResultRecord:
         """The result as JSON-ready data. The facts it cites ride along as
         `cited`, id to text; the board's whole FactSet is the facts route's."""
         cited = {}
@@ -521,7 +587,7 @@ class Board:
     swaps: Swaps | None = None          # blue's swaps, None without blue picks
     stages: list[StageRow] = field(default_factory=list)    # the plan stage by stage
 
-    def to_dict(self) -> Payload:
+    def to_dict(self) -> BoardRecord:
         """The board as JSON-ready data."""
         return {"map": self.map_name, "side": self.side, "stage": self.stage, "bans": self.bans,
                 "plan": self.plan, "swaps": self.swaps, "stages": self.stages,
