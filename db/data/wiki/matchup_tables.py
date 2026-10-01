@@ -45,9 +45,12 @@ class Released(NamedTuple):
 
 def released_articles(cursor: psycopg.Cursor, pull: PullContext) -> Released:
     """Every released hero and its article: what the synergies and counters
-    pulls read before either writes."""
+    pulls read before either writes, the heroes' read committed before the
+    first fetch."""
     cursor.execute("SELECT name, hero_id FROM heroes WHERE status = 'released' ORDER BY name")
     heroes: dict[str, int] = dict(cursor.fetchall())
+    # the read's transaction ends here, so none stays open across the fetches
+    cursor.connection.commit()
     return Released(heroes, fetch_articles(pull, heroes))
 
 

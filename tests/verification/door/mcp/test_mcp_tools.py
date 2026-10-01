@@ -1,9 +1,10 @@
 """The tools in-process: query, db_status, roster, the board tools, the
 compact infer, db_migrate and metrics against the built database; and,
 with no database, query's refusals, the playbook writes' mirror, the Draft
-a board tool hands its function, the readiness every door reports, and
-how query turns a cell into JSON, pages its rows and words an empty
-result. The one registry's family order is test_mcp_registry's."""
+a board tool hands its function, the readiness every door reports, a
+migration that fails, and how query turns a cell into JSON, pages its rows
+and words an empty result. The one registry's family order is
+test_mcp_registry's."""
 
 import contextlib
 import datetime
@@ -350,6 +351,48 @@ def test_the_probe_exits_one_when_there_is_no_database(monkeypatch, capsys):
     assert schema.main() == 1
     captured = capsys.readouterr()
     assert captured.out == "" and "no database: nothing to point at" in captured.err
+
+
+def test_a_migration_that_fails_is_named_and_the_files_before_it_stay_recorded():
+    """Each file commits with its ledger row, the files before the ledger's
+    own with it; one that fails is rolled back and named, so the ledger
+    never lags the schema and a retry starts at the file that broke."""
+
+    class Connection:
+        """Commits what was executed since the last commit or rollback; the
+        ledger exists once the migration that makes it has run."""
+
+        def __init__(self):
+            self.ledger, self.open, self.recorded = False, [], []
+
+        def cursor(self):
+            return contextlib.nullcontext(self)
+
+        def execute(self, sql, params=None):
+            if sql == "fails":
+                raise psycopg.errors.DuplicateTable('relation "heroes" already exists')
+            self.ledger = self.ledger or sql == "makes the ledger"
+            if sql.startswith("INSERT INTO schema_migrations"):
+                self.open.append(params[0])
+            return self
+
+        def fetchone(self):                     # to_regclass('schema_migrations')
+            return ("schema_migrations" if self.ledger else None,)
+
+        def commit(self):
+            self.recorded += self.open
+            self.open = []
+
+        def rollback(self):
+            self.open = []
+
+    files = [schema.Migration(path="migrations/%s" % name, sql=sql) for name, sql in (
+        ("001_a.sql", "runs"), ("002_b.sql", "makes the ledger"), ("003_c.sql", "runs"),
+        ("004_d.sql", "fails"), ("005_e.sql", "runs"))]
+    cx = Connection()
+    with pytest.raises(schema.SchemaError, match=r'^004_d\.sql: relation "heroes" already exists$'):
+        schema.apply(cx, files)
+    assert cx.recorded == ["001_a.sql", "002_b.sql", "003_c.sql"] and cx.open == []
 
 
 def test_a_query_cell_arrives_as_json():

@@ -167,8 +167,10 @@ wrote and read.
 
 1. **Every page before the first write.** A run reads what it needs from
    the database, fetches every page, and only then writes, so no row stays
-   locked across a fetch. pull_rates commits its read of the map ids
-   before its fetches, so no transaction stays open across them either.
+   locked across a fetch. A run that reads before it fetches commits that
+   read before the first fetch - pull_rates its map ids, pull_terrain its
+   maps and stages, pull_synergies and pull_counters the released heroes -
+   so no transaction stays open across the fetches either.
 2. **One transaction.** A run writes, then commits once. The door opens
    the connection in a `with` block, so a run that raises leaves the
    tables as they were.

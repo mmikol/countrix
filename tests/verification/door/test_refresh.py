@@ -44,18 +44,29 @@ def test_refresh_once_survives_a_bad_day(monkeypatch):
     assert ok is True
 
 
-def test_the_loop_refreshes_stale_data_on_start_then_waits(monkeypatch):
+def test_the_loop_refreshes_stale_data_on_start_then_waits(monkeypatch, tmp_path):
+    """The age is the caches' of the context the loop runs, the folders its
+    pulls write, never the repo's: a page 30 hours old there is refreshed at
+    once, one an hour old waits for the time."""
+    from door.mcp import tools
     runs, waits = [], []
-    monkeypatch.setattr(refresh, "cache_age_hours", lambda *a: 30.0)
     monkeypatch.setattr(refresh, "refresh_once", lambda ctx, log: runs.append(ctx) or (True, ""))
 
     def sleep(seconds):
         waits.append(seconds)
-        if len(waits) == 2:
+        if len(waits) % 2 == 0:
             raise KeyboardInterrupt
+    ctx = tools.Context(dsn="postgresql://nowhere",
+                        caches={"blizzard": str(tmp_path), "wiki": str(tmp_path)})
+    write_aged(tmp_path / "Ana.wikitext", "x", hours=30)
     with pytest.raises(KeyboardInterrupt):
-        refresh.run_forever("ctx", "05:00", log=lambda m: None, sleep=sleep)
-    assert runs == ["ctx"] * 2 and all(0 < w <= 24 * 3600 for w in waits)
+        refresh.run_forever(ctx, "05:00", log=lambda m: None, sleep=sleep)
+    assert runs == [ctx] * 2 and all(0 < w <= 24 * 3600 for w in waits)
+    runs.clear()
+    write_aged(tmp_path / "Ana.wikitext", "x", hours=1)
+    with pytest.raises(KeyboardInterrupt):
+        refresh.run_forever(ctx, "05:00", log=lambda m: None, sleep=sleep)
+    assert runs == [ctx]                    # the wait first, then the refresh at the time
 
 
 def test_the_loop_refuses_a_time_that_is_not_hh_mm_before_it_refreshes(monkeypatch):
@@ -86,7 +97,6 @@ def test_full_refresh_is_due_when_the_slow_caches_are_stale(tmp_path):
     write_aged(tmp_path / "Mei.wikitext", "x", hours=24 * 9)
     write_aged(tmp_path / "cargo_patches.json", "x", hours=1)
     assert refresh.full_due([str(tmp_path)]) is True
-    assert refresh.full_due() in (True, False)     # the default reads the wiki cache
 
 
 def test_daily_refresh_touches_only_what_moves(monkeypatch):
@@ -94,7 +104,7 @@ def test_daily_refresh_touches_only_what_moves(monkeypatch):
     calls = []
     monkeypatch.setattr(tools.Context, "call", lambda ctx, name, **kw: calls.append(
         (name, kw.get("refresh"))) or ToolReply("%s: ok\n  rows  1" % name, {}))
-    monkeypatch.setattr(refresh, "full_due", lambda: False)
+    monkeypatch.setattr(refresh, "full_due", lambda cache_dirs: False)
     ok, text = refresh.refresh_once(tools.Context(dsn="postgresql://nowhere"), lambda m: None)
     # patches first: the day's snapshot is stamped with the patch live today
     assert ok and calls == [("pull_patches", True), ("pull_rates", True),
@@ -108,7 +118,7 @@ def test_daily_refresh_touches_only_what_moves(monkeypatch):
     # the calls above are stubbed, so a renamed tool would pass them: the names are checked here
     assert {name for name, _ in calls} <= set(tools.REGISTRY.names())
     calls.clear()
-    monkeypatch.setattr(refresh, "full_due", lambda: True)
+    monkeypatch.setattr(refresh, "full_due", lambda cache_dirs: True)
     ok, text = refresh.refresh_once(tools.Context(dsn="postgresql://nowhere"), lambda m: None)
     assert ok and calls == [("sync_all", True)] and text == "sync_all: ok"
     assert {name for name, _ in calls} <= set(tools.REGISTRY.names())

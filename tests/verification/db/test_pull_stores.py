@@ -292,7 +292,8 @@ def test_the_terrain_pull_counts_each_map_and_stage_and_deletes_nothing_before_i
     assert {key: summary[key] for key in (
         "maps", "rows", "words", "stages", "stages_no_text", "stage_rows")} == {
         "maps": 1, "rows": 8, "words": 93, "stages": 1, "stages_no_text": 1, "stage_rows": 8}
-    assert connection.commits == 1 and pull.session.calls == 1   # Nepal, asked for once
+    # one commit ends the maps and stages read before the fetches, one the reload
+    assert connection.commits == 2 and pull.session.calls == 1   # Nepal, asked for once
 
 
 # --- the playstyles and the patches: one page each ---------------------------
