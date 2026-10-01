@@ -2,10 +2,14 @@
 load. No server and no database - these read ui/pages.py's output
 and the scripts' source. The scripts are pinned at their seams - the routes
 and query keys they send, the ids they write, the globals and payload keys
-they read - against what the shell and the server write. The two decisions
-only the client can make, the stale-reply guard and the HTML escape, are
-pinned in the script; any other decision worth pinning is made on the
-server, as the seat badge is (momentum.badges), and tested there."""
+they read - against what the shell and the server write. The decisions
+only the client can make are pinned in the script: the stale-reply guard;
+the HTML escape; the meta and swap-cost weights, never pruned as a stale
+heuristic's are; the swaps and suggested slots, drawn only for the picks
+the board in hand answered, held while a board solves and never offering a
+picked hero; and a taken swap, checked against the bans and the role caps
+as a pick is. Any other decision worth pinning is made on the server, as
+the seat badge is (momentum.badges), and tested there."""
 
 import os
 import re

@@ -34,11 +34,14 @@ def test_patches_and_synergies_are_pulls_in_dependency_order():
     order = list(pulls)
     assert pulls["pull_patches"] == "wiki"
     assert pulls["pull_synergies"] == "wiki"
+    # the roster runs first: a kit, a synergy and a counter link to heroes
+    assert order[0] == "pull_heroes"
     # a rates pull stamps its snapshot with the patch live today
     assert order.index("pull_patches") < order.index("pull_rates")
-    # a synergy and a counter are pairs of heroes on the roster
-    assert order.index("pull_heroes") < order.index("pull_synergies")
-    assert order.index("pull_heroes") < order.index("pull_counters")
+    # a stage's terrain needs its stage, and a map's rates its row: a rates
+    # pull run before the maps skips every map
+    assert order.index("pull_maps") < order.index("pull_terrain")
+    assert order.index("pull_maps") < order.index("pull_rates")
     # every pull_* tool is a pull, in the order it was registered
     assert order == [n for n in tools.REGISTRY.names() if n.startswith("pull_")]
 
@@ -202,18 +205,38 @@ def test_the_data_dictionary_says_counters_are_the_wikis_matchups():
     assert "loader" not in prose and "tooltip" not in prose     # 005's, about counterpick
 
 
-def test_the_migration_that_drops_counterpick_is_one_transaction():
+# what three migrations that drop data run, in the order they run it
+DROPS_IN_ORDER = {
+    # map_strategy, then counterpick's rows: the rates, their snapshots, the
+    # counters, then the source
+    "019_wiki_replaces_counterpick.sql": (
+        "DROP TABLE IF EXISTS map_strategy;", "DELETE FROM hero_meta", "DELETE FROM map_meta",
+        "DELETE FROM meta_snapshots", "DELETE FROM counters",
+        "DELETE FROM sources WHERE code = 'counterpick';"),
+    # the two tables 024 added, the picks before the matches they reference
+    "027_drop_matches.sql": ("DROP TABLE IF EXISTS match_picks;", "DROP TABLE IF EXISTS matches;"),
+    # the snapshot's season column before the seasons it references, then the
+    # two kit tables nothing read
+    "028_drop_unread.sql": (
+        "ALTER TABLE meta_snapshots DROP COLUMN IF EXISTS season_id;",
+        "DROP TABLE IF EXISTS seasons;", "DROP TABLE IF EXISTS ability_modifiers;",
+        "DROP TABLE IF EXISTS perk_ability_effects;"),
+}
+
+
+def test_the_migrations_that_drop_data_drop_children_before_parents():
+    """Each drops a row, a column or a table before the one it references:
+    019 counterpick's rows, 027 the recorded matches, 028 the data nothing
+    read. That each is one transaction, tests/qa/test_docs.py holds of every
+    migration but 010-013."""
     from db.psql import schema
-    [sql] = [
-        m.sql for m in schema.read_migrations() if m.name == "019_wiki_replaces_counterpick.sql"]
-    body = [line for line in sql.splitlines() if line and not line.startswith("--")]
-    assert body[0] == "BEGIN;" and body[-1] == "COMMIT;"
-    assert "DROP TABLE IF EXISTS map_strategy;" in body
-    # children before parents: rates, their snapshots, counters, then the source
-    order = [sql.index(statement) for statement in (
-        "DELETE FROM hero_meta", "DELETE FROM meta_snapshots", "DELETE FROM counters",
-        "DELETE FROM sources WHERE code = 'counterpick';")]
-    assert order == sorted(order)
+    sql = {m.name: m.sql for m in schema.read_migrations()}
+    for name, statements in DROPS_IN_ORDER.items():
+        body = "\n".join(line for line in sql[name].splitlines()
+                         if not line.lstrip().startswith("--"))
+        assert [s for s in statements if s not in body] == [], name
+        order = [body.index(statement) for statement in statements]
+        assert order == sorted(order), name
 
 
 def test_a_table_name_that_reaches_sql_text_is_checked():
@@ -239,27 +262,6 @@ def test_every_path_the_layer_declares_exists():
     for path in (schema.MIGRATIONS_DIR, catalog.strategies_dir(),
                  os.path.join(db.ROOT, "docs")):
         assert os.path.isdir(path), path
-
-
-def test_the_migration_that_drops_the_matches_is_one_transaction():
-    """027 drops the two tables 024 added, the picks before the matches they
-    reference."""
-    from db.psql import schema
-    [sql] = [m.sql for m in schema.read_migrations() if m.name == "027_drop_matches.sql"]
-    body = [line for line in sql.splitlines() if line and not line.startswith("--")]
-    assert body == ["BEGIN;", "DROP TABLE IF EXISTS match_picks;",
-                    "DROP TABLE IF EXISTS matches;", "COMMIT;"]
-
-
-def test_the_migration_that_drops_the_unread_data_is_one_transaction():
-    """028 drops the snapshot's season column before the seasons it
-    references, then the two kit tables nothing read."""
-    from db.psql import schema
-    [sql] = [m.sql for m in schema.read_migrations() if m.name == "028_drop_unread.sql"]
-    body = [line for line in sql.splitlines() if line and not line.startswith("--")]
-    assert body == ["BEGIN;", "ALTER TABLE meta_snapshots DROP COLUMN IF EXISTS season_id;",
-                    "DROP TABLE IF EXISTS seasons;", "DROP TABLE IF EXISTS ability_modifiers;",
-                    "DROP TABLE IF EXISTS perk_ability_effects;", "COMMIT;"]
 
 
 # --- the built database ----------------------------------------------------

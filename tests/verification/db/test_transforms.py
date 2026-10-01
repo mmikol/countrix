@@ -1,13 +1,15 @@
 """Unit tests: the pure functions the pulls lean on - the measurement, name
-and map readers. No database, no network - every lesson here was paid for
-once already."""
+and map readers - and the doc writers, embed and table_prose. No database,
+no network - every lesson here was paid for once already."""
 
 import pytest
 
+from db import embed
 from db.data.normalizer import hero_key, name_key, slug
 from db.data.wiki import WikiError
 from db.data.wiki.kits.measurements import parse_measurements
 from db.data.wiki.maps import parse_phases, parse_stages, parse_stretches, stages_of
+from db.psql.schema import table_prose
 
 # --- measurements: value / numerator / denominator / window ------------
 
@@ -221,3 +223,46 @@ def test_a_maps_stages_follow_its_mode():
     # a Push map stays whole
     assert stages_of("push", FIXTURE, phases) == []
     assert stages_of("push", ESCORT_NAMED, phases) == []
+
+
+# --- the doc writers: a table's prose, a generated section ----------------------
+
+def test_a_tables_prose_is_the_comment_block_directly_above_it():
+    text = "\n".join([
+        "-- THE FILE: a header that is no table's.",
+        "BEGIN;",
+        "",
+        "-- One row per hero.",
+        "--",
+        "-- The roster, from Blizzard.",
+        "CREATE TABLE heroes (",
+        "    hero_id serial PRIMARY KEY",
+        ");",
+        "",
+        "-- Not this one: a blank line follows it.",
+        "",
+        "CREATE TABLE maps (map_id serial PRIMARY KEY);",
+        "-- Nor this one:",
+        "    -- an indented line ends the block.",
+        "CREATE TABLE modes (mode_id serial PRIMARY KEY);",
+        "-- Two lines,",
+        "-- one sentence.",
+        "CREATE TABLE stages (stage_id serial PRIMARY KEY);",
+        "COMMIT;",
+    ])
+    assert table_prose(text) == {
+        "heroes": "One row per hero. The roster, from Blizzard.",   # the bare -- is dropped
+        "maps": "", "modes": "",
+        "stages": "Two lines, one sentence.",
+    }
+
+
+def test_embed_replaces_only_the_marked_section(tmp_path):
+    path = tmp_path / "doc.md"
+    path.write_text("# T\n\nkeep\n\n<!-- generated:x -->\nold\n<!-- /generated:x -->"
+                    "\n\nalso keep\n")
+    embed(str(path), "x", "new\nlines")
+    assert path.read_text() == ("# T\n\nkeep\n\n<!-- generated:x -->\nnew\nlines\n"
+                                "<!-- /generated:x -->\n\nalso keep\n")
+    with pytest.raises(ValueError, match="no y markers"):
+        embed(str(path), "y", "z")
