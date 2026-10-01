@@ -616,15 +616,12 @@ class _Pass:
                 six=self.world.resolve(None, (), tuple(suggested["six"])).blue
                 if suggested["status"] == "suggested" else six,
                 swaps=[StageSwap({"out": p["out"], "in": p["in"]}) for p in suggested["pairs"]])
-        plain = blue.solver
-        whole = Objective(self.world, m, red=plain.red, banned=plain.banned_heroes,
-                          side=plain.side, catalog=plain.catalog, base=OFF)
         raw = swaps.raw_cost(cost, blue.span)
         if raw is None:
             raw = cost = 0.0
         self.watch.check()
-        return swaps.chain(swaps.ChainStart(plain=plain, whole=whole, chosen=draft.stage,
-                                            origin=six, raw=raw, cost=cost, taken=taken))
+        return swaps.chain(swaps.ChainStart(plain=blue.solver, chosen=draft.stage, origin=six,
+                                            raw=raw, cost=cost, taken=taken))
 
     def _against(self, draft: Draft, six: Result) -> Momentum:
         """The momentum were blue to field `six`, a Result on blue's

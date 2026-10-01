@@ -274,6 +274,14 @@ def ruled(solver: Objective, whole: Objective) -> StageRules:
         off=[s.name for s in weighted if solver.gates[s.id] is False and whole.gates[s.id] is True])
 
 
+def gates_on(plain: Objective, stage: str = "") -> Objective:
+    """`plain`'s board on `stage` - the whole map where it names none - with
+    the default engine off: the objective a stage's rules are read off
+    (ruled), which reads only its gates."""
+    return Objective(plain.world, plain.m, red=plain.red, banned=plain.banned_heroes,
+                     side=plain.side, stage=stage, catalog=plain.catalog, base=OFF)
+
+
 class Taken(NamedTuple):
     """The board's swap answer on its chosen stage: the six it makes (the
     origin where the picks keep) and its swaps."""
@@ -283,14 +291,12 @@ class Taken(NamedTuple):
 
 class ChainStart(NamedTuple):
     """What the stage plan is walked from: blue's optimal's Solver, whose
-    board and scale every stage shares; the whole map's objective, which a
-    stage's rules are read against; the board's chosen stage; the origin -
-    the six the comps tab shows; the raw cost and the cost in share points;
-    and the board's swap answer on the chosen stage - a swap suggested, or
-    the picks kept under the cost - None where it gave neither: it searched
-    none, or withheld the swap."""
+    board and scale every stage shares; the board's chosen stage; the
+    origin - the six the comps tab shows; the raw cost and the cost in share
+    points; and the board's swap answer on the chosen stage - a swap
+    suggested, or the picks kept under the cost - None where it gave
+    neither: it searched none, or withheld the swap."""
     plain: Solver
-    whole: Objective
     chosen: str
     origin: Sequence[Hero]
     raw: float
@@ -306,6 +312,7 @@ def chain(p: ChainStart, memo: Memo | None = None) -> list[StageRow]:
         return []
     memo = {} if memo is None else memo
     titles = {s.id: s.name for s in p.plain.catalog} | base.TITLES
+    whole = gates_on(p.plain)
     walk = stages(m)
     phases = [name for name, kind in walk if kind == "phase"]
     rows: list[StageRow] = []
@@ -320,9 +327,7 @@ def chain(p: ChainStart, memo: Memo | None = None) -> list[StageRow]:
         reference = previous if kind == "phase" else p.origin
         index = (phases.index(name) + 1, len(phases)) if kind == "phase" else (0, 0)
         if current:
-            here = Objective(p.plain.world, m, red=p.plain.red, banned=p.plain.banned_heroes,
-                             side=p.plain.side, stage=name, catalog=p.plain.catalog, base=OFF)
-            rules = ruled(here, p.whole)
+            rules = ruled(gates_on(p.plain, name), whole)
             # the board's own swap answer on this stage, one answer with the
             # swaps above the picks; where it gave none, the origin
             played_six = sorted(p.taken.six if p.taken is not None else p.origin,
@@ -331,18 +336,18 @@ def chain(p: ChainStart, memo: Memo | None = None) -> list[StageRow]:
             rows.append(_row(m, name, kind, current=True, six=[h.name for h in played_six],
                              swaps=taken, rules=rules, blurb=plan.stage_blurb(
                                  m, name, index, rules, taken, [], p.cost,
-                                 origin=p.taken is None)))
+                                 outcome="origin" if p.taken is None else "solved")))
             if kind == "phase":
                 previous = played_six
             continue
         solver = keeping(p.plain, reference, p.raw, stage=name)
-        rules = ruled(solver, p.whole)
+        rules = ruled(solver, whole)
         try:
             got = leg(solver, reference, memo)
         except (Unbounded, Infeasible) as error:
             rows.append(_row(m, name, kind, rules=rules, solved=False, blurb=plan.stage_blurb(
-                m, name, index, rules, [], [], p.cost, solved=False,
-                infeasible=isinstance(error, Infeasible))))
+                m, name, index, rules, [], [], p.cost,
+                outcome="infeasible" if isinstance(error, Infeasible) else "unsolved")))
             continue
         heroes = got.six.heroes
         swaps = moved(reference, heroes)

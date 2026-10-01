@@ -17,7 +17,7 @@ from facts.draft import Draft
 from inference import catalog, engine, plan, swaps
 from inference.base import OFF
 from inference.result import StageRules
-from inference.scoring import Candidate, Objective, quantized
+from inference.scoring import Candidate, quantized
 from inference.solver import Solver
 from tests.verification.inference import ASSUMPTIONS_ONLY, DEFAULT, FIXTURE_PLAYBOOK
 from tests.verification.inference.test_swaps import netted, plain_seat
@@ -60,10 +60,9 @@ def planned(world, draft, playbook, base, origin, memo=None):
     walks them, and the plain Solver and raw cost they were walked on."""
     plain, span = plain_seat(world, draft, playbook, base)
     raw = swaps.raw_cost(COST, span) or 0.0
-    whole = Objective(world, plain.m, red=plain.red, side=plain.side, catalog=playbook, base=OFF)
     six = world.resolve(None, (), tuple(origin)).blue
-    rows = swaps.chain(swaps.ChainStart(plain=plain, whole=whole, chosen=draft.stage,
-                                        origin=six, raw=raw, cost=COST), memo)
+    rows = swaps.chain(swaps.ChainStart(plain=plain, chosen=draft.stage, origin=six, raw=raw,
+                                        cost=COST), memo)
     return rows, plain, raw
 
 
@@ -225,7 +224,7 @@ def test_a_stage_no_six_can_hold_says_so_and_not_that_it_ran_out(synthetic_world
     out of its budget."""
     m = synthetic_world.resolve("Ember Ruins", (), (), ())[0]
     none = StageRules(on=[], off=[])
-    stuck = plan.stage_blurb(m, "Forge", (0, 0), none, [], [], COST, solved=False,
-                             infeasible=True)
+    stuck = plan.stage_blurb(m, "Forge", (0, 0), none, [], [], COST, outcome="infeasible")
     assert "No six keeps this stage's limits" in stuck and "budget" not in stuck
-    assert "budget" in plan.stage_blurb(m, "Forge", (0, 0), none, [], [], COST, solved=False)
+    assert "budget" in plan.stage_blurb(m, "Forge", (0, 0), none, [], [], COST,
+                                        outcome="unsolved")
