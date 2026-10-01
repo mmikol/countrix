@@ -41,7 +41,7 @@ def playbook(directory):
 def test_the_lean_field_measures_what_the_whole_one_does(synthetic_world, tmp_path, monkeypatch,
                                                          draft):
     """The same board frozen twice - its field read lean, then prepared
-    whole - holds the same bounds and the same floor, bit for bit."""
+    whole - holds the same scale and the same floor, bit for bit."""
     rules = playbook(str(tmp_path))
     lean = seated(synthetic_world, draft, rules, DEFAULT)
     assert lean.lean_keys() == frozenset({"cc_count", "mobility_count", "range_min",
@@ -50,7 +50,7 @@ def test_the_lean_field_measures_what_the_whole_one_does(synthetic_world, tmp_pa
     monkeypatch.setattr(Objective, "lean_keys", lambda self: None)
     whole = seated(synthetic_world, draft, rules, DEFAULT)
     whole.freeze_scale()
-    assert lean.bounds == whole.bounds and lean.floor == whole.floor
+    assert lean.scale == whole.scale and lean.floor == whole.floor
 
 
 def test_a_playbook_that_needs_more_is_prepared_whole(synthetic_world):

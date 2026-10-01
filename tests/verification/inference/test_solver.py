@@ -589,7 +589,7 @@ def test_the_floor_is_the_lowest_reference_six(synthetic_world):
     fill = solver_module.Solver(world, m, red=red, locked=locked, side="attack",
                                 catalog=playbook, base=DEFAULT)
     fill.adopt_scale(solver)
-    assert fill.floor == solver.floor and fill.bounds == solver.bounds
+    assert fill.floor == solver.floor and fill.scale == solver.scale
 
 
 # a board that reads the terrain: a rule and a limit Forge's hazards turn on
@@ -615,7 +615,7 @@ def test_every_stage_of_a_map_shares_one_scale_and_reads_its_own_floor(
         synthetic_world, tmp_path):
     """The scale is measured on the whole map, each heuristic read wherever
     the board settles its gate: a stage that turns a rule on and a limit
-    that reads the terrain move no bound. The floor is the board's own -
+    that reads the terrain move no low or high. The floor is the board's own -
     the lowest reference six under its stage's gates and limits - so a
     stage that reads as the map floors where the map does, off the same
     measured sixes. Each stage is searched exactly: its best sixes are the
@@ -633,8 +633,8 @@ def test_every_stage_of_a_map_shares_one_scale_and_reads_its_own_floor(
         solver.freeze_scale()
     assert [solvers[s].gates["hazard-cc"] for s in solvers] == [False, False, True]
     assert [solvers[s].reads_the_stage() for s in solvers] == [False, False, True]
-    assert solvers[""].bounds == solvers["Courtyard"].bounds == solvers["Forge"].bounds
-    assert "hazard-cc" in solvers[""].bounds
+    assert solvers[""].scale == solvers["Courtyard"].scale == solvers["Forge"].scale
+    assert "hazard-cc" in solvers[""].scale
     for solver in solvers.values():
         scores = [solver.score(c, detail=False).score for c in scale._prepared(solver)]
         assert solver.floor == min(scores)

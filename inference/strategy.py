@@ -73,15 +73,17 @@ from facts import compute
 from inference.expr import ExprError, Section, compile_expr
 from inference.frontmatter import Frontmatter, Scalar
 
-# a strategy's kind, as its frontmatter names it, and its form, as its fields make it
+# a strategy's kind, as its frontmatter names it, its form, as its fields make
+# it, and which end of a heuristic's metric is good
 type Kind = Literal["constraint", "heuristic", "assumption"]
 type Form = Literal["limit", "heuristic", "scored", "assumption", "draft"]
+type Direction = Literal["maximize", "minimize"]
 KINDS: tuple[Kind, ...] = ("constraint", "heuristic", "assumption")
 # load() sorts by this index within a kind: a heuristic on a metric before one
 # on an expression, and draft last for either kind
 FORMS: tuple[Form, ...] = ("limit", "heuristic", "scored", "assumption", "draft")
 WEIGHED: tuple[Form, ...] = ("heuristic", "scored")     # the forms a weight scales: a heuristic's
-DIRECTIONS = ("maximize", "minimize")      # which end of a heuristic's metric is good
+DIRECTIONS: tuple[Direction, ...] = ("maximize", "minimize")
 
 # the namespaces one board settles for every candidate six
 _BOARD_SECTIONS = ("enemy", "map", "world", "params")
@@ -276,7 +278,7 @@ class StrategyRecord(TypedDict):
     pending: bool
     need: bool
     category: str
-    direction: str | None
+    direction: Direction | None
     metric: str | None
     weight: float
     when: str | None

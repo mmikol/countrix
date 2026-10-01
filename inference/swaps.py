@@ -96,11 +96,11 @@ def keeping(plain: Solver, picks: Sequence[Hero], cost: float,
             stage: str | None = None) -> Solver:
     """The swap search's Solver on `plain`'s board - blue's optimal's,
     nothing locked - with `cost` points, the raw cost, for each of `picks`
-    a six keeps, on `plain`'s scale: its bounds and its floor; on `stage`
-    where given, else on `plain`'s."""
+    a six keeps, on `plain`'s scale: each heuristic's low and high, and its
+    floor; on `stage` where given, else on `plain`'s."""
     solver = Solver(plain.world, plain.m, red=plain.red, locked=(), banned=plain.banned_heroes,
                     side=plain.side, stage=plain.stage if stage is None else stage,
-                    catalog=plain.catalog, base=plain.weights, check=plain.check,
+                    catalog=plain.catalog, base=plain.base, check=plain.check,
                     keep=frozenset(h.id for h in picks), swap=cost)
     solver.adopt_scale(plain)
     return solver

@@ -273,10 +273,10 @@ def _current(
         barred: list[str] | None = None) -> Result:
     """`seat`'s picks (`draft.blue`, from that seat's perspective) as they
     stand against the other seat's (`draft.red`), on the span of the seat's
-    `optimal`: its Solver's bounds and floor, and its score, the 100. A full
+    `optimal`: its Solver's scale and floor, and its score, the 100. A full
     six is ranked against every legal six through the optimal's search, and
     reads "evaluate" where `kind` is "current", any other kind staying as
-    given; a partial team is scored under the bounds the optimal's search
+    given; a partial team is scored on the scale the optimal's search
     froze, and says so. `barred` is the limits the picks break when their
     comp is not allowed (_barred): it is scored nowhere and ranked against
     nothing, and says why."""
