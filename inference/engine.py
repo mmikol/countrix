@@ -214,7 +214,7 @@ def _optimal(
     with `top` alternatives. `scale_of` is a solver on the same board whose
     scale this search takes - a fill takes its seat's - and `check` is asked
     as the search runs whether the board was superseded."""
-    started = time.time()
+    started = time.monotonic()
     seated = _seat_board(world, draft)
     m, red_h, blue_h, bans_h = seated.board
     _check_teams(red_h, blue_h, seat)
@@ -235,7 +235,7 @@ def _optimal(
                            for c in solved.ranked[1:top + 1]]
     optimal = _Optimal(result, solver, solved)
     result.scale_to(optimal.span)
-    result.seconds = time.time() - started
+    result.seconds = time.monotonic() - started
     return optimal
 
 
@@ -246,7 +246,7 @@ def _evaluated(
     legal six, labelled `kind`, through `solved`, the seat's own search on
     this board. A six that breaks a limit is scored with its breaches
     listed: the board bars blue's before it gets here, and ranks red's."""
-    started = time.time()
+    started = time.monotonic()
     seated = _seat_board(world, draft)
     red_h, blue_h = seated.board.red, seated.board.blue
     _check_teams(red_h, blue_h, seat)
@@ -259,7 +259,7 @@ def _evaluated(
     result.alternatives = [Alternative(blue=_order(c.heroes), score=round(c.score, 3),
                                        normalized=None)
                            for c in evaluated.field[:3]]
-    result.seconds = time.time() - started
+    result.seconds = time.monotonic() - started
     # the board's best known six is the 100, not this comp's own best rival: a
     # beaten six must not read 100 because nothing it was compared against beat it
     result.scale_to(Span(best=max([result.score] + [a["score"] for a in result.alternatives]),
@@ -287,7 +287,7 @@ def _current(
                             solved=optimal.solved)
         result.scale_to(optimal.span)
         return result
-    started = time.time()
+    started = time.monotonic()
     seated = _seat_board(world, draft)
     blue_h = seated.board.blue
     picks = [h.name for h in blue_h]
@@ -303,7 +303,7 @@ def _current(
     result.scale_to(optimal.span)
     if barred is not None:
         result.bar(barred)
-    result.seconds = time.time() - started
+    result.seconds = time.monotonic() - started
     return result
 
 

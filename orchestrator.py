@@ -77,8 +77,8 @@ def get_json(url: str, timeout: float = 10) -> dict[str, Any] | None:
 def wait_for(url: str, seconds: float, what: str) -> dict[str, Any]:
     """The first JSON the URL answers, an error included, polled until
     `seconds` pass; then the run stops."""
-    started = time.time()
-    while time.time() - started < seconds:
+    started = time.monotonic()
+    while time.monotonic() - started < seconds:
         data = get_json(url)
         if data is not None:
             return data
@@ -158,12 +158,12 @@ def probe() -> Probe | None:
     """One board solved on the board -> {"seconds", "picks"}, or None when it
     did not answer with a six: unreachable, erroring, or a playbook whose
     limits seat no composition."""
-    started = time.time()
+    started = time.monotonic()
     data = get_json(PROBE, timeout=2 * MINUTE)
     picks = (data or {}).get("blue", {}).get("blue") or []
     if len(picks) != 6:                            # a six, or the solve failed
         return None
-    return Probe(seconds=round(time.time() - started, 1), picks=picks)
+    return Probe(seconds=round(time.monotonic() - started, 1), picks=picks)
 
 
 def _state_problem(data: dict[str, Any]) -> str | None:
