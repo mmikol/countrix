@@ -34,8 +34,12 @@ The search, which reads the playbook:
                   locked picks
     scale         the board's one scale: the seeded reference sample and field
                   every heuristic is normalised against, and the board's floor
+    intervals     what a value can be over a branch of the search, and an
+                  expression read over such values
+    ranges        each team.* and matchup.* metric's range over a branch's
+                  completions, the rules the bound reads
     bounds        the search's bounds: the most any six a branch can reach
-                  scores, each metric's and expression's range over it
+                  scores, read off the intervals and the ranges
     solver        the exact search over every legal six under the constraints
                   and heuristics, by branch and bound; players are assumed to
                   play optimally

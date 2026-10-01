@@ -37,7 +37,8 @@ from facts.draft import Side
 from facts.model import ROLES, Hero, Map, World
 from inference import scale
 from inference.base import BaseWeights
-from inference.bounds import Bound, Frame, Space, roster
+from inference.bounds import Bound, Frame, roster
+from inference.ranges import Space
 from inference.scoring import Candidate, Objective, quantized, rank_key
 from inference.shapes import Shape, legal_shapes
 from inference.strategy import Strategy
