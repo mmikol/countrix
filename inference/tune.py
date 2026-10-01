@@ -359,11 +359,10 @@ def _meta_text(directory: str) -> tuple[str, str]:
     if os.path.abspath(directory) != os.path.abspath(catalog_module.SHIPPED_DIR):
         sources.append((catalog_module.SHIPPED_DIR, "seeded from the shipped %s; " % name))
     for source, seeded in sources:
-        try:
-            with open(os.path.join(source, name), encoding="utf-8") as handle:
+        path = os.path.join(source, name)
+        if os.path.isfile(path):
+            with open(path, encoding="utf-8") as handle:
                 return handle.read(), seeded
-        except FileNotFoundError:
-            continue
     raise TuneError("%s: missing - the playbook's folder holds the default engine's weights"
                     " there" % name)
 

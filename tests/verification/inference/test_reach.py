@@ -120,6 +120,13 @@ def test_a_hero_no_board_fits_is_infeasible_not_a_crash(synthetic_world, monkeyp
     with pytest.raises(Infeasible, match="no board the search tries seats Anvil") as caught:
         reach.search(synthetic_world, "Anvil")
     assert isinstance(caught.value, Refusal)
+    anvil = synthetic_world.hero("Anvil")
+    boards = reach.maps(synthetic_world, anvil)
+    tried = len(reach.reds(synthetic_world, anvil)) * sum(
+        len(reach.SIDES) if reach.is_sided(m) else 1 for m in boards)
+    assert tried > 0
+    assert "(%d allow no six with it, 0 refuse past the search's budget)" % tried \
+        in str(caught.value)
     recorded_board = {"hero": "Anvil", "seated": True, "map": "Harbor Gate", "side": "",
                       "red": [], "banned": [], "six": ["Anvil"], "gap": 0.0}
     assert reach.seated(synthetic_world, recorded_board) is False
