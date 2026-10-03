@@ -1,5 +1,5 @@
-/* the comps tab: the game plan, the two seats and the badges above
-   the pickers; loaded before board.js, which calls into it */
+/* the comps tab: the game plan, the fight odds, the two seats and the badges
+   above the pickers; loaded before board.js, which calls into it */
 /* the list under a comp: every strategy the playbook holds, one bar each - lit
    when it applied to this comp, greyed when it did not (its guard unmet, or
    nothing to read) - in three panes behind tabs, satisfied, costing and did not
@@ -130,14 +130,14 @@ function wireBars(root) {
   });
 }
 
-/* the comps panel: the game plan, the two seats side by side and the badge
-   above each picker */
+/* the comps panel: the game plan, the fight odds strip, the two seats side by
+   side and the badge above each picker */
 function renderInf() {
   var d = INF;
   if (!d || d.error) {
     el('inf-blue').innerHTML = "<div class='warnbox'>" + esc(d ? d.error : 'no result') + '</div>';
     el('inf-red').innerHTML = ''; el('plan').innerHTML = '';
-    el('stageplan').innerHTML = '';
+    el('stageplan').innerHTML = ''; el('momentum').innerHTML = ''; el('momentum').title = '';
     ['bluescore', 'redscore'].forEach(function (id) { el(id).textContent = ''; el(id).title = ''; });
     paint();                              /* the last board's suggestions go with it */
     return;
@@ -146,6 +146,15 @@ function renderInf() {
   el('plan').innerHTML = "<span class='lbl'>game plan</span><div class='text'>" + text.map(esc).join('<br>') + '</div>' + (basis ? "<div class='basis'>" + esc(basis) + '</div>' : '');
   renderStages(d.stages);
   var mo = d.momentum;                  /* every board carries it, the badges included */
+  /* the fight odds: blue's six and red's likely six head to head on the meta
+     alone, each side's part of 100, the engine's words on hover; where there
+     are none the engine's verdict says why */
+  var odds = mo.odds, strip = el('momentum');
+  strip.title = odds ? odds.tip : '';
+  strip.innerHTML = "<span class='lbl'>fight odds</span>" + (odds
+    ? "<span class='side blue'>blue " + odds.blue + "%</span><span class='split'><span class='part blue' style='width:" +
+      odds.blue + "%'></span><span class='part red' style='width:" + odds.red + "%'></span></span><span class='side red'>red " + odds.red + '%</span>'
+    : "<span class='verdict'>" + esc(mo.verdict) + '</span>');
   /* red is never optimized: its box is its likely six - its picks and, for
      each open slot, the hero the map's pick rates and the wiki's synergies
      pull first - with the six's pull. Blue's shows the six the plan describes -

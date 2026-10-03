@@ -166,7 +166,15 @@ table.facts tr.warn td { color:#ff9d8f; } table.facts tr.derived td.text { color
 
 /* the comps panel: the game plan, then the two seats side by side */
 .plan { padding:12px 14px; margin-bottom:10px; border-radius:10px; border:1px solid var(--line); background:linear-gradient(170deg,#1b2436 0%,#161a24 70%); }
-.plan .lbl, .stages .lbl { font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); }
+.plan .lbl, .momentum .lbl, .stages .lbl { font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); }
+.momentum { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; padding:10px 14px; margin:14px 0 0; border-radius:10px; border:1px solid var(--line); background:#151a24; }
+.momentum:empty { display:none; }
+.momentum .side { font-family:"Bebas Neue",Impact,sans-serif; font-size:16px; letter-spacing:.08em; white-space:nowrap; }
+.momentum .side.blue { color:var(--blue); } .momentum .side.red { color:var(--red); }
+.momentum .split { flex:1; min-width:120px; display:flex; height:8px; border:1px solid var(--line); border-radius:4px; overflow:hidden; background:#0b0e14; }   /* blue's part of 100, then red's */
+.momentum .split .part { display:block; height:100%; transition:width .25s; }
+.momentum .split .part.blue { background:var(--blue); } .momentum .split .part.red { background:var(--red); }
+.momentum .verdict { flex:1; color:var(--muted); font-size:12px; }   /* why there are no odds */
 .plan .text { margin-top:6px; line-height:1.55; font-size:13.5px; }
 .seats { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
 @media (max-width:1100px) { .seats { grid-template-columns:1fr; } }

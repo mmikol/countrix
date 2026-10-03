@@ -39,9 +39,9 @@ from facts.draft import (
 from facts.factset import FactSet
 from facts.model import ROLES, Hero, Map, Resolved, World
 from inference import catalog as catalog_module
-from inference import supersede, swaps
+from inference import scale, supersede, swaps
 from inference.base import OFF, SWAP, BaseWeights
-from inference.plan import Seats, momentum, plan
+from inference.plan import HeadToHead, Seats, momentum, plan
 from inference.result import (
     Alternative,
     Board,
@@ -406,17 +406,21 @@ def board(
     # a full six is ranked against every legal six through its seat's search;
     # 100 is the seat's optimal, whatever it holds. The limits bind blue's picks
     cur = solve.current(ours, blue, stuck=stuck)
-    mo = momentum(Seats(current=cur, expected=expected, fill=fill))
+    # the six the comps tab shows for blue, which the plan describes: a comp
+    # that is not allowed is described by the optimal instead
+    held = len(draft.blue) == TEAM_SIZE and cur.barred is None
+    shown = fill if fill is not None else cur if held else blue.result
+    # the fight odds read that six against red's likely six on the default
+    # engine alone; a comp the limits rule out has none
+    head = None if cur.barred is not None else _head_to_head(
+        world, m, draft, shown.blue, expected.blue, catalog, base, bans_h)
+    mo = momentum(Seats(current=cur, expected=expected, fill=fill, head=head))
     # the swap cost, read once: the swaps above the picks and the chosen
     # stage's row are one answer
     cost = swap_in_force(brief) if brief.search_swaps or brief.walk_stages else 0.0
     suggested = None
     if brief.search_swaps and draft.blue:
         suggested = solve.swaps(draft, blue, _Seat(cur, fill, mo, unsolved), cost)
-    # the six the comps tab shows for blue, which the plan describes: a comp
-    # that is not allowed is described by the optimal instead
-    held = len(draft.blue) == TEAM_SIZE and cur.barred is None
-    shown = fill if fill is not None else cur if held else blue.result
     staged = solve.stages(m, draft, blue, shown.blue, cost, suggested) if brief.walk_stages else []
     return Board(map_name=expected.map_name, side=draft.side, stage=draft.stage,
                  bans=list(draft.bans),
@@ -566,6 +570,37 @@ def _scored(world: World, draft: Draft, optimal: _Optimal, cand: Candidate,
                             optimal.solver.considered)
     result.scale_to(optimal.span)
     return result
+
+
+def _head_to_head(
+        world: World, m: Map | None, draft: Draft, blue: Sequence[str], red: Sequence[str],
+        catalog: list[Strategy], base: BaseWeights, bans: Sequence[Hero]) -> HeadToHead | None:
+    """Blue's six and red's likely six scored against each other on the
+    default engine alone - no playbook rule for either side, red's six
+    scored and never searched - and the board's floor on the same terms: the
+    lowest such score among the board's reference sixes (scale.sample, drawn
+    under the playbook's limits as blue's own scale is), each read against
+    red's six. None with the engine off or a six short of a team."""
+    if not base.on or len(blue) != TEAM_SIZE or len(red) != TEAM_SIZE:
+        return None
+    ours = world.resolve(None, (), tuple(blue)).blue
+    theirs = world.resolve(None, (), tuple(red)).blue
+
+    def engine_alone(side: Side, against: Sequence[Hero]) -> Objective:
+        return Objective(world, m, red=against, banned=bans, side=side, stage=draft.stage,
+                         catalog=[], base=base)
+
+    def score(objective: Objective, cand: Candidate) -> float:
+        return objective.score(objective.prepare(cand), detail=False).score
+
+    for_blue = engine_alone(draft.side, theirs)
+    reference = scale.sample(Objective(world, m, red=theirs, banned=bans, side=draft.side,
+                                       stage=draft.stage, catalog=catalog, base=base))
+    if not reference:
+        return None
+    return HeadToHead(blue=score(for_blue, Candidate(ours)),
+                      red=score(engine_alone(draft.flipped().side, ours), Candidate(theirs)),
+                      floor=min(score(for_blue, c) for c in reference))
 
 
 def _check_teams(red_h: Sequence[Hero], blue_h: Sequence[Hero]) -> None:

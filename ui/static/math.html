@@ -7,6 +7,7 @@
 <a class='sub' href='#sustained-healing'>sustained healing</a>
 <a class='sub' href='#healing-floor'>the healing floor</a>
 <a class='sub' href='#what-100-means'>what 100 means</a>
+<a class='sub' href='#fight-odds'>fight odds</a>
 <a class='sub' href='#problem'>the problem's class</a>
 <a class='sub' href='#argmax'>the argmax</a>
 <a class='sub' href='#searched'>what is searched</a>
@@ -94,7 +95,8 @@ the default, 2.5 strong and 4 dominant, or from the owner's word, as <code>heal-
 did, and each rule's weight and each of the engine's is yours to turn - the tune tool for the
 file, a slider for a session, the Meta slider for the whole engine. A score is not a
 probability: blue's badge places it on the seat's span, from its floor, 0, to its optimal, 100.
-Red is never optimized or scored: its badge is its likely six's pull. The rates are Competitive Role Queue,
+Red is never optimized: its badge describes its likely six, and the fight odds score that six
+against blue's on the default engine alone. The rates are Competitive Role Queue,
 5v5, a proxy for Open Queue 6v6, so a value a hero has only beside a second tank, such as
 Zarya's in a two-tank front line, is missing from them.</p>
 <h2 id='function'>The function: STRATEGIES( FACTS )</h2>
@@ -273,6 +275,20 @@ they stand, says that no six keeping them meets the limits. Red's picks are the 
 and never ruled out. Blue still drafting is read through its fill, the best six its picks can
 reach: a sum over fewer picks reads low. Where no fill is solved - a fill past the search's
 budget - the seat is read off its picks as they stand, and its badge says so.</p>
+<p id='fight-odds'><b>Fight odds.</b> The strip above the teams compares blue's six - the six
+its badge reads - with red's likely six. Each is scored by the default engine alone against the
+other: its win-rate edge, its synergy, and its counters against the other six. No playbook rule
+counts for either side, since red reads none, and red's six is scored, never searched. Each
+side's part of 100 is its score above the board's floor, the lowest such score among the
+board's reference sixes:</p>
+<pre class='eq'>odds(blue) = round( 100 &middot; b / (b + r) ),   odds(red) = 100 &minus; odds(blue)
+           b = max( s(blue) &minus; f, 0 ),   r = max( s(red) &minus; f, 0 )
+           s: the default engine's score against the other six
+           f: the lowest s among the board's reference sixes, read against red's six</pre>
+<p>Scaling or shifting every score alike leaves the split where it is. With neither six above
+the floor, with the engine off, or with blue's picks not allowed, there are no odds. Blue's six
+is chosen to score well and red's likely six is the most-picked heroes, so blue usually leads:
+the odds compare the two sixes as they stand, and are not a chance of winning.</p>
 <p id='problem'><b>The problem's class.</b> With V the heroes the board leaves open - released
 and unbanned - a six is x &isin; {0,1}^V, x_h = 1 where h is picked, and the search solves</p>
 <pre class='eq'>maximise    score(x)
@@ -388,8 +404,8 @@ better; the board's draws - each hero's a hash of the map, the side and the hero
 its rates and its name - pick the one shown, the six whose draws sum highest, and the board says
 how many tie. With the meta at 0 and every weight at 0, every legal six ties: each hero of a role
 has the same chance of being the one drawn across boards, and one board draws the same six every
-time. A share is a score's place on blue's span, not a probability of winning, and red's pull
-ranks heroes by their pick rates and documented synergies: nothing here is fitted to match
+time. A share is a score's place on blue's span and the fight odds a split of two scores, not
+probabilities of winning, and red's pull ranks heroes by their pick rates and documented synergies: nothing here is fitted to match
 results. The playbook holds both as assumptions, <i>Tied sixes are equally good</i> and <i>Deterministic, not probabilistic</i>.</p>
 <h2 id='board'>The board</h2>
 <p id='likely-comp'><b>Red's likely comp</b>: red's revealed picks, then slot by slot toward a
