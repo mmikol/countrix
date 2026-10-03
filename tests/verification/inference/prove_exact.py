@@ -96,9 +96,9 @@ BOARDS = {
                             "attack"),
     "ilios-bans": Board("Ilios", ("Winston", "Tracer", "Genji", "Kiriko"), (),
                         ("Ana", "Sojourn", "Reinhardt", "Moira"), ""),
-    # a fill against red's full six, as the countered case solves one
-    "havana-countered": Board("Havana", ("Reinhardt", "Zarya", "Genji", "Tracer", "Ana", "Lúcio"),
-                              ("Kiriko",), (), "attack"),
+    # a fill against red's full six
+    "havana-full-red": Board("Havana", ("Reinhardt", "Zarya", "Genji", "Tracer", "Ana", "Lúcio"),
+                             ("Kiriko",), (), "attack"),
     # a full six the search puts fortieth: its rank is counted exactly
     "junkertown-fortieth": Board("Junkertown", ("Ramattra", "Doomfist", "Bastion", "Reaper"),
                                  (), (), "defense", ("Ashe", "Baptiste", "D.Mon", "Juno",

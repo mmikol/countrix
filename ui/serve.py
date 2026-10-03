@@ -103,20 +103,19 @@ def _first(query: Query, key: str) -> str | None:
 
 
 def handle_board(cx: psycopg.Connection, query: Query) -> web.Reply:
-    """Both seats and the current comp - what the board's two displays show -
-    under the playbook tab's weights, its Meta slider's (meta:value) among
-    them. The page never reads the countered case, so it is not solved
-    here; a newer board from the same `client` (one lane when none is
-    named) supersedes this one, which then answers 400, and a board
-    ADMISSION finds no room for answers 429. The whole query is read before
-    the lane is taken, so a malformed one supersedes nothing."""
+    """The board - what its two displays show - under the playbook tab's
+    weights, its Meta slider's (meta:value) among them. A newer board from
+    the same `client` (one lane when none is named) supersedes this one,
+    which then answers 400, and a board ADMISSION finds no room for answers
+    429. The whole query is read before the lane is taken, so a malformed
+    one supersedes nothing."""
     draft = parse_board(query)
     weights = catalog_module.parse_weights(query.get("weights", []))
     superseded = LATEST.take(_first(query, "client") or "")
     try:
         with ADMISSION.admitted(superseded):
             world = tables.load(cx)
-            brief = engine.Brief(weights=weights, solve_countered=False, superseded=superseded)
+            brief = engine.Brief(weights=weights, superseded=superseded)
             return web.Reply(engine.board(world, draft, brief=brief).to_dict(), 200)
     except BusyError as busy:
         return web.Reply({"error": str(busy)}, 429)

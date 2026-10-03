@@ -1,6 +1,6 @@
 """The search on a board, held to a full enumeration: the best sixes of
-every legal six, element for element, on both seats, around locked picks,
-past bans, in the countered case and on a plateau where every six ties;
+every legal six, element for element, for blue's optimal and its fill,
+around locked picks, past bans and on a plateau where every six ties;
 a full six's rank; shape limits, a charge for a rule broken that never
 prunes, a bonus that reads a name refused by its expression, a need and
 its budget, partners that only pay together, the scale
@@ -17,7 +17,7 @@ import shutil
 import pytest
 
 from db import Refusal
-from facts.draft import Draft, opposite
+from facts.draft import Draft
 from facts.records import Synergy
 from facts.team import team_metrics
 from inference import catalog
@@ -125,33 +125,21 @@ def test_the_search_reaches_the_enumerated_maximum(synthetic_world, catalog_copy
 
 
 @pytest.mark.parametrize("base", [OFF, DEFAULT], ids=["base-off", "base-on"])
-def test_every_seat_of_a_board_is_the_enumerated_maximum(synthetic_world, base):
-    """A board's searches are each exact: blue's optimal against red's picks,
-    the fill around blue's picks on blue's scale, and the countered case -
-    red's best counter on the other side, the one red six the board solves,
-    then blue's picks filled against it on the scale of blue's best counter
-    to it. Each is the enumeration's best six, and the board shows each six
-    and its alternatives in the enumeration's order."""
+def test_every_search_of_a_board_is_the_enumerated_maximum(synthetic_world, base):
+    """A board's searches are each exact: blue's optimal against red's picks
+    and the fill around blue's picks on blue's scale. Each is the
+    enumeration's best six, and the board shows each six and its
+    alternatives in the enumeration's order."""
     from inference import engine
     playbook = catalog.load(FIXTURE_PLAYBOOK)
     for draft in (Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm", "Rook"), side="attack"),
                   Draft("Ember Ruins", ("Anvil",), ("Needle",), ("Myrrh",))):
         board = engine.board(synthetic_world, draft, catalog=playbook,
                              brief=engine.Brief(base=base, search_swaps=False))
-        blue_seat = dataclasses.replace(draft, blue=())
-        red_seat = Draft(draft.map_name, draft.blue, (), draft.bans, opposite(draft.side))
-        blue = seated(synthetic_world, blue_seat, playbook, base)
-        red = seated(synthetic_world, red_seat, playbook, base)
+        blue = seated(synthetic_world, dataclasses.replace(draft, blue=()), playbook, base)
         blue.freeze_scale()
-        red.freeze_scale()
-        assert sorted(board.countered.red) == sorted(enumerated(red)[0].names), draft
-        against = dataclasses.replace(draft, red=tuple(board.countered.red), blue=())
-        countered = seated(synthetic_world, against, playbook, base)
-        countered.freeze_scale()
         seats = [(board.blue, blue),
-                 (board.fill, seated(synthetic_world, draft, playbook, base, blue)),
-                 (board.countered, seated(synthetic_world, dataclasses.replace(
-                     against, blue=draft.blue), playbook, base, countered))]
+                 (board.fill, seated(synthetic_world, draft, playbook, base, blue))]
         for result, solver in seats:
             full = enumerated(solver)
             assert verdicts(solver.solve(top=K).ranked) == verdicts(full[:K]), draft

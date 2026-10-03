@@ -347,7 +347,7 @@ def test_a_board_at_meta_zero_is_the_board_off(synthetic_world):
     off = engine.board(synthetic_world, draft, catalog=fix,
                        brief=engine.Brief(base=OFF, swap=10.0)).to_dict()
     assert zero["swaps"] is not None
-    seats = ("blue", "current", "fill", "countered", "expected")
+    seats = ("blue", "current", "fill", "expected")
     assert [zero[k]["base"] for k in seats] == [dict(DEFAULT.record(), meta=0.0)] * len(seats)
     assert [off[k]["base"] for k in seats] == [OFF.record()] * len(seats)
     for payload in (zero, off):

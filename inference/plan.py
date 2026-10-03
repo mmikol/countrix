@@ -32,12 +32,10 @@ from inference.result import (
 class Seats(NamedTuple):
     """What the verdict reads off a board: blue's current comp; its fill, the
     best six reachable from half-drafted picks, which the seat is read
-    through; blue's picks against red's best counter, where that hedge was
-    solved; and red's likely six, which nothing scores."""
+    through; and red's likely six, which nothing scores."""
     current: Result
     expected: Result
     fill: Result | None = None
-    countered: Result | None = None
 
 
 def momentum(seats: Seats) -> Momentum:
@@ -55,15 +53,8 @@ def momentum(seats: Seats) -> Momentum:
     badges = Badges(blue=_badge(cur, fill), red=_likely_badge(seats.expected))
     why = cur.unscored()
     share = _now(cur, fill).share() if cur.blue and why is None else None
-    countered = seats.countered
-    countered_share = None
-    if countered is not None and countered.blue and not countered.unscored():
-        countered_share = countered.share()
     partial = bool(cur.blue and cur.partial)
-    verdict = _verdict_line(cur, share, partial, why)
-    if countered_share is not None:
-        verdict += "; if red plays its best counter, your picks hold %d / 100" % countered_share
-    return Momentum(blue=share, countered=countered_share, partial=partial, verdict=verdict,
+    return Momentum(blue=share, partial=partial, verdict=_verdict_line(share, partial, why),
                     badges=badges)
 
 
@@ -110,8 +101,8 @@ def _likely_badge(likely: Result) -> Badge:
     return Badge(label="%.0f pull" % pull, tip=tip)
 
 
-def _verdict_line(cur: Result, share: int | None, partial: bool, why: str | None) -> str:
-    """Blue's standing in words, before the countered hedge."""
+def _verdict_line(share: int | None, partial: bool, why: str | None) -> str:
+    """Blue's standing in words."""
     if why is not None:                  # picks not allowed, or a board that waits
         return "blue " + why if why.startswith(NOT_ALLOWED) else why
     if share is None:

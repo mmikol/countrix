@@ -28,7 +28,7 @@ def test_a_playbook_that_scores_nothing_reads_unscored(synthetic_world):
     # the optimal is the reference: 100, always
     assert d["blue"]["scoring"] is True and d["blue"]["normalized"] == 100
     assert all(a["normalized"] is None for a in d["blue"]["alternatives"])
-    for key in ("current", "fill", "countered"):
+    for key in ("current", "fill"):
         assert d[key]["scoring"] is False and d[key]["normalized"] is None
         assert all(a["normalized"] is None for a in d[key]["alternatives"])
     assert d["expected"]["unscored"] == LIKELIHOOD and d["expected"]["normalized"] is None
@@ -53,7 +53,7 @@ def test_the_default_engine_scores_a_playbook_that_scores_nothing(synthetic_worl
     limit_only = [h for h in reference if h.form == "limit"]
     draft = Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm", "Anvil"))
     d = engine.board(synthetic_world, draft, catalog=limit_only, brief=BRIEF).to_dict()
-    for key in ("blue", "current", "fill", "countered"):
+    for key in ("blue", "current", "fill"):
         assert d[key]["scoring"] is True and d[key]["unscored"] is None, key
     assert 0 < d["fill"]["normalized"] <= 100 and d["momentum"]["blue"] is not None
     assert "unscored" not in {badge["label"] for badge in d["momentum"]["badges"].values()}

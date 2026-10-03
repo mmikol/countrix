@@ -331,9 +331,8 @@ you can see</i>, not against every red they might pick. Before red reveals anyth
 answers their likely starting comp, filled from the map's pick rates, through the default
 engine's counter term; each pick they show
 re-solves against what is now known. It is a best reply to present information and changes as
-that information does. The hedge is the <i>if countered optimally</i> case the
-<code>board</code> tool reports: it scores your six against red's best reply to it, so a comp
-that wins only while red plays badly shows up there. The board page does not solve it.</p>
+that information does. Red is never solved, so nothing scores your six against red's best reply
+to it.</p>
 <p id='swaps'><b>Swaps and stages.</b> A six is not held for the map. Above blue's picks the
 board suggests the swaps that pay for their cost, as one answer: of every legal six, the one that
 scores most less the swap cost for each of blue's picks it drops, a tie to the board's draw. The
@@ -407,9 +406,8 @@ partners(h, S) how many heroes already on S the synergy table pairs h with; a re
 reveal one, the counter term reads their likely comp - on this map, side and bans; never against
 blue's own picks. Once blue picks, its seat shows blue's six above the optimal: from one to five picks,
 the picks with the rest filled by a second solve that keeps them - the six the suggestion
-tiles offer; at six, the six itself. The game plan describes that six. The one red six the
-engine solves is red's best counter in the board tool's <i>if countered optimally</i> case, a
-what-if for blue the board page does not show.</p>
+tiles offer; at six, the six itself. The game plan describes that six. Blue's is the only seat
+the engine solves.</p>
 <p id='weights'><b>The weights.</b> A heuristic's weight is the slider under its card. It stays
 in your browser and rides with every request until reset; the file's weight is the default,
 and only the tune tool changes it. Every heuristic has a slider, 0 to %(WEIGHT_MAX)g, on a metric

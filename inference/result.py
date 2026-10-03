@@ -28,7 +28,7 @@ from inference.solver import RANK_CAP, Tied
 from inference.strategy import Strategy
 
 # what a result is, which its heading names
-type ResultKind = Literal["infer", "evaluate", "current", "countered", "fill", "expected"]
+type ResultKind = Literal["infer", "evaluate", "current", "fill", "expected"]
 # a stage of the plan: a phase of one route or an arena of its own
 type StageKind = Literal["phase", "arena"]
 
@@ -147,13 +147,11 @@ class Badges(TypedDict):
 
 
 class Momentum(TypedDict):
-    """Where blue's picks stand: blue's share of its optimal, its share
-    against red's best counter where the countered case was solved, whether
-    blue is half-drafted, the verdict in words and the badge above each
-    picker - blue's share, red's likely six's pull. A share is None where it
-    cannot be read."""
+    """Where blue's picks stand: blue's share of its optimal, whether blue is
+    half-drafted, the verdict in words and the badge above each picker -
+    blue's share, red's likely six's pull. The share is None where it cannot
+    be read."""
     blue: int | None
-    countered: int | None
     partial: bool
     verdict: str
     badges: Badges
@@ -204,9 +202,8 @@ class ResultRecord(TypedDict):
 class BoardRecord(TypedDict):
     """A board as to_dict() serves it, the JSON the shells read: the board
     it was solved on, the plan, blue's swaps and the plan stage by stage,
-    blue's results - the countered case and the fill None where the board
-    has none - the momentum, the shapes the roster allows, and red's likely
-    six."""
+    blue's results - the fill None where the board has none - the momentum,
+    the shapes the roster allows, and red's likely six."""
     map: str | None
     side: Side
     stage: str
@@ -216,7 +213,6 @@ class BoardRecord(TypedDict):
     stages: list[StageRow]
     blue: ResultRecord
     current: ResultRecord
-    countered: ResultRecord | None
     fill: ResultRecord | None
     momentum: Momentum
     shapes: list[list[int]]
@@ -263,8 +259,7 @@ def not_allowed(rules: list[str]) -> str:
 # what each kind of result is, as its rendered heading names it
 HEADINGS: dict[ResultKind, str] = {
     "infer": "optimal comp", "evaluate": "evaluation", "current": "current comp",
-    "countered": "if countered optimally", "fill": "your picks, the rest filled",
-    "expected": "their likely starting comp"}
+    "fill": "your picks, the rest filled", "expected": "their likely starting comp"}
 # the reason red's likely six carries no share: it is filled, never scored
 LIKELIHOOD = (
     "unscored - filled from the map's pick rates and the wiki's synergies, which"
@@ -563,7 +558,6 @@ class Board:
     blue: Result
     current: Result
     fill: Result | None
-    countered: Result | None
     momentum: Momentum
     plan: str
     shapes: list[list[int]]
@@ -576,7 +570,6 @@ class Board:
         return {"map": self.map_name, "side": self.side, "stage": self.stage, "bans": self.bans,
                 "plan": self.plan, "swaps": self.swaps, "stages": self.stages,
                 "blue": self.blue.to_dict(), "current": self.current.to_dict(),
-                "countered": self.countered.to_dict() if self.countered else None,
                 "fill": self.fill.to_dict() if self.fill else None, "momentum": self.momentum,
                 "shapes": self.shapes,
                 "expected": self.expected.to_dict()}
@@ -588,8 +581,6 @@ class Board:
         parts += [r.rendered() for r in (self.blue, self.current) if r.blue or r.kind != "current"]
         if self.fill:
             parts.append(self.fill.rendered())
-        if self.countered:
-            parts.append(self.countered.rendered())
         parts.append(self.expected.rendered())
         parts.append("momentum: " + self.momentum["verdict"])
         if self.swaps is not None:

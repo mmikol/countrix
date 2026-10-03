@@ -157,40 +157,37 @@ db <- facts <- inference <- door <- ui.
   `tables.load` lays the wiki's 6v6 pools and lines (`heroes.*_6v6`,
   `kit_6v6`) over the 5v5 rows before `derive_scalars` (`facts/kit_format.py`).
   The 5v5 figures stay stored, and each change names the one it moved.
-- **The solver is deterministic.** `engine.board()` returns a Board of up to
-  five Results (blue, current, fill, countered, expected); fill is None
-  unless one to five blue picks are locked, countered is None without blue
-  picks or when the caller's `Brief` leaves it out, as the page's boards
-  do. Blue is the side the playbook optimizes; red is never optimized or
-  scored: `expected` is red's likely six around its revealed picks, each
-  pick with its pull (`compute.expected_picks`), and red's badge is the
-  six's total pull. The countered case alone solves a red six, red's best
-  counter, as a what-if for blue. A Draft may name a stage the map lists (`stage`,
-  resolved by `facts.draft.board_stage`); every seat plays it, and it moves
-  the `map.*` metrics alone - the ground in play, `compute.ground`. Each
-  seat has one scale: the reference sample, drawn from a string seed of
-  the map and the side, and the board's field, which reads the enemy, both
-  measured on the whole map (`prepare(measure=True)`), so the stages of a
-  map share it; the lowest of the sample's scores under the board's own
-  gates is the seat's floor, a share's 0, as its optimal is the 100.
-  current and the fill share blue's optimal's scale, so infer, the fill and
-  current are comparable. The search is exact
-  (`inference/solver.py`, its bounds in `inference/bounds.py` over
-  `inference/intervals.py` and `inference/ranges.py`): every
-  legal six of the released, unbanned roster, each once, by branch and
-  bound, in one total order - the score to `SCORE_PLACES` decimals, then
-  the six's tie-break draws, then sorted names - each six scored in one
-  seat order. A draw is a hash of the board's map and side and the hero's
-  id (`scoring.draw`), never a rate or a name, so with nothing scoring
-  every legal six ties and the draw alone picks; the optimal reports how
-  many sixes share its score (`Solver.ties`), and the `ties-are-drawn`
-  assumption says so in the playbook.
-  A new metric or expression construct needs a bound rule, and
+- **The solver is deterministic.** `engine.board()` returns a Board of up
+  to four Results (blue, current, fill, expected); fill is None unless one
+  to five blue picks are locked. Blue is the side the playbook optimizes,
+  and the only seat solved; red is never optimized or scored: `expected` is
+  red's likely six around its revealed picks, each pick with its pull
+  (`compute.expected_picks`), and red's badge is the six's total pull. A
+  Draft may name a stage the map lists (`stage`, resolved by
+  `facts.draft.board_stage`); every seat plays it, and it moves the `map.*`
+  metrics alone - the ground in play, `compute.ground`. Each seat has one
+  scale: the reference sample, drawn from a string seed of the map and the
+  side, and the board's field, which reads the enemy, both measured on the
+  whole map (`prepare(measure=True)`), so the stages of a map share it; the
+  lowest of the sample's scores under the board's own gates is the seat's
+  floor, a share's 0, as its optimal is the 100. current and the fill share
+  blue's optimal's scale, so infer, the fill and current are comparable.
+  The search is exact (`inference/solver.py`, its bounds in
+  `inference/bounds.py` over `inference/intervals.py` and
+  `inference/ranges.py`): every legal six of the released, unbanned roster,
+  each once, by branch and bound, in one total order - the score to
+  `SCORE_PLACES` decimals, then the six's tie-break draws, then sorted
+  names - each six scored in one seat order. A draw is a hash of the
+  board's map and side and the hero's id (`scoring.draw`), never a rate or
+  a name, so with nothing scoring every legal six ties and the draw alone
+  picks; the optimal reports how many sixes share its score
+  (`Solver.ties`), and the `ties-are-drawn` assumption says so in the
+  playbook. A new metric or expression construct needs a bound rule, and
   `tests/verification/inference/test_bounds.py` fails without one. Blue's
   picks the limits rule out - a full six that breaks one, or picks the
   fill's search proves no six completes - are not allowed: no score, no
-  share; red's picks are never ruled out. A search past its budget
-  refuses (`solver.Unbounded`), never guesses.
+  share; red's picks are never ruled out. A search past its budget refuses
+  (`solver.Unbounded`), never guesses.
 - **Blue's swaps are one joint answer.** With blue picks, `Board.swaps`
   (`inference/swaps.py`) is the best legal six reachable from them when
   each pick dropped costs the swap cost - `weights=swap:<v>`, else

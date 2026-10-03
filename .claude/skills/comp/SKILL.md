@@ -29,9 +29,9 @@ shows). Prefer whichever is connected; they expose the same tools.
    the fact ids (F#) that justify it, the score breakdown per engine term
    and per strategy, and alternatives. `board` with the same
    arguments also returns the game plan in prose, the user's current comp
-   scored, their picks against red's best counter, their locked picks with
-   the empty slots filled, and red's likely six around red's picks with
-   its pull (red is never optimized or scored) - use it when the user asks
+   scored, their locked picks with the empty slots filled, and red's likely
+   six around red's picks with its pull (red is never optimized or scored)
+   - use it when the user asks
    how the game is going, how their six rates, what the enemy should be
    playing, or for the plan in a few lines. With blue picks it also
    carries `swaps`, the swaps of their picks that pay for the swap cost,

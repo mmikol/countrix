@@ -33,8 +33,7 @@ from tests.verification.inference import (
 def test_board_solves_blues_seat_and_reads_reds_likely_six(synthetic_world):
     """Blue's seat is solved and scored; red's is never optimized. Red reads as
     its likely six around its revealed picks, on the other side, with each
-    pick's pull and no strategy read. The countered case alone solves red's
-    best counter, as a what-if for blue."""
+    pick's pull and no strategy read. Nothing solves a red six."""
     from inference import engine
     world = synthetic_world
     fix = catalog.load(FIXTURE_PLAYBOOK)        # the reference playbook has the side rules
@@ -52,10 +51,7 @@ def test_board_solves_blues_seat_and_reads_reds_likely_six(synthetic_world):
     assert all(p["pull"] >= 0 for p in likely.picks)
     assert cur.kind == "current" and cur.partial and cur.blue == ["Balm"]
     assert cur.contributions and cur.score is not None
-    assert b.countered is not None and b.countered.kind == "countered"
-    theirs = engine.infer(world, Draft("Harbor Gate", ("Balm",), (), side="defense"), catalog=fix,
-                          base=DEFAULT)
-    assert b.countered.red == theirs.blue               # blue against red's best counter
+    assert "countered" not in b.to_dict()
     fill = b.fill                                       # the empty slots, filled around Balm
     assert fill.kind == "fill"
     assert fill.locked == ["Balm"]
@@ -73,8 +69,8 @@ def test_board_solves_blues_seat_and_reads_reds_likely_six(synthetic_world):
     # reports no share of its own. Red's badge is its likely six's pull
     assert mo["blue"] == fill.to_dict()["normalized"]
     assert cur.to_dict()["normalized"] is None
-    assert mo["verdict"].startswith("blue %d / 100 of its optimal" % mo["blue"])
-    assert "best counter" in mo["verdict"]
+    assert mo["verdict"] == "blue %d / 100 of its optimal (the best six from its picks)" % (
+        mo["blue"])
     pull = sum(p["pull"] for p in likely.picks)
     assert mo["badges"]["red"]["label"] == "%.0f pull" % pull
     # prose: the ground, what to play, them, the family
@@ -92,7 +88,7 @@ def test_board_solves_blues_seat_and_reads_reds_likely_six(synthetic_world):
     assert d["plan"] == plan
     assert d["fill"]["kind"] == "fill" and "the rest filled" in b.rendered()
     assert "current comp" in b.rendered() and "momentum:" in b.rendered()
-    seats = (blue, cur, fill, b.countered, b.expected)
+    seats = (blue, cur, fill, b.expected)
     assert not any("facts" in r.to_dict() for r in seats)      # no seat carries the facts
     # blue's side rule fires, and the other side's does not
     ids = {c["id"] for c in blue.contributions if c.get("applies")}
@@ -218,11 +214,11 @@ def test_blue_picks_that_break_a_limit_are_not_allowed_and_the_board_still_rende
     assert cur["unscored"] == NOT_ALLOWED and cur["scoring"] is False and cur["partial"]
     assert cur["score"] is None and cur["normalized"] is None and cur["rank"] is None
     assert [(c["id"], c["ok"]) for c in cur["contributions"]] == [("three-supports", False)]
-    assert d["fill"] is None and d["countered"] is None
+    assert d["fill"] is None
     assert len(d["blue"]["blue"]) == 6 and d["blue"]["normalized"] == 100
     assert sum(world.hero(n).role == "support" for n in d["blue"]["blue"]) <= 3
     mo = d["momentum"]
-    assert mo["blue"] is None and mo["countered"] is None
+    assert mo["blue"] is None
     assert mo["badges"]["blue"] == {"label": "not allowed", "tip": NOT_ALLOWED}
     assert mo["verdict"].startswith("blue " + NOT_ALLOWED)
     assert "NOT ALLOWED: breaks At most three supports" in b.current.rendered()
@@ -232,7 +228,7 @@ def test_blue_picks_that_break_a_limit_are_not_allowed_and_the_board_still_rende
     assert full["current"]["kind"] == "evaluate" and full["current"]["unscored"] == NOT_ALLOWED
     assert full["current"]["score"] is None and full["current"]["alternatives"] == []
     assert full["momentum"]["blue"] is None
-    assert b.fill is None and b.countered is None
+    assert b.fill is None
     assert "The six is the one you picked." not in b.plan
     kept = engine.board(world, Draft("Harbor Gate", ("Mortar",), SUPPORTS[:3]), catalog=cat,
                         brief=BRIEF)
@@ -376,7 +372,7 @@ def test_board_ranks_a_full_six_and_ignores_sides_on_control(synthetic_world):
     b = engine.board(world, Draft(), catalog=fix, brief=BRIEF)
     assert not b.current.blue and b.current.partial
     # nothing locked: the optimal is the fill
-    assert b.countered is None and b.fill is None
+    assert b.fill is None
     assert b.momentum["verdict"].startswith("no blue picks yet: the suggested six is blue's")
     assert b.momentum["blue"] is None
     assert b.plan.startswith("No map yet, so this is the meta's best six")
@@ -487,12 +483,12 @@ def test_the_search_proves_real_boards_scoring_few_sixes_in_full(world):
 
 
 def test_every_seat_of_a_board_plays_the_stage_it_names(synthetic_world, tmp_path):
-    """A board on a stage solves every result there - blue's optimal and
-    current comp, the fill, the countered case and red's likely six - so the
-    two sides fight on one ground: a rule the stage's terrain turns on
-    applies to blue's sixes and to the countered case's, each six keeps the
-    limit it turns on, and the rule cites the ground in play's fact. The whole map turns
-    the rule off, and a stage the map does not list is refused."""
+    """A board on a stage reads every result there - blue's optimal and
+    current comp, the fill and red's likely six - so the two sides fight on
+    one ground: a rule the stage's terrain turns on applies to blue's sixes,
+    each six keeps the limit it turns on, and the rule cites the ground in
+    play's fact. The whole map turns the rule off, and a stage the map does
+    not list is refused."""
     world = synthetic_world
     (tmp_path / "hazard-ground.md").write_text(
         "---\nname: Hazards pay\nkind: heuristic\nweight: 0.5\n"
@@ -501,10 +497,10 @@ def test_every_seat_of_a_board_plays_the_stage_it_names(synthetic_world, tmp_pat
     playbook = hazard_playbook(world, tmp_path)
     b = engine.board(world, Draft("Ember Ruins", ("Mortar",), ("Anvil",), stage="forge"),
                      catalog=playbook, brief=BRIEF)
-    seats = (b.blue, b.current, b.fill, b.countered, b.expected)
+    seats = (b.blue, b.current, b.fill, b.expected)
     assert b.stage == "Forge" and {r.stage for r in seats} == {"Forge"}
     assert b.to_dict()["stage"] == b.to_dict()["blue"]["stage"] == "Forge"
-    for r in (b.blue, b.fill, b.countered):
+    for r in (b.blue, b.fill):
         terms = {c["id"]: c for c in r.contributions}
         assert terms["hazard-cc"]["applies"] and terms["hazard-cc"]["raw"] >= 1
         assert terms["hazard-ground"]["bonus"] == 1
