@@ -329,9 +329,9 @@ def board(
     red's picks as they reveal:
 
         blue         blue's optimal six: the best counter to red's selection
-                     as revealed - or, before they reveal a pick, to their
-                     likely six - on this map, side and bans; blue's own
-                     picks never constrain it
+                     as revealed - before they reveal a pick, the default
+                     engine's counter term reads their likely six - on this
+                     map, side and bans; blue's own picks never constrain it
         red          red's optimal six: their best counter to blue's
                      selection, on the other side - the scale red's current
                      comp is measured on
@@ -405,10 +405,11 @@ def board(
     draft = dataclasses.replace(draft, side=seated.side, stage=seated.stage)
     _check_teams(red_h, blue_h, "blue")
     expected = _expected(world, m, bans_h, draft, catalog, base)
-    enemy = draft.red or tuple(expected.blue)
-    # each seat's draft, from that seat's perspective: its own picks are `blue`
-    blue_seat = dataclasses.replace(draft, red=enemy, blue=())
-    ours = dataclasses.replace(draft, red=enemy)       # blue's current comp and fill
+    # each seat's draft, from that seat's perspective: its own picks are `blue`,
+    # and red is its revealed picks alone - the default engine's counter term
+    # reads red's likely six where it has none (base.opponent), as infer does
+    blue_seat = dataclasses.replace(draft, blue=())
+    ours = draft                                       # blue's current comp and fill
     # red's, the draft flipped, on the draft's stage: both sides fight on the same ground
     theirs = draft.flipped()
     red_seat = dataclasses.replace(theirs, blue=())
@@ -450,7 +451,7 @@ def board(
     cost = swap_in_force(brief) if brief.search_swaps or brief.walk_stages else 0.0
     suggested = None
     if brief.search_swaps and draft.blue:
-        suggested = solve.swaps(draft, enemy, blue, _Seat(cur, fill, mo, unsolved), cost)
+        suggested = solve.swaps(draft, blue, _Seat(cur, fill, mo, unsolved), cost)
     # the six the comps tab shows for blue, which the plan describes: a comp
     # that is not allowed is described by the optimal instead
     held = len(draft.blue) == TEAM_SIZE and cur.barred is None
@@ -532,16 +533,14 @@ class _Pass:
         return _current(self.world, draft, optimal=top, catalog=self.catalog,
                         base=self.base, seat="blue", kind="countered")
 
-    def swaps(
-            self, draft: Draft, enemy: tuple[str, ...], blue: _Optimal, seat: _Seat,
-            cost: float) -> Swaps:
+    def swaps(self, draft: Draft, blue: _Optimal, seat: _Seat, cost: float) -> Swaps:
         """Blue's swaps (inference.swaps): the best six reachable from blue's
-        picks (`draft.blue`) against `enemy` - red's picks, else its likely
-        six - at `cost` share points a pick dropped, on blue's optimal's
-        board and scale. Where a swap is suggested, red's optimal, current
-        comp and fill are solved again against the six it makes, and the
-        fight odds read off them as the momentum reads the board's; a
-        suggestion they do not rise on is withheld."""
+        picks (`draft.blue`) against red's revealed picks, at `cost` share
+        points a pick dropped, on blue's optimal's board and scale. Where a
+        swap is suggested, red's optimal, current comp and fill are solved
+        again against the six it makes, and the fight odds read off them as
+        the momentum reads the board's; a suggestion they do not rise on is
+        withheld."""
         picks = self.world.resolve(draft.map_name, draft.red, draft.blue, draft.bans).blue
         full = len(picks) == TEAM_SIZE
         before, odds = seat.momentum["blue"], seat.momentum["odds"]
@@ -576,7 +575,7 @@ class _Pass:
             return none(str(error))
         if not target.gains:
             return kept
-        ours = dataclasses.replace(draft, red=enemy, blue=tuple(h.name for h in target.six.heroes))
+        ours = dataclasses.replace(draft, blue=tuple(h.name for h in target.six.heroes))
         six = _scored(self.world, ours, blue, target.six, self.catalog, self.base,
                       locked=[h.name for h in picks])
         pairs = swaps.paired(picks, target.six.heroes, six)
@@ -600,7 +599,7 @@ class _Pass:
             self, m: Map | None, draft: Draft, blue: _Optimal, origin: Sequence[str],
             cost: float, suggested: Swaps | None) -> list[StageRow]:
         """The plan stage by stage (inference.swaps.chain) from `origin`, the
-        six the comps tab shows, against blue's enemy, on blue's optimal's
+        six the comps tab shows, against red's revealed picks, on blue's optimal's
         board and scale, at `cost` share points a hero changed; the board's
         chosen stage takes the board's own swap answer - a swap suggested, or
         the picks kept - solved on that stage, so its row and the swaps above

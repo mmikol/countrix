@@ -6,19 +6,6 @@ keeps it current.
 
 ## Next
 
-- **Blue's seat reads red's likely six through the counter term alone.**
-  Until red reveals a pick, `engine.board` hands blue's seat, current,
-  fill, swaps and stages the likely six as red's picks (`enemy =
-  draft.red or tuple(expected.blue)`), so every `enemy.*` and `matchup.*`
-  metric reads it - `heal-rate`'s `matchup.heal_shortfall` among them -
-  and the scale's field ranks against it; `infer`, which reach proves
-  against, reads an empty red. docs/inference.md and the math page say
-  the counter term alone reads the likely six. The seats take
-  `draft.red` as it is, `base.opponent` alone falls back to the likely
-  six and its `same` check goes, and the plan says "counters" only where
-  the counter term read it; test_engine and test_base pin today's
-  reading and flip. Cost: half a day, and reach re-recorded if a board
-  moves.
 - **A text metric is refused as a bonus or penalty.** A strategy with
   `bonus: map.side` loads as scored, so `add_strategy` writes it, and
   every board where its guard holds then fails: `scoring._amount` reads
