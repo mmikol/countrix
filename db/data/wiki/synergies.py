@@ -14,7 +14,7 @@ the first sentence of the advice, cut to a clause under 120 characters, or
 NO_ADVICE where no claim writes any. synergy_cells keeps every written
 cell, a claim or not, so the facts layer can tell a pair an article wrote
 off from one neither article wrote (facts/tables.py reads the second at
-the written pairs' mean). Both tables are reloaded wholesale.
+the written cells' claim share). Both tables are reloaded wholesale.
 """
 
 import re
@@ -129,11 +129,6 @@ def claimed(cells: Sequence[Cell]) -> list[Row]:
     """[Row(teammate name, advice)] - the cells that claim their pair, a
     rating with no advice among them as ''."""
     return [Row(hero=c.hero, cell=c.advice) for c in cells if c.claim]
-
-
-def parse_synergies(text: str) -> list[Row]:
-    """[Row(teammate name, advice)] - the claims one article's synergy cells make."""
-    return claimed(read_cells(text))
 
 
 # {(low id, high id): (score, note)}

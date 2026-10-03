@@ -241,7 +241,7 @@ _KEYS: dict[str, frozenset[str]] = {}
 def _bag(
         world: World, heroes: list[Hero], m: Map | None, enemies: list[Hero],
         wanted: frozenset[str]) -> MetricBag:
-    """The `wanted` sections' keys for these picks, in registry order. The
+    """The `wanted` sections' keys for these picks. The
     map's section reads the meta's, and the meta and versus sections the
     most-banned pick: max_ban_* name it and banproof_coverage takes its
     answers away; with no ban rate on the team it is the first pick."""
@@ -276,8 +276,7 @@ def team_metrics(world: World, heroes: Iterable[Hero], m: Map | None = None,
     """Every TEAM_METRICS key for these picks, on this map, vs these
     enemies; with `only`, the keys of the sections that hold those keys,
     and no others - a caller reading a few keys (inference.scale's field)
-    skips the rest. Each section's helper returns its keys in registry
-    order, and the bag keeps that order."""
+    skips the rest."""
     wanted = SECTIONS
     if only is not None:
         keys, named = _section_keys(world), set(only)

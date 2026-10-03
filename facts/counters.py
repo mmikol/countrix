@@ -66,7 +66,7 @@ from dataclasses import dataclass
 from typing import NamedTuple
 
 from db import KIND_ABILITY, KIND_PASSIVE, KIND_ULTIMATE
-from facts.kit import KitPiece
+from facts.kit import MIN_FALLOFF, KitPiece
 from facts.model import Hero, World
 from facts.records import DerivedEdge, Fired, Pairing
 from facts.scalars import (
@@ -121,7 +121,6 @@ DEFAULT_PSPEED = 40.0       # m/s: a projectile publishing no speed
 MAX_REACH = 60.0            # m: no weapon counts further; a hitscan with no limit reaches it
 MELEE_REACH = 4.0           # m: a melee weapon publishing no range
 BEAM_REACH = 15.0           # m: a beam publishing no range
-MIN_FALLOFF_START = 10.0    # m: a shotgun's falloff starting nearer is a splash, not a reach
 # --- anti-air and fliers ---------------------------------------------------------
 LIGHT_POOL = 300        # hp: a flier over this pool (D.Va) is no light flier
 AA_KIND = {"hitscan": 1.0, "fast projectile": 0.75, "projectile": 0.4, "beam": 0.2,
@@ -239,7 +238,7 @@ def _reach(piece: KitPiece) -> Reach:
         return Reach(piece.reach or MELEE_REACH, True)
     if "shotgun" in piece.weapon_kind and not piece.stats.get("range"):
         starts = [s.value for s in piece.stats.get("damage_falloff_range", ())
-                  if s.value is not None and s.value >= MIN_FALLOFF_START
+                  if s.value is not None and s.value >= MIN_FALLOFF
                   and "min" in s.condition and "simultaneous" not in s.condition]
         if starts:
             return Reach(min(starts), True)
@@ -266,7 +265,6 @@ def _fights(guns: Sequence[KitPiece]) -> list[tuple[KitPiece, float]]:
 class Features:
     """What the mechanisms read of one hero: its kit facts, each strength in
     [0, 1] unless a unit says otherwise, and the pieces that set them."""
-    id: int
     name: str
     role: str
     subrole: str
@@ -487,7 +485,7 @@ def features(h: Hero, support_hps: float) -> Features:
         main_kind = "none"
     armor = h.armor + h.form_armor
     return Features(
-        id=h.id, name=h.name, role=h.role, subrole=h.subrole, pool=h.pool, armor=armor,
+        name=h.name, role=h.role, subrole=h.subrole, pool=h.pool, armor=armor,
         armor_share=armor / (h.pool + h.form_armor) if h.pool else 0.0, dps=h.dps,
         burst=burst, burst_piece=burst_piece, melee_only=h.melee_only, main=main,
         main_kind=main_kind, main_hit=hit, instance=instance, armor_loss=armor_loss,
@@ -735,13 +733,13 @@ def derive(world: World) -> None:
             ((pair.score, round(pair.score - world.matrix[(loser.id, w)].score, 3), w)
                 for (w, lose), pair in world.matrix.items() if lose == loser.id),
             key=lambda t: (-t[0], -t[1], world.heroes[t[2]].name))
-        top = [(score, net, w) for score, net, w in answers
+        top = [(score, w) for score, net, w in answers
                 if score >= THRESHOLD and net > 0][:TOP_ANSWERS]
-        for score, net, w in top:
+        for score, w in top:
             if (loser.id, w) in world.counters or (w, loser.id) in world.counters:
                 continue
             world.derived[(loser.id, w)] = DerivedEdge(
-                winner=w, loser=loser.id, score=score, net=net,
+                winner=w, loser=loser.id, score=score,
                 fired=world.matrix[(w, loser.id)].fired)
 
 

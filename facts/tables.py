@@ -52,8 +52,8 @@ PREVIOUS_BLIZZARD = """(select ms.snapshot_id from meta_snapshots ms
     order by ms.captured_at desc, ms.snapshot_id desc limit 1)""" % LATEST_BLIZZARD
 
 
-def _rows(cx: Connection, sql: str, *args: object) -> list[TupleRow]:
-    return cx.execute(sql, args or None).fetchall()
+def _rows(cx: Connection, sql: str) -> list[TupleRow]:
+    return cx.execute(sql).fetchall()
 
 
 def _z_scores[K](values: dict[K, float]) -> dict[K, float]:

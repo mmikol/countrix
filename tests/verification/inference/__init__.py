@@ -6,7 +6,7 @@ alone written where a test says, so no solver test reads inference/strategies/, 
 recorded fixture, read with the objective it was recorded under and compared with the
 one in force, evaluated(), a full six scored as the board scores its current comp, and
 timeless(), a board's payload less the seconds each result took, for comparing two
-solves."""
+solves, and six() and seated(), a recorded reach board solved afresh."""
 
 import dataclasses
 import json
@@ -19,8 +19,9 @@ import pytest
 from db import ROOT
 from facts.draft import Draft
 from facts.model import World
-from inference import base, catalog, engine
+from inference import base, catalog, engine, reach
 from inference.result import Result
+from inference.solver import Infeasible, Unbounded
 from inference.strategy import Strategy
 
 FIXTURES = os.path.join(ROOT, "tests", "fixtures")
@@ -109,3 +110,20 @@ def timeless(payload: dict[str, Any]) -> dict[str, Any]:
         if isinstance(value, dict) and "seconds" in value:
             value.pop("seconds")
     return payload
+
+
+def six(world: World, board: reach.Reach) -> list[str]:
+    """The optimal six of a board a reach search recorded, solved afresh; none
+    on a board the playbook's limits no longer fit."""
+    try:
+        top = engine.infer(world, Draft(map_name=board["map"], red=tuple(board["red"]),
+                                        bans=tuple(board["banned"]), side=board["side"]), top=1)
+    except (Infeasible, Unbounded):
+        return []
+    return top.blue
+
+
+def seated(world: World, board: reach.Reach) -> bool:
+    """Is the hero still in the optimal six of the board a search recorded for
+    it? A board the playbook's limits no longer fit has fallen: it seats no one."""
+    return board["hero"] in six(world, board)

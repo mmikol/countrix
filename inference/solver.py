@@ -257,12 +257,12 @@ class Solver(Objective):
                              " the playbook" % where)
         return Solved(self, [self.hydrate(c) for _, c in goal.items], goal.k)
 
-    def outranking(self, target: Candidate, cap: int | None = None) -> int | None:
+    def outranking(self, target: Candidate) -> int | None:
         """How many legal sixes rank above `target` (scoring.rank_key), a six
         that ties its quantized score counted where the tie-break or the
         names put it first, as the alternatives are listed: exactly, or None
-        once `cap` do - RANK_CAP where none is named."""
-        goal = _Count(target, RANK_CAP if cap is None else cap)
+        once RANK_CAP do."""
+        goal = _Count(target, RANK_CAP)
         self._search(goal)
         return None if goal.done else goal.count
 

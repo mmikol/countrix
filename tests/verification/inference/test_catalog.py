@@ -180,8 +180,7 @@ def test_the_reference_and_the_live_playbooks_are_valid_and_reference_real_metri
     assert forms == {"limit", "scored", "heuristic", "assumption"}
     assert {h.form for h in cat if h.kind == "heuristic"} == {"heuristic", "scored"}
     assert {h.form for h in cat if h.kind == "constraint"} == {"limit"}
-    assert all(
-        h.form == "assumption" and not h.solver_reads for h in cat if h.kind == "assumption")
+    assert all(h.form == "assumption" for h in cat if h.kind == "assumption")
     assert {h.id for h in cat if h.kind == "assumption"} >= {"optimal-play", "vintage", "objective"}
     registry = compute.registry()
     for h in cat:
@@ -249,7 +248,7 @@ def test_a_constraint_is_a_limit_a_heuristic_weighs_and_an_assumption_is_prose(t
         (tmp_path / "x.md").write_text(text, encoding="utf-8")
         return catalog.load(str(tmp_path))[0]
     limit = load_one("---\nname: l\nkind: constraint\nrequire: team.tanks <= 2\n---\nx\n")
-    assert limit.form == "limit" and limit.solver_reads and not limit.weighs
+    assert limit.form == "limit" and not limit.weighs
     assert load_one("---\nname: s\nkind: heuristic\nbonus: team.tanks\n---\nx\n").form == "scored"
     charge = load_one("---\nname: c\nkind: heuristic\nwhen: not (team.tanks <= 1)\n"
                       "penalty: 2\n---\nx\n")

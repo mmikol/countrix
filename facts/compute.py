@@ -223,7 +223,8 @@ def matchup_metrics(world: World, blue_t: MetricBag, red_t: MetricBag) -> Metric
     """MATCHUP_METRICS from blue's seat, given both teams' metrics and the
     World, whose role medians fill red's open slots for the healing floor.
 
-    Only what reading both sides produces. A number that is already a team
+    What reading both sides produces, and blue's answers to red's ultimates
+    (ult_answers) beside red's ultimate damage. A number that is already a team
     metric, blue's or red's, is not restated here under a second name: two
     strategies reading the same number through two keys weigh one signal
     twice, and the catalog cannot see that they do. Read team.* for blue's

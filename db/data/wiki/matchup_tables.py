@@ -36,6 +36,17 @@ SENTENCE_END_RE = re.compile(r"(?<![ .][A-Z])[.!?](?=\s+[A-Z\"'])")
 PLACEHOLDERS = {"", "tobeadded", "tba", "tbd", "na", "none", "todo"}
 
 
+def split_sentences(text: str) -> list[str]:
+    """The text's sentences, by SENTENCE_END_RE, each stripped; no empty one."""
+    parts: list[str] = []
+    start = 0
+    for end in SENTENCE_END_RE.finditer(text):
+        parts.append(text[start: end.end()])
+        start = end.end()
+    parts.append(text[start:])
+    return [part.strip() for part in parts if part.strip()]
+
+
 class Released(NamedTuple):
     """The released heroes, {name: hero_id} in name order, and what
     fetch_articles read of their articles."""
@@ -101,7 +112,7 @@ MATCHUP = Column(heading="match", position=1, parameter="matchup", ratings=("rat
 class Row(NamedTuple):
     """One row of the section's tables: the hero it is about and the text of
     one cell - the markup as section_rows reads it, or the plain advice
-    synergies.parse_synergies makes of it."""
+    synergies.claimed makes of it."""
     hero: str
     cell: str
 

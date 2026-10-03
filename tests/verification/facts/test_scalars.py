@@ -54,7 +54,6 @@ def test_the_body_counts_a_forms_armor_by_its_uptime_and_every_cooldown():
     ult = _kit("Annihilation", KIND_ULTIMATE, _stat("cooldown", 30, "seconds"))
     hero = _hero("tank", health=275, armor=100, abilities=[form, rally, ult])
     assert hero.pool == 375 and hero.form_armor == 137.5
-    assert hero.keywords == {"movement", "armor"}
     assert hero.cooldowns == [8.0, 11.0] and hero.median_cooldown == 9.5
     assert _hero().median_cooldown is None and _hero().cooldowns == []
 

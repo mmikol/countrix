@@ -250,7 +250,7 @@ def _graph():
     fired = (Fired("antiair", 1.0, "hitscan against a flier", "Longshot, hitscan, 60 m"),)
     for loser, winner in (("Kite", "Mortar"), ("Anvil", "Mortar"), ("Gale", "Needle")):
         w.derived[(ids[loser], ids[winner])] = DerivedEdge(
-            winner=ids[winner], loser=ids[loser], score=1.0, net=1.0, fired=fired)
+            winner=ids[winner], loser=ids[loser], score=1.0, fired=fired)
         w.matrix[(ids[winner], ids[loser])] = Pairing(score=1.0, fired=fired)
     return w, ids
 
@@ -290,7 +290,8 @@ def test_derive_fills_only_the_pairs_the_wiki_leaves_out():
     counters.derive(w)
     assert (1, 3) in w.derived and (2, 1) not in w.derived and (1, 2) not in w.derived
     edge = w.derived[(1, 3)]
-    assert (edge.winner, edge.loser, edge.score) == (3, 1, 1.0) and edge.net > 0
+    assert (edge.winner, edge.loser, edge.score) == (3, 1, 1.0)
+    assert w.matrix[(3, 1)].score > w.matrix[(1, 3)].score
     assert len(w.matrix) == 6
 
 

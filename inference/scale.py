@@ -32,8 +32,8 @@ REFERENCE_SEED = 20260913
 SCALE_POOL = 6                    # each role's heroes in the field that fixes a board's scale
 
 
-def sample(objective: Objective, size: int = REFERENCE_SIZE) -> list[Candidate]:
-    """A seeded sample of `size` random legal sixes for this board,
+def sample(objective: Objective) -> list[Candidate]:
+    """A seeded sample of REFERENCE_SIZE random legal sixes for this board,
     unprepared; every legal six, in the seeded order, on a roster that holds
     fewer. Deterministic for a given map and side, and independent of the
     locked picks, the enemies and the bans, so every call on one board
@@ -65,7 +65,7 @@ def sample(objective: Objective, size: int = REFERENCE_SIZE) -> list[Candidate]:
     out: list[Candidate] = []
     seen: set[SixKey] = set()
     if shapes:
-        while len(out) < min(size, space):
+        while len(out) < min(REFERENCE_SIZE, space):
             t, d, s = rng.choice(shapes)
             heroes = (rng.sample(by_role["tank"], t) + rng.sample(by_role["damage"], d)
                       + rng.sample(by_role["support"], s))

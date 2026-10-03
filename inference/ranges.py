@@ -299,9 +299,9 @@ def _mean(known: Known, fallback: str | None = None) -> Spec:
     return Spec(build, (fallback,) if fallback else ())
 
 
-def _extreme_of(known: Known, lowest: bool, default: float = 0.0) -> Spec:
+def _extreme_of(known: Known, lowest: bool) -> Spec:
     """The largest (or, `lowest`, the smallest) known value among the six;
-    `default` where none is known. An open role that must take known values
+    0 where none is known. An open role that must take known values
     bounds the far end by the one it can least avoid."""
     def build(space: Space) -> Rule:
         values = [known(h, space) for h in space.heroes]
@@ -331,8 +331,8 @@ def _extreme_of(known: Known, lowest: bool, default: float = 0.0) -> Spec:
             elif available:
                 ends.append(max(available) if lowest else min(available))
             if none_possible:
-                near.append(default)
-                ends.append(default)
+                near.append(0.0)
+                ends.append(0.0)
             if not ends:
                 return FALSE
             if lowest:
@@ -342,9 +342,9 @@ def _extreme_of(known: Known, lowest: bool, default: float = 0.0) -> Spec:
     return Spec(build)
 
 
-def _median(of: Callable[[Hero, Space], Sequence[float]], default: float = 0.0) -> Spec:
+def _median(of: Callable[[Hero, Space], Sequence[float]]) -> Spec:
     """A median of the values the six carry lies between the least and the
-    most of them; `default` where the six carries none."""
+    most of them; 0 where the six carries none."""
     def build(space: Space) -> Rule:
         values = [list(of(h, space)) for h in space.heroes]
 
@@ -363,7 +363,7 @@ def _median(of: Callable[[Hero, Space], Sequence[float]], default: float = 0.0) 
                 lo, hi = min(lo, least), max(hi, most)
                 empty = empty and bare >= n
             if empty:
-                lo, hi = min(lo, default), max(hi, default)
+                lo, hi = min(lo, 0.0), max(hi, 0.0)
             return Iv(lo, hi)
         return Rule(read)
     return Spec(build)
@@ -419,8 +419,8 @@ def pair_halves(matrix: Sequence[Sequence[float]], pool: Sequence[int],
     return halves
 
 
-def _pairwise(weight: Callable[[Space], list[list[float]]], per: float = 1.0) -> Spec:
-    """A sum over the six's pairs, divided by `per`: the picks' own pairs,
+def _pairwise(weight: Callable[[Space], list[list[float]]]) -> Spec:
+    """A sum over the six's pairs: the picks' own pairs,
     each open candidate's pairs with the picks, and half its best (or worst)
     pairs among the rest of the roster (pair_halves). Each role then takes
     its best (or worst) few."""
@@ -450,8 +450,8 @@ def _pairwise(weight: Callable[[Space], list[list[float]]], per: float = 1.0) ->
                 worst.sort()
                 hi += sum(best[:n])
                 lo += sum(worst[:n])
-            return Iv(lo / per, hi / per)
-        return Rule(read, _slack(flat, count=PAIR_COUNT) / per)
+            return Iv(lo, hi)
+        return Rule(read, _slack(flat, count=PAIR_COUNT))
     return Spec(build)
 
 

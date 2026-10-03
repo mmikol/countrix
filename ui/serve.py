@@ -128,8 +128,7 @@ def handle_strategies() -> web.Reply:
     is the server's fault: the CatalogError reaches the request boundary, a
     500."""
     return web.Reply({"strategies": [s.to_dict() for s in catalog_module.load()],
-                      "meta": catalog_module.meta_record(catalog_module.read_meta()),
-                      "playbook": catalog_module.playbook_name()}, 200)
+                      "meta": catalog_module.meta_record(catalog_module.read_meta())}, 200)
 
 
 def handle_health() -> web.Reply:

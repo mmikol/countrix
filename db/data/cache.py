@@ -37,7 +37,7 @@ from collections.abc import Callable, Mapping
 
 import requests
 
-from db import SECONDS_PER_HOUR, Log, to_stderr
+from db import SECONDS_PER_HOUR, Log, to_stderr, write_whole
 
 MAX_BACKOFF = 60.0
 
@@ -115,16 +115,6 @@ def _read_cache(path: str) -> str:
         return handle.read()
 
 
-def _write_cache(path: str, text: str) -> None:
-    """A page's text into the cache: written into a .part file beside it and
-    renamed over any older copy once whole, so a write cut short raises and
-    leaves the old copy - never half a page a later build reads as whole."""
-    part = path + ".part"
-    with open(part, "w", encoding="utf-8") as handle:
-        handle.write(text)
-    os.replace(part, path)
-
-
 def _keep_stale(pull: PullContext, path: str, error: Exception) -> str:
     """A refetch failed: fall back to the cached copy, record it in the pull's
     stale and say so in its log."""
@@ -193,7 +183,7 @@ def cached(pull: PullContext, name: str, produce: Callable[[], str]) -> str:
                 raise
             text = _keep_stale(pull, path, error)
         else:
-            _write_cache(path, text)
+            write_whole(path, text)   # never half a page a later build reads as whole
     pull.captured.append(os.path.getmtime(path))
     return text
 

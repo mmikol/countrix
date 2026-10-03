@@ -71,13 +71,18 @@ class SixKit(NamedTuple):
     rejected: list[str]
 
 
+def infobox(text: str) -> dict[str, str] | None:
+    """The parameters of an article's character infobox; None without one."""
+    block = next(markup.find_templates(text, r"Infobox character"), None)
+    return markup.parse_params(block) if block is not None else None
+
+
 def parse_six_a_side(text: str) -> SixKit:
     """The 6v6 kit an article states: its infobox pools and every
     Ability_details block's 6v6_details lines, in the article's order."""
     pools: dict[str, int] = {}
     rejected: list[str] = []
-    block = next(markup.find_templates(text, r"Infobox character"), None)
-    params = markup.parse_params(block) if block is not None else {}
+    params = infobox(text) or {}
     for pool in POOL_FIELDS:
         field = pool + "6v6"
         value = markup.wikitext_to_text(params.get(field, ""))

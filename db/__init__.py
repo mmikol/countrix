@@ -27,8 +27,9 @@ the scope every rates snapshot is pinned to, the one error a caller can fix
 (Refusal), which every layer raises and every door answers as the caller's,
 where a progress line goes (Log) and the stderr writer a pull, a Context
 and the MCP server default to (to_stderr), the hour every age is read in
-(SECONDS_PER_HOUR), and embed, which rewrites one generated section of a
-markdown file for every layer that generates docs.
+(SECONDS_PER_HOUR), write_whole, a file written whole or not at all, and
+embed, which rewrites one generated section of a markdown file for every
+layer that generates docs.
 docs/db.md names the tables each pull writes, and the schema.
 
 Every row carries a source_id, and that is the only distinction drawn
@@ -107,6 +108,16 @@ PERK_TIERS: dict[PerkTier, int] = {"minor": 1, "major": 2}
 PLATFORM = "console"
 INPUT_DEVICE = "controller"
 REGION = "americas"
+
+
+def write_whole(path: str, text: str) -> None:
+    """`text` into `path`, written into a .part file beside it and renamed
+    over it once whole: a write cut short raises and leaves the old file as
+    it was."""
+    part = path + ".part"
+    with open(part, "w", encoding="utf-8") as handle:
+        handle.write(text)
+    os.replace(part, path)
 
 
 def embed(path: str, name: str, text: str) -> None:

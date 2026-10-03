@@ -464,10 +464,9 @@ class Result:
                 "weights": {s.id: s.weight for s in self.catalog if s.kind == "heuristic"},
                 # the default engine's weights it was scored under: the meta and its dials
                 "base": self.base.record(),
-                # a partial team has no share to report: the sum runs over the picks
-                # it has, so a perfectly played draft reads 16 after one pick and can
-                # fall when the right third pick lands. The fill result carries the
-                # number that means something - the best six reachable from here
+                # a partial team has no share to report: its score covers only the
+                # picks it has. The fill result carries the number that means
+                # something - the best six reachable from here
                 "normalized": self.share() if scoring and not self.partial else None,
                 "playstyle": self.playstyle, "picks": self.picks,
                 "contributions": self.contributions, "violations": self.violations,

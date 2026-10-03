@@ -5,7 +5,6 @@ none of these tools writes.
 """
 
 from collections.abc import Mapping
-from typing import TypedDict
 
 from door.mcp.boards import board_tool
 from door.mcp.registry import Context, tool
@@ -13,9 +12,6 @@ from door.mcp.schema import Property, ToolReply
 from facts import tables
 from facts.draft import Draft
 from inference import catalog, engine, reach
-from inference.result import Result
-
-COMPACT_TERMS = 15        # the heaviest terms a compact reply carries
 
 # the search's one knob as the tools describe it; clamp_top holds its rule
 TOP: Property = {
@@ -23,29 +19,6 @@ TOP: Property = {
     "description": "alternatives to return, 1 to %d (default %d): the next best sixes"
                    " of the whole legal space, in order"
                    % (engine.TOP_CEILING, engine.TOP_DEFAULT)}
-
-
-class WeightedTerm(TypedDict):
-    """One scoring term of a compact reply: its strategy and its weighted part
-    of the score."""
-    id: str
-    weighted: float
-
-
-class CompactInfer(TypedDict):
-    """A compact infer reply's payload: the board and the six with its score;
-    how many scoring terms the full reply's contributions carry (terms), how
-    many of them do not apply here (idle), the applying heuristics whose
-    metric does not vary on this board (silent), and the heaviest terms."""
-    map: str | None
-    side: str
-    red: list[str]
-    blue: list[str]
-    score: float
-    terms: int
-    idle: int
-    silent: list[str]
-    largest: list[WeightedTerm]
 
 
 @board_tool(
@@ -59,46 +32,12 @@ class CompactInfer(TypedDict):
     " limits are refused as not allowed, the limits named. Returns the comp,"
     " per-pick reasons with fact citations, the score breakdown per engine"
     " term and strategy, and alternatives.",
-    {
-        "top": TOP,
-        "compact": {"type": "boolean",
-                    "description": "true: a reply small enough to carry under a"
-                                   " playbook of hundreds. The structured payload"
-                                   " then has its own keys: map, side, red, blue,"
-                                   " score, terms (how many scoring terms the full"
-                                   " reply carries), idle, silent (applying,"
-                                   " metric not varying on this board) and largest"
-                                   " (the %d heaviest terms, each an id and its"
-                                   " weighted value)" % COMPACT_TERMS}})
-def infer(
-        ctx: Context, draft: Draft, top: int | None = None, compact: bool = False) -> ToolReply:
+    {"top": TOP})
+def infer(ctx: Context, draft: Draft, top: int | None = None) -> ToolReply:
     with ctx.connect() as cx:
         world = tables.load(cx)
     result = engine.infer(world, draft, top=engine.clamp_top(top))
-    if compact:
-        return ToolReply(*_compact(result))
     return ToolReply(result.rendered(), result.to_dict())
-
-
-def _compact(result: Result) -> tuple[str, CompactInfer]:
-    """A result small enough for a tool reply under a playbook of hundreds:
-    the comp, the heuristics that apply but whose metric does not vary on this
-    board, and the largest terms."""
-    terms = result.contributions
-    silent = sorted(c["id"] for c in terms if c.get("spread") is False)   # applying heuristics
-    idle = sum(1 for c in terms if not c["applies"])
-    largest = sorted((c for c in terms if c["weighted"]),
-                     key=lambda c: (-abs(c["weighted"]), c["id"]))[:COMPACT_TERMS]
-    payload = CompactInfer(
-        map=result.map_name, side=result.side, red=list(result.red), blue=list(result.blue),
-        score=round(result.score, 3), terms=len(terms), idle=idle, silent=silent,
-        largest=[WeightedTerm(id=c["id"], weighted=round(c["weighted"], 4)) for c in largest])
-    lines = result.rendered().split("\n")[:2]
-    lines.append("  %d terms, %d not applying here" % (len(terms), idle))
-    lines.append("  silent (applies, metric does not vary here): %s"
-                 % (", ".join(silent) or "none"))
-    lines += ["  %+.2f  %s" % (c["weighted"], c["id"]) for c in largest]
-    return "\n".join(lines), payload
 
 
 @tool(

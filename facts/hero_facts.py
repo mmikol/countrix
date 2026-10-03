@@ -286,8 +286,8 @@ def _hero_best_maps(fs: FactSet, world: World, h: Hero, team: Seat) -> None:
     line per map - with a map, the facts on it are the whole story."""
     name = h.name
     if h.best_maps and h.win is not None:
-        # the same intersection rule as the rates. best_maps is filled only for
-        # a hero with a win rate, from maps it has a rate on.
+        # best_maps is filled only for a hero with a win rate, from maps it
+        # has a rate on.
         overall = h.win
         fs.add("hero", name, "hero.best_map", "%s's three best maps by Blizzard's map rates,"
             " over its own %.1f%%: %s" % (name, overall, ", ".join(

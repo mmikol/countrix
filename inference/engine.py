@@ -348,7 +348,7 @@ def board(
                      when each pick dropped costs the swap cost (meta.md's,
                      the brief's, or its weights' SWAP), with blue's share
                      and the fight odds before and after; the suggestion is
-                     withheld where the odds would fall (None without blue
+                     withheld where the odds would not rise (None without blue
                      picks, or when the brief does not ask for it)
         countered    blue's picks against red's optimal six - how you hold
                      if they answer you perfectly: a full six as it stands, a
@@ -541,7 +541,7 @@ class _Pass:
         board and scale. Where a swap is suggested, red's optimal, current
         comp and fill are solved again against the six it makes, and the
         fight odds read off them as the momentum reads the board's; a
-        suggestion that lowers them is withheld."""
+        suggestion they do not rise on is withheld."""
         picks = self.world.resolve(draft.map_name, draft.red, draft.blue, draft.bans).blue
         full = len(picks) == TEAM_SIZE
         before, odds = seat.momentum["blue"], seat.momentum["odds"]

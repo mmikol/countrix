@@ -7,8 +7,9 @@ derives a kit piece's combat numbers from both at read time - a reload
 worded beside a firing rate, a figure that is a sum and not one hit, a
 percent worth its published cap, a row on the hero itself - so a fix to how
 a wording is read is a code change here and needs no re-pull. The rest of
-the facts package reads the measurements and the keywords, never the
-prose.
+the facts package reads the measurements and the keywords, and a stat's
+text or an ability's description only where a word or a figure in it
+settles a case (counters, scalars, kit_format).
 """
 
 import math

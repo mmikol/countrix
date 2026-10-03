@@ -26,6 +26,7 @@ from db import ROOT, psql
 from facts import tables
 from facts.model import World
 from inference import base, catalog, reach
+from tests.verification.inference import six
 
 OUT = os.path.join(ROOT, "tests", "fixtures", "reach.json")
 
@@ -61,7 +62,7 @@ def _elsewhere(
             if _board(prior) in seen:
                 continue
             seen.add(_board(prior))
-            solved: reach.Reach = {**prior, "six": reach.six(world, prior)}
+            solved: reach.Reach = {**prior, "six": six(world, prior)}
             boards.append(solved)
             if name in solved["six"]:
                 board = solved
