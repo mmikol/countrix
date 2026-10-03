@@ -9,7 +9,7 @@ import copy
 from facts import board_facts
 from facts.draft import Draft
 from facts.team import team_metrics
-from inference import catalog
+from inference import base, catalog
 from inference.base import OFF
 from inference.expr import Expr
 from inference.result import Result
@@ -181,8 +181,9 @@ def test_the_plan_names_the_stages_the_facts_hold_and_no_other(
 
 def test_the_plan_says_nothing_the_board_contradicts(synthetic_world):
     """A mirror is told as one, a six solved before red reveals a pick names the
-    likely six it counters, "Above all" leaves out the shape every six pays and
-    a rule named for another style, and the family follows the style tags."""
+    likely six its counter term read and counters, blue's own six only names
+    it, "Above all" leaves out the shape every six pays and a rule named for
+    another style, and the family follows the style tags."""
     from types import SimpleNamespace as Ns
 
     from inference import plan
@@ -216,6 +217,10 @@ def test_the_plan_says_nothing_the_board_contradicts(synthetic_world):
         for r in rules[:4]]
     terms.append({"id": "unmet", "kind": "heuristic", "form": "heuristic", "applies": True,
                   "weighted": -0.5, "metric": None, "need": True})
+    # the default engine's counter term, as it reads red's likely six before a reveal
+    terms.append({"id": base.COUNTERS, "kind": "base", "form": "base", "applies": True,
+                  "weighted": 0.0, "metric": None, "against": ["Anvil", "Mortar"],
+                  "likely": True})
     red_h = [world.hero("Anvil"), world.hero("Mortar")]
     theirs = team_metrics(world, red_h, m, [])
     red_lean = theirs["style_lean"] or theirs["style_top"]
@@ -235,6 +240,9 @@ def test_the_plan_says_nothing_the_board_contradicts(synthetic_world):
     said = plan.plan(world, m, "", [], [], six)                        # red revealed nothing
     assert "this red" not in said and "but the six leans poke" in said
     assert "No red pick yet: the six counters their likely six (Anvil, Mortar)." in said
+    six.kind = "evaluate"                                              # blue's own six
+    said = plan.plan(world, m, "", [], [], six)
+    assert "No red pick yet: their likely six is Anvil and Mortar." in said
     tanks = plan._family(world, m, "brawl", "tank", ["Mortar"])
     tagged = [
         h for h in world.heroes.values()
@@ -278,4 +286,5 @@ def test_the_plan_describes_the_six_the_comps_tab_shows(synthetic_world, scratch
     assert one.plan.endswith("your 1 pick, red's 1 revealed pick.")
     full = board((), tuple(one.fill.blue))
     assert "The six is the one you picked." in full.plan and "your 6 picks" in full.plan
-    assert "the six counters" not in full.plan and "their likely six is " in full.plan
+    # the default engine off, no term reads red's likely six: the plan names none
+    assert "the six counters" not in full.plan and "likely six" not in full.plan

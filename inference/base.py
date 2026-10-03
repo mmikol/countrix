@@ -18,11 +18,8 @@
                 answers them, a wiki edge WIKI_WEIGHT (2) and, on a pair the
                 wiki has no edge on either way, a derived one DERIVED_WEIGHT
                 (1). The other side is its locked picks; with none, its likely
-                six on this map (compute.expected_picks, past the bans).
-                Where the other side gets no picks - red's seat before blue
-                picks, infer before red reveals - only this term reads it;
-                the board hands blue's seat that six as red's picks, so
-                there every term reads it
+                six on this map (compute.expected_picks, past the bans),
+                which only this term reads
 
 It is always on and needs no playbook: under a playbook of assumptions the
 board's sixes are the ones these three favour, and the strategies' terms
@@ -244,13 +241,10 @@ def likely_six(world: World, m: Map | None, banned: Sequence[Hero]) -> tuple[Her
 def opponent(
         world: World, m: Map | None, red: Sequence[Hero], banned: Sequence[Hero]) -> Opponent:
     """The other side as the counter term reads it: its locked picks, else its
-    likely six. Handed exactly that likely six, as the board hands blue's
-    seat until red reveals a pick, it is the likely six still."""
-    likely = likely_six(world, m, banned)
+    likely six."""
     if not red:
-        return Opponent(heroes=likely, likely=True)
-    same = {h.id for h in red} == {h.id for h in likely}
-    return Opponent(heroes=tuple(red), likely=same)
+        return Opponent(heroes=likely_six(world, m, banned), likely=True)
+    return Opponent(heroes=tuple(red), likely=False)
 
 
 def rate_edge(h: Hero, m: Map | None) -> float:

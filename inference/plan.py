@@ -389,14 +389,18 @@ def _them(
 
 
 def _unrevealed(six: Result) -> str | None:
-    """Their likely six while red has revealed nothing: the six searched as
-    its counter says so; blue's own six counters nothing, and the plan only
-    names it."""
-    if not six.red:
+    """Their likely six while red has revealed nothing, as the default
+    engine's counter term read it: a six searched with that term on counters
+    it, and says so; blue's own six, or a six searched with the term off,
+    only names it. None where no counter term read it."""
+    read = next((c for c in six.contributions
+                 if c["id"] == base.COUNTERS and c.get("likely") and c.get("against")), None)
+    if read is None:
         return None
-    if six.kind != "evaluate":
-        return "No red pick yet: the six counters their likely six (%s)." % ", ".join(six.red)
-    return "No red pick yet: their likely six is %s." % _and(six.red)
+    likely = read.get("against", [])
+    if six.kind != "evaluate" and read["applies"]:
+        return "No red pick yet: the six counters their likely six (%s)." % ", ".join(likely)
+    return "No red pick yet: their likely six is %s." % _and(likely)
 
 
 def _answered(six: Result) -> dict[str, list[str]]:

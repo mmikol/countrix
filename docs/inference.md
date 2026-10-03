@@ -220,11 +220,11 @@ the sixes its three terms favour, scored and explained:
   pair the wiki leaves out weigh 1 each; the others are not replaced.
   The other side is its locked picks, or, with none, its likely six on
   this map past the bans (`compute.expected_picks`, the six the board's
-  red panel shows). The board hands blue's seat that six as red's picks,
-  so there every term reads it; where the other side gets no picks -
-  red's seat before blue picks, `infer` before red reveals - only this
-  term does. Only this term reads a derived edge: the `team.*` and
-  `enemy.*` counter metrics read the wiki's graph against the picks. The board
+  red panel shows); either seat reads the other the same way, on the
+  board and in `infer` alike. Only this term reads the likely six or a
+  derived edge: every other term reads the side's revealed picks, and the
+  `team.*` and `enemy.*` counter metrics read the wiki's graph against
+  them. The board
   names every derived edge it counts with the mechanism and the numbers
   that fired.
 
@@ -914,12 +914,9 @@ P_r = enemy.pool_total + f x sum over r of d_r x pool_medians[r]
 
 A red that has shown its two supports reads as two, not as two and a
 share of a third. A complete red that heals nothing needs nothing. The
-likely six is read only where a seat is handed it as red's picks: on the
-board, blue's seat before red reveals, where the bar is that six's
-healing on its pool.
+likely six is not read: it rests on pick rates.
 
-**The threshold.** With red empty - red's seat before blue picks, `infer`
-before red reveals - red is the 2-2-2 of role-median
+**The threshold.** With red empty, red is the 2-2-2 of role-median
 heroes: H_r = `world.hps_bench` = 139.87 hp/s and P_r = twice the sum of
 `World.pool_medians` = 2 x (525 + 250 + 237.5) = 2025, the 6v6 kit as of
 2026-09-26. A six must heal 6.91% of its own pool a second, and never less

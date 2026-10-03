@@ -118,14 +118,12 @@ the wiki leaves out count; the others are not replaced. A wiki edge counts %(WIK
 derived one %(DERIVED_WEIGHT)d, and the board names every derived edge it counts with the
 mechanism that fired. Only this term reads a derived edge - the playbook's counter metrics read
 the wiki's graph alone.</p>
-<p>The other side is its locked picks, or its likely six on this map until it locks one. On the
-board, blue's seat is solved against red's likely six as though red had picked it, so there
-every term reads it - the healing floor, the <code>enemy.*</code> and <code>matchup.*</code>
-metrics, the counter metrics and the scale's field. Where the other side has no picks and none
-are handed in - red's seat before blue picks, and <code>infer</code> before red reveals - only
-this term reads the likely six, and the rest read an empty side. A playbook of assumptions alone
-gets the six these three favour, scored and explained, and every other term sits on top of
-them.</p>
+<p>The other side is its locked picks, or its likely six on this map until it locks one. Only
+this term reads the likely six: every other term - the healing floor, the <code>enemy.*</code>
+and <code>matchup.*</code> metrics, the counter metrics, the scale's field - reads the side's
+revealed picks, none before a reveal, on the board and in <code>infer</code> alike. A playbook of
+assumptions alone gets the six these three favour, scored and explained, and every other term
+sits on top of them.</p>
 <p>A limit that fails removes the six, and no limit scores. A heuristic on a metric normalises
 it to 0..1 against %(REFERENCE_SIZE)s random legal sixes for the board, the <i>reference
 sample</i>, and against the board's <i>field</i>, flips it when minimising, then multiplies by
@@ -240,12 +238,9 @@ H_r          red's healing  + f &middot; d_support &middot; hps_bench / 2
 P_r          red's pool     + f &middot; &Sigma;_q d_q &middot; median pool of role q
 d_q          max( 0, 2 &minus; red's picks in role q ): what the two-two-two still misses
 f            red's open slots / &Sigma;_q d_q, 0 when nothing is missing</pre>
-<p>Red here is the other side as the seat reads it. On the board, until red locks a pick, blue's
-seat reads red's likely six as red's picks, so the bar is that six's healing on its pool, and
-the map's pick rates and the synergy table choose its heroes; from red's first pick the open
-slots are filled as above, so the bar moves when red locks a hero its likely six already held.
-With red empty - red's seat before blue picks, or <code>infer</code> before red reveals - it is
-a two-two-two of role-median heroes: it heals <code>world.hps_bench</code>, twice the median
+<p>Red here is the other side's revealed picks, their open slots filled as above; the likely six
+is not read. With red empty - before red reveals a pick - it is a two-two-two of role-median
+heroes: it heals <code>world.hps_bench</code>, twice the median
 support, on twice the sum of the role-median pools in the kit in force. A six must then heal
 that share of its own pool a second, and never less than <code>world.hps_bench</code>, and
 everything in that threshold is kit data. The sources give no absolute bar - no fight length,
@@ -344,7 +339,8 @@ search returns exactly the sixes a full enumeration ranks first. On the built da
 force of every legal six on real boards agreed with it six for six, score for score.</p>
 <p id='against-red'><b>What it is optimal against.</b> A comp is optimal <i>against the red
 you can see</i>, not against every red they might pick. Before red reveals anything the board
-answers their likely starting comp, filled from the map's pick rates; each pick they show
+answers their likely starting comp, filled from the map's pick rates, through the default
+engine's counter term; each pick they show
 re-solves against what is now known. It is a best reply to present information and changes as
 that information does. The hedge is the <i>if countered optimally</i> case the
 <code>board</code> tool reports: it scores your six against red's best reply to it, so a comp
@@ -382,11 +378,9 @@ and the rest payload - and the playbook's rules that read them; the win rates ar
 <p id='reach'><b>Reach.</b> The weights are meant to make a hero common or rare, never
 impossible. What is established is narrower: at the reach fixture's recording of 2026-09-30,
 under the shipped playbook - the default engine, the healing floor and the terrain rules - 50
-of the 53 released heroes had a board on which they are in the optimal six <code>infer</code>
-solves, within a match's %(MAX_BANS)d bans, and each such board is a proof: the six is the exact
-optimum. Where such a board leaves red unrevealed, <code>infer</code> reads red as no picks,
-while the board page reads red's likely six in every term and may seat another six. The search
-found none for three: Emre, Freja and Sojourn; a roster, a playbook or a weight that moves
+of the 53 released heroes had a board on which they are in the optimal six, within a match's
+%(MAX_BANS)d bans, and each such board is a proof: the six is the exact optimum, on the board page
+and in <code>infer</code> alike. The search found none for three: Emre, Freja and Sojourn; a roster, a playbook or a weight that moves
 re-records it. That is not evidence that no such board exists, only that a search over every map
 but a few reds did not find one. No rule forbids any of them; the engine does not value what they
 do on the boards it tried, and the playbook's rules are what can answer that.</p>
@@ -419,9 +413,9 @@ change when red reveals a pick.</p>
 pick(h, map)   the hero's pick rate on this map; overall with no map set or no rate here, 0 with none
 partners(h, S) how many heroes already on S the synergy table pairs h with
                a tie goes to the name first in alphabetical order</pre>
-<p id='counter'><b>Blue's optimal counter</b>: solved against red's revealed picks, or their
-likely comp until they reveal one, on this map, side and bans; never against blue's own
-picks. Once blue picks, its seat shows blue's six above the optimal: from one to five picks,
+<p id='counter'><b>Blue's optimal counter</b>: solved against red's revealed picks - before they
+reveal one, the counter term reads their likely comp - on this map, side and bans; never against
+blue's own picks. Once blue picks, its seat shows blue's six above the optimal: from one to five picks,
 the picks with the rest filled by a second solve that keeps them - the six the suggestion
 tiles offer; at six, the six itself. The game plan describes that six. Red's
 optimal is solved as the scale for red's score and not shown.</p>
@@ -448,8 +442,8 @@ clock that runs them daily.</p>
 layer's answer at each stage of a draft; <code>serve.py</code> reads the World per request.
 It never calls a language model.</p>
 <p><b>Claude</b>: runs when you ask. It refreshes the sources, derives a strategy's mathematics
-from its prose, and tunes weights. <code>/comp</code> is the same solver in chat; with no red
-given, only the default engine's counter term reads red's likely six.</p>
+from its prose, and tunes weights. <code>/comp</code> is the same solver in chat: the same board
+gives the same six there.</p>
 <p class='legend'><code>docs/architecture.md</code>, <code>docs/db.md</code>,
 <code>docs/inference.md</code>.</p>
 </article>
