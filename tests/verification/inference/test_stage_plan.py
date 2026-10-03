@@ -19,7 +19,7 @@ from inference.base import OFF
 from inference.result import StageRules
 from inference.scoring import Candidate, quantized
 from inference.solver import Solver
-from tests.verification.inference import ASSUMPTIONS_ONLY, DEFAULT, FIXTURE_PLAYBOOK
+from tests.verification.inference import ASSUMPTIONS_ONLY, DEFAULT
 from tests.verification.inference.enumeration import netted, plain_seat
 
 COST = 5.0                  # share points of blue's span a hero changed costs
@@ -128,22 +128,6 @@ def test_the_chosen_stage_is_the_origin_and_the_phases_before_it_are_played(
     assert assault["played"] and not assault["six"] and not assault["current"]
     assert escort["current"] and sorted(escort["six"]) == sorted(ORIGIN)
     assert "Play the six the board suggests here" in escort["blurb"]
-
-
-def test_a_withheld_swap_leaves_the_chosen_stage_the_origin(synthetic_world, monkeypatch):
-    """A swap the fight odds hold back is no answer on the board's chosen
-    stage: its row plays the six the board suggests, as a board that
-    searched no swap reads, and never says no swap pays for its cost."""
-    draft = Draft("Harbor Gate", ("Mortar", "Gale"), ORIGIN, side="attack", stage="Escort")
-    worse = {"odds": {"blue": 0, "red": 100}}
-    monkeypatch.setattr(engine._Pass, "_against", lambda self, draft, six: worse)
-    board = engine.board(synthetic_world, draft, catalog=catalog.load(FIXTURE_PLAYBOOK),
-                         brief=engine.Brief(base=DEFAULT, solve_countered=False, swap=COST))
-    assert board.swaps["status"] == "withheld"
-    [escort] = [r for r in board.stages if r["current"]]
-    assert sorted(escort["six"]) == sorted(ORIGIN) and escort["swaps"] == []
-    assert "Play the six the board suggests here" in escort["blurb"]
-    assert "no swap pays" not in escort["blurb"]
 
 
 def test_an_unscored_seat_walks_its_stages_at_no_cost(synthetic_world):

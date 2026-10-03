@@ -1042,3 +1042,4 @@ Every change to a strategy's frontmatter, newest last: when, what, why, and who.
 - 2026-09-30T21:59Z `high-ground-over-barrier` body: rewritten (Review of 2026-09-30: the threshold's unit, sd from the ordinary map's, and the measure the restored cap sets.) [claude-code-session]
 - 2026-09-30T21:59Z `control-points-have-edges` body: rewritten (Review of 2026-09-30: the threshold's unit, sd from the ordinary map's, and the measure the restored cap sets.) [claude-code-session]
 - 2026-09-30T21:59Z `meta` body: rewritten (Review of 2026-09-30: the swap cost also prices each hero changed between stages of the plan.) [claude-code-session]
+- 2026-10-03T15:30Z `deterministic-not-probabilistic` body: rewritten (the owner dropped the fight odds: red is never optimized or scored, so no red share exists to split against blue's) [claude-code-session]

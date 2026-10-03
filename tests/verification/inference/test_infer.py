@@ -106,7 +106,7 @@ def test_scores_share_one_scale_per_board(synthetic_world):
     assert r.alternatives[0]["normalized"] <= 100
     b = engine.board(world, Draft("Harbor Gate", red, tuple(r.blue)), catalog=fix, brief=BRIEF)
     assert abs(b.current.score - r.score) < 1e-9 and b.blue.blue == r.blue
-    assert b.current.to_dict()["normalized"] == 100 and b.red.to_dict()["normalized"] == 100
+    assert b.current.to_dict()["normalized"] == 100
 
 
 def test_an_announced_hero_is_described_but_never_picked(synthetic_world):

@@ -129,9 +129,9 @@ function paintBans() {
 }
 
 /* a filled slot's tooltip: the reason the board gives its hero - blue's fill
-   or six, red's current comp - and none while no board has answered */
+   or six, red's likely six - and none while no board has answered */
 function pickReason(team, name) {
-  var d = INF, r = !d || d.error ? null : team === 'blue' ? (d.fill || d.current) : d.red_current;
+  var d = INF, r = !d || d.error ? null : team === 'blue' ? (d.fill || d.current) : d.expected;
   var p = r && r.picks ? r.picks.filter(function (x) { return x.hero === name; })[0] : null;
   return p ? p.why : '';
 }
@@ -211,7 +211,7 @@ function qs() {
 var pending = null, seq = 0, FACTS = null, INF = null;
 var STALE = false;         /* the last refresh failed: the next focus or reconnect retries it */
 var solve = null;          /* the board request in flight, aborted when a newer one is sent */
-var redKey = null;         /* the map, side and bans red's likely six was last drawn for */
+var redKey = null;         /* the map, side, bans and red picks red's likely six was drawn for */
 /* this page's name on its board requests: the server stops a board this page
    has moved past, and serves every other page's in its own lane */
 var CLIENT = Math.random().toString(36).slice(2, 10);
@@ -223,7 +223,6 @@ function solving(on) {
     if (on) { if (node.textContent !== '…') node.dataset.was = node.textContent; node.textContent = '…'; }
     else if (node.textContent === '…' && node.dataset.was !== undefined) { node.textContent = node.dataset.was; }
   });
-  if (on) el('momentum').innerHTML = "<span class='lbl'>fight odds</span><span class='legend searching'>solving…</span>";
   ['plan', 'blueslots', 'redslots', 'blueswaps', 'stageplan'].forEach(function (id) {
     el(id).classList.toggle('waiting', !!on);
   });
@@ -246,7 +245,6 @@ function boardFailed() {
   el('inf-blue').innerHTML = "<div class='warnbox'>the board is not answering</div>";
   el('inf-red').innerHTML = ''; el('plan').innerHTML = '';
   el('stageplan').innerHTML = ''; el('blueswaps').innerHTML = '';
-  el('momentum').innerHTML = "<span class='lbl'>fight odds</span><span class='legend'>the board is not answering</span>";
   ['bluescore', 'redscore'].forEach(function (id) { el(id).textContent = ''; el(id).title = ''; });
 }
 
@@ -264,13 +262,13 @@ function refresh() {
       STALE = true; factsFailed('the board is not answering');
     });
     /* the search is seconds of work, so everything it feeds says so until it
-       lands: the two seats, the odds bar, the scores, the plan and the filled
-       slots. Without this the board shows the last board's numbers while it
-       thinks, which reads as an answer. Red's likely six changes only with
-       the map, the side and the bans, so a pick leaves it standing */
+       lands: the two seats, the scores, the plan and the filled slots. Without
+       this the board shows the last board's numbers while it thinks, which
+       reads as an answer. Red's likely six changes only with the map, the
+       side, the bans and red's own picks, so a blue pick leaves it standing */
     solving(true);
-    el('inf-blue').innerHTML = "<p class='legend searching'>searching both seats…</p>";
-    var key = [st.map, st.side, st.stage].concat(st.bans).join('|');
+    el('inf-blue').innerHTML = "<p class='legend searching'>searching…</p>";
+    var key = [st.map, st.side, st.stage].concat(st.bans, ['red'], st.red).join('|');
     if (key !== redKey) el('inf-red').innerHTML = "<p class='legend searching'>searching…</p>";
     if (solve) solve.abort();           /* the older request; this one's arrival stops its board */
     solve = new AbortController();
@@ -309,19 +307,30 @@ function renderFacts() {
   el('factsn').textContent = shown === total ? commas(total) + ' facts' : commas(shown) + ' of ' + commas(total) + ' facts';
 }
 
-/* the empty blue slots carry the solver's suggestions: the optimal six before
-   any pick, then the fill - the best six that keeps the locked ones - and a
-   click locks one. The tile shows the hero alone; its reasons ride in the
-   hover title and on the comps tab, which draws the same six */
+/* the empty slots carry the board's suggestions, and a click locks one. Blue's
+   are the solver's: the optimal six before any pick, then the fill - the best
+   six that keeps the locked ones. Red's are its likely six around its picks:
+   for each open slot the hero the map's pick rates and the wiki's synergies
+   pull first, drawn only for the red picks the board in hand answered. The
+   tile shows the hero alone; its reason and pull ride in the hover title */
 function paintSuggestions() {
-  var slots = el('blueslots').children, d = INF;
+  var d = INF;
   var src = !d || d.error ? null : (st.blue.length ? d.fill : d.blue);
   var sw = answered() ? d.swaps : null;         /* the swaps' empty slots show the fill's heroes */
   var free = function (p) { return st.blue.indexOf(p.hero) < 0; };
   var open = sw && sw.open && sw.open.length ? sw.open.filter(free)
            : src && src.picks ? src.picks.filter(function (p) { return !p.locked && free(p); }) : [];
-  for (var i = st.blue.length, k = 0; i < TEAM; i++) {
-    var s = slots[i], p = open[k++];
+  suggest('blue', open);
+  var likely = redAnswered() ? d.expected.picks.filter(function (p) {
+    return !p.locked && st.red.indexOf(p.hero) < 0; }) : [];
+  suggest('red', likely);
+}
+
+/* `team`'s empty slots, in order, show `picks` */
+function suggest(team, picks) {
+  var slots = el(team + 'slots').children;
+  for (var i = st[team].length, k = 0; i < TEAM; i++) {
+    var s = slots[i], p = picks[k++];
     if (!p) continue;
     var h = hero(p.hero) || { name: p.hero, portrait: p.portrait };
     s.className = 'slot suggested'; s.setAttribute('data-h', p.hero); s.title = p.why;
@@ -336,8 +345,8 @@ function paintSuggestions() {
 function paintSwaps() {
   var d = INF, sw = answered() ? d.swaps : null, box = el('blueswaps');
   var pairs = sw && sw.pairs ? sw.pairs : [];
-  if (!pairs.length) {                   /* a withheld swap says why; a kept six says nothing */
-    box.innerHTML = sw && sw.status === 'withheld' ? "<div class='swapcap'>" + esc(sw.verdict) + '</div>' : '';
+  if (!pairs.length) {                   /* a kept six says nothing */
+    box.innerHTML = '';
     return;
   }
   var cells = '';
@@ -370,6 +379,12 @@ function answered() {
   var d = INF, asked = d && !d.error && d.current ? d.current.blue || [] : null;
   return !!asked && asked.length === st.blue.length &&
     asked.every(function (n, i) { return st.blue[i] === n; });
+}
+/* the same for red: the likely six the board in hand drew around red's picks */
+function redAnswered() {
+  var d = INF, asked = d && !d.error && d.expected ? d.expected.locked || [] : null;
+  return !!asked && asked.length === st.red.length &&
+    asked.every(function (n, i) { return st.red[i] === n; });
 }
 /* the stage picker: the map's stages in play order after the whole map,
    hidden on a map without stages; a stage the map does not list is dropped */

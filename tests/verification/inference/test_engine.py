@@ -1,10 +1,10 @@
-"""board(): both seats on opposite sides, the weights it is given, the fight
-odds, the shapes and the queue's tank limit, an empty catalog kept as the
-caller's, a limit red's reveal already breaks and blue's picks may not, the
-share read from the seat's floor and a mirror's even odds, the likely six, a
-full six on control, every seat of a board on the stage it names, the
-page's boards superseding one another, and the healing floor on top of the
-default engine.
+"""board(): blue's seat solved and red's likely six read, never solved; the
+weights it is given, the shapes and the queue's tank limit, an empty catalog
+kept as the caller's, a limit red's reveal already breaks and blue's picks
+may not, the share read from the seat's floor, the likely six, a full six on
+control, every seat of a board on the stage it names, the page's boards
+superseding one another, and the healing floor on top of the default
+engine.
 Every board is the synthetic World's but the last two, King's Row and
 Samoa on the built database. test_board_gate holds the lobby's limits on every door."""
 
@@ -30,34 +30,32 @@ from tests.verification.inference import (
 )
 
 
-def test_board_solves_both_seats_on_opposite_sides_and_scores_the_current(synthetic_world):
+def test_board_solves_blues_seat_and_reads_reds_likely_six(synthetic_world):
+    """Blue's seat is solved and scored; red's is never optimized. Red reads as
+    its likely six around its revealed picks, on the other side, with each
+    pick's pull and no strategy read. The countered case alone solves red's
+    best counter, as a what-if for blue."""
     from inference import engine
     world = synthetic_world
     fix = catalog.load(FIXTURE_PLAYBOOK)        # the reference playbook has the side rules
     b = engine.board(world, Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm",), side="attack"),
                      catalog=fix, brief=BRIEF)
-    blue, red, cur = b.blue, b.red, b.current
+    blue, cur, likely = b.blue, b.current, b.expected
     assert blue.seat == "blue" and blue.kind == "infer" and blue.side == "attack"
     assert blue.locked == []
     absolute = engine.infer(world, Draft("Harbor Gate", ("Mortar", "Gale"), (), side="attack"),
                             catalog=fix, base=DEFAULT)
     assert blue.blue == absolute.blue                     # blue's optimal ignores your picks
-    assert red.seat == "red" and red.side == "defense" and len(red.blue) == 6
-    # red's optimal: their best counter to ours
-    assert red.locked == [] and red.red == ["Balm"]
-    theirs = engine.infer(world, Draft("Harbor Gate", ("Balm",), (), side="defense"), catalog=fix,
-                          base=DEFAULT)
-    assert red.blue == theirs.blue
+    assert likely.seat == "red" and likely.side == "defense" and len(likely.blue) == 6
+    assert likely.locked == ["Mortar", "Gale"] and likely.red == ["Balm"]
+    assert {"Mortar", "Gale"} <= set(likely.blue) and likely.contributions == []
+    assert all(p["pull"] >= 0 for p in likely.picks)
     assert cur.kind == "current" and cur.partial and cur.blue == ["Balm"]
     assert cur.contributions and cur.score is not None
-    rc = b.red_current                                  # their comp as revealed, scored vs ours
-    assert rc.seat == "red"
-    assert set(rc.blue) == {"Mortar", "Gale"}
-    assert rc.red == ["Balm"]
-    assert rc.partial
-    assert rc.to_dict()["normalized"] is None        # a partial team has no share
     assert b.countered is not None and b.countered.kind == "countered"
-    assert b.countered.red == red.blue                  # blue's best counter to red's optimal
+    theirs = engine.infer(world, Draft("Harbor Gate", ("Balm",), (), side="defense"), catalog=fix,
+                          base=DEFAULT)
+    assert b.countered.red == theirs.blue               # blue against red's best counter
     fill = b.fill                                       # the empty slots, filled around Balm
     assert fill.kind == "fill"
     assert fill.locked == ["Balm"]
@@ -70,14 +68,15 @@ def test_board_solves_both_seats_on_opposite_sides_and_scores_the_current(synthe
     assert fill.blue == around.blue
     mo = b.momentum
     assert set(mo) == set(Momentum.__annotations__) and mo["partial"]
-    # each seat is half-drafted, so its share is read through its fill - the best
-    # six reachable from its picks - not off the picks alone; both current comps'
-    # dicts report no share of their own.
+    # blue is half-drafted, so its share is read through its fill - the best six
+    # reachable from its picks - not off the picks alone; the current comp's dict
+    # reports no share of its own. Red's badge is its likely six's pull
     assert mo["blue"] == fill.to_dict()["normalized"]
-    assert mo["red"] is not None
-    assert cur.to_dict()["normalized"] is None and rc.to_dict()["normalized"] is None
-    assert ("ahead by" in mo["verdict"] or mo["verdict"].startswith("even"))
+    assert cur.to_dict()["normalized"] is None
+    assert mo["verdict"].startswith("blue %d / 100 of its optimal" % mo["blue"])
     assert "best counter" in mo["verdict"]
+    pull = sum(p["pull"] for p in likely.picks)
+    assert mo["badges"]["red"]["label"] == "%.0f pull" % pull
     # prose: the ground, what to play, them, the family
     plan = b.plan
     assert plan.startswith("Harbor Gate is a Hybrid map: a capture point and then the payload path")
@@ -88,19 +87,16 @@ def test_board_solves_both_seats_on_opposite_sides_and_scores_the_current(synthe
     assert plan.endswith("Based on: the Role Queue rates and counters, the map, the side,"
                          " your 1 pick, red's 2 revealed picks.")
     d = b.to_dict()
-    assert d["side"] == "attack" and d["red"]["seat"] == "red" and d["current"]["partial"]
-    assert d["red_current"]["seat"] == "red"
+    assert d["side"] == "attack" and d["expected"]["seat"] == "red" and d["current"]["partial"]
     assert d["momentum"]["verdict"] == mo["verdict"]
     assert d["plan"] == plan
     assert d["fill"]["kind"] == "fill" and "the rest filled" in b.rendered()
     assert "current comp" in b.rendered() and "momentum:" in b.rendered()
-    seats = (blue, red, cur, rc, fill, b.countered, b.expected)
+    seats = (blue, cur, fill, b.countered, b.expected)
     assert not any("facts" in r.to_dict() for r in seats)      # no seat carries the facts
-    # the side constraints fire on the right seat
+    # blue's side rule fires, and the other side's does not
     ids = {c["id"] for c in blue.contributions if c.get("applies")}
     assert "attack-breaks-the-hold" in ids and "defense-holds-the-ground" not in ids
-    ids = {c["id"] for c in red.contributions if c.get("applies")}
-    assert "defense-holds-the-ground" in ids
 
 
 def test_the_board_scores_under_the_weights_it_is_given(synthetic_world, harbor_gate_board):
@@ -125,23 +121,6 @@ def test_the_board_scores_under_the_weights_it_is_given(synthetic_world, harbor_
                 if h.id == heuristic.id).weight == heuristic.weight
 
 
-def test_fight_odds_pit_the_two_shares_against_each_other(synthetic_world, harbor_gate_board):
-    """Both seats scored: each side's odds are its share over the two shares'
-    sum, the pair splits 100, and the verdict says so; one seat unscored or
-    empty: no odds."""
-    from inference import engine
-    b = harbor_gate_board.to_dict()
-    mo = b["momentum"]
-    n, m = mo["blue"], mo["red"]
-    assert isinstance(n, int) and isinstance(m, int) and n + m > 0
-    blue_odds = round(100.0 * n / (n + m))
-    assert mo["odds"] == {"blue": blue_odds, "red": 100 - blue_odds}
-    assert "fight odds blue %d%%, red %d%%" % (blue_odds, 100 - blue_odds) in mo["verdict"]
-    alone = engine.board(synthetic_world, Draft("Harbor Gate", ("Mortar", "Gale")),
-                         catalog=catalog.load(FIXTURE_PLAYBOOK), brief=BRIEF).to_dict()
-    assert alone["momentum"]["blue"] is None and alone["momentum"]["odds"] is None
-
-
 def test_legal_shapes_follow_the_playbook_and_the_board_carries_them(synthetic_world):
     """The roster enforces what the shape limits allow: the two-tank limit
     means no triple the solver would search seats a third tank, and the
@@ -160,10 +139,10 @@ def test_legal_shapes_follow_the_playbook_and_the_board_carries_them(synthetic_w
     assert b.shapes == [list(s) for s in shapes]
     d = b.to_dict()
     assert d["shapes"] == b.shapes
-    # red's likely six rides along - static: the map and the meta, not their reveal
-    assert d["expected"]["kind"] == "expected" and "Mortar" not in d["expected"]["blue"]
+    # red's likely six rides along, around red's revealed pick
+    assert d["expected"]["kind"] == "expected" and d["expected"]["locked"] == ["Mortar"]
     assert len(d["expected"]["picks"]) == 6 and all(p["why"] for p in d["expected"]["picks"])
-    assert not any(p["locked"] for p in d["expected"]["picks"])
+    assert [p["hero"] for p in d["expected"]["picks"] if p["locked"]] == ["Mortar"]
 
 
 def test_the_queue_caps_tanks_at_two_whatever_the_playbook_holds(synthetic_world):
@@ -183,8 +162,8 @@ def test_the_queue_caps_tanks_at_two_whatever_the_playbook_holds(synthetic_world
                            ("Harbor Gate", ["Anvil", "Kite"])):
         d = engine.board(world, Draft(map_name, (), tuple(blue)),
                          catalog=ASSUMPTIONS_ONLY, brief=BRIEF).to_dict()
-        sixes = [d[seat]["blue"] for seat in ("blue", "red", "fill", "expected") if d[seat]]
-        assert len(sixes) == (4 if blue else 3)
+        sixes = [d[seat]["blue"] for seat in ("blue", "fill", "expected") if d[seat]]
+        assert len(sixes) == (3 if blue else 2)
         for six in sixes:
             assert sum(world.hero(n).role == "tank" for n in six) <= MAX_TANKS, (map_name, six)
         assert max(t for t, _, _ in d["shapes"]) == MAX_TANKS
@@ -199,33 +178,26 @@ NOT_ALLOWED = "not allowed: breaks At most three supports"
 
 
 def test_red_may_reveal_what_a_limit_forbids(synthetic_world, tmp_path):
-    """A limit binds the sixes the playbook builds and blue's own picks, not
-    the other side's revealed ones: red past it still gets its optimal and
-    its current comp, read off its picks with no fill, and is never ruled
-    out. The limit reads a dial and is still a shape limit, so the shapes
-    the board carries stop at three supports. A full red six past it is
-    scored, ranked and shared, and says which limit it breaks; a draft
-    beside the limit is named, not scored."""
+    """A limit binds the sixes the playbook builds and blue's own picks, never
+    red's: red is never optimized or scored, so picks past a limit are its
+    likely six's as they stand, and its badge is their pull. The limit reads
+    a dial and is still a shape limit, so the shapes the board carries stop
+    at three supports. A draft beside the limit is named, not scored."""
     from inference import engine
     world, cat = synthetic_world, support_limit(tmp_path)
     d = engine.board(world, Draft("Harbor Gate", SUPPORTS), catalog=cat, brief=BRIEF).to_dict()
-    for seat in ("blue", "red"):
-        assert sum(world.hero(n).role == "support" for n in d[seat]["blue"]) <= 3, seat
-    assert sorted(d["red_current"]["blue"]) == sorted(SUPPORTS)
-    assert d["red_current"]["unscored"] is None and d["red_current"]["score"] is not None
-    assert d["momentum"]["badges"]["red"]["label"] != "not allowed"
+    assert sum(world.hero(n).role == "support" for n in d["blue"]["blue"]) <= 3
+    assert d["expected"]["locked"] == list(SUPPORTS) and set(SUPPORTS) <= set(d["expected"]["blue"])
+    assert d["momentum"]["badges"]["red"]["label"].endswith(" pull")
     assert d["shapes"] and max(supports for _, _, supports in d["shapes"]) == 3
     (tmp_path / "a-draft.md").write_text(
         "---\nname: A draft\nkind: heuristic\n---\nprose\n", "utf-8")
-    b = engine.board(world, Draft("Harbor Gate", ("Anvil", "Mortar", *SUPPORTS)),
-                     catalog=catalog.load(str(tmp_path)), brief=BRIEF)
-    red = b.red_current.to_dict()
-    assert red["kind"] == "evaluate" and red["violations"] == ["three-supports"]
-    assert (red["rank"] is not None or red["outranked"]) and red["normalized"] is not None
-    assert red["pending"] == ["a-draft"]
-    text = b.rendered()
-    assert "  VIOLATES: three-supports" in text
-    assert "  drafts not yet scored (run /strategy): a-draft" in text
+    six = ("Anvil", "Mortar", *SUPPORTS)
+    b = engine.board(world, Draft("Harbor Gate", six), catalog=catalog.load(str(tmp_path)),
+                     brief=BRIEF)
+    assert b.expected.blue == list(six) and b.expected.locked == list(six)
+    assert b.blue.to_dict()["pending"] == ["a-draft"]
+    assert "  drafts not yet scored (run /strategy): a-draft" in b.rendered()
 
 
 def test_blue_picks_that_break_a_limit_are_not_allowed_and_the_board_still_renders(
@@ -233,8 +205,8 @@ def test_blue_picks_that_break_a_limit_are_not_allowed_and_the_board_still_rende
     """Constraints cut the space for blue's own picks too. Four supports under
     a three-support limit leave no six that keeps them: the fill is not
     solved, the board does not error, and blue's current comp is not
-    allowed - no score, no share, no odds, the limit named in its reason and
-    its badge, its breakdown the limit alone. Blue's optimal still renders.
+    allowed - no score, no share, the limit named in its reason and its
+    badge, its breakdown the limit alone. Blue's optimal still renders.
     A full six that breaks it reads the same, ranked against nothing, and
     the plan describes the optimal. Three supports keep the limit and
     score."""
@@ -250,7 +222,7 @@ def test_blue_picks_that_break_a_limit_are_not_allowed_and_the_board_still_rende
     assert len(d["blue"]["blue"]) == 6 and d["blue"]["normalized"] == 100
     assert sum(world.hero(n).role == "support" for n in d["blue"]["blue"]) <= 3
     mo = d["momentum"]
-    assert mo["blue"] is None and mo["odds"] is None and mo["countered"] is None
+    assert mo["blue"] is None and mo["countered"] is None
     assert mo["badges"]["blue"] == {"label": "not allowed", "tip": NOT_ALLOWED}
     assert mo["verdict"].startswith("blue " + NOT_ALLOWED)
     assert "NOT ALLOWED: breaks At most three supports" in b.current.rendered()
@@ -259,13 +231,13 @@ def test_blue_picks_that_break_a_limit_are_not_allowed_and_the_board_still_rende
     full = b.to_dict()
     assert full["current"]["kind"] == "evaluate" and full["current"]["unscored"] == NOT_ALLOWED
     assert full["current"]["score"] is None and full["current"]["alternatives"] == []
-    assert full["momentum"]["blue"] is None and full["momentum"]["odds"] is None
+    assert full["momentum"]["blue"] is None
     assert b.fill is None and b.countered is None
     assert "The six is the one you picked." not in b.plan
     kept = engine.board(world, Draft("Harbor Gate", ("Mortar",), SUPPORTS[:3]), catalog=cat,
                         brief=BRIEF)
     assert kept.current.barred is None and kept.fill is not None
-    assert kept.momentum["blue"] is not None and kept.momentum["odds"] is not None
+    assert kept.momentum["blue"] is not None
 
 
 def test_a_half_drafted_seat_may_break_a_limit_its_picks_to_come_can_mend(
@@ -318,36 +290,22 @@ def test_a_share_is_read_from_the_seats_floor_so_a_six_below_zero_still_holds_on
         synthetic_world):
     """Scores are signed: the default engine counts each pick's edge over 50.
     On Harbor Gate under the engine alone the dive six scores below zero
-    against the brawl six, which scores above it, and read from zero it was 0
-    / 100 and the odds 0 to 100. Read from the seat's floor - the lowest of
-    its reference sixes - it holds a share above 0, the odds sit strictly
-    between, and the optimal is still 100."""
+    against the brawl six, and read from zero it was 0 / 100. Read from the
+    seat's floor - the lowest of its reference sixes - it holds a share
+    above 0, and the optimal is still 100."""
     from inference import engine
     from inference.result import _pct
     b = engine.board(synthetic_world, Draft("Harbor Gate", BRAWL, DIVE), catalog=ASSUMPTIONS_ONLY,
                      brief=BRIEF)
     cur = b.current
-    assert cur.score < 0 < b.red_current.score
+    assert cur.score < 0
     assert _pct(cur.score, cur.best, 0.0) == 0                         # the old zero anchor
     assert cur.floor is not None and cur.floor < cur.score < cur.best == b.blue.score
     assert cur.floor == b.blue.floor
     share = round(100.0 * (cur.score - cur.floor) / (cur.best - cur.floor))
     mo = b.momentum
     assert mo["blue"] == cur.share() == share and 0 < share < 100
-    assert 0 < mo["odds"]["blue"] < 100 and mo["odds"]["blue"] + mo["odds"]["red"] == 100
     assert b.to_dict()["blue"]["normalized"] == 100
-
-
-def test_a_mirror_reads_even(synthetic_world):
-    """The same six on both sides of a map with no sides is the same board
-    from either seat: the same optimal, the same floor, the same share, and
-    even odds."""
-    from inference import engine
-    b = engine.board(synthetic_world, Draft("Ember Ruins", BRAWL, BRAWL), catalog=ASSUMPTIONS_ONLY,
-                     brief=BRIEF)
-    assert b.current.floor == b.red_current.floor and b.current.best == b.red_current.best
-    assert b.momentum["blue"] == b.momentum["red"]
-    assert b.momentum["odds"] == {"blue": 50, "red": 50}
 
 
 def test_an_empty_catalog_is_the_callers_and_loads_no_playbook(synthetic_world, monkeypatch):
@@ -369,7 +327,8 @@ def test_blue_counters_the_likely_six_until_red_reveals_a_pick(synthetic_world):
     default engine's counter term alone, as infer does: red is its revealed
     picks, none, so the opening suggestion is infer's own six, and every
     other term - the healing floor among them - reads an empty red. The
-    first reveal replaces the likely six with red's actual picks."""
+    first reveal replaces the likely six with red's actual picks, and red's
+    likely six fills in around them."""
     from inference import base, engine
     world = synthetic_world
     fix = catalog.load(FIXTURE_PLAYBOOK)
@@ -388,7 +347,8 @@ def test_blue_counters_the_likely_six_until_red_reveals_a_pick(synthetic_world):
     revealed = engine.board(world, Draft("Harbor Gate", ("Mortar",), ("Balm",)), catalog=fix,
                             brief=BRIEF)
     assert revealed.blue.red == ["Mortar"] and revealed.current.red == ["Mortar"]
-    assert revealed.expected.blue == likely                      # static
+    around = [p["hero"] for p in compute.expected_picks(world, m, revealed=[world.hero("Mortar")])]
+    assert revealed.expected.blue == around and revealed.expected.locked == ["Mortar"]
 
 
 def test_board_ranks_a_full_six_and_ignores_sides_on_control(synthetic_world):
@@ -402,7 +362,7 @@ def test_board_ranks_a_full_six_and_ignores_sides_on_control(synthetic_world):
     six = first.blue.alternatives[2]["blue"]
     b = engine.board(world, Draft("Ember Ruins", ("Gale",), tuple(six), side="attack"),
                      catalog=fix, brief=BRIEF)
-    assert b.side == "" and b.blue.side == "" and b.red.side == ""
+    assert b.side == "" and b.blue.side == "" and b.expected.side == ""
     assert b.current.kind == "evaluate" and b.current.rank == 4 and not b.current.outranked
     assert "(rank 4 among the legal sixes)" in b.current.rendered()
     assert set(b.current.blue) == set(six)
@@ -417,8 +377,8 @@ def test_board_ranks_a_full_six_and_ignores_sides_on_control(synthetic_world):
     assert not b.current.blue and b.current.partial
     # nothing locked: the optimal is the fill
     assert b.countered is None and b.fill is None
-    assert b.momentum["verdict"] == "no picks yet on either side"
-    assert b.momentum["blue"] is None and b.momentum["red"] is None
+    assert b.momentum["verdict"].startswith("no blue picks yet: the suggested six is blue's")
+    assert b.momentum["blue"] is None
     assert b.plan.startswith("No map yet, so this is the meta's best six")
     assert b.plan.endswith("Based on: the Role Queue rates and counters.")
     assert len(b.blue.blue) == 6                      # the meta's best six, before any map
@@ -527,11 +487,11 @@ def test_the_search_proves_real_boards_scoring_few_sixes_in_full(world):
 
 
 def test_every_seat_of_a_board_plays_the_stage_it_names(synthetic_world, tmp_path):
-    """A board on a stage solves every seat there - both optimals, both
-    current comps, the fill, the countered case and the likely six - so the
+    """A board on a stage solves every result there - blue's optimal and
+    current comp, the fill, the countered case and red's likely six - so the
     two sides fight on one ground: a rule the stage's terrain turns on
-    applies to red's seat as to blue's, each six keeps the limit it turns
-    on, and the rule cites the ground in play's fact. The whole map turns
+    applies to blue's sixes and to the countered case's, each six keeps the
+    limit it turns on, and the rule cites the ground in play's fact. The whole map turns
     the rule off, and a stage the map does not list is refused."""
     world = synthetic_world
     (tmp_path / "hazard-ground.md").write_text(
@@ -541,10 +501,10 @@ def test_every_seat_of_a_board_plays_the_stage_it_names(synthetic_world, tmp_pat
     playbook = hazard_playbook(world, tmp_path)
     b = engine.board(world, Draft("Ember Ruins", ("Mortar",), ("Anvil",), stage="forge"),
                      catalog=playbook, brief=BRIEF)
-    seats = (b.blue, b.red, b.current, b.red_current, b.fill, b.countered, b.expected)
+    seats = (b.blue, b.current, b.fill, b.countered, b.expected)
     assert b.stage == "Forge" and {r.stage for r in seats} == {"Forge"}
     assert b.to_dict()["stage"] == b.to_dict()["blue"]["stage"] == "Forge"
-    for r in (b.blue, b.red, b.fill, b.countered):
+    for r in (b.blue, b.fill, b.countered):
         terms = {c["id"]: c for c in r.contributions}
         assert terms["hazard-cc"]["applies"] and terms["hazard-cc"]["raw"] >= 1
         assert terms["hazard-ground"]["bonus"] == 1
@@ -553,8 +513,8 @@ def test_every_seat_of_a_board_plays_the_stage_it_names(synthetic_world, tmp_pat
     assert " on Ember Ruins - Forge vs " in b.blue.rendered()
     whole = engine.board(world, Draft("Ember Ruins", ("Mortar",), ("Anvil",)),
                          catalog=playbook, brief=BRIEF)
-    assert whole.stage == "" and {r.stage for r in (whole.blue, whole.red)} == {""}
-    for r in (whole.blue, whole.red):
+    assert whole.stage == "" and {r.stage for r in (whole.blue, whole.expected)} == {""}
+    for r in (whole.blue, whole.fill):
         terms = {c["id"]: c for c in r.contributions}
         assert not terms["hazard-cc"]["applies"] and terms["hazard-ground"]["bonus"] == 0
         assert "text" not in terms["hazard-ground"]

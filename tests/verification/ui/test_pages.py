@@ -81,18 +81,15 @@ def test_the_page_is_a_shell_over_static_files():
     assert "/static/board.css" in body and "/static/board.js" in body
     order = [body.index("/static/%s.js" % n) for n in ("comps", "playbook", "board")]
     assert order == sorted(order)      # board.js loads last: it calls the others
-    assert "id='momentum'" in body and "id='plan'" in body
+    assert "id='plan'" in body and "id='momentum'" not in body     # red is never scored: no odds
     # scores live in the boxes
     assert "id='bluescore'" in body and "id='redscore'" in body
     assert "data-clear='red'" in body and "data-clear='blue'" in body
-    # the momentum strip sits above both boxes
-    assert body.index("id='momentum'") < body.index("id='blueslots'")
-    assert "id='momentum'" not in body[body.index("id='tab-comps'"):]
     # blue on the left, red on the right, like the boxes
     assert body.index("id='inf-blue'") < body.index("id='inf-red'")
     assert body.index("id='blueslots'") < body.index("id='redslots'")
     page = pages.view_math()
-    assert "<p id='fight-odds'><b>Fight odds.</b>" in page
+    assert "id='fight-odds'" not in page and "Red is never optimized" in page
     # a table of contents: every link resolves to an id on the page
     toc = page[page.index("<nav class='toc'>"):page.index("</nav>")]
     targets = re.findall(r"href='#([^']+)'", toc)
@@ -104,7 +101,7 @@ def test_the_page_is_a_shell_over_static_files():
     # and the page says what the short name stands for
     assert "<b>Countrix</b> is short for <b>Counter Utility Matrix</b>" in page
     css = pages.static_file("board.css")[0].decode()
-    for rule in (".tile.capped", ".tile.soon", ".momentum .verdict", ".inf-six + .inf-six"):
+    for rule in (".tile.capped", ".tile.soon", ".inf-six + .inf-six"):
         assert rule in css, rule
     assert "id='clearall'" in body
     header = body.split("</header>")[0]
@@ -189,20 +186,21 @@ def test_the_scripts_read_payload_keys_the_server_writes(synthetic_world, monkey
     solved = engine.board(synthetic_world, Draft("Harbor Gate", ("Mortar",), ("Balm",)),
                           catalog=catalog.load(FIXTURE_PLAYBOOK), brief=BRIEF).to_dict()
     read(
-        "plan momentum shapes current red_current fill expected blue map side swaps stages",
+        "plan momentum shapes current fill expected blue map side swaps stages",
         solved)
     read("pairs open verdict status", Swaps.__annotations__)
     read("out in at portrait why", SwapPair.__annotations__)
     read("hero portrait why", OpenSlot.__annotations__)
     read("stage kind current played six swaps blurb solved", StageRow.__annotations__)
     read(
-        "picks contributions alternatives considered seconds playstyle cited scoring unscored"
-        " tie blue", solved["current"])
+        "picks contributions alternatives considered seconds playstyle cited tie blue",
+        solved["current"])
     read("hero role why evidence portrait", Pick.__annotations__)
+    read("locked picks", solved["expected"])
     read(
         "id kind applies ok weighted form when bonus penalty norm spread need metric raw"
         " weight fact text", Contribution.__annotations__)
-    read("blue red odds verdict badges", Momentum.__annotations__)
+    read("badges", Momentum.__annotations__)
     read("label tip", Badge.__annotations__)
     read(
         "id name kind form weight direction metric need when require penalty bonus params body",
@@ -255,16 +253,19 @@ def test_the_swap_cost_slider_rides_the_weights_key_the_engine_reads_to_its_ceil
 
 def test_the_swap_row_and_the_slots_it_fills_follow_the_picks_the_board_answered():
     """A swap and a suggested slot are drawn only for the picks the board in
-    hand answered - the current comp's picks, in the order sent - so a local
-    change hides them until the next board lands; a picked hero is never
-    suggested again; the swap row and the stage plan wait with the rest while
-    a board is solving; and a swap is checked against the bans and the role
-    caps as a pick is."""
+    hand answered - the current comp's picks, in the order sent, and red's
+    likely six's revealed ones - so a local change hides them until the next
+    board lands; a picked hero is never suggested again; red's empty slots
+    show its likely six; the swap row and the stage plan wait with the rest
+    while a board is solving; and a swap is checked against the bans and the
+    role caps as a pick is."""
     script = scripts()
     assert "answered() ? d.swaps : null" in function(script, "paintSwaps")
     suggest = function(script, "paintSuggestions")
     assert "answered() ? d.swaps : null" in suggest and "sw.open.filter(free)" in suggest
+    assert "redAnswered() ? d.expected.picks" in suggest and "st.red.indexOf(p.hero)" in suggest
     assert "d.current.blue" in function(script, "answered")
+    assert "d.expected.locked" in function(script, "redAnswered")
     assert "'blueswaps', 'stageplan'" in function(script, "solving")
     take = function(script, "takeSwap")
     assert "st.bans.indexOf(into)" in take and "roleCap('blue'" in take
@@ -281,15 +282,14 @@ def test_a_reply_to_an_older_request_is_dropped_and_its_board_cancelled():
 
 
 def test_an_apostrophe_cannot_close_a_single_quoted_attribute():
-    """King's Row in a title='...' attribute, or the label's own "each side's",
-    must not end the attribute at the apostrophe."""
+    """King's Row in a title='...' attribute must not end the attribute at the
+    apostrophe."""
     script = scripts()
     esc = function(script, "esc")
     replaced = "King's Row <b> \"x\" & y"
     for pattern, entity in re.findall(r"\.replace\(/(.)/g,\s*'([^']+)'\)", esc):
         replaced = replaced.replace(pattern, entity)
     assert "'" not in replaced and "<" not in replaced and '"' not in replaced
-    assert "title='each side\\'s" not in script and "title='each side&#39;s" in script
 
 
 @pytest.mark.parametrize(("dial", "phrase"), [

@@ -158,19 +158,23 @@ db <- facts <- inference <- door <- ui.
   `kit_6v6`) over the 5v5 rows before `derive_scalars` (`facts/kit_format.py`).
   The 5v5 figures stay stored, and each change names the one it moved.
 - **The solver is deterministic.** `engine.board()` returns a Board of up to
-  seven Results (blue, red, current, red_current, fill, countered, expected);
-  fill is None unless one to five blue picks are locked, countered is None
-  without blue picks or when the caller's `Brief` leaves it out, as the
-  page's boards do. A Draft may name a stage the map lists (`stage`,
+  five Results (blue, current, fill, countered, expected); fill is None
+  unless one to five blue picks are locked, countered is None without blue
+  picks or when the caller's `Brief` leaves it out, as the page's boards
+  do. Blue is the side the playbook optimizes; red is never optimized or
+  scored: `expected` is red's likely six around its revealed picks, each
+  pick with its pull (`compute.expected_picks`), and red's badge is the
+  six's total pull. The countered case alone solves a red six, red's best
+  counter, as a what-if for blue. A Draft may name a stage the map lists (`stage`,
   resolved by `facts.draft.board_stage`); every seat plays it, and it moves
   the `map.*` metrics alone - the ground in play, `compute.ground`. Each
   seat has one scale: the reference sample, drawn from a string seed of
   the map and the side, and the board's field, which reads the enemy, both
   measured on the whole map (`prepare(measure=True)`), so the stages of a
   map share it; the lowest of the sample's scores under the board's own
-  gates is the seat's floor, a
-  share's 0, as its optimal is the 100. current shares blue's optimal's scale, red_current red's, so within
-  a seat infer, the fill and current are comparable. The search is exact
+  gates is the seat's floor, a share's 0, as its optimal is the 100.
+  current and the fill share blue's optimal's scale, so infer, the fill and
+  current are comparable. The search is exact
   (`inference/solver.py`, its bounds in `inference/bounds.py` over
   `inference/intervals.py` and `inference/ranges.py`): every
   legal six of the released, unbanned roster, each once, by branch and
@@ -185,7 +189,7 @@ db <- facts <- inference <- door <- ui.
   `tests/verification/inference/test_bounds.py` fails without one. Blue's
   picks the limits rule out - a full six that breaks one, or picks the
   fill's search proves no six completes - are not allowed: no score, no
-  share, no odds; red's picks are never ruled out. A search past its budget
+  share; red's picks are never ruled out. A search past its budget
   refuses (`solver.Unbounded`), never guesses.
 - **Blue's swaps are one joint answer.** With blue picks, `Board.swaps`
   (`inference/swaps.py`) is the best legal six reachable from them when
@@ -195,9 +199,8 @@ db <- facts <- inference <- door <- ui.
   `Objective` (`keep`, `swap`) that the bound carries exactly, so the
   search stays one exact branch and bound; the keep term is never a
   contribution, and the target is scored again on the plain objective.
-  A swap needs its net to beat the six that keeps every pick; red is
-  re-solved against the target for the odds after, and a suggestion they
-  do not rise on is withheld. Red is never searched for swaps. `BRIEF` in
+  A swap needs its net to beat the six that keeps every pick. Red is never
+  searched for swaps. `BRIEF` in
   tests/verification/inference/__init__.py turns them off
   (`Brief.search_swaps`); a test that reads them names its cost.
 - **The plan runs stage by stage.** On a map with stages, `Board.stages`

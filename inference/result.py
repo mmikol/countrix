@@ -36,7 +36,8 @@ type StageKind = Literal["phase", "arena"]
 class Pick(TypedDict):
     """One hero of a result's six, with the reason it is there and the ids of
     the facts the reason cites. A solved six carries each hero's subrole and
-    portrait; red's likely six carries neither."""
+    portrait; red's likely six carries neither, and its pull instead
+    (facts.compute.expected_picks)."""
     hero: str
     role: str
     locked: bool
@@ -44,6 +45,7 @@ class Pick(TypedDict):
     evidence: list[str]
     subrole: NotRequired[str]
     portrait: NotRequired[str | None]
+    pull: NotRequired[float]
 
 
 class Alternative(TypedDict):
@@ -59,12 +61,6 @@ class Consideration(TypedDict):
     """An assumption of the playbook: prose a comp is reconciled against."""
     id: str
     name: str
-
-
-class Odds(TypedDict):
-    """The two shares pitted against each other: each seat's part of 100."""
-    blue: int
-    red: int
 
 
 # One swap the board suggests above blue's picks: the pick that goes (`out`),
@@ -84,17 +80,9 @@ class OpenSlot(TypedDict):
     why: str
 
 
-class SwapOdds(TypedDict):
-    """The fight odds before the swaps and after them; None where they
-    cannot be read - red has no picks, or a seat's share waits."""
-    before: Odds | None
-    after: Odds | None
-
-
 # what came of blue's swap search: a swap suggested; the picks kept, no swap
-# gaining its cost; a swap withheld, since it would not raise the fight odds;
-# or none searched, the seat unscored or the search refused
-type SwapStatus = Literal["suggested", "keep", "withheld", "none"]
+# gaining its cost; or none searched, the seat unscored or the search refused
+type SwapStatus = Literal["suggested", "keep", "none"]
 
 
 class Swaps(TypedDict):
@@ -102,8 +90,8 @@ class Swaps(TypedDict):
     search, the stage it was solved on, the cost in share points, the six
     the swaps make (the six the picks keep where none is suggested), each
     swap, the heroes the empty slots show - the fill's, as the rest of the
-    board shows it - blue's share before and after, the fight odds before
-    and after, and the verdict in words."""
+    board shows it - blue's share before and after, and the verdict in
+    words."""
     status: SwapStatus
     stage: str
     cost: float
@@ -112,7 +100,6 @@ class Swaps(TypedDict):
     open: list[OpenSlot]
     before: int | None
     after: int | None
-    odds: SwapOdds
     verdict: str
 
 
@@ -160,15 +147,14 @@ class Badges(TypedDict):
 
 
 class Momentum(TypedDict):
-    """Who the picks favour: each seat's share of its optimal, blue's share
-    against red's best counter, whether either seat is half-drafted, the
-    fight odds, the verdict in words and the badge above each picker. A
-    share is None where it cannot be read."""
+    """Where blue's picks stand: blue's share of its optimal, its share
+    against red's best counter where the countered case was solved, whether
+    blue is half-drafted, the verdict in words and the badge above each
+    picker - blue's share, red's likely six's pull. A share is None where it
+    cannot be read."""
     blue: int | None
-    red: int | None
     countered: int | None
     partial: bool
-    odds: Odds | None
     verdict: str
     badges: Badges
 
@@ -218,9 +204,9 @@ class ResultRecord(TypedDict):
 class BoardRecord(TypedDict):
     """A board as to_dict() serves it, the JSON the shells read: the board
     it was solved on, the plan, blue's swaps and the plan stage by stage,
-    each seat's results - the countered case and the fill None where the
-    board has none - the momentum, the shapes the roster allows, and red's
-    likely six."""
+    blue's results - the countered case and the fill None where the board
+    has none - the momentum, the shapes the roster allows, and red's likely
+    six."""
     map: str | None
     side: Side
     stage: str
@@ -229,9 +215,7 @@ class BoardRecord(TypedDict):
     swaps: Swaps | None
     stages: list[StageRow]
     blue: ResultRecord
-    red: ResultRecord
     current: ResultRecord
-    red_current: ResultRecord
     countered: ResultRecord | None
     fill: ResultRecord | None
     momentum: Momentum
@@ -568,8 +552,8 @@ class Result:
 
 @dataclass(kw_only=True, eq=False)
 class Board:
-    """Both seats of one draft: the seven Results board() solves, the verdict
-    and prose it reads off them, and the shape limits the roster enforces.
+    """One draft: blue's Results board() solves, red's likely six, the verdict
+    and prose read off them, and the shape limits the roster enforces.
     Carries the same to_dict()/rendered() pair as Result, so the shells hand a
     board to the caller the way they hand a single seat."""
     map_name: str | None
@@ -577,9 +561,7 @@ class Board:
     stage: str
     bans: list[str]
     blue: Result
-    red: Result
     current: Result
-    red_current: Result
     fill: Result | None
     countered: Result | None
     momentum: Momentum
@@ -593,18 +575,17 @@ class Board:
         """The board as JSON-ready data."""
         return {"map": self.map_name, "side": self.side, "stage": self.stage, "bans": self.bans,
                 "plan": self.plan, "swaps": self.swaps, "stages": self.stages,
-                "blue": self.blue.to_dict(), "red": self.red.to_dict(),
-                "current": self.current.to_dict(), "red_current": self.red_current.to_dict(),
+                "blue": self.blue.to_dict(), "current": self.current.to_dict(),
                 "countered": self.countered.to_dict() if self.countered else None,
                 "fill": self.fill.to_dict() if self.fill else None, "momentum": self.momentum,
                 "shapes": self.shapes,
                 "expected": self.expected.to_dict()}
 
     def rendered(self) -> str:
-        """The board as text: the plan, each seat, and the verdict."""
+        """The board as text: the plan, blue's results, red's likely six and the
+        verdict."""
         parts = ["game plan:\n" + self.plan]
-        parts += [r.rendered() for r in (self.blue, self.red, self.current, self.red_current)
-                  if r.blue or r.kind != "current"]
+        parts += [r.rendered() for r in (self.blue, self.current) if r.blue or r.kind != "current"]
         if self.fill:
             parts.append(self.fill.rendered())
         if self.countered:

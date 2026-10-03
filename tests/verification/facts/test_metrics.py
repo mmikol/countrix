@@ -251,8 +251,10 @@ def test_the_objective_is_the_point_the_payload_or_the_push_a_stage_is_won_on(
 def test_expected_picks_read_the_map_and_the_meta_and_no_strategy(synthetic_world):
     """Red's likely six: their revealed picks first, then the most-picked
     heroes on the map, never a banned hero, never a third tank (the queue's
-    own limit), the overall meta when no map is set - each with the rate
-    it rests on. No strategy is read: the same six under any playbook."""
+    own limit), six in all whatever the revealed picks' roles, the overall
+    meta when no map is set - each with the rate it rests on and its pull,
+    which sum to the six's rates plus SYNERGY_PULL a documented pair. No
+    strategy is read: the same six under any playbook."""
     w = synthetic_world
     harbor = w.map("Harbor Gate")
     # announced, and the likeliest pick on record: still never expected
@@ -265,18 +267,28 @@ def test_expected_picks_read_the_map_and_the_meta_and_no_strategy(synthetic_worl
     # gives Flint the last damage seat, though the roster reads Rook first.
     # Unbanned, Needle's 9 would have taken Gale's seat
     assert six == [
-        {"hero": "Kite", "role": "tank", "rate": None, "locked": True, "why": "revealed"},
-        {"hero": "Anvil", "role": "tank", "rate": 12.0, "locked": False,
-            "why": "picked in 12.0% of matches on Harbor Gate"},
-        {"hero": "Flint", "role": "damage", "rate": 7.0, "locked": False,
-            "why": "picked in 7.0% of matches on Harbor Gate"},
-        {"hero": "Gale", "role": "damage", "rate": 5.5, "locked": False,
-            "why": "picked in 5.5% of matches on Harbor Gate; pairs with Kite"},
-        {"hero": "Balm", "role": "support", "rate": 10.0, "locked": False,
-            "why": "picked in 10.0% of matches on Harbor Gate; pairs with Anvil"},
-        {"hero": "Sorrel", "role": "support", "rate": 5.0, "locked": False,
-            "why": "picked in 5.0% of matches on Harbor Gate; pairs with Gale"}]
+        {"hero": "Kite", "role": "tank", "rate": 8.0, "locked": True, "pull": 8.0,
+            "why": "revealed; pull 8.0: picked in 8.0% of matches on Harbor Gate"},
+        {"hero": "Anvil", "role": "tank", "rate": 12.0, "locked": False, "pull": 12.0,
+            "why": "pull 12.0: picked in 12.0% of matches on Harbor Gate"},
+        {"hero": "Flint", "role": "damage", "rate": 7.0, "locked": False, "pull": 7.0,
+            "why": "pull 7.0: picked in 7.0% of matches on Harbor Gate"},
+        {"hero": "Gale", "role": "damage", "rate": 5.5, "locked": False, "pull": 7.5,
+            "why": "pull 7.5: picked in 5.5% of matches on Harbor Gate; pairs with Kite"},
+        {"hero": "Balm", "role": "support", "rate": 10.0, "locked": False, "pull": 12.0,
+            "why": "pull 12.0: picked in 10.0% of matches on Harbor Gate; pairs with Anvil"},
+        {"hero": "Sorrel", "role": "support", "rate": 5.0, "locked": False, "pull": 7.0,
+            "why": "pull 7.0: picked in 5.0% of matches on Harbor Gate; pairs with Gale"}]
     assert len(six) == TEAM_SIZE and Counter(p["role"] for p in six) == EXPECTED_SHAPE
+    heroes = [w.hero(p["hero"]) for p in six]
+    pairs = sum(1 for i, a in enumerate(heroes) for b in heroes[i + 1:] if w.synergy(a.id, b.id))
+    assert sum(p["pull"] for p in six) == pytest.approx(
+        sum(p["rate"] for p in six) + compute.SYNERGY_PULL * pairs)
+    # three damage revealed: two tanks and a support fill the six, and no more
+    damage = [w.hero(n) for n in ("Rook", "Gale", "Flint")]
+    off_role = compute.expected_picks(w, harbor, revealed=damage)
+    assert len(off_role) == TEAM_SIZE
+    assert Counter(p["role"] for p in off_role) == {"damage": 3, "tank": 2, "support": 1}
     # deterministic
     assert six == compute.expected_picks(w, harbor, revealed=[kite], banned=[needle])
     anywhere = compute.expected_picks(w, None)
@@ -284,7 +296,7 @@ def test_expected_picks_read_the_map_and_the_meta_and_no_strategy(synthetic_worl
             ("Tansy", 7.5)]
     assert [(p["hero"], p["rate"]) for p in anywhere] == meta
     assert all(
-        p["why"].startswith("picked in %.1f%% of matches overall (no map set)" % rate)
+        "picked in %.1f%% of matches overall (no map set)" % rate in p["why"]
         for p, (_, rate) in zip(anywhere, meta, strict=True))
     # no strategy is read: nothing here takes a catalog
     assert "catalog" not in inspect.signature(compute.expected_picks).parameters
@@ -300,16 +312,16 @@ def test_an_expected_pick_says_what_its_rate_rests_on(synthetic_world):
     del anvil.map_rates[harbor.id]
     # Anvil's 11 overall still beats Kite's 8 on the map
     first = compute.expected_picks(w, harbor)[0]
-    assert first == {"hero": "Anvil", "role": "tank", "rate": 11.0, "locked": False,
-                     "why": "picked in 11.0% of matches overall (no rate on this map)"}
+    assert first == {"hero": "Anvil", "role": "tank", "rate": 11.0, "locked": False, "pull": 11.0,
+                     "why": "pull 11.0: picked in 11.0% of matches overall (no rate on this map)"}
     kite = w.hero("Kite")
     kite.pick, kite.map_rates = None, {}
     banned = [w.hero(n) for n in ("Anvil", "Mortar", "Quarry")]
     five = compute.expected_picks(w, harbor, banned=banned)
     assert len(five) == TEAM_SIZE - 1
     assert [p for p in five if p["role"] == "tank"] == [
-        {"hero": "Kite", "role": "tank", "rate": None, "locked": False,
-            "why": "no pick rate on record"}]
+        {"hero": "Kite", "role": "tank", "rate": None, "locked": False, "pull": 0.0,
+            "why": "pull 0.0: no pick rate on record"}]
 
 
 def test_the_world_metrics_and_the_registry_the_catalog_validates_against(synthetic_world):

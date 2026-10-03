@@ -144,9 +144,9 @@ the sixes its three terms favour, scored and explained:
   answers, scoring 0.5 or more and more than the reverse, those on a
   pair the wiki leaves out weigh 1 each; the others are not replaced.
   The other side is its locked picks, or, with none, its likely six on
-  this map past the bans (`compute.expected_picks`, the six the board's
-  red panel shows); either seat reads the other the same way, on the
-  board and in `infer` alike. Only this term reads the likely six or a
+  this map past the bans (`compute.expected_picks` with nothing
+  revealed), on the board and in `infer` alike. Only this term reads the
+  likely six or a
   derived edge: every other term reads the side's revealed picks, and the
   `team.*` and `enemy.*` counter metrics read the wiki's graph against
   them. The board
@@ -271,33 +271,36 @@ between heroes the wiki has not compared.
 
 ## The share
 
-Each seat's optimal six is its 100, and its 0 is the seat's floor: the
-lowest score among the reference sixes its scale drew (`Solver.floor`,
-from `inference/scale.py`), and a fill takes its seat's. A comp's share
-is its place on that span:
+Blue's optimal six is its 100, and its 0 is the seat's floor: the lowest
+score among the reference sixes its scale drew (`Solver.floor`, from
+`inference/scale.py`), and a fill takes the seat's. A comp's share is its
+place on that span:
 
 ```
 share = clamp((score - floor) / (best - floor), 0, 1) x 100
-odds  = each seat's share over the two shares' sum
 ```
 
 A score is signed, since the rate term counts each pick's edge over 50,
-so a share read from zero put every six below zero at 0, and against a
-six above zero the odds read 100 to 0. The floor puts both seats on a
-real scale; a mirror still reads 50 to 50. A best no higher than the
-floor leaves nothing to divide, and every comp but the optimal reads
-*unscored*.
+so a share read from zero put every six below zero at 0; the floor puts
+blue's comps on a real scale. A best no higher than the floor leaves
+nothing to divide, and every comp but the optimal reads *unscored*.
+
+Red is never optimized and never scored: the board's red is its likely
+six around its revealed picks (`compute.expected_picks`), each pick with
+its pull - its pick rate here plus `SYNERGY_PULL` for each partner
+already on the six - and red's badge is the six's total pull. No red
+share exists, so the board pits no red figure against blue's.
 
 A comp the limits rule out is not allowed: blue's full six that breaks
-one, or picks that no six keeping them completes within the limits (their
-fill is then not solved). The fill searches every six on the roster that
-keeps the picks, so a fill that ends with none is a proof, and only that
-rules the picks out. Such a comp carries no score, no share and no odds,
-and its breakdown keeps the limits alone; blue's optimal and red's seat
-still render. The badge and the strip read `not allowed: breaks <the
+one, or picks that no six keeping them completes within the limits
+(their fill is then not solved). The fill searches every six on the
+roster that keeps the picks, so a fill that ends with none is a proof,
+and only that rules the picks out. Such a comp carries no score and no
+share, and its breakdown keeps the limits alone; blue's optimal and
+red's likely six still render. The badge reads `not allowed: breaks <the
 limit's name>`, or, where the picks break no limit as they stand, `not
-allowed: no six that keeps these picks meets the playbook's limits`. Red's
-revealed picks are the other side's facts and are never ruled out.
+allowed: no six that keeps these picks meets the playbook's limits`.
+Red's revealed picks are the other side's facts and are never ruled out.
 The `infer` tool refuses such picks in the same words.
 
 ## The swaps
@@ -343,12 +346,6 @@ and decides nothing; a half-drafted seat's empty slots show the fill's
 heroes (`open`), whether or not a swap is suggested, as the rest of the
 board does.
 
-Where a swap is suggested, red's optimal, current comp and fill are
-solved again against the target, and the fight odds read off them as the
-board's own are read; a suggestion that would lower them is withheld,
-and the verdict names the swaps it held back. The gate reads the picks
-as they stand.
-
 **Why joint.** Each pick's best single swap, taken alone, can conflict:
 two tanks in for one slot, one hero taken twice, or a union of bests
 below the joint answer. One search over every legal six gives one
@@ -358,8 +355,8 @@ answer from the new picks: with R' the picks after one swap, `net_R'(x)
 never searched for swaps; its picks are the other side's facts.
 
 The verdict reads `swap <pick> for <hero>: <before> -> <after> / 100 of
-the optimal, fight odds <before> -> <after>, at a cost of <c> / 100 a
-swap`, or `keep the picks: no swap gains its cost of <c> / 100`.
+the optimal, at a cost of <c> / 100 a swap`, or `keep the picks: no swap
+gains its cost of <c> / 100`.
 
 **Why swaps are scored.** The owner's words: swaps mid-fight should be
 scored, and the engine "needs to be dynamic". A six is not held for the
@@ -509,7 +506,7 @@ The suite holds the search to enumeration:
 `test_the_search_reaches_the_enumerated_maximum` and its neighbours in
 `tests/verification/inference/test_solver.py` compare the best sixes, the
 score floats and the ranks with a full enumeration's on synthetic boards -
-both seats, the fill, the countered case, bans, locks and plateaus - and
+blue's optimal, the fill, the countered case, bans, locks and plateaus - and
 `tests/verification/inference/test_bounds.py` holds every rule and the whole
 bound to every completion of random branches. On the built database,
 `.venv/bin/python -m tests.verification.inference.prove_exact` brute-forces
@@ -929,7 +926,7 @@ A six heals at least the share of its total health that the other side heals of 
 
 *assumption* - prose the solver takes as given and the session holds a comp to
 
-The same board, playbook and weights always give the same six, the same score and the same alternatives: nothing is sampled when a board is solved, and every seed is a string read off the board. A score, a share and the fight odds are the playbook's arithmetic over the facts, not probabilities of winning, because nothing is fitted to match results. A higher score means a better six under these rules and weights, never a greater chance to win.
+The same board, playbook and weights always give the same six, the same score and the same alternatives: nothing is sampled when a board is solved, and every seed is a string read off the board. A score and a share are the playbook's arithmetic over the facts, not probabilities of winning, because nothing is fitted to match results. A higher score means a better six under these rules and weights, never a greater chance to win.
 
 ##### This is Open Queue Ranked (`open-queue-ranked`, assumptions)
 
