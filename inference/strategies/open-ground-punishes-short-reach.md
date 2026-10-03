@@ -4,7 +4,7 @@ kind: heuristic
 category: map
 metric: team.range_min
 direction: maximize
-weight: 1
+weight: 0.5
 when: map.open_ground >= params.STANDOUT
 params:
   STANDOUT: 0.5
