@@ -188,6 +188,8 @@ table.facts tr.warn td { color:#ff9d8f; } table.facts tr.derived td.text { color
   text-transform:uppercase; background:rgba(0,0,0,.6); padding:2px 6px; border-radius:3px; }
 .slot.suggested { border:1px dashed var(--blue); cursor:pointer; opacity:.7; }
 .slot.suggested:hover { opacity:1; box-shadow:0 0 16px rgba(62,166,255,.35); }
+.team.red .slot.suggested { border-color:var(--red); }
+.team.red .slot.suggested:hover { box-shadow:0 0 16px rgba(255,75,87,.35); }
 /* the swaps above blue's picks: the incoming hero over the pick it replaces */
 .swaps { display:flex; flex-wrap:wrap; gap:8px; margin:2px 0 0; }
 .swaps:empty { display:none; }

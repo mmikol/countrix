@@ -14,7 +14,7 @@
 <a class='sub' href='#swaps'>swaps and stages</a>
 <a class='sub' href='#deterministic'>deterministic, not probabilistic</a>
 <a href='#board'>the board</a>
-<a class='sub' href='#likely-comp'>red's likely starting comp</a>
+<a class='sub' href='#likely-comp'>red's likely comp</a>
 <a class='sub' href='#counter'>blue's optimal counter</a>
 <a class='sub' href='#weights'>the weights</a>
 <a href='#pieces'>how the pieces fit</a>
@@ -328,8 +328,8 @@ search returns exactly the sixes a full enumeration ranks first. On the built da
 force of every legal six on real boards agreed with it six for six, score for score.</p>
 <p id='against-red'><b>What it is optimal against.</b> A comp is optimal <i>against the red
 you can see</i>, not against every red they might pick. Before red reveals anything the board
-answers their likely starting comp, filled from the map's pick rates, through the default
-engine's counter term; each pick they show
+answers their likely starting comp, filled from the map's pick rates and the wiki's synergies,
+through the default engine's counter term; each pick they show
 re-solves against what is now known. It is a best reply to present information and changes as
 that information does. Red is never solved, so nothing scores your six against red's best reply
 to it.</p>
@@ -362,7 +362,7 @@ stages at no cost. A stage differs from its map through the ground in play - its
 the wiki's text on it stresses, its name, and on a Hybrid its objective, the first phase a point
 and the rest payload - and the playbook's rules that read them; the win rates are per map.</p>
 <p id='reach'><b>Reach.</b> The weights are meant to make a hero common or rare, never
-impossible. What is established is narrower: at the reach fixture's recording of 2026-09-30,
+impossible. What is established is narrower: at the reach fixture's recording of 2026-10-03,
 under the shipped playbook - the default engine, the healing floor and the terrain rules - 50
 of the 53 released heroes had a board on which they are in the optimal six, within a match's
 %(MAX_BANS)d bans, and each such board is a proof: the six is the exact optimum, on the board page
@@ -387,8 +387,8 @@ its rates and its name - pick the one shown, the six whose draws sum highest, an
 how many tie. With the meta at 0 and every weight at 0, every legal six ties: each hero of a role
 has the same chance of being the one drawn across boards, and one board draws the same six every
 time. A share is a score's place on blue's span, not a probability of winning, and red's pull
-ranks heroes by how often they are picked: nothing here is fitted to match results. The playbook holds both as
-assumptions, <i>Tied sixes are equally good</i> and <i>Deterministic, not probabilistic</i>.</p>
+ranks heroes by their pick rates and documented synergies: nothing here is fitted to match
+results. The playbook holds both as assumptions, <i>Tied sixes are equally good</i> and <i>Deterministic, not probabilistic</i>.</p>
 <h2 id='board'>The board</h2>
 <p id='likely-comp'><b>Red's likely comp</b>: red's revealed picks, then slot by slot toward a
 two-two-two, past the bans, six in all, the open-role hero of the highest pull below - a greedy

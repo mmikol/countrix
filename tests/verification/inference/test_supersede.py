@@ -9,7 +9,8 @@ import pytest
 from facts.draft import Draft
 from tests.verification.inference import BRIEF
 
-# red revealed and one blue pick locked on a sided map: every seat of the board solves
+# red revealed and one blue pick locked on a sided map: blue's optimal, current comp and
+# fill all solve, and red's likely six forms around its pick
 DRAFT = Draft("Harbor Gate", ("Anvil",), ("Balm",), side="attack")
 
 

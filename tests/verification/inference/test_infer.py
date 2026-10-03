@@ -166,7 +166,7 @@ def test_a_seat_is_timed_from_when_its_search_began(
         return solve(solver, top)
     monkeypatch.setattr(Solver, "solve", slow)
     seat = engine._optimal(synthetic_world, draft, catalog=scratch_playbook, base=DEFAULT,
-                           top=1, seat="blue", kind="infer")
+                           top=1, kind="infer")
     assert 0.3 <= seat.result.seconds < 5 and seat.result.to_dict()["seconds"] >= 0.3
 
 

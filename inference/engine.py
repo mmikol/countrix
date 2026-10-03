@@ -6,15 +6,16 @@
 returns the optimal six around the locked picks, each pick with the facts
 that justify it (the facts the board would show for map + red + the
 six), the score broken down into the default engine's terms and each
-strategy's, and the alternatives. board() does it for both seats - blue's
-absolute optimal, red around its revealed ones, on opposite sides of a
-sided map - scores the current blue picks as they stand, and suggests the
-swaps from blue's picks that pay for their cost (inference.swaps). Both refuse
-a team past the queue's tanks, on either seat, and a stage the map does
-not list, and score under the default engine at the playbook's weights
-(its meta.md) unless the caller names others; base.OFF, the meta at 0, is
-the playbook alone. Every seat of a board is solved on its stage - the
-ground in play, the whole map where the draft names none. The limits
+strategy's, and the alternatives. board() does it for blue's seat - its
+absolute optimal - scores the current blue picks as they stand, suggests
+the swaps from blue's picks that pay for their cost (inference.swaps), and
+reads red's likely six around its revealed picks
+(facts.compute.expected_picks), which nothing solves or scores. Both
+refuse a team past the queue's tanks, on either side, and a stage the map
+does not list, and score under the default engine at the playbook's
+weights (its meta.md) unless the caller names others; base.OFF, the meta
+at 0, is the playbook alone. Blue's seat is solved on the board's stage -
+the ground in play, the whole map where the draft names none. The limits
 bind blue's own picks: the board reads a six that breaks one as not
 allowed, and infer refuses locked picks no six completes. The records are
 result.py's and the prose plan.py's. Every search is exact
@@ -30,7 +31,6 @@ from facts import board_facts, compute
 from facts.draft import (
     TEAM_SIZE,
     Draft,
-    Seat,
     Side,
     board_side,
     board_stage,
@@ -65,23 +65,22 @@ TOP_CEILING = 20            # the most alternatives a caller may ask for
 
 
 class _SeatBoard(NamedTuple):
-    """A draft read for one seat: its names as the World's objects, and the
-    side and stage the board plays, each as the map keeps it."""
+    """A draft read for blue's seat: its names as the World's objects, and
+    the side and stage the board plays, each as the map keeps it."""
     board: Resolved
     side: Side
     stage: str
 
     def result(
-            self, kind: ResultKind, seat: Seat, *, catalog: list[Strategy],
-            base: BaseWeights, blue: list[str], locked: list[str],
-            partial: bool = False) -> Result:
-        """The seat's Result before its six is scored: the map, the other
-        side's picks, the bans, the side and the stage."""
+            self, kind: ResultKind, *, catalog: list[Strategy], base: BaseWeights,
+            blue: list[str], locked: list[str], partial: bool = False) -> Result:
+        """Blue's Result before its six is scored: the map, red's picks, the
+        bans, the side and the stage."""
         m = self.board.map
         return Result(kind=kind, map_name=m.name if m else None,
                       red=[h.name for h in self.board.red], blue=blue, locked=locked,
                       catalog=catalog, base=base, bans=[h.name for h in self.board.banned],
-                      side=self.side, stage=self.stage, seat=seat, partial=partial)
+                      side=self.side, stage=self.stage, partial=partial)
 
 
 def _seat_board(world: World, draft: Draft) -> _SeatBoard:
@@ -102,7 +101,7 @@ def clamp_top(top: int | None = None) -> int:
     return max(1, min(TOP_DEFAULT if top is None else top, TOP_CEILING))
 
 
-BOARD_TOP = 5               # the alternatives each of a board's seats keeps
+BOARD_TOP = 5               # the alternatives blue's optimal and fill keep
 
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
@@ -166,7 +165,7 @@ def infer(
     catalog = catalog_module.load() if catalog is None else catalog
     base = weights_in_force(base)
     try:
-        return _optimal(world, draft, catalog=catalog, base=base, top=top, seat="blue",
+        return _optimal(world, draft, catalog=catalog, base=base, top=top,
                         kind="infer").result
     except Infeasible as error:
         if not draft.blue:
@@ -198,18 +197,18 @@ def _broken(objective: Objective, heroes: Sequence[Hero]) -> list[str]:
 
 def _optimal(
         world: World, draft: Draft, *, catalog: list[Strategy], base: BaseWeights,
-        top: int, seat: Seat, kind: ResultKind, check: Callable[[], None] | None = None,
+        top: int, kind: ResultKind, check: Callable[[], None] | None = None,
         scale_of: Solver | None = None) -> _Optimal:
-    """The optimal six for `seat` around its locked picks (`draft.blue`)
-    against the other seat's revealed ones (`draft.red`), labelled `kind`,
-    with `top` alternatives. `scale_of` is a solver on the same board whose
-    scale this search takes - a fill takes its seat's - and `check` is asked
-    as the search runs whether the board was superseded."""
+    """Blue's optimal six around its locked picks (`draft.blue`) against
+    red's revealed ones (`draft.red`), labelled `kind`, with `top`
+    alternatives. `scale_of` is a solver on the same board whose scale this
+    search takes - a fill takes the optimal's - and `check` is asked as the
+    search runs whether the board was superseded."""
     started = time.monotonic()
     seated = _seat_board(world, draft)
     m, red_h, blue_h, bans_h = seated.board
-    _check_teams(red_h, blue_h, seat)
-    result = seated.result(kind, seat, catalog=catalog, base=base, blue=[],
+    _check_teams(red_h, blue_h)
+    result = seated.result(kind, catalog=catalog, base=base, blue=[],
                            locked=[h.name for h in blue_h])
     solver = Solver(world, m, red=red_h, locked=blue_h, banned=bans_h, side=seated.side,
                     stage=seated.stage, catalog=catalog, base=base, check=check)
@@ -232,17 +231,16 @@ def _optimal(
 
 def _evaluated(
         world: World, draft: Draft, *, catalog: list[Strategy], base: BaseWeights,
-        seat: Seat, kind: ResultKind, optimal: _Optimal) -> Result:
-    """`seat`'s full six (`draft.blue`), scored and ranked against every
-    legal six, labelled `kind`, through the search of `optimal`, the seat's
-    own on this board, and read on its span. A six that breaks a limit is
-    scored with its breaches listed: the board bars blue's before it gets
-    here, and ranks red's."""
+        optimal: _Optimal) -> Result:
+    """Blue's full six (`draft.blue`), scored and ranked against every legal
+    six through the search of `optimal`, blue's own on this board, and read
+    on its span. A six that breaks a limit is scored with its breaches
+    listed; the board bars blue's before it gets here."""
     started = time.monotonic()
     seated = _seat_board(world, draft)
     red_h, blue_h = seated.board.red, seated.board.blue
-    _check_teams(red_h, blue_h, seat)
-    result = seated.result(kind, seat, catalog=catalog, base=base,
+    _check_teams(red_h, blue_h)
+    result = seated.result("evaluate", catalog=catalog, base=base,
                            blue=[h.name for h in blue_h], locked=[])
     evaluated = evaluate_comp(optimal.solved, blue_h)
     fs = _board_facts(world, result, seated.side)
@@ -270,13 +268,12 @@ def _current(
     full = len(draft.blue) == TEAM_SIZE
     label: ResultKind = "evaluate" if full else "current"
     if full and barred is None:
-        return _evaluated(world, draft, catalog=catalog, base=base, seat="blue", kind=label,
-                          optimal=optimal)
+        return _evaluated(world, draft, catalog=catalog, base=base, optimal=optimal)
     started = time.monotonic()
     seated = _seat_board(world, draft)
     blue_h = seated.board.blue
     picks = [h.name for h in blue_h]
-    result = seated.result(label, "blue", catalog=catalog, base=base, blue=picks,
+    result = seated.result(label, catalog=catalog, base=base, blue=picks,
                            locked=[] if full else list(picks), partial=not full)
     solver = optimal.solver
     if blue_h:
@@ -365,9 +362,9 @@ def board(
     The brief's weights override the files' for this board only - the
     playbook tab's sliders, its Meta slider among them; the files stay as
     they are and every result says the weights it was scored under. The
-    brief's base is the default engine's weights every seat scores under -
+    brief's base is the default engine's weights blue's seat scores under -
     the playbook's meta.md where it names none - the likely six its counter
-    term reads where the other seat has no picks.
+    term reads where red has no picks.
 
     The searches run one after another in this process, each exact. Every
     CHECK_EVERY branches (inference.solver) a search asks the brief's check,
@@ -385,7 +382,7 @@ def board(
     seated = _seat_board(world, draft)
     m, red_h, blue_h, bans_h = seated.board
     draft = dataclasses.replace(draft, side=seated.side, stage=seated.stage)
-    _check_teams(red_h, blue_h, "blue")
+    _check_teams(red_h, blue_h)
     expected = _likely(world, m, red_h, bans_h, draft, catalog, base)
     # blue's seat: its own picks are `blue`, and red is its revealed picks alone -
     # the default engine's counter term reads red's likely six where it has none
@@ -459,7 +456,7 @@ class _Pass:
         """Blue's optimal six on `draft`, on `scale_of`'s scale where given."""
         self.watch.check()
         return _optimal(self.world, draft, catalog=self.catalog, base=self.base,
-                        top=BOARD_TOP, seat="blue", kind=kind, check=self.watch.check,
+                        top=BOARD_TOP, kind=kind, check=self.watch.check,
                         scale_of=scale_of)
 
     def current(self, draft: Draft, optimal: _Optimal, *, stuck: bool) -> Result:
@@ -562,7 +559,7 @@ def _scored(world: World, draft: Draft, optimal: _Optimal, cand: Candidate,
     as a Result on the optimal's span: its picks, their reasons and its
     breakdown - `locked`, the picks it keeps, marked."""
     seated = _seat_board(world, draft)
-    result = seated.result("evaluate", "blue", catalog=catalog, base=base,
+    result = seated.result("evaluate", catalog=catalog, base=base,
                            blue=_order(seated.board.blue),
                            locked=[name for name in locked if name in set(draft.blue)])
     result.record_candidate(cand, _board_facts(world, result, seated.side),
@@ -571,13 +568,12 @@ def _scored(world: World, draft: Draft, optimal: _Optimal, cand: Candidate,
     return result
 
 
-def _check_teams(red_h: Sequence[Hero], blue_h: Sequence[Hero], seat: Seat) -> None:
-    """Refuse a board the queue would not seat: a team past its tanks, on
-    either seat - the other seat's team (`red_h`) first, then `seat`'s own
-    (`blue_h`), each named from `seat`'s perspective. A team past six picks
-    never gets this far: Draft refuses it."""
-    check_tanks(red_h, "red" if seat == "blue" else "blue")
-    check_tanks(blue_h, seat)
+def _check_teams(red_h: Sequence[Hero], blue_h: Sequence[Hero]) -> None:
+    """Refuse a board the queue would not seat: a team past its tanks, red's
+    (`red_h`) first, then blue's (`blue_h`). A team past six picks never
+    gets this far: Draft refuses it."""
+    check_tanks(red_h, "red")
+    check_tanks(blue_h, "blue")
 
 
 def _likely(

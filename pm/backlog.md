@@ -92,8 +92,8 @@ keeps it current.
   normalised term stays within 0..1 and the reference sample bounds it;
   a rule at weight 0 is the objective
   without it; the optimum moves with a rule's weight and never back;
-  every six's breakdown sums to its score, in every form; each seat of a
-  board is infer on that seat's draft.
+  every six's breakdown sums to its score, in every form; blue's optimal
+  on a board is infer on blue's draft.
   Cost: (a) three to four days, the kit model most of it; (b) a day for
   the tests, a day for the page.
 - **Recorded matches, playbook validation and learned weights.** The
@@ -136,7 +136,7 @@ keeps it current.
   `facts/team.py` or `facts/compute.py` reads. Knockbacks as their own
   count (Control's edges), damage beams apart from healing beams, area
   healing apart from area damage. Cost: a day each.
-- **A share's zero is one six.** Each seat's floor is the lowest of its
+- **A share's zero is one six.** Blue's floor is the lowest of its
   1,200 reference sixes, so one pathological six sets every share on the
   board and a roster or rates change moves them all through it; a floor
   far below the field crowds every share toward 100. A low quantile (the

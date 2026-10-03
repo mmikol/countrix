@@ -18,11 +18,11 @@ from tests.verification.inference import BRIEF, FIXTURE_PLAYBOOK
 FIX = catalog.load(FIXTURE_PLAYBOOK)
 
 
-def comp(blue, score, best, partial=False, seat="blue"):
-    """A seat's current comp of `blue` under the reference playbook, scoring
+def comp(blue, score, best, partial=False):
+    """Blue's current comp of `blue` under the reference playbook, scoring
     `score` on a scale whose 100 is `best`."""
     return Result(kind="current", map_name=None, red=[], blue=blue, locked=blue,
-                  catalog=FIX, base=OFF, score=score, best=best, partial=partial, seat=seat)
+                  catalog=FIX, base=OFF, score=score, best=best, partial=partial)
 
 
 def likely(*pulls, revealed=0):
@@ -40,8 +40,8 @@ SIX = likely(12, 7.5, 7, 12, 7, 8)          # 53.5 pull
 
 
 def test_the_verdict_reads_blues_standing():
-    """Blue's share of its optimal, through its fill while half-drafted; red
-    is never a share."""
+    """Blue's share of its optimal, through its fill while half-drafted and
+    off its picks alone where no fill was solved; red is never a share."""
     from inference import plan
     seated = plan.momentum(plan.Seats(comp(["a"] * 6, 8, 10), SIX))
     assert seated["verdict"] == "blue 80 / 100 of its optimal" and seated["blue"] == 80
@@ -50,6 +50,8 @@ def test_the_verdict_reads_blues_standing():
                                     fill=comp(["a"] * 6, 7, 10)))
     assert half["verdict"] == "blue 70 / 100 of its optimal (the best six from its picks)"
     assert half["partial"]
+    alone = plan.momentum(plan.Seats(comp(["a"], 3, 10, partial=True), SIX))
+    assert alone["verdict"] == "blue 30 / 100 of its optimal (its picks alone)"
     none = plan.momentum(plan.Seats(comp([], 0, 10), SIX))
     assert none["verdict"].startswith("no blue picks yet") and none["blue"] is None
 
@@ -71,7 +73,7 @@ def test_the_badge_is_worded_on_the_server():
     assert waiting["badges"]["red"] == {
         "label": "54 pull",
         "tip": ("their likely six: 53.5 pull - each hero's pick rate here, plus 2 for each"
-                " synergy partner on the six")}
+                " documented synergy pair on the six")}
     held = plan.momentum(plan.Seats(comp([], 0, 10), likely(12, 7.5, 7, 12, 7, 8, revealed=2)))
     assert held["badges"]["red"]["tip"].startswith(
         "their picks and the likeliest heroes for the rest: 53.5 pull")

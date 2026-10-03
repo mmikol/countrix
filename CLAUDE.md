@@ -165,7 +165,7 @@ db <- facts <- inference <- door <- ui.
   (`compute.expected_picks`), and red's badge is the six's total pull. A
   Draft may name a stage the map lists (`stage`, resolved by
   `facts.draft.board_stage`); every seat plays it, and it moves the `map.*`
-  metrics alone - the ground in play, `compute.ground`. Each seat has one
+  metrics alone - the ground in play, `compute.ground`. Blue's seat has one
   scale: the reference sample, drawn from a string seed of the map and the
   side, and the board's field, which reads the enemy, both measured on the
   whole map (`prepare(measure=True)`), so the stages of a map share it; the

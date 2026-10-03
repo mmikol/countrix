@@ -252,9 +252,10 @@ def test_expected_picks_read_the_map_and_the_meta_and_no_strategy(synthetic_worl
     """Red's likely six: their revealed picks first, then the most-picked
     heroes on the map, never a banned hero, never a third tank (the queue's
     own limit), six in all whatever the revealed picks' roles, the overall
-    meta when no map is set - each with the rate it rests on and its pull,
-    which sum to the six's rates plus SYNERGY_PULL a documented pair. No
-    strategy is read: the same six under any playbook."""
+    meta when no map is set - each with the rate it rests on and its pull, a
+    revealed pick's counting only the picks revealed before it, which sum to
+    the six's rates plus SYNERGY_PULL a documented pair. No strategy is
+    read: the same six under any playbook."""
     w = synthetic_world
     harbor = w.map("Harbor Gate")
     # announced, and the likeliest pick on record: still never expected
@@ -289,6 +290,12 @@ def test_expected_picks_read_the_map_and_the_meta_and_no_strategy(synthetic_worl
     off_role = compute.expected_picks(w, harbor, revealed=damage)
     assert len(off_role) == TEAM_SIZE
     assert Counter(p["role"] for p in off_role) == {"damage": 3, "tank": 2, "support": 1}
+    # Kite and Gale are a documented pair: revealed, the later of the two gains it
+    gale = w.hero("Gale")
+    pair = compute.expected_picks(w, harbor, revealed=[kite, gale])
+    assert [(p["hero"], p["pull"]) for p in pair[:2]] == [("Kite", 8.0), ("Gale", 7.5)]
+    flipped = compute.expected_picks(w, harbor, revealed=[gale, kite])
+    assert [(p["hero"], p["pull"]) for p in flipped[:2]] == [("Gale", 5.5), ("Kite", 10.0)]
     # deterministic
     assert six == compute.expected_picks(w, harbor, revealed=[kite], banned=[needle])
     anywhere = compute.expected_picks(w, None)
