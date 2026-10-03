@@ -513,7 +513,8 @@ both seats, the fill, the countered case, bans, locks and plateaus - and
 `tests/verification/inference/test_bounds.py` holds every rule and the whole
 bound to every completion of random branches. On the built database,
 `.venv/bin/python -m tests.verification.inference.prove_exact` brute-forces
-every legal six of a real board, in slices, against the search.
+every legal six of a real board, in slices, against the search, and its
+`draw` stage holds the tie-break's draw even over the real roster.
 
 ### Why the search is exact
 
