@@ -64,21 +64,20 @@ def reach_tool(ctx: Context, hero: str) -> ToolReply:   # _tool: inference.reach
 
 @board_tool(
     "board", "The whole board at any step of the draft (no map, a map, a side,"
-    " the stage in play, bans, red's picks as they reveal), every seat solved on"
-    " that stage: blue's optimal six as the best counter"
-    " to red's selection - to their likely six until they reveal a pick"
-    " (blue's own picks never constrain it), red's best"
-    " counter to yours, both current comps scored on those scales, your picks"
-    " against red's best counter, your locked picks with the empty slots filled,"
-    " the fight odds (each seat's share of its own optimal, and the two against"
-    " each other), the swaps from blue's picks that pay for the swap cost - one"
-    " joint answer, the best six reachable from the picks when each pick"
-    " dropped costs that many share points, with blue's share and the fight"
-    " odds before and after - the game plan in prose and, on a map with stages,"
-    " the plan stage by stage, the shapes the queue and the playbook's limits"
-    " allow, and red's likely six"
-    " from the data alone (a two-two-two from the map's pick rates and the"
-    " wiki's synergies, past the bans; static for the board, no strategy read).",
+    " the stage in play, bans, red's picks as they reveal), solved on that"
+    " stage for blue, the side the playbook optimizes: blue's optimal six as"
+    " the best counter to red's selection - to their likely six until they"
+    " reveal a pick (blue's own picks never constrain it) - your current comp"
+    " scored on its scale, your locked picks with the empty slots filled, your"
+    " picks against red's best counter (the one red six solved, a what-if),"
+    " blue's share of its optimal, the swaps from blue's picks that pay for the"
+    " swap cost - one joint answer, the best six reachable from the picks when"
+    " each pick dropped costs that many share points, with blue's share before"
+    " and after - the game plan in prose and, on a map with stages, the plan"
+    " stage by stage, the shapes the queue and the playbook's limits allow, and"
+    " red's likely six from the data alone: its revealed picks, then for each"
+    " open slot the hero the map's pick rates and the wiki's synergies pull"
+    " first, past the bans, each with its pull; red is never optimized.",
     {
         "weights": {"type": "object",
                     "description": "{heuristic id: 0..10} - weights to score this"

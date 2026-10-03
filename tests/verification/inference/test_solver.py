@@ -126,12 +126,12 @@ def test_the_search_reaches_the_enumerated_maximum(synthetic_world, catalog_copy
 
 @pytest.mark.parametrize("base", [OFF, DEFAULT], ids=["base-off", "base-on"])
 def test_every_seat_of_a_board_is_the_enumerated_maximum(synthetic_world, base):
-    """A board's seats are each an exact search: blue's optimal against red's
-    picks, red's against blue's on the other side, the fill around blue's
-    picks on blue's scale, red's fill on red's, and the countered case -
-    blue's best counter to red's optimal six, and blue's picks filled against
-    it on that scale. Each is the enumeration's best six, and the board shows
-    each seat's six and alternatives in the enumeration's order."""
+    """A board's searches are each exact: blue's optimal against red's picks,
+    the fill around blue's picks on blue's scale, and the countered case -
+    red's best counter on the other side, the one red six the board solves,
+    then blue's picks filled against it on the scale of blue's best counter
+    to it. Each is the enumeration's best six, and the board shows each six
+    and its alternatives in the enumeration's order."""
     from inference import engine
     playbook = catalog.load(FIXTURE_PLAYBOOK)
     for draft in (Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm", "Rook"), side="attack"),
@@ -144,11 +144,11 @@ def test_every_seat_of_a_board_is_the_enumerated_maximum(synthetic_world, base):
         red = seated(synthetic_world, red_seat, playbook, base)
         blue.freeze_scale()
         red.freeze_scale()
-        theirs = Draft(draft.map_name, draft.blue, draft.red, draft.bans, opposite(draft.side))
-        against = dataclasses.replace(draft, red=tuple(board.red.blue), blue=())
+        assert sorted(board.countered.red) == sorted(enumerated(red)[0].names), draft
+        against = dataclasses.replace(draft, red=tuple(board.countered.red), blue=())
         countered = seated(synthetic_world, against, playbook, base)
         countered.freeze_scale()
-        seats = [(board.blue, blue), (board.red, red),
+        seats = [(board.blue, blue),
                  (board.fill, seated(synthetic_world, draft, playbook, base, blue)),
                  (board.countered, seated(synthetic_world, dataclasses.replace(
                      against, blue=draft.blue), playbook, base, countered))]
@@ -158,8 +158,6 @@ def test_every_seat_of_a_board_is_the_enumerated_maximum(synthetic_world, base):
             shown = [sorted(result.blue), *(sorted(a["blue"]) for a in result.alternatives)]
             assert shown == [sorted(c.names) for c in full[:len(shown)]], draft
             assert abs(result.score - full[0].score) < 1e-12
-        red_fill = seated(synthetic_world, theirs, playbook, base, red)
-        assert verdicts(red_fill.solve(top=K).ranked) == verdicts(enumerated(red_fill)[:K])
 
 
 @pytest.mark.parametrize("playbook", ["assumptions", "healing floor"])

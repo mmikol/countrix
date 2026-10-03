@@ -90,7 +90,7 @@ keeps it current.
   on the math page where they cannot: the same board gives the same six;
   scaling every weight by one factor leaves the argmax unchanged; a
   normalised term stays within 0..1 and the reference sample bounds it;
-  fight odds split 100 exactly; a rule at weight 0 is the objective
+  a rule at weight 0 is the objective
   without it; the optimum moves with a rule's weight and never back;
   every six's breakdown sums to its score, in every form; each seat of a
   board is infer on that seat's draft.
@@ -104,7 +104,7 @@ keeps it current.
   a `record_match` tool, checked as the board checks a board (six a team,
   at most two tanks, a side on a sided map), stamped with the playbook's
   digest and stored under the `user` source. The playbook is judged
-  against the recorded maps: each rescored from both seats, then models
+  against the recorded maps: each rescored from blue's seat, then models
   from a coin flip to the heroes plus the playbook score, fitted and
   scored out of sample on a time and a sessions split by log loss and
   Brier with intervals over sessions, each strategy family ablated, a

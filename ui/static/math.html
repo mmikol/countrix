@@ -7,7 +7,6 @@
 <a class='sub' href='#sustained-healing'>sustained healing</a>
 <a class='sub' href='#healing-floor'>the healing floor</a>
 <a class='sub' href='#what-100-means'>what 100 means</a>
-<a class='sub' href='#fight-odds'>fight odds</a>
 <a class='sub' href='#problem'>the problem's class</a>
 <a class='sub' href='#argmax'>the argmax</a>
 <a class='sub' href='#searched'>what is searched</a>
@@ -94,8 +93,8 @@ learned: a rule's starting weight comes from its prose on the house scale, 0.25 
 the default, 2.5 strong and 4 dominant, or from the owner's word, as <code>heal-rate</code>'s 2
 did, and each rule's weight and each of the engine's is yours to turn - the tune tool for the
 file, a slider for a session, the Meta slider for the whole engine. A score is not a
-probability: a badge places it on the seat's span, from its floor, 0, to its optimal, 100, and
-the fight odds split 100 between the two seats' shares. The rates are Competitive Role Queue,
+probability: blue's badge places it on the seat's span, from its floor, 0, to its optimal, 100.
+Red is never optimized or scored: its badge is its likely six's pull. The rates are Competitive Role Queue,
 5v5, a proxy for Open Queue 6v6, so a value a hero has only beside a second tank, such as
 Zarya's in a two-tank front line, is missing from them.</p>
 <h2 id='function'>The function: STRATEGIES( FACTS )</h2>
@@ -252,13 +251,13 @@ median, and one of them past Kiriko lifts it to about 151 hp/s. Overheal is out,
 untargeted area heal, which lands on full-health teammates too, reads above what it heals.
 Brigitte holds her Flail in contact throughout; at half contact she reads 61.7 hp/s in place of
 98.4.</p>
-<p id='what-100-means'><b>What 100 means.</b> Each seat's best six on this board is its
+<p id='what-100-means'><b>What 100 means.</b> Blue's best six on this board is its
 optimal, 100. Its 0 is the seat's floor: the lowest score among the sixes of its reference
 sample that keep the board's limits, scored on the board's stage. The sample is drawn from every
 released hero whatever the bans, so the floor six may hold a banned one; the field does not
 enter the floor, and 0 stands in where no six of the sample keeps the limits. A score is signed
 - the rate term counts each pick's edge over a coin flip - so zero anchors nothing, and a six
-below it would read 0 against any six above it. The badge above a picker places the seat's six
+below it would read 0 against any six above it. The badge above blue's picker places blue's six
 on the span between the two - its picks at six, the best six its picks reach while it drafts,
 the optimal's 100 before any pick - under the default engine and this playbook,
 not a win probability:</p>
@@ -268,21 +267,11 @@ not a win probability:</p>
 <p>An optimal no higher than the floor leaves no share to divide, so every other comp reads
 <i>unscored</i>, and the reason is on hover. A comp whose own picks break a limit - a full six
 that breaks one, or picks no six can complete within the limits - is <i>not allowed</i>: no
-score, no share and no odds, and the badge names the limits its picks break or, where they break
-none as they stand, says that no six keeping them meets the limits. Red's picks are the other
-side's, and never ruled out.</p>
-<p id='fight-odds'><b>Fight odds.</b> Blue's share over the sum of both shares, red's the
-rest, read off the two whole-number shares: a split of 100. The name is the board's; in
-probability the odds of p are p / (1 &minus; p), and this is neither those nor a fitted
-probability:</p>
-<pre class='eq'>odds_blue = round( 100 &middot; b / (b + r) )      odds_red = 100 &minus; odds_blue
-            b, r: blue's and red's shares; round: to the nearest whole number, a half to the even one</pre>
-<p>A seat still drafting is read through its fill, the best six its picks can reach, on both
-sides alike: a sum over fewer picks reads low, so the seat with more picks would lead. Where no
-fill is solved - red's revealed picks already past a limit, or a fill past the search's budget -
-the seat is read off its picks as they stand, and its badge says so. There are no odds where a seat has no picks, is
-unscored or not allowed, or where both shares are 0: each bar shows its own seat's share, an
-unscored or not-allowed seat its badge's word.</p>
+score and no share, and the badge names the limits its picks break or, where they break none as
+they stand, says that no six keeping them meets the limits. Red's picks are the other side's,
+and never ruled out. Blue still drafting is read through its fill, the best six its picks can
+reach: a sum over fewer picks reads low. Where no fill is solved - a fill past the search's
+budget - the seat is read off its picks as they stand, and its badge says so.</p>
 <p id='problem'><b>The problem's class.</b> With V the heroes the board leaves open - released
 and unbanned - a six is x &isin; {0,1}^V, x_h = 1 where h is picked, and the search solves</p>
 <pre class='eq'>maximise    score(x)
@@ -356,14 +345,12 @@ net_R'(x) = net_R(x) + c &middot; ( [p &notin; x] &minus; [q &notin; x] )      [
           &le; net_R(target) + c = net_R'(target)</pre>
 <p>A six that reaches the bound tied the target from R and loses the same draw. The board reads
 the rest from the new picks as it reads any swap, so it can still keep the picks: on a tie with
-them, or where the rest would not raise the fight odds. The cost is in share points of blue's
+them. The cost is in share points of blue's
 span - c = swap &middot; (best &minus; floor) / 100 in the score's points - %(SWAP)g by default
 (meta.md's swap, 0 to %(SWAP_MAX)g, a slider on the playbook tab), and stands in for the ultimate
 charge and the walk a swap costs. The gain is read on the scores, so the whole, clamped shares
 the verdict shows can differ from it by a point, and by more where the picks score below the
-floor. Where red has revealed picks, a swap that would not raise blue's fight odds is withheld;
-where there are no odds to read, before or after, the net decides alone. Red is never told to
-swap.</p>
+floor. Red is never told to swap.</p>
 <p>The plan stage by stage walks the map's stages in play order from the six the comps tab shows
 - blue's picks at six, the fill around fewer, the optimal before any pick; the board's chosen
 stage plays the swaps suggested above the picks, the phases before it read as played, and the
@@ -400,25 +387,29 @@ better; the board's draws - each hero's a hash of the map, the side and the hero
 its rates and its name - pick the one shown, the six whose draws sum highest, and the board says
 how many tie. With the meta at 0 and every weight at 0, every legal six ties: each hero of a role
 has the same chance of being the one drawn across boards, and one board draws the same six every
-time. A share is a score's place on its seat's span and the fight odds a ratio of two shares,
-not probabilities of winning: nothing here is fitted to match results. The playbook holds both as
+time. A share is a score's place on blue's span, not a probability of winning, and red's pull
+ranks heroes by how often they are picked: nothing here is fitted to match results. The playbook holds both as
 assumptions, <i>Tied sixes are equally good</i> and <i>Deterministic, not probabilistic</i>.</p>
 <h2 id='board'>The board</h2>
-<p id='likely-comp'><b>Red's likely starting comp</b>: a two-two-two filled slot by slot, past
-the bans, each slot the open-role hero of the highest pull below - a greedy fill by a score in
-pick-rate points, not the six a probability ranks first. No strategy is read, and it does not
-change when red reveals a pick.</p>
-<pre class='eq'>pull(h) = pick(h, map) + %(SYNERGY_PULL)g &times; partners(h, the six so far)
+<p id='likely-comp'><b>Red's likely comp</b>: red's revealed picks, then slot by slot toward a
+two-two-two, past the bans, six in all, the open-role hero of the highest pull below - a greedy
+fill by a score in pick-rate points, not the six a probability ranks first. Red is never
+optimized: no strategy is read and nothing scores it. The board suggests it in red's empty
+slots, red's badge is its pull, and blue's counter term reads it before red reveals a pick.</p>
+<pre class='eq'>pull(h)    = pick(h, map) + %(SYNERGY_PULL)g &times; partners(h, the six so far)
+pull(six)  = &Sigma; pull(h) = &Sigma; pick(h, map) + %(SYNERGY_PULL)g &times; the documented pairs on the six
 
 pick(h, map)   the hero's pick rate on this map; overall with no map set or no rate here, 0 with none
-partners(h, S) how many heroes already on S the synergy table pairs h with
+partners(h, S) how many heroes already on S the synergy table pairs h with; a revealed pick
+               counts the revealed picks before it
                a tie goes to the name first in alphabetical order</pre>
 <p id='counter'><b>Blue's optimal counter</b>: solved against red's revealed picks - before they
 reveal one, the counter term reads their likely comp - on this map, side and bans; never against
 blue's own picks. Once blue picks, its seat shows blue's six above the optimal: from one to five picks,
 the picks with the rest filled by a second solve that keeps them - the six the suggestion
-tiles offer; at six, the six itself. The game plan describes that six. Red's
-optimal is solved as the scale for red's score and not shown.</p>
+tiles offer; at six, the six itself. The game plan describes that six. The one red six the
+engine solves is red's best counter in the board tool's <i>if countered optimally</i> case, a
+what-if for blue the board page does not show.</p>
 <p id='weights'><b>The weights.</b> A heuristic's weight is the slider under its card. It stays
 in your browser and rides with every request until reset; the file's weight is the default,
 and only the tune tool changes it. Every heuristic has a slider, 0 to %(WEIGHT_MAX)g, on a metric

@@ -80,10 +80,6 @@ def test_the_swap_search_is_the_enumerated_best_net(synthetic_world, limited, ba
         if not drops:
             assert s["pairs"] == [] and s["verdict"].startswith("keep the picks"), (name, cost)
             continue
-        if not s["pairs"]:              # the odds gate withheld it, and says so
-            assert s["status"] == "withheld", (name, cost)
-            assert s["verdict"].startswith("keep the picks: the best swaps"), (name, cost)
-            continue
         assert s["status"] == "suggested" and sorted(s["six"]) == sorted(best.names), (name, cost)
         held = [p for p in draft.blue if p in s["six"]]
         assert set(held) | {p["in"] for p in s["pairs"]} <= set(s["six"])
@@ -162,8 +158,7 @@ def test_the_keep_term_is_never_a_term_of_a_payload_and_the_share_is_the_evaluat
     six = evaluated(synthetic_world, dataclasses.replace(draft, blue=tuple(s["six"])),
                     catalog=playbook)
     assert six.share() == s["after"]
-    assert s["before"] == board.momentum["blue"] and s["odds"]["before"] == board.momentum["odds"]
-    assert s["odds"]["after"] is not None
+    assert s["before"] == board.momentum["blue"]
 
 
 def test_a_board_without_blue_picks_or_asked_for_none_has_no_swaps(synthetic_world):
@@ -194,28 +189,6 @@ def test_the_raw_cost_is_share_points_of_the_span():
     assert swaps.raw_cost(10.0, Span(best=1.0, floor=1.0)) is None
     assert swaps.raw_cost(10.0, Span(best=1.0, floor=None)) == pytest.approx(0.1)
     assert swaps.raw_cost(10.0, Span(best=-1.0, floor=None)) is None
-
-
-def test_a_swap_that_does_not_raise_the_fight_odds_is_withheld(synthetic_world, monkeypatch):
-    """The odds after are read off red solved again against the six the
-    swaps make; a swap is suggested only where they rise, as the owner asked,
-    and where they would not, the picks keep, the status says withheld and
-    the verdict names the swaps it held back and the odds they would read."""
-    playbook = catalog.load(FIXTURE_PLAYBOOK)
-    draft = BOARDS["full"]
-    brief = engine.Brief(base=DEFAULT, swap=5.0)
-    offered = engine.board(synthetic_world, draft, catalog=playbook, brief=brief).swaps
-    odds = offered["odds"]
-    assert offered["pairs"] and odds["after"]["blue"] > odds["before"]["blue"]
-    assert offered["status"] == "suggested"
-    worse = {"odds": {"blue": 0, "red": 100}}
-    monkeypatch.setattr(engine._Pass, "_against", lambda self, draft, six: worse)
-    held = engine.board(synthetic_world, draft, catalog=playbook, brief=brief).swaps
-    assert held["pairs"] == [] and sorted(held["six"]) == sorted(draft.blue)
-    assert held["status"] == "withheld"
-    assert held["verdict"] == "keep the picks: the best swaps (%s) would not raise the fight odds" \
-        " %d -> 0" % (", ".join("%s for %s" % (p["out"], p["in"]) for p in offered["pairs"]),
-                      offered["odds"]["before"]["blue"])
 
 
 def test_a_fill_out_of_budget_suggests_no_swap(synthetic_world, monkeypatch):

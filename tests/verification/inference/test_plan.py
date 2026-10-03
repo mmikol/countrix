@@ -1,8 +1,8 @@
-"""The board in prose: the momentum verdict read off the two current comps,
-each half-drafted seat through its fill, the badge above each picker, and
-the game plan - the six the comps tab shows, the style, the terrain and the
-stages it names, and nothing the board contradicts. Every board is the
-synthetic World's: no database."""
+"""The board in prose: the verdict read off blue's current comp, through its
+fill while half-drafted, the badge above each picker, and the game plan -
+the six the comps tab shows, the style, the terrain and the stages it names,
+and nothing the board contradicts. Every board is the synthetic World's: no
+database."""
 
 import copy
 
@@ -12,7 +12,7 @@ from facts.team import team_metrics
 from inference import base, catalog
 from inference.base import OFF
 from inference.expr import Expr
-from inference.result import Result
+from inference.result import Pick, Result
 from tests.verification.inference import BRIEF, FIXTURE_PLAYBOOK
 
 FIX = catalog.load(FIXTURE_PLAYBOOK)
@@ -25,69 +25,88 @@ def comp(blue, score, best, partial=False, seat="blue"):
                   catalog=FIX, base=OFF, score=score, best=best, partial=partial, seat=seat)
 
 
-def test_the_momentum_verdict_reads_the_two_current_comps():
+def likely(*pulls, revealed=0):
+    """Red's likely six of heroes r0, r1.. with these pulls, the first
+    `revealed` of them red's picks."""
+    picks = [
+        Pick(hero="r%d" % i, role="tank", locked=i < revealed, why="", evidence=[], pull=p)
+        for i, p in enumerate(pulls)]
+    return Result(kind="expected", map_name=None, red=[], blue=[p["hero"] for p in picks],
+                  locked=[p["hero"] for p in picks if p["locked"]], catalog=FIX, base=OFF,
+                  seat="red", picks=picks)
+
+
+SIX = likely(12, 7.5, 7, 12, 7, 8)          # 53.5 pull
+
+
+def test_the_verdict_reads_blues_standing():
+    """Blue's share of its optimal, through its fill while half-drafted, with
+    the countered hedge where it was solved; red is never a share."""
     from inference import plan
-    even = plan.momentum(plan.Seats(comp(["a"], 8, 10), comp(["b"], 7.8, 10)))
-    assert even["verdict"].startswith("even") and even["blue"] == 80 and even["red"] == 78
-    blue = plan.momentum(plan.Seats(comp(["a"] * 6, 9, 10), comp(["b"] * 6, 5, 10),
-                                    countered=comp(["a"] * 6, 3, 10)))
-    assert blue["verdict"].startswith("blue ahead by 40") and blue["countered"] == 30
-    assert "your picks hold 30 / 100" in blue["verdict"] and not blue["partial"]
-    red = plan.momentum(plan.Seats(comp(["a"], 2, 10, partial=True), comp(["b"] * 6, 9, 10)))
-    assert red["verdict"].startswith("red ahead by 70") and "(partial picks)" in red["verdict"]
-    only_red = plan.momentum(plan.Seats(comp([], 0, 10), comp(["b"], 5, 10)))
-    assert only_red["verdict"].startswith("red has revealed")
+    seated = plan.momentum(plan.Seats(comp(["a"] * 6, 8, 10), SIX))
+    assert seated["verdict"] == "blue 80 / 100 of its optimal" and seated["blue"] == 80
+    assert set(seated) == {"blue", "countered", "partial", "verdict", "badges"}
+    hedged = plan.momentum(plan.Seats(comp(["a"] * 6, 9, 10), SIX,
+                                      countered=comp(["a"] * 6, 3, 10)))
+    assert hedged["countered"] == 30 and "your picks hold 30 / 100" in hedged["verdict"]
+    half = plan.momentum(plan.Seats(comp(["a"], 2, 10, partial=True), SIX,
+                                    fill=comp(["a"] * 6, 7, 10)))
+    assert half["verdict"] == "blue 70 / 100 of its optimal (the best six from its picks)"
+    assert half["partial"]
+    none = plan.momentum(plan.Seats(comp([], 0, 10), SIX))
+    assert none["verdict"].startswith("no blue picks yet") and none["blue"] is None
 
 
 def test_the_badge_is_worded_on_the_server():
-    """The badge above each picker is the engine's: "unscored", with the
-    reason, whenever the seat's comp cannot be a share of anything - picks
-    or not, never 100 / 100; before any pick the suggested six's 100; else
-    the picks' share of the seat's optimal, a half-drafted seat's through
-    the best six its picks reach where that fill was solved and off the
-    picks themselves where it was not, and the tip says which."""
+    """Blue's badge is the engine's: "unscored", with the reason, whenever its
+    comp cannot be a share of anything - picks or not, never 100 / 100;
+    before any pick the suggested six's 100; else the picks' share of the
+    optimal, a half-drafted seat's through the best six its picks reach where
+    that fill was solved and off the picks themselves where it was not, and
+    the tip says which. Red's is its likely six's pull, which nothing scores,
+    so it reads the same whatever blue's board can or cannot score."""
     from inference import plan
-    waiting = plan.momentum(plan.Seats(comp(["a"], 0, 0), comp([], 0, 0, seat="red")))
-    for badge in waiting["badges"].values():                # picks or not
-        assert badge["label"] == "unscored"
-        assert badge["tip"] == ("unscored on this board - the optimal six scores 0.00, not above"
-                                " the floor of 0.00, so no comp is a share of it")
-    empty = plan.momentum(plan.Seats(comp([], 0, 10), comp(["b"] * 6, 5, 10, seat="red")))
-    assert empty["badges"]["blue"] == {
+    waiting = plan.momentum(plan.Seats(comp(["a"], 0, 0), SIX))
+    assert waiting["badges"]["blue"] == {
+        "label": "unscored",
+        "tip": ("unscored on this board - the optimal six scores 0.00, not above the floor of"
+                " 0.00, so no comp is a share of it")}
+    assert waiting["badges"]["red"] == {
+        "label": "54 pull",
+        "tip": ("their likely six: 53.5 pull - each hero's pick rate here, plus 2 for each"
+                " synergy partner on the six")}
+    held = plan.momentum(plan.Seats(comp([], 0, 10), likely(12, 7.5, 7, 12, 7, 8, revealed=2)))
+    assert held["badges"]["red"]["tip"].startswith(
+        "their picks and the likeliest heroes for the rest: 53.5 pull")
+    assert held["badges"]["blue"] == {
         "label": "100 / 100",
         "tip": "no blue picks yet: the suggested six is this seat's optimal, 100"}
-    assert empty["badges"]["red"] == {
-        "label": "50 / 100", "tip": "their picks reach 50% of their best counter to yours"}
-    half = plan.momentum(plan.Seats(comp(["a"], 2, 10, partial=True),
-                                    comp(["b"], 3, 10, partial=True, seat="red"),
+    half = plan.momentum(plan.Seats(comp(["a"], 2, 10, partial=True), SIX,
                                     fill=comp(["a"] * 6, 8, 10)))
     assert half["badges"]["blue"] == {
         "label": "80 / 100",
         "tip": "the best six from your picks reaches 80% of the best six for this board"}
-    assert half["badges"]["blue"]["label"] == "%d / 100" % half["blue"]   # as the strip reads it
-    # red's fill was not solved (its revealed picks past a limit, a search past its
-    # budget): the share is its picks' own, and the tip says so
-    assert half["badges"]["red"]["tip"] == "their picks reach 30% of their best counter to yours"
-    full = plan.momentum(plan.Seats(comp(["a"] * 6, 9, 10), comp([], 0, 10, seat="red")))
+    assert half["badges"]["blue"]["label"] == "%d / 100" % half["blue"]
+    # no fill solved (a search past its budget): the share is the picks' own, and the tip says so
+    alone = plan.momentum(plan.Seats(comp(["a"], 3, 10, partial=True), SIX))
+    assert alone["badges"]["blue"]["tip"] == "your picks reach 30% of the best six for this board"
+    full = plan.momentum(plan.Seats(comp(["a"] * 6, 9, 10), SIX))
     assert full["badges"]["blue"]["tip"] == "your picks reach 90% of the best six for this board"
-    assert full["badges"]["red"]["label"] == "100 / 100"
 
 
-def test_both_seats_are_read_through_their_fills_while_half_drafted(
+def test_blue_is_read_through_its_fill_and_the_countered_case_fills_its_picks(
         synthetic_world, scratch_playbook):
-    """Blue's share used to be its fill's and red's the sum over its picks
-    alone, which reads low, so a half-drafted blue always led. Each seat is
-    now read through its own fill and the countered case fills blue's picks
-    too: a board where both seats hold the same one pick on an unsided map
-    is the same board from either side, and reads even."""
+    """Blue's share is its fill's while it is half-drafted - the picks alone
+    would sum over a smaller team and read low - and the countered case fills
+    blue's picks too, against red's best counter, the one red six the board
+    solves."""
     from inference import engine
     b = engine.board(synthetic_world, Draft("Ember Ruins", ("Anvil",), ("Anvil",)),
                      catalog=scratch_playbook, brief=BRIEF)
-    assert b.current.partial and b.red_current.partial
-    assert b.momentum["blue"] == b.momentum["red"] == b.fill.to_dict()["normalized"]
-    assert b.momentum["verdict"].startswith("even - blue %d, red %d (partial picks)"
-                                            % (b.momentum["blue"], b.momentum["red"]))
-    assert b.momentum["odds"] == {"blue": 50, "red": 50}
+    assert b.current.partial
+    assert b.momentum["blue"] == b.fill.to_dict()["normalized"]
+    assert b.momentum["verdict"].startswith(
+        "blue %d / 100 of its optimal (the best six from its picks)" % b.momentum["blue"])
     assert b.countered.kind == "countered" and len(b.countered.blue) == 6
     assert "Anvil" in b.countered.locked and not b.countered.partial
     assert b.momentum["countered"] == b.countered.to_dict()["normalized"]

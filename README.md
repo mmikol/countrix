@@ -13,12 +13,12 @@ gives cites a fact.
 ![The board: King's Row, blue on attack, Widowmaker banned, both sides scored](docs/img/board.jpg)
 
 *King's Row, blue on attack, two picks a side, Widowmaker banned. The solver
-fills blue's six around Ana and Reinhardt. Each badge is a side's six as a share
-of the best six it could field here: blue's fill is its best, 100; red's two
-picks reach 92. The fight odds split those two shares and are not a win
-probability. The screenshots run the reference playbook ([below](#quick-start))
-without its two rules that read Blizzard's published win rates, and the cards
-hide the rate figures: Blizzard licenses those for personal use only.*
+fills blue's six around Ana and Reinhardt; blue's badge is its six as a share
+of the best six it could field here, 100. The picture predates red's likely
+six: red is no longer scored, and its badge now reads the pull of that six.
+The screenshots run the reference playbook ([below](#quick-start)) without its
+two rules that read Blizzard's published win rates, and the cards hide the rate
+figures: Blizzard licenses those for personal use only.*
 
 ## What it does
 

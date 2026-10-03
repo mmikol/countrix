@@ -144,12 +144,11 @@ def open_slots(picks: Sequence[Pick]) -> list[OpenSlot]:
             for p in picks]
 
 
-def verdict(pairs: Sequence[SwapPair], cost: float, before: int | None, after: int,
-            odds: tuple[int, int] | None, *, partial: bool) -> str:
-    """The suggestion in words: each swap, blue's share before and after -
-    the picks filled where the seat is half-drafted - and the fight odds
-    where both are read; or that the picks keep, and the cost that held
-    them."""
+def verdict(pairs: Sequence[SwapPair], cost: float, before: int | None, after: int, *,
+            partial: bool) -> str:
+    """The suggestion in words: each swap and blue's share before and after -
+    the picks filled where the seat is half-drafted; or that the picks keep,
+    and the cost that held them."""
     if not pairs:
         return "keep the picks: no swap gains its cost of %s / 100" % plan.cost_text(cost)
     if before is None:
@@ -157,15 +156,8 @@ def verdict(pairs: Sequence[SwapPair], cost: float, before: int | None, after: i
     else:
         share = "%d -> %d / 100 of the optimal%s" % (
             before, after, " (the picks filled)" if partial else "")
-    fight = ", fight odds %d -> %d" % odds if odds is not None else ""
-    return "swap %s: %s%s, at a cost of %s / 100 a swap" % (
-        _swaps(pairs), share, fight, plan.cost_text(cost))
-
-
-def withheld(pairs: Sequence[SwapPair], odds: tuple[int, int]) -> str:
-    """Why a suggestion is withheld: its swaps would not raise the fight odds."""
-    return "keep the picks: the best swaps (%s) would not raise the fight odds %d -> %d" % (
-        _swaps(pairs), *odds)
+    return "swap %s: %s, at a cost of %s / 100 a swap" % (
+        _swaps(pairs), share, plan.cost_text(cost))
 
 
 def _swaps(pairs: Sequence[SwapPair]) -> str:
@@ -296,7 +288,7 @@ class ChainStart(NamedTuple):
     origin - the six the comps tab shows; the raw cost and the cost in share
     points; and the board's swap answer on the chosen stage - a swap
     suggested, or the picks kept under the cost - None where it gave
-    neither: it searched none, or withheld the swap."""
+    neither: it searched none."""
     plain: Solver
     chosen: str
     origin: Sequence[Hero]

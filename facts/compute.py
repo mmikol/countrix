@@ -22,7 +22,7 @@ from collections import OrderedDict
 from collections.abc import Sequence
 from typing import Literal, NamedTuple, TypedDict
 
-from facts.draft import EXPECTED_SHAPE, Side, is_sided
+from facts.draft import EXPECTED_SHAPE, TEAM_SIZE, Side, is_sided
 from facts.model import ROLES, TERRAIN_FEATURES, Hero, Map, World
 from facts.team import TEAM_METRICS, VERSUS_METRICS, MetricBag, number
 
@@ -98,12 +98,13 @@ SYNERGY_PULL = 2.0        # pick-rate points a hero gains per synergy partner al
 
 class ExpectedPick(TypedDict):
     """One of the other side's likely six: the hero, its role, the pick rate
-    it rests on (None for a revealed pick or a hero with no rate), whether it
-    was revealed, and the reason in words."""
+    it rests on (None for a hero with no rate), whether it was revealed, its
+    pull and the reason in words."""
     hero: str
     role: str
     rate: float | None
     locked: bool
+    pull: float
     why: str
 
 
@@ -113,10 +114,12 @@ def expected_picks(world: World, m: Map | None, *, revealed: Sequence[Hero] = ()
     strategy read: any picks given as revealed first, then slot by slot the
     hero the map's pick rates (the overall meta with no map set) and the
     wiki's synergies rank first - a hero's pull is its pick rate plus
-    SYNERGY_PULL per partner already on the six - into a two-two-two,
-    past the bans. Ties go to the alphabetically first name. Deterministic;
-    the board calls it with nothing revealed, so the six is static for the
-    board. Each entry says what it rests on."""
+    SYNERGY_PULL per partner already on the six - toward a two-two-two,
+    past the bans, six heroes in all. Ties go to the alphabetically first
+    name. Deterministic. Each entry carries its pull - a revealed pick's
+    counts the revealed picks before it - so the six's pulls sum to its pick
+    rates plus SYNERGY_PULL per documented pair on it, and says what it
+    rests on."""
     shape = dict(EXPECTED_SHAPE)
     chosen = list(revealed)
     for h in revealed:
@@ -127,26 +130,31 @@ def expected_picks(world: World, m: Map | None, *, revealed: Sequence[Hero] = ()
         r = h.map_pick(m.id) if m is not None else None
         return (r if r is not None else h.pick, r is not None)
 
-    def partners(h: Hero) -> list[Hero]:
-        return [c for c in chosen if world.synergy(c.id, h.id)]
+    def partners(h: Hero, among: Sequence[Hero]) -> list[Hero]:
+        return [c for c in among if world.synergy(c.id, h.id)]
+
+    def entry(h: Hero, among: Sequence[Hero], locked: bool) -> ExpectedPick:
+        value, on_map = rate(h)
+        mates = partners(h, among)
+        pull = (value or 0.0) + SYNERGY_PULL * len(mates)
+        why = _pick_reason(value, on_map, m, mates)
+        return {"hero": h.name, "role": h.role, "rate": value, "locked": locked,
+                "pull": round(pull, 2),
+                "why": "%spull %.1f: %s" % ("revealed; " if locked else "", pull, why)}
 
     picked: list[ExpectedPick] = []
-    while any(shape.values()):
+    while any(shape.values()) and len(chosen) < TEAM_SIZE:
         field = [h for h in world.heroes.values()
                  if h.released and h.id not in taken and shape.get(h.role, 0) > 0]
         if not field:
             break
         best = min(field, key=lambda h: (
-            -((rate(h)[0] or 0.0) + SYNERGY_PULL * len(partners(h))), h.name))
-        value, on_map = rate(best)
-        picked.append({"hero": best.name, "role": best.role, "rate": value, "locked": False,
-                       "why": _pick_reason(value, on_map, m, partners(best))})
+            -((rate(h)[0] or 0.0) + SYNERGY_PULL * len(partners(h, chosen))), h.name))
+        picked.append(entry(best, chosen, False))
         chosen.append(best)
         taken.add(best.id)
         shape[best.role] -= 1
-    out: list[ExpectedPick] = [
-        {"hero": h.name, "role": h.role, "rate": None, "locked": True, "why": "revealed"}
-        for h in revealed]
+    out = [entry(h, revealed[:i], True) for i, h in enumerate(revealed)]
     return out + sorted(picked, key=lambda p: (ROLES.index(p["role"]), p["hero"]))
 
 

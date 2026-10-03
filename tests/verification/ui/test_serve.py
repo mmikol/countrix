@@ -20,15 +20,16 @@ def test_the_strategies_handler_lists_the_playbook_in_force():
 
 @pytest.mark.invariant
 def test_the_board_handler_serves_both_seats_and_the_current_comp(db):
-    """What the page's board shows: both seats' optimal on opposite sides,
-    the current comp partial until blue holds six and evaluated once it
-    does, and no countered case."""
+    """What the page's board shows: blue's optimal, red's likely six on the
+    other side around red's picks, the current comp partial until blue holds
+    six and evaluated once it does, and no countered case."""
     for side, other in (("attack", "defense"), ("defense", "attack")):
         data, code = serve.handle_board(db, {
             "map": ["King's Row"], "red": ["Zarya"], "blue": ["Ana"], "side": [side]})
         assert code == 200 and data["side"] == side
         assert data["blue"]["kind"] == "infer" and len(data["blue"]["blue"]) == 6
-        assert data["red"]["seat"] == "red" and data["red"]["side"] == other
+        assert data["expected"]["seat"] == "red" and data["expected"]["side"] == other
+        assert data["expected"]["locked"] == ["Zarya"] and len(data["expected"]["blue"]) == 6
         assert data["current"]["partial"] and data["current"]["blue"] == ["Ana"]
         assert data["blue"]["cited"] and all(p["evidence"] for p in data["blue"]["picks"])
         assert data["countered"] is None                   # the page never reads it
@@ -45,7 +46,7 @@ def test_the_board_handler_serves_both_seats_and_the_current_comp(db):
     data, code = serve.handle_board(db, {
         "map": ["King's Row"], "stage": ["assault"], "red": ["Zarya"], "side": ["attack"]})
     assert code == 200 and data["stage"] == "Assault"
-    assert data["blue"]["stage"] == data["red"]["stage"] == "Assault"
+    assert data["blue"]["stage"] == data["expected"]["stage"] == "Assault"
     with pytest.raises(Refusal, match="King's Row has no stage 'Well'"):
         serve.handle_board(db, {"map": ["King's Row"], "stage": ["Well"]})
     db.rollback()

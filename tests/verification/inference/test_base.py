@@ -163,28 +163,26 @@ def test_the_counters_read_the_likely_six_until_the_other_side_locks_a_pick(synt
     assert not objective.engine.opponent.likely
 
 
-def test_each_seat_reads_the_other_sides_likely_six_or_its_picks(synthetic_world):
-    """The board's two seats alike: before blue picks, red's optimal reads
-    blue's likely six as blue's optimal reads red's; once blue locks a pick,
-    red's reads that pick. Each counter term cites the fact that says which."""
+def test_blue_counters_reds_likely_six_and_red_is_never_solved(synthetic_world):
+    """Before red reveals a pick blue's counter term reads red's likely six,
+    and its fact says so. Red is never optimized: the board solves no red
+    seat, and red's likely six reads no strategy - its picks carry their pull
+    and nothing scores them."""
     empty = engine.board(synthetic_world, Draft("Harbor Gate", side="attack"),
                          catalog=ASSUMPTIONS_ONLY, brief=BRIEF)
     likely = empty.expected.blue
     # the plan says the six counters it, and names the engine's terms it is built on
     assert "No red pick yet: the six counters their likely six (" in empty.plan
     assert "Above all: win rates here" in empty.plan
-    for seat, other in ((empty.blue, "red"), (empty.red, "blue")):
-        [c] = [c for c in seat.contributions if c["id"] == base.COUNTERS]
-        assert sorted(c["against"]) == sorted(likely) and c["likely"], seat.seat
-        assert c["text"] == "counters read %s's likely six on Harbor Gate: %s - %d into it, %d" \
-            " back (%+d), a wiki edge 2 and a derived one 1" % (
-                other, ", ".join(c["against"]), c["answers"], c["exposures"],
-                c["answers"] - c["exposures"])
+    [c] = [c for c in empty.blue.contributions if c["id"] == base.COUNTERS]
+    assert sorted(c["against"]) == sorted(likely) and c["likely"]
+    assert c["text"] == "counters read red's likely six on Harbor Gate: %s - %d into it, %d" \
+        " back (%+d), a wiki edge 2 and a derived one 1" % (
+            ", ".join(c["against"]), c["answers"], c["exposures"], c["answers"] - c["exposures"])
+    assert {"red", "red_current"}.isdisjoint(empty.to_dict())
+    assert empty.expected.contributions == [] and all("pull" in p for p in empty.expected.picks)
     held = engine.board(synthetic_world, Draft("Harbor Gate", (), ("Balm",), side="attack"),
                         catalog=ASSUMPTIONS_ONLY, brief=BRIEF)
-    [c] = [c for c in held.red.contributions if c["id"] == base.COUNTERS]
-    assert c["against"] == ["Balm"] and not c["likely"]
-    assert c["text"].startswith("counters read blue as it stands: Balm - ")
     [c] = [c for c in held.blue.contributions if c["id"] == base.COUNTERS]
     assert c["likely"] and sorted(c["against"]) == sorted(likely)
 
@@ -349,7 +347,7 @@ def test_a_board_at_meta_zero_is_the_board_off(synthetic_world):
     off = engine.board(synthetic_world, draft, catalog=fix,
                        brief=engine.Brief(base=OFF, swap=10.0)).to_dict()
     assert zero["swaps"] is not None
-    seats = ("blue", "red", "current", "red_current", "fill", "countered", "expected")
+    seats = ("blue", "current", "fill", "countered", "expected")
     assert [zero[k]["base"] for k in seats] == [dict(DEFAULT.record(), meta=0.0)] * len(seats)
     assert [off[k]["base"] for k in seats] == [OFF.record()] * len(seats)
     for payload in (zero, off):

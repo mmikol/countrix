@@ -53,7 +53,6 @@ from inference.result import (
     Span,
     StageRow,
     StageSwap,
-    SwapOdds,
     Swaps,
     not_allowed,
 )
@@ -332,26 +331,20 @@ def board(
                      as revealed - before they reveal a pick, the default
                      engine's counter term reads their likely six - on this
                      map, side and bans; blue's own picks never constrain it
-        red          red's optimal six: their best counter to blue's
-                     selection, on the other side - the scale red's current
-                     comp is measured on
         current      blue's picks as they stand, scored against red's
                      selection on blue's optimal's scale - or not allowed, with
                      no score, where the playbook's limits rule them out: a
                      full six that breaks one, or picks that no six keeping
                      them completes within the limits
-        red_current  red's picks as they stand, scored against blue's
-                     selection on red's optimal's scale; red's picks are the
-                     other side's facts, never ruled out
         swaps        the swaps from blue's picks that pay for their cost -
                      one joint answer, the best six reachable from the picks
                      when each pick dropped costs the swap cost (meta.md's,
                      the brief's, or its weights' SWAP), with blue's share
-                     and the fight odds before and after; the suggestion is
-                     withheld where the odds would not rise (None without blue
-                     picks, or when the brief does not ask for it)
-        countered    blue's picks against red's optimal six - how you hold
-                     if they answer you perfectly: a full six as it stands, a
+                     before and after (None without blue picks, or when the
+                     brief does not ask for it)
+        countered    blue's picks against red's best counter to the board -
+                     how you hold if they answer you perfectly, the one red
+                     six the board solves: a full six as it stands, a
                      half-drafted one filled, on the scale of blue's best
                      counter to that six (None without blue picks, when the
                      brief does not ask for it, when blue's picks are not
@@ -360,9 +353,9 @@ def board(
                      solver - the best six that keeps what you hold, on
                      blue's optimal's scale (None unless one to five are
                      locked, or when no six keeps them and meets the limits)
-        momentum     the verdict from the two current comps, each
-                     half-drafted seat read through its fill; red's fill is
-                     solved for the verdict and not kept
+        momentum     blue's standing, a half-drafted seat read through its
+                     fill, and the badge above each picker: blue's share,
+                     red's likely six's pull
         plan         the game plan in prose, from the same facts, for the six
                      the comps tab shows for blue: its optimal before any
                      blue pick, the fill around one to five, the picks
@@ -374,11 +367,12 @@ def board(
         shapes       the (tanks, damage, supports) triples the queue and the
                      playbook's shape limits allow - what the roster enforces
                      as you pick; a team past six picks or two tanks is refused
-        expected     red's likely six from the data alone - a two-two-two from
-                     the map's pick rates and the wiki's synergies, past the
-                     bans - static for the board, no strategy read; what the
-                     comps tab shows for red and what blue counters until red
-                     reveals a pick
+        expected     red's likely six from the data alone - red's revealed
+                     picks, and for each open slot the hero the map's pick
+                     rates and the wiki's synergies pull first, past the bans;
+                     no strategy read, nothing scored, each pick with its
+                     pull. Red is never optimized: this is what the board
+                     suggests for red
 
     The brief's weights override the files' for this board only - the
     playbook tab's sliders, its Meta slider among them; the files stay as
@@ -391,9 +385,9 @@ def board(
     CHECK_EVERY branches (inference.solver) a search asks the brief's check,
     and a board it reports superseded stops there and raises
     supersede.Superseded. A search past its budget (solver.Unbounded)
-    refuses the board when it is a seat's optimal; a fill, red's fill or
-    the countered case it happens in reads None, and a fill that runs out
-    leaves blue's picks allowed, since nothing proved them otherwise.
+    refuses the board when it is blue's optimal; a fill or the countered case
+    it happens in reads None, and a fill that runs out leaves blue's picks
+    allowed, since nothing proved them otherwise.
     """
     brief = Brief() if brief is None else brief
     catalog = catalog_module.weighted(
@@ -404,18 +398,14 @@ def board(
     m, red_h, blue_h, bans_h = seated.board
     draft = dataclasses.replace(draft, side=seated.side, stage=seated.stage)
     _check_teams(red_h, blue_h, "blue")
-    expected = _expected(world, m, bans_h, draft, catalog, base)
-    # each seat's draft, from that seat's perspective: its own picks are `blue`,
-    # and red is its revealed picks alone - the default engine's counter term
-    # reads red's likely six where it has none (base.opponent), as infer does
+    expected = _likely(world, m, red_h, bans_h, draft, catalog, base)
+    # blue's seat: its own picks are `blue`, and red is its revealed picks alone -
+    # the default engine's counter term reads red's likely six where it has none
+    # (base.opponent), as infer does. Red is never optimized
     blue_seat = dataclasses.replace(draft, blue=())
     ours = draft                                       # blue's current comp and fill
-    # red's, the draft flipped, on the draft's stage: both sides fight on the same ground
-    theirs = draft.flipped()
-    red_seat = dataclasses.replace(theirs, blue=())
     solve = _Pass(world, catalog, base, watch)
     blue = solve.optimal(blue_seat, seat="blue")
-    red = solve.optimal(red_seat, seat="red")
     unsolved = False
     try:
         fill = solve.filled(ours, seat="blue", of=blue)
@@ -431,21 +421,15 @@ def board(
     # a full six is ranked against every legal six through its seat's search;
     # 100 is the seat's optimal, whatever it holds. The limits bind blue's picks
     cur = solve.current(ours, blue, seat="blue", stuck=stuck)
-    red_cur = solve.current(theirs, red, seat="red")
-    try:
-        red_fill = solve.filled(theirs, seat="red", of=red)
-    except (Infeasible, Unbounded):
-        # red's revealed picks are the other side's facts, not ours to limit: past
-        # a limit they already break no fill exists, and red is read off its picks
-        red_fill = None
     countered = None
     if cur.barred is None and brief.solve_countered and draft.blue:
-        # a what-if: where no six answers red's six around blue's picks, it is not solved
+        # a what-if for blue, and the one place a red six is solved: red's best
+        # counter to the board, on the other side; where none answers, not solved
         with contextlib.suppress(Infeasible, Unbounded):
-            countered = solve.countered(dataclasses.replace(draft, red=tuple(red.result.blue)))
-    seats = Seats(current=cur, red_current=red_cur, fill=fill, red_fill=red_fill,
-                  countered=countered)
-    mo = momentum(seats)
+            theirs = dataclasses.replace(draft.flipped(), blue=())
+            red = solve.optimal(theirs, seat="red").result
+            countered = solve.countered(dataclasses.replace(draft, red=tuple(red.blue)))
+    mo = momentum(Seats(current=cur, expected=expected, fill=fill, countered=countered))
     # the swap cost, read once: the swaps above the picks and the chosen
     # stage's row are one answer
     cost = swap_in_force(brief) if brief.search_swaps or brief.walk_stages else 0.0
@@ -459,8 +443,7 @@ def board(
     staged = solve.stages(m, draft, blue, shown.blue, cost, suggested) if brief.walk_stages else []
     return Board(map_name=expected.map_name, side=draft.side, stage=draft.stage,
                  bans=list(draft.bans),
-                 blue=blue.result, red=red.result, current=cur, red_current=red_cur,
-                 fill=fill, countered=countered, momentum=mo,
+                 blue=blue.result, current=cur, fill=fill, countered=countered, momentum=mo,
                  plan=plan(world, m, draft.side, list(draft.bans), red_h, shown),
                  shapes=[list(s) for s in legal_shapes(catalog)], expected=expected,
                  swaps=suggested, stages=staged)
@@ -468,8 +451,8 @@ def board(
 
 class _Seat(NamedTuple):
     """Blue's seat as the swaps read it: its current comp, its fill where it
-    is half-drafted, the board's momentum, whose share and odds are the
-    swaps' before, and whether the fill ran out of budget."""
+    is half-drafted, the board's momentum, whose share is the swaps' before,
+    and whether the fill ran out of budget."""
     current: Result
     fill: Result | None
     momentum: Momentum
@@ -523,7 +506,7 @@ class _Pass:
         return fill
 
     def countered(self, draft: Draft) -> Result | None:
-        """Blue's picks (`draft.blue`) against red's optimal six (`draft.red`):
+        """Blue's picks (`draft.blue`) against red's best counter (`draft.red`):
         how they hold if red answers perfectly, on the scale of blue's best
         counter to that six. A full six is ranked against every legal six; a
         half-drafted one is filled, as the fill reads blue's picks."""
@@ -536,14 +519,10 @@ class _Pass:
     def swaps(self, draft: Draft, blue: _Optimal, seat: _Seat, cost: float) -> Swaps:
         """Blue's swaps (inference.swaps): the best six reachable from blue's
         picks (`draft.blue`) against red's revealed picks, at `cost` share
-        points a pick dropped, on blue's optimal's board and scale. Where a
-        swap is suggested, red's optimal, current comp and fill are solved
-        again against the six it makes, and the fight odds read off them as
-        the momentum reads the board's; a suggestion they do not rise on is
-        withheld."""
+        points a pick dropped, on blue's optimal's board and scale."""
         picks = self.world.resolve(draft.map_name, draft.red, draft.blue, draft.bans).blue
         full = len(picks) == TEAM_SIZE
-        before, odds = seat.momentum["blue"], seat.momentum["odds"]
+        before = seat.momentum["blue"]
         fill = seat.fill
         # the best six that keeps every pick: the picks at six, the fill around
         # fewer; none where no six keeps them
@@ -556,8 +535,8 @@ class _Pass:
                      six=_order(keeper) if keeper is not None else [],
                      pairs=[], open=swaps.open_slots(
                          [p for p in fill.picks if not p["locked"]] if fill is not None else []),
-                     before=before, after=before, odds=SwapOdds(before=odds, after=odds),
-                     verdict=swaps.verdict([], cost, before, 0, None, partial=not full))
+                     before=before, after=before,
+                     verdict=swaps.verdict([], cost, before, 0, partial=not full))
 
         def none(why: str) -> Swaps:
             kept["status"] = "none"
@@ -580,20 +559,9 @@ class _Pass:
                       locked=[h.name for h in picks])
         pairs = swaps.paired(picks, target.six.heroes, six)
         after = six.share()
-        odds_after = self._against(draft, six)["odds"] if draft.red else None
-        # blue's fight odds before and after, where both are read
-        both = ((odds["blue"], odds_after["blue"])
-                if odds is not None and odds_after is not None else None)
-        # the owner's rule: a swap raises the score and the odds of winning a
-        # fight, so a swap the odds read and do not rise on is withheld
-        if both is not None and both[1] <= both[0]:
-            kept["status"] = "withheld"
-            kept["verdict"] = swaps.withheld(pairs, both)
-            return kept
         return Swaps(status="suggested", stage=draft.stage, cost=cost, six=list(six.blue),
                      pairs=pairs, open=kept["open"], before=before, after=after,
-                     odds=SwapOdds(before=odds, after=odds_after),
-                     verdict=swaps.verdict(pairs, cost, before, after, both, partial=not full))
+                     verdict=swaps.verdict(pairs, cost, before, after, partial=not full))
 
     def stages(
             self, m: Map | None, draft: Draft, blue: _Optimal, origin: Sequence[str],
@@ -603,9 +571,9 @@ class _Pass:
         board and scale, at `cost` share points a hero changed; the board's
         chosen stage takes the board's own swap answer - a swap suggested, or
         the picks kept - solved on that stage, so its row and the swaps above
-        the picks are one answer; a swap withheld or not searched leaves the
-        row the origin's. An unscored seat's stages swap at no cost, and say
-        so. Empty on a map without stages."""
+        the picks are one answer; a swap not searched leaves the row the
+        origin's. An unscored seat's stages swap at no cost, and say so.
+        Empty on a map without stages."""
         if m is None or not m.stages or not origin:
             return []
         six = self.world.resolve(None, (), tuple(origin)).blue
@@ -621,19 +589,6 @@ class _Pass:
         self.watch.check()
         return swaps.chain(swaps.ChainStart(plain=blue.solver, chosen=draft.stage, origin=six,
                                             raw=raw, cost=cost, taken=taken))
-
-    def _against(self, draft: Draft, six: Result) -> Momentum:
-        """The momentum were blue to field `six`, a Result on blue's
-        optimal's span: red's optimal, current comp and fill solved again
-        against it, and read with blue's six, as the board's own is."""
-        theirs = dataclasses.replace(draft, blue=tuple(six.blue)).flipped()
-        red = self.optimal(dataclasses.replace(theirs, blue=()), seat="red")
-        red_cur = self.current(theirs, red, seat="red")
-        try:
-            red_fill = self.filled(theirs, seat="red", of=red)
-        except (Infeasible, Unbounded):
-            red_fill = None
-        return momentum(Seats(current=six, red_current=red_cur, red_fill=red_fill))
 
 
 def _scored(world: World, draft: Draft, optimal: _Optimal, cand: Candidate,
@@ -660,16 +615,19 @@ def _check_teams(red_h: Sequence[Hero], blue_h: Sequence[Hero], seat: Seat) -> N
     check_tanks(blue_h, seat)
 
 
-def _expected(
-        world: World, m: Map | None, bans_h: Sequence[Hero], draft: Draft,
-        catalog: list[Strategy], base: BaseWeights) -> Result:
-    """Red's likely six - the map and the meta alone, past the bans - static
-    for the board; until red reveals a pick it is what blue's seat counters.
-    A Result like every other seat: its picks carry the reason each rests on."""
-    likely = compute.expected_picks(world, m, banned=bans_h)
-    return Result(kind="expected", map_name=m.name if m else None, red=[],
-                  blue=[p["hero"] for p in likely], locked=[], catalog=catalog, base=base,
-                  bans=list(draft.bans), side=draft.side, stage=draft.stage, seat="red",
+def _likely(
+        world: World, m: Map | None, red_h: Sequence[Hero], bans_h: Sequence[Hero],
+        draft: Draft, catalog: list[Strategy], base: BaseWeights) -> Result:
+    """Red's likely six: its revealed picks, then for each open slot the hero
+    the map's pick rates and the wiki's synergies pull first, past the bans
+    (compute.expected_picks) - the six the board suggests for red. Red is
+    never optimized and never scored: each pick carries its pull and what it
+    rests on. A Result like blue's, from red's side of the board."""
+    likely = compute.expected_picks(world, m, revealed=red_h, banned=bans_h)
+    return Result(kind="expected", map_name=m.name if m else None, red=list(draft.blue),
+                  blue=[p["hero"] for p in likely], locked=[h.name for h in red_h],
+                  catalog=catalog, base=base, bans=list(draft.bans),
+                  side=draft.flipped().side, stage=draft.stage, seat="red",
                   picks=[Pick(hero=p["hero"], role=p["role"], locked=p["locked"], why=p["why"],
-                              evidence=[])
+                              evidence=[], pull=p["pull"])
                          for p in likely])
