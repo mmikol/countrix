@@ -13,7 +13,7 @@ from facts.draft import Draft
 from inference import catalog
 from inference.scoring import Objective
 from tests.verification.inference import ASSUMPTIONS_ONLY, DEFAULT, FIXTURE_PLAYBOOK
-from tests.verification.inference.test_solver import seated
+from tests.verification.inference.enumeration import seated
 
 RULES = {
     "points-reward-control": ("team.cc_count", "maximize", 1, "map.chokes >= 0.5"),

@@ -32,7 +32,7 @@ from inference.base import OFF
 from inference.shapes import legal_shapes
 from inference.solver import RANK_CAP, Solver
 from tests.verification.inference import ASSUMPTIONS_ONLY, DEFAULT
-from tests.verification.inference.test_solver import enumerated, seated, verdicts, widened
+from tests.verification.inference.enumeration import enumerated, seated, verdicts, widened
 
 K = 6                   # the sixes a board's seat keeps: its best and BOARD_TOP alternatives
 BOARDS = (

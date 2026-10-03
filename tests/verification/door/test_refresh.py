@@ -9,7 +9,7 @@ import pytest
 
 from door import refresh
 from door.mcp.schema import ToolReply
-from tests.verification.db.test_cache import write_aged
+from tests.verification.db import write_aged
 
 
 def test_seconds_until_the_next_daily_run():

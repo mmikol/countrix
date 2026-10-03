@@ -7,8 +7,6 @@ test_board_facts.py, test_hero_facts.py and test_team_facts.py, and what the
 load itself reads is test_world.py's, test_world_kits.py's and
 test_world_maps.py's."""
 
-import statistics
-
 import pytest
 
 from facts import board_facts, compute, model
@@ -48,31 +46,6 @@ def test_the_whole_database_becomes_facts(world):
     # one population of rates, Blizzard's
     assert {s["source"] for s in world.snapshots} == {"blizzard"}
     assert any("Americas" in f.text for f in fs.facts if f.key == "meta.snapshot")
-
-
-def test_the_rates_half_of_a_maps_style_is_derived_from_its_rates(world):
-    """Map.rate_lift[S] is the z-score, across the maps, of the mean map-minus-overall
-    win rate of the released heroes tagged S, each weighted 1/(its tag count)."""
-    styles = sorted({s for h in world.heroes.values() for s in h.styles})
-    assert styles and all(set(m.styles) == set(styles) for m in world.maps.values())
-
-    def lift(m, style):
-        rows = [((h.map_win(m.id) - h.win) / len(h.styles), 1 / len(h.styles))
-                for h in world.heroes.values()
-                if h.released and style in h.styles and h.win is not None
-                and h.map_win(m.id) is not None]
-        return sum(x for x, _ in rows) / sum(w for _, w in rows)
-    for style in styles:
-        lifts = {m.id: lift(m, style) for m in world.maps.values()}
-        mean, sd = statistics.fmean(lifts.values()), statistics.pstdev(lifts.values())
-        for m in world.maps.values():
-            assert m.rate_lift[style] == pytest.approx((lifts[m.id] - mean) / sd, abs=1e-3)
-        assert statistics.fmean(m.rate_lift[style] for m in world.maps.values()) == \
-            pytest.approx(0, abs=1e-3)
-    m = world.map("King's Row")
-    ranked = sorted(m.styles, key=lambda s: (-m.styles[s], s))
-    assert m.style_top == ranked[0]
-    assert m.style_margin == pytest.approx(m.styles[ranked[0]] - m.styles[ranked[1]])
 
 
 def test_a_map_without_text_gets_no_terrain_fact(world):
@@ -175,18 +148,11 @@ def test_map_rates_are_the_intersection_with_the_board(world):
     assert not no_map.find("hero.map_win")
 
 
-def test_a_heros_best_maps_are_derived_from_blizzards_map_rates(world):
-    """Hero.best_maps: the three maps with the largest (map win rate - overall win
-    rate), only where positive, ties by map name."""
-    for h in world.heroes.values():
-        lifts = sorted((-round(win - h.win, 3), world.maps[mid].name, mid)
-                       for mid, (win, _) in h.map_rates.items()
-                       if h.win is not None and win > h.win)
-        assert h.best_maps == [mid for _, _, mid in lifts[:3]], h.name
-        assert len(h.best_maps) <= 3
-        assert all(h.map_win(mid) > h.win for mid in h.best_maps), h.name
+def test_most_heroes_have_three_best_maps_and_symmetras_are_facts(world):
+    """Hero.best_maps, worked by hand in test_tables, on Blizzard's map
+    rates: most released heroes run ahead of their overall rate on three
+    maps or more, and Symmetra's best maps are worded as facts."""
     assert sum(1 for h in world.heroes.values() if h.released and len(h.best_maps) == 3) > 40
-    assert all(not h.best_maps for h in world.heroes.values() if not h.map_rates)
     # the hero's own line without a map; on its best map, the rank, and the team's count
     sym = world.hero("Symmetra")
     top = world.maps[sym.best_maps[0]]
@@ -206,13 +172,6 @@ def test_the_provenance_is_one_line_per_source(world):
     seen = [(f.value["source"], f.value["queue"]) for f in lines]
     assert len(seen) == len(set(seen)), seen                  # no source and queue twice
     assert any(f.value["source"] == "blizzard" for f in lines)   # the main rates' line is there
-
-
-def test_the_map_fact_carries_this_maps_ban_rate(world):
-    fs = board_facts.generate(world, Draft("King's Row", ("Zarya",), ("Sombra", "Ana")))
-    fact = fs.find("hero.map_win", "Sombra")[0]
-    if world.hero("Sombra").map_ban(world.map("King's Row").id) is not None:
-        assert ", banned " in fact.text
 
 
 KINGS_ROW_SIX = ("Reinhardt", "Genji", "Hanzo", "Vendetta", "Widowmaker", "Zenyatta")

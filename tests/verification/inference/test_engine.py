@@ -2,13 +2,11 @@
 odds, the shapes and the queue's tank limit, an empty catalog kept as the
 caller's, a limit red's reveal already breaks and blue's picks may not, the
 share read from the seat's floor and a mirror's even odds, the likely six, a
-full six on control, every seat of a board on the synthetic World and on
-the stage it names, the page's boards superseding one another, and the
-healing floor on top of the default engine.
+full six on control, every seat of a board on the stage it names, the
+page's boards superseding one another, and the healing floor on top of the
+default engine.
 Every board is the synthetic World's but the last two, King's Row and
 Samoa on the built database. test_board_gate holds the lobby's limits on every door."""
-
-import os
 
 import pytest
 
@@ -19,12 +17,16 @@ from facts.records import MapRate
 from facts.team import team_metrics
 from inference import catalog, engine
 from inference.base import OFF
+from inference.result import Momentum
 from tests.verification.inference import (
     ASSUMPTIONS_ONLY,
     BRIEF,
     DEFAULT,
     FIXTURE_PLAYBOOK,
+    SUPPORTS,
+    hazard_playbook,
     heal_rate,
+    support_limit,
 )
 
 
@@ -35,7 +37,8 @@ def test_board_solves_both_seats_on_opposite_sides_and_scores_the_current(synthe
     b = engine.board(world, Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm",), side="attack"),
                      catalog=fix, brief=BRIEF)
     blue, red, cur = b.blue, b.red, b.current
-    assert blue.seat == "blue" and blue.side == "attack" and blue.locked == []
+    assert blue.seat == "blue" and blue.kind == "infer" and blue.side == "attack"
+    assert blue.locked == []
     absolute = engine.infer(world, Draft("Harbor Gate", ("Mortar", "Gale"), (), side="attack"),
                             catalog=fix, base=DEFAULT)
     assert blue.blue == absolute.blue                     # blue's optimal ignores your picks
@@ -54,10 +57,11 @@ def test_board_solves_both_seats_on_opposite_sides_and_scores_the_current(synthe
     assert rc.partial
     assert rc.to_dict()["normalized"] is None        # a partial team has no share
     assert b.countered is not None and b.countered.kind == "countered"
+    assert b.countered.red == red.blue                  # blue's best counter to red's optimal
     fill = b.fill                                       # the empty slots, filled around Balm
     assert fill.kind == "fill"
     assert fill.locked == ["Balm"]
-    assert len(fill.blue) == 6
+    assert len(fill.blue) == len(fill.picks) == 6
     assert "Balm" in fill.blue
     assert [p["locked"] for p in fill.picks].count(True) == 1
     assert 0 < fill.to_dict()["normalized"] <= 100
@@ -65,7 +69,7 @@ def test_board_solves_both_seats_on_opposite_sides_and_scores_the_current(synthe
                                        side="attack"), catalog=fix, base=DEFAULT)
     assert fill.blue == around.blue
     mo = b.momentum
-    assert set(mo) >= {"blue", "red", "countered", "verdict", "partial"} and mo["partial"]
+    assert set(mo) == set(Momentum.__annotations__) and mo["partial"]
     # each seat is half-drafted, so its share is read through its fill - the best
     # six reachable from its picks - not off the picks alone; both current comps'
     # dicts report no share of their own.
@@ -78,7 +82,6 @@ def test_board_solves_both_seats_on_opposite_sides_and_scores_the_current(synthe
     plan = b.plan
     assert plan.startswith("Harbor Gate is a Hybrid map: a capture point and then the payload path")
     assert "You are attacking: you have to break their hold" in plan
-    assert "The map rewards %s" % world.map("Harbor Gate").style_top in plan
     assert "Their 2 picks so far (Mortar, Gale)" in plan and "answer" in plan
     assert "If you stray from the six, stay in its family. Tanks: " in plan
     assert "Above all: " in plan
@@ -91,6 +94,8 @@ def test_board_solves_both_seats_on_opposite_sides_and_scores_the_current(synthe
     assert d["plan"] == plan
     assert d["fill"]["kind"] == "fill" and "the rest filled" in b.rendered()
     assert "current comp" in b.rendered() and "momentum:" in b.rendered()
+    seats = (blue, red, cur, rc, fill, b.countered, b.expected)
+    assert not any("facts" in r.to_dict() for r in seats)      # no seat carries the facts
     # the side constraints fire on the right seat
     ids = {c["id"] for c in blue.contributions if c.get("applies")}
     assert "attack-breaks-the-hold" in ids and "defense-holds-the-ground" not in ids
@@ -190,19 +195,7 @@ def test_the_queue_caps_tanks_at_two_whatever_the_playbook_holds(synthetic_world
                          catalog=ASSUMPTIONS_ONLY, brief=BRIEF)
 
 
-SUPPORTS = ("Balm", "Myrrh", "Sorrel", "Tansy")
 NOT_ALLOWED = "not allowed: breaks At most three supports"
-
-
-def _support_limit(directory):
-    """A playbook of one limit, at most three supports, written in `directory`
-    on a dial, as the shipped rule writes it."""
-    with open(os.path.join(directory, "three-supports.md"), "w", encoding="utf-8") as handle:
-        handle.write("---\nname: At most three supports\nkind: constraint\n"
-                     "require: team.supports <= params.MAX_SUPPORTS\nparams:\n"
-                     "    MAX_SUPPORTS: 3\n---\n# At most three supports\n\n"
-                     "A six fields at most three supports.\n")
-    return catalog.load(str(directory))
 
 
 def test_red_may_reveal_what_a_limit_forbids(synthetic_world, tmp_path):
@@ -214,7 +207,7 @@ def test_red_may_reveal_what_a_limit_forbids(synthetic_world, tmp_path):
     scored, ranked and shared, and says which limit it breaks; a draft
     beside the limit is named, not scored."""
     from inference import engine
-    world, cat = synthetic_world, _support_limit(tmp_path)
+    world, cat = synthetic_world, support_limit(tmp_path)
     d = engine.board(world, Draft("Harbor Gate", SUPPORTS), catalog=cat, brief=BRIEF).to_dict()
     for seat in ("blue", "red"):
         assert sum(world.hero(n).role == "support" for n in d[seat]["blue"]) <= 3, seat
@@ -246,7 +239,7 @@ def test_blue_picks_that_break_a_limit_are_not_allowed_and_the_board_still_rende
     the plan describes the optimal. Three supports keep the limit and
     score."""
     from inference import engine
-    world, cat = synthetic_world, _support_limit(tmp_path)
+    world, cat = synthetic_world, support_limit(tmp_path)
     b = engine.board(world, Draft("Harbor Gate", (), SUPPORTS), catalog=cat, brief=BRIEF)
     d = b.to_dict()
     cur = d["current"]
@@ -432,33 +425,6 @@ def test_board_ranks_a_full_six_and_ignores_sides_on_control(synthetic_world):
     b = engine.board(world, Draft("Ember Ruins", (), (), ("Needle",)), catalog=fix, brief=BRIEF)
     assert b.plan.endswith("the map, 1 ban.") and b.plan.count("\n") >= 2
     assert b.plan.startswith("Ember Ruins is a Control map: one point in three arenas")
-    assert "The map rewards %s" % world.map("Ember Ruins").style_top in b.plan
-
-
-def test_a_board_on_the_synthetic_world_holds_every_seat(synthetic_world, scratch_playbook):
-    """With red revealed and one blue pick locked, a board holds all seven
-    seats, each what its kind says, with no database: blue's optimal, red's
-    on the other side of a sided map, the two current comps, the fill around
-    the lock and the countered case. Without a blue pick there is no fill and
-    no countered case."""
-    from inference import engine
-    from inference.result import Momentum
-    from inference.shapes import legal_shapes
-    b = engine.board(synthetic_world, Draft("Harbor Gate", ("Anvil",), ("Balm",), side="attack"),
-                     catalog=scratch_playbook, brief=BRIEF)
-    assert b.blue.kind == "infer" and b.blue.side == "attack"
-    assert b.red.seat == "red" and b.red.side == "defense"
-    assert b.current.partial and b.current.blue == ["Balm"]
-    assert b.fill.kind == "fill" and len(b.fill.picks) == 6 and "Balm" in b.fill.blue
-    assert b.countered.kind == "countered" and b.countered.red == b.red.blue
-    assert set(b.momentum) == set(Momentum.__annotations__)
-    assert b.plan.split("\n")[-1].startswith("Based on: ")
-    assert b.shapes == [list(s) for s in legal_shapes(scratch_playbook)]
-    seats = (b.blue, b.red, b.current, b.red_current, b.fill, b.countered, b.expected)
-    assert not any("facts" in r.to_dict() for r in seats)
-    alone = engine.board(synthetic_world, Draft("Harbor Gate", ("Anvil",), side="attack"),
-                         catalog=scratch_playbook, brief=BRIEF)
-    assert alone.fill is None and alone.countered is None
 
 
 def test_a_newer_board_from_the_same_client_supersedes_the_older_one(
@@ -567,7 +533,6 @@ def test_every_seat_of_a_board_plays_the_stage_it_names(synthetic_world, tmp_pat
     applies to red's seat as to blue's, each six keeps the limit it turns
     on, and the rule cites the ground in play's fact. The whole map turns
     the rule off, and a stage the map does not list is refused."""
-    from tests.verification.inference.test_solver import hazard_playbook
     world = synthetic_world
     (tmp_path / "hazard-ground.md").write_text(
         "---\nname: Hazards pay\nkind: heuristic\nweight: 0.5\n"

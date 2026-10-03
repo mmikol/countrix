@@ -2,11 +2,20 @@
 its default engine weights (DEFAULT, its meta.md), its
 assumptions alone (ASSUMPTIONS_ONLY) for a test that needs a playbook that scores nothing,
 the shipped healing floor's fields (HEAL_RATE) and heal_rate(), a playbook of that rule
-alone written where a test says, so no solver test reads inference/strategies/, the
+alone written where a test says, and two more written the same way - support_limit(),
+at most three supports, which SUPPORTS breaks, and hazard_playbook(), the rules Ember
+Ruins' Forge turns on - so no solver test reads inference/strategies/, the
 recorded fixture, read with the objective it was recorded under and compared with the
 one in force, evaluated(), a full six scored as the board scores its current comp, and
 timeless(), a board's payload less the seconds each result took, for comparing two
-solves, and six() and seated(), a recorded reach board solved afresh."""
+solves, and six() and seated(), a recorded reach board solved afresh. Beside the tests:
+
+    conftest.py      the folder's fixtures: a scratch playbook and the Harbor Gate board
+    enumeration.py   the answers the search is held to, found without it, and the seats
+                     it is compared on
+    prove_exact.py   the hand-run proofs on the built database
+    record_reach.py  the recorder of tests/fixtures/reach.json
+"""
 
 import dataclasses
 import json
@@ -56,6 +65,40 @@ def heal_rate(directory: str) -> list[Strategy]:
         handle.write("---\nname: Heal at the other side's rate\n%s---\n# Heal at the other"
                      " side's rate\n\nThe healing floor.\n" % fields)
     return catalog.load(directory)
+
+
+# four supports: one past the limit support_limit() writes
+SUPPORTS = ("Balm", "Myrrh", "Sorrel", "Tansy")
+
+
+def support_limit(directory: str | os.PathLike[str]) -> list[Strategy]:
+    """A playbook of one limit, at most three supports, written in `directory`
+    on a dial, as the shipped rule writes it."""
+    with open(os.path.join(directory, "three-supports.md"), "w", encoding="utf-8") as handle:
+        handle.write("---\nname: At most three supports\nkind: constraint\n"
+                     "require: team.supports <= params.MAX_SUPPORTS\nparams:\n"
+                     "    MAX_SUPPORTS: 3\n---\n# At most three supports\n\n"
+                     "A six fields at most three supports.\n")
+    return catalog.load(str(directory))
+
+
+# a board that reads the terrain: a rule and a limit Forge's hazards turn on
+HAZARD_RULES = {
+    "hazard-cc": "---\nname: Hazards reward crowd control\nkind: heuristic\n"
+                 "metric: team.cc_count\ndirection: maximize\nweight: 1\n"
+                 "when: map.hazards >= 1.5\n---\nPush them off.\n",
+    "hazard-needs-cc": "---\nname: Hazards need crowd control\nkind: constraint\n"
+                       "require: team.cc_count >= 1 or map.hazards < 1.5\n---\nAlways.\n"}
+
+
+def hazard_playbook(world: World, directory: str | os.PathLike[str]) -> list[Strategy]:
+    """The reference playbook's assumptions and HAZARD_RULES, and Ember
+    Ruins' Forge stage whose text raises its hazards past the map's."""
+    for sid, text in HAZARD_RULES.items():
+        with open(os.path.join(directory, "%s.md" % sid), "w", encoding="utf-8") as handle:
+            handle.write(text)
+    world.map("Ember Ruins").stage_z["Forge"]["hazards"] = 2.5
+    return [*ASSUMPTIONS_ONLY, *catalog.load(str(directory))]
 
 
 class Recorded(TypedDict):

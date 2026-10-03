@@ -55,17 +55,6 @@ def test_a_synergy_pair_reads_higher_with_every_cell_an_article_claims(world):
 
 
 @pytest.mark.invariant
-def test_names_resolve_across_spellings(world):
-    assert world.hero("lucio").name == "Lúcio"
-    assert world.hero("D.VA").name == "D.Va"
-    assert world.map("kings row").name == "King's Row"
-    with pytest.raises(Refusal, match="unknown heroes"):
-        world.resolve(None, ["Goku"], [])
-    with pytest.raises(Refusal, match="unknown map"):
-        world.resolve("Atlantis", [], [])
-
-
-@pytest.mark.invariant
 def test_the_tiers_are_read_up_the_ladder_with_their_names(world, rows):
     """Every tier's name, and each hero's rates per tier in the ladder's
     order, which the alphabet's is not (diamond, emerald, gold)."""

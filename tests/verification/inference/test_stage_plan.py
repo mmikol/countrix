@@ -20,7 +20,7 @@ from inference.result import StageRules
 from inference.scoring import Candidate, quantized
 from inference.solver import Solver
 from tests.verification.inference import ASSUMPTIONS_ONLY, DEFAULT, FIXTURE_PLAYBOOK
-from tests.verification.inference.test_swaps import netted, plain_seat
+from tests.verification.inference.enumeration import netted, plain_seat
 
 COST = 5.0                  # share points of blue's span a hero changed costs
 RULES = {

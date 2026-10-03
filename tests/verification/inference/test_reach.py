@@ -51,11 +51,7 @@ def test_every_hero_reach_finds_a_board_for_is_still_seated_and_none_is_newly_lo
     # with five of them banned; the playbook's rules are what can answer it. They are
     # not searched again on every run - three searches are a minute, more under
     # coverage - so one that comes to seat leaves UNSEATED when the recorder
-    # re-records. The healing floor seated Illari and Lifeweaver and unseated Cassidy;
-    # summed healing seated Kiriko and unseated Zarya; the written pairs' mean for an
-    # unwritten synergy pair and the exact search, recorded together, seated Cassidy,
-    # Domina, Hazard, Ramattra, Shion, Sierra and Venture and unseated Kiriko; every
-    # map searched, not the four best by rate, seated Zarya on Midtown with one ban.
+    # re-records.
     assert not UNSEATED - released, "not a released hero: %s" % ", ".join(UNSEATED - released)
     lost = [name for name in sorted((released - on_file - UNSEATED) | set(fell))
             if not reach.search(world, name)["seated"]]
@@ -150,8 +146,7 @@ def test_the_search_tries_every_map_the_ones_its_rates_lift_it_most_on_first(syn
     """Two maps with no rates join the three: the search tries all five,
     Harbor Gate first, where Anvil's rate is highest, and Salt Flats last;
     a map with no rate lifts it by nothing, level with Ember Ruins, and ties
-    go by name. It used to stop at four, and Zarya's seat on Midtown lay
-    past her four."""
+    go by name."""
     w = synthetic_world
     for mid, name in ((901, "Zinc Quay"), (902, "Amber Pier")):
         w.maps[mid] = Map(mid, name, "Control")
@@ -164,8 +159,7 @@ def test_the_reds_read_the_counter_graph_the_engine_scores(synthetic_world):
     scores, not the wiki's edges alone: Anvil's derived answers to Quarry
     and Flint rank after its wiki answer to Mortar and before the most
     picked heroes it does not answer, and Balm, with a derived answer to
-    Anvil, drops behind them. On the wiki's edges alone the red was
-    Mortar, Kite, Needle, Rook, Balm and Tansy."""
+    Anvil, drops behind them."""
     w = synthetic_world
     ids = {h.name: h.id for h in w.heroes.values()}
     for winner, loser in (("Anvil", "Quarry"), ("Anvil", "Flint"), ("Balm", "Anvil")):

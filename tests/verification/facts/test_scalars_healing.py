@@ -8,17 +8,13 @@ import pytest
 
 from db import KIND_ABILITY, KIND_PASSIVE, KIND_ULTIMATE, KIND_WEAPON
 from facts import scalars
-from facts.kit import KitPiece, Stat
+from facts.kit import KitPiece
 from facts.model import Hero
-
-
-def _stat(code, value, unit_num=None, unit_den=None, den=None, condition=None, text=None):
-    return Stat(code=code, value=value, unit_num=unit_num, unit_den=unit_den, den_value=den,
-                condition=condition, text=text)
+from tests.verification.facts import stat
 
 
 def _rate(code, value, condition=None, unit="hp"):
-    return _stat(code, value, unit, "seconds", 1, condition)
+    return stat(code, value, unit, "seconds", 1, condition)
 
 
 def _kit(name, kind, *stats, keywords=""):
@@ -63,7 +59,7 @@ def test_a_beam_heals_at_what_its_resource_sustains():
     beam = _kit(
         "Solar Beam", KIND_WEAPON, _rate("heal", 115), _rate("hps", 115),
         _rate("energy", 33.3, "cost", "percent"), _rate("energy", 35, "regen rate", "percent"),
-        _stat("duration", 0.6, "seconds", condition="energy regen delay"), keywords="beam")
+        stat("duration", 0.6, "seconds", condition="energy regen delay"), keywords="beam")
     assert _hero(weapons=[beam]).hps == pytest.approx(scalars.energy_duty(33.3, 35.0, 0.6, 115.0))
     # a beam with no resource heals at its heal row, before its hps field
     staff = _kit("Staff", KIND_WEAPON, _rate("heal", 55), _rate("hps", 60), keywords="beam")
@@ -75,14 +71,14 @@ def test_an_area_heal_counts_the_teammates_it_reaches():
     one 1 + 4 p(r), a wave its angle's share; a heal on no listed area
     counts one target. The pieces add up."""
     aura = _kit("Crossfade", KIND_ABILITY, _rate("heal", 18, "allies"), _rate("heal", 12, "self"),
-                _stat("radius", 12, "meters"))
-    grenade = _kit("Biotic Grenade", KIND_ABILITY, _stat("heal", 90, "hp"),
-                   _stat("radius", 4, "meters"), _stat("cooldown", 12, "seconds"))
-    wave = _kit("Wave", KIND_ABILITY, _stat("heal", 80, "hp"), _stat("cooldown", 14, "seconds"),
-                _stat("view_angle", 15, "degrees"), keywords="shockwave")
-    lone = _kit("Pack", KIND_ABILITY, _stat("heal", 25, "hp", condition="instantly"),
-                _stat("heal", 100, "hp", "seconds", 2, "over time"),
-                _stat("radius", 20, "meters"), _stat("cooldown", 5, "seconds"))
+                stat("radius", 12, "meters"))
+    grenade = _kit("Biotic Grenade", KIND_ABILITY, stat("heal", 90, "hp"),
+                   stat("radius", 4, "meters"), stat("cooldown", 12, "seconds"))
+    wave = _kit("Wave", KIND_ABILITY, stat("heal", 80, "hp"), stat("cooldown", 14, "seconds"),
+                stat("view_angle", 15, "degrees"), keywords="shockwave")
+    lone = _kit("Pack", KIND_ABILITY, stat("heal", 25, "hp", condition="instantly"),
+                stat("heal", 100, "hp", "seconds", 2, "over time"),
+                stat("radius", 20, "meters"), stat("cooldown", 5, "seconds"))
     hero = _hero(abilities=[aura, grenade, wave, lone])
     assert hero.hps_pieces == pytest.approx({
         "Crossfade": 18 * 5 * scalars.p_within(12),
@@ -98,20 +94,20 @@ def test_a_cast_cycles_on_its_cooldown_and_a_held_effect_on_both():
     stops at its 300; the smaller of two instant figures is the one every
     cast lands."""
     crossfade = _kit("Crossfade", KIND_ABILITY, _rate("heal", 18, "allies"),
-                     _stat("radius", 12, "meters"))
+                     stat("radius", 12, "meters"))
     amp = _kit(
-        "Amp It Up", KIND_ABILITY, _rate("heal", 56), _stat("radius", 12, "meters"),
-        _stat("cooldown", 12, "seconds"), _stat("duration", 3, "seconds"))
+        "Amp It Up", KIND_ABILITY, _rate("heal", 56), stat("radius", 12, "meters"),
+        stat("cooldown", 12, "seconds"), stat("duration", 3, "seconds"))
     reach = 5 * scalars.p_within(12)
     assert _hero(abilities=[crossfade, amp]).hps_pieces["Amp It Up"] == pytest.approx(
         38 * 3 / 15 * reach)
     orb = _kit(
         "Biotic Orb", KIND_ABILITY,
-        _stat("heal", 75, "hp", "seconds", 1, text="75 per second , up to 300"),
-        _stat("cooldown", 8, "seconds"), _stat("duration", 7, "seconds", condition="max"))
+        stat("heal", 75, "hp", "seconds", 1, text="75 per second , up to 300"),
+        stat("cooldown", 8, "seconds"), stat("duration", 7, "seconds", condition="max"))
     assert _hero(abilities=[orb]).hps == pytest.approx(300 / 15)
-    flash = _kit("Flash Heal", KIND_ABILITY, _stat("heal", 60, "hp", condition="default"),
-                 _stat("heal", 120, "hp", condition="low health"), _stat("cooldown", 12, "seconds"))
+    flash = _kit("Flash Heal", KIND_ABILITY, stat("heal", 60, "hp", condition="default"),
+                 stat("heal", 120, "hp", condition="low health"), stat("cooldown", 12, "seconds"))
     assert _hero(abilities=[flash]).hps == pytest.approx(5.0)
 
 
@@ -120,30 +116,30 @@ def test_a_bounce_a_trigger_and_a_lock_on_read_their_own_rows():
     m, its third when one of three more does; Inspire fires on the first
     Flail swing past its 1.25 s lockout; the torpedo lock holds the gun."""
     kasa = _kit("Healing Kasa", KIND_ABILITY,
-                *(_stat("heal", v, "hp", condition=c)
+                *(stat("heal", v, "hp", condition=c)
                   for v, c in ((90, "1st bounce"), (70, "2nd bounce"), (50, "3rd bounce"),
                                (30, "self"))),
-                _stat("range", 12, "meters", condition="bounce range from target"),
-                _stat("cooldown", 6, "seconds"))
+                stat("range", 12, "meters", condition="bounce range from target"),
+                stat("cooldown", 6, "seconds"))
     q = scalars.p_within(12)
     second = 1 - (1 - q) ** 4
     third = second * (1 - (1 - q) ** 3)
     assert _hero(abilities=[kasa]).hps == pytest.approx((90 + 70 * second + 50 * third) / 6)
-    flail = _kit("Rocket Flail", KIND_WEAPON, _stat("fire_rate", 1, "swings", "seconds", 0.6),
+    flail = _kit("Rocket Flail", KIND_WEAPON, stat("fire_rate", 1, "swings", "seconds", 0.6),
                  _rate("dps", 75))
-    inspire = _kit("Inspire", KIND_PASSIVE, _stat("heal", 12, "hp", condition="instant"),
-                   _rate("heal", 11.25), _stat("duration", 4, "seconds"),
-                   _stat("radius", 20, "meters"))
+    inspire = _kit("Inspire", KIND_PASSIVE, stat("heal", 12, "hp", condition="instant"),
+                   _rate("heal", 11.25), stat("duration", 4, "seconds"),
+                   stat("radius", 20, "meters"))
     brig = _hero(weapons=[flail], abilities=[inspire])
     assert brig.hps == pytest.approx((11.25 + 12 / 1.8) * 5 * scalars.p_within(20))
     assert brig.hps == pytest.approx(73.36, abs=0.005)
-    blaster = _kit("Blaster", KIND_WEAPON, _stat("heal", 72, "hp"), _rate("hps", 80))
+    blaster = _kit("Blaster", KIND_WEAPON, stat("heal", 72, "hp"), _rate("hps", 80))
     torpedoes = _kit(
-        "Torpedoes", KIND_ABILITY, _stat("heal", 85, "hp", condition="direct"),
-        _stat("heal", 50, "hp", condition="over time"), _stat("cooldown", 12, "seconds"),
-        _stat("duration", 0.35, "seconds", condition="lock-on, min"),
-        _stat("duration", 1.0, "seconds", condition="lock-on, max"),
-        _stat("range", 40, "meters", condition="targeting"))
+        "Torpedoes", KIND_ABILITY, stat("heal", 85, "hp", condition="direct"),
+        stat("heal", 50, "hp", condition="over time"), stat("cooldown", 12, "seconds"),
+        stat("duration", 0.35, "seconds", condition="lock-on, min"),
+        stat("duration", 1.0, "seconds", condition="lock-on, max"),
+        stat("range", 40, "meters", condition="targeting"))
     juno = _hero(weapons=[blaster], abilities=[torpedoes])
     lock = 0.35 + 0.65 * (15 - 5) / (40 - 5)
     cycle = 12 + lock
@@ -158,9 +154,9 @@ def test_a_stream_ticks_at_its_tooltips_and_a_wave_refunds_its_energy():
         "Restorative Stream", KIND_ABILITY, _rate("heal", 20, "passive"),
         _rate("heal", 55, "bonus manual healing"), _rate("energy", 33.3, "cost", "percent"),
         _rate("energy", 15, "recharge", "percent"),
-        _stat("duration", 2, "seconds", condition="recharge delay"), keywords="heal;;target ally")
-    wave = _kit("Guardian Wave", KIND_ABILITY, _stat("heal", 80, "hp"),
-                _stat("cooldown", 14, "seconds"), _stat("view_angle", 15, "degrees"),
+        stat("duration", 2, "seconds", condition="recharge delay"), keywords="heal;;target ally")
+    wave = _kit("Guardian Wave", KIND_ABILITY, stat("heal", 80, "hp"),
+                stat("cooldown", 14, "seconds"), stat("view_angle", 15, "degrees"),
                 keywords="shockwave")
     refund = 50 * 33 / 33.3 / 14
     got = _hero(abilities=[stream, wave]).hps_pieces
@@ -175,24 +171,24 @@ def test_the_sum_leaves_out_what_does_not_run_beside_the_gun_or_heal_a_teammate(
     a perk are no baseline, a self row is the hero's own, and a damage hero's
     heal on itself is not the team's; of two healing weapons the better
     counts."""
-    gun = _kit("Gun", KIND_WEAPON, _stat("heal", 24, "hp"), _rate("hps", 87))
+    gun = _kit("Gun", KIND_WEAPON, stat("heal", 24, "hp"), _rate("hps", 87))
     alt = _kit("Gun (ADS)", KIND_WEAPON, _rate("hps", 60))
     lifeline = _kit("Lifeline", KIND_ABILITY, _rate("heal", 25, "ally"),
-                    _stat("cooldown", 2, "seconds"))
-    dash = _kit("Rejuvenating Dash", KIND_ABILITY, _stat("heal", 55, "hp"),
-                _stat("cooldown", 5, "seconds"))
+                    stat("cooldown", 2, "seconds"))
+    dash = _kit("Rejuvenating Dash", KIND_ABILITY, stat("heal", 55, "hp"),
+                stat("cooldown", 5, "seconds"))
     ult = _kit("Tree", KIND_ULTIMATE, _rate("heal", 400))
     perk = _kit("Perk", KIND_ABILITY, _rate("heal", 50))
-    purr = _kit("Purr", KIND_ABILITY, _stat("heal", 30, "hp", condition="per pulse, allies"),
-                _stat("heal", 18, "hp", condition="per pulse, self"),
-                _stat("duration", 4, "seconds", condition="total"),
-                _stat("duration", 0.95, "seconds", condition="healing pulse rate"),
-                _stat("range", 10, "meters"), _stat("cooldown", 12, "seconds"))
+    purr = _kit("Purr", KIND_ABILITY, stat("heal", 30, "hp", condition="per pulse, allies"),
+                stat("heal", 18, "hp", condition="per pulse, self"),
+                stat("duration", 4, "seconds", condition="total"),
+                stat("duration", 0.95, "seconds", condition="healing pulse rate"),
+                stat("range", 10, "meters"), stat("cooldown", 12, "seconds"))
     hero = _hero(weapons=[gun, alt], abilities=[lifeline, dash, ult, purr], perks=[perk])
     assert hero.hps_pieces == pytest.approx({
         "Gun": 87.0, "Purr": 4 * 30 * 5 * scalars.p_within(10) / 16})
     assert hero.hps == pytest.approx(sum(hero.hps_pieces.values()))
-    siphon = _kit("Siphon", KIND_ABILITY, _rate("heal", 150), _stat("duration", 3, "seconds"))
+    siphon = _kit("Siphon", KIND_ABILITY, _rate("heal", 150), stat("duration", 3, "seconds"))
     assert _hero("damage", abilities=[siphon]).hps == 0.0
 
 
@@ -200,9 +196,9 @@ def test_a_share_of_the_teammates_damage_heals_at_the_rosters_dps():
     """Cardiac Overdrive heals the teammates 50% of what they deal for 3 s of
     every 12 + 3, around Mauga: at 94.29 dps a teammate, 16.32."""
     overdrive = _kit(
-        "Cardiac Overdrive", KIND_ABILITY, _stat("heal", 50, "percent", condition="allies"),
-        _stat("heal", 100, "percent", condition="self"), _stat("duration", 3, "seconds"),
-        _stat("cooldown", 12, "seconds"), _stat("radius", 10.5, "meters"),
+        "Cardiac Overdrive", KIND_ABILITY, stat("heal", 50, "percent", condition="allies"),
+        stat("heal", 100, "percent", condition="self"), stat("duration", 3, "seconds"),
+        stat("cooldown", 12, "seconds"), stat("radius", 10.5, "meters"),
         keywords="area of effect;;spherical::ignore barrier;;target ally")
     mauga = _hero("tank", abilities=[overdrive])
     assert mauga.hps == 0.0

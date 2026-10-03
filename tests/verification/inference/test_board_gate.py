@@ -8,17 +8,16 @@ query to serve.handle_board, which is a door here. The synthetic World
 stands in for the database and the reference playbook for the live one,
 and every board solves in this process."""
 
-import contextlib
 import os
 import shutil
 
 import pytest
 
 from db import Refusal
-from door.mcp import tools
 from facts import tables
 from facts.draft import Draft
 from inference import catalog, engine
+from tests.verification.door.mcp import Offline
 from tests.verification.inference import FIXTURE_PLAYBOOK
 from ui import board as page
 from ui import serve
@@ -38,14 +37,6 @@ OVER_LIMIT = [
     pytest.param({"blue": SEVEN}, "more than 6 blue picks", id="seven-blue"),
     pytest.param({"blue": ("Anvil",), "bans": SEVEN[:6]}, "more than 5 bans", id="six-bans"),
 ]
-
-
-class Offline(tools.Context):
-    """The door's context, every tool family registered, over no database:
-    tables.load is stubbed."""
-
-    def connect(self, boot=False):
-        return contextlib.nullcontext("cx")
 
 
 @pytest.fixture()

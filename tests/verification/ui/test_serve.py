@@ -1,6 +1,8 @@
 """The board's routes over the engine, ui/serve.py, which run in the
 board's process: they speak the results the engine returns, admit boards
-one at a time, and report the catalog and the database's health."""
+one at a time, and report the catalog and the database's health. The
+database out of reach, as /health reports it, is
+tests/verification/db/test_psql.py's."""
 
 import pytest
 
@@ -147,92 +149,6 @@ def test_health_reports_the_catalog_and_the_database(monkeypatch, dsn):
     data, code = serve.handle_health()
     assert code == 200 and data["strategies"] == len(catalog.load())
     assert data["status"] == "ok" and data["heroes"] > 40
-
-
-def test_a_host_without_pgserver_is_told_to_set_database_url(monkeypatch, tmp_path):
-    """The image and CI carry no pgserver. With no DATABASE_URL either there is
-    no database, even beside a built cluster, and the one useful answer names
-    the variable to set: a NoDatabaseError, which /health reports as
-    degraded. The cluster here is a PG_VERSION file, so the test reaches the
-    missing pgserver on every host."""
-    (tmp_path / "PG_VERSION").write_text("16\n")
-    monkeypatch.delenv("DATABASE_URL", raising=False)
-    monkeypatch.setattr(serve.psql, "DEFAULT_DB_DIR", str(tmp_path))
-    monkeypatch.setattr(serve.psql, "pgserver", None)
-    with pytest.raises(serve.psql.NoDatabaseError,
-                       match=r"pgserver is not installed.*DATABASE_URL"):
-        serve.psql.default_dsn()
-    data, code = serve.handle_health()
-    assert code == 200 and data["status"] == "degraded" and "DATABASE_URL" in data["error"]
-
-
-def test_a_probe_with_no_cluster_is_degraded_and_creates_none(monkeypatch, tmp_path):
-    """default_dsn resolves and never creates: with no DATABASE_URL and no
-    cluster built it raises NoDatabaseError before pgserver is asked, and
-    /health answers degraded with the variable to set. Only db_rebuild
-    creates a cluster, through psql.boot."""
-    cluster = tmp_path / "cluster"
-
-    class NoServer:
-        @staticmethod
-        def get_server(pgdata):
-            raise AssertionError("the resolver asked pgserver for %s" % pgdata)
-    monkeypatch.delenv("DATABASE_URL", raising=False)
-    monkeypatch.setattr(serve.psql, "DEFAULT_DB_DIR", str(cluster))
-    monkeypatch.setattr(serve.psql, "pgserver", NoServer)
-    with pytest.raises(serve.psql.NoDatabaseError, match="db_rebuild"):
-        serve.psql.default_dsn()
-    data, code = serve.handle_health()
-    assert code == 200 and data["status"] == "degraded" and "DATABASE_URL" in data["error"]
-    assert not cluster.exists()
-
-
-def test_an_emptied_pid_file_degrades_health(monkeypatch, tmp_path):
-    """A process killed while writing pgserver's pid file leaves it empty, and
-    the next first touch reads it as a JSONDecodeError, which the start
-    reports as NoDatabaseError: one of the ways the database is out of
-    reach, so /health answers 200 and degraded."""
-    import json
-
-    (tmp_path / "PG_VERSION").write_text("16\n")
-
-    class Server:
-        @staticmethod
-        def get_server(pgdata):
-            raise json.JSONDecodeError("Expecting value", "", 0)
-    monkeypatch.delenv("DATABASE_URL", raising=False)
-    monkeypatch.setattr(serve.psql, "DEFAULT_DB_DIR", str(tmp_path))
-    monkeypatch.setattr(serve.psql, "pgserver", Server)
-    data, code = serve.handle_health()
-    assert code == 200 and data["status"] == "degraded"
-    assert "did not start (JSONDecodeError - Expecting value" in data["error"]
-
-
-def test_the_first_touch_holds_the_lock_and_leaves_the_pid_file_alone(monkeypatch, tmp_path):
-    """The first touch asks pgserver once, under the process's own lock, so
-    two threads cannot interleave its pid file; an emptied file is pgserver's
-    and is reported, never rewritten, and the lock is free afterwards."""
-    import json
-
-    (tmp_path / "PG_VERSION").write_text("16\n")
-    pids = tmp_path / ".handle_pids.json"
-    pids.write_text("")
-    held = []
-
-    class Server:
-        @staticmethod
-        def get_server(pgdata):
-            held.append(serve.psql._FIRST_TOUCH.locked())
-            raise json.JSONDecodeError("Expecting value", "", 0)
-    monkeypatch.delenv("DATABASE_URL", raising=False)
-    monkeypatch.setattr(serve.psql, "DEFAULT_DB_DIR", str(tmp_path))
-    monkeypatch.setattr(serve.psql, "pgserver", Server)
-    with pytest.raises(serve.psql.NoDatabaseError) as refused:
-        serve.psql.default_dsn()
-    assert isinstance(refused.value.__cause__, json.JSONDecodeError)
-    assert held == [True]
-    assert pids.read_text() == ""
-    assert not serve.psql._FIRST_TOUCH.locked()
 
 
 def test_a_slider_weight_rides_the_board_and_a_malformed_one_is_refused(

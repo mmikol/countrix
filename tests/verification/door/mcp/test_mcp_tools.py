@@ -2,16 +2,14 @@
 db_migrate and metrics against the built database; and,
 with no database, query's refusals, db_status's remedy for a stale schema,
 the playbook writes' mirror, the Draft
-a board tool hands its function, the readiness every door reports, a
-migration that fails, and how query turns a cell into JSON, pages its rows
-and words an empty result. The one registry's family order is
-test_mcp_registry's."""
+a board tool hands its function, and how query turns a cell into JSON, pages
+its rows and words an empty result. The one registry's family order is
+test_mcp_registry's; the readiness every door reports and a migration that
+fails are db.psql.schema's, in tests/verification/db/test_psql.py."""
 
-import contextlib
 import datetime
 import decimal
 import os
-import shutil
 
 import psycopg
 import pytest
@@ -22,7 +20,7 @@ from door.mcp import boards, lifecycle, tools
 from facts import board_facts, tables
 from facts.draft import Draft
 from inference import catalog, tune
-from tests.verification.inference import FIXTURE_PLAYBOOK
+from tests.verification.door.mcp import Offline
 
 # --- the tools against the built database ----------------------------------
 
@@ -55,7 +53,6 @@ def test_query_is_read_only(ctx):
 @pytest.mark.invariant
 def test_db_status_and_roster(ctx):
     text, status = ctx.call("db_status")
-    # 33: map_strategy went with counterpick.gg (migration 019)
     assert status["table_count"] >= 33 and status["counts"]["heroes"] > 40
     assert status["state"] == "current" and "state: current" in text
     assert status["counts"]["counters"] >= 100
@@ -193,22 +190,16 @@ def test_metrics_tool_serves_the_vocabulary():
     assert text.splitlines()[0].startswith("team.")
 
 
-def test_every_playbook_write_mirrors_the_catalog_once(tmp_path, monkeypatch):
+def test_every_playbook_write_mirrors_the_catalog_once(catalog_copy, monkeypatch):
     """tune, add_strategy and infer_strategy each reload the strategies table
     once, after the write."""
-    for name in catalog.strategy_files(FIXTURE_PLAYBOOK):
-        shutil.copy(os.path.join(FIXTURE_PLAYBOOK, name), tmp_path / name)
-    monkeypatch.setenv("COUNTRIX_STRATEGIES", str(tmp_path))
+    monkeypatch.setenv("COUNTRIX_STRATEGIES", catalog_copy)
     mirrored = []
     monkeypatch.setattr(catalog, "mirror", lambda cx, cat, directory=None: mirrored.append(
         (cx, len(cat))))
-
-    class Offline(tools.Context):
-        def connect(self):
-            return contextlib.nullcontext("cx")
     ctx = Offline(dsn="postgresql://nowhere")
     heuristic = next(h for h in catalog.load() if h.kind == "heuristic")
-    files = len(catalog.strategy_files(str(tmp_path)))
+    files = len(catalog.strategy_files(catalog_copy))
     ctx.call("tune", id=heuristic.id, field="weight", value=3, reason="a test")
     assert mirrored == [("cx", files)]
     ctx.call(
@@ -222,14 +213,13 @@ def test_every_playbook_write_mirrors_the_catalog_once(tmp_path, monkeypatch):
     assert not [h.id for h in catalog.load() if h.pending]
 
 
-def test_a_playbook_write_reaches_the_database_before_it_moves_a_file(tmp_path, monkeypatch):
+def test_a_playbook_write_reaches_the_database_before_it_moves_a_file(
+        catalog_copy, tmp_path, monkeypatch):
     """tune, add_strategy and infer_strategy open the database before they
     write, as db_rebuild does before it drops: with the database out of
     reach each call fails with no strategy file, doc or log line moved, so
     the same call succeeds once the database is back."""
-    for name in catalog.strategy_files(FIXTURE_PLAYBOOK):
-        shutil.copy(os.path.join(FIXTURE_PLAYBOOK, name), tmp_path / name)
-    monkeypatch.setenv("COUNTRIX_STRATEGIES", str(tmp_path))
+    monkeypatch.setenv("COUNTRIX_STRATEGIES", catalog_copy)
     monkeypatch.setattr(catalog, "mirror", lambda cx, cat, directory=None: None)
     documented = []
     monkeypatch.setattr(catalog, "write_docs", lambda cat, path=None: documented.append(len(cat)))
@@ -238,10 +228,6 @@ def test_a_playbook_write_reaches_the_database_before_it_moves_a_file(tmp_path, 
     class Unreachable(tools.Context):
         def connect(self):
             raise psql.NoDatabaseError("no database")
-
-    class Offline(tools.Context):
-        def connect(self):
-            return contextlib.nullcontext("cx")
     heuristic = next(h for h in catalog.load() if h.kind == "heuristic")
     calls = (
         ("tune", {"id": heuristic.id, "field": "weight", "value": 3, "reason": "a test"}),
@@ -258,26 +244,20 @@ def test_a_playbook_write_reaches_the_database_before_it_moves_a_file(tmp_path, 
     assert len(documented) == 3 and len(tune.log_tail(5)) == 3
 
 
-def test_add_strategy_stores_a_charge_with_a_numeric_penalty(tmp_path, monkeypatch):
+def test_add_strategy_stores_a_charge_with_a_numeric_penalty(catalog_copy, monkeypatch):
     """The door declares its strategy fields from the rule that checks them,
     so the numeric penalty the skill and the prompt promise a charge for a
     rule broken passes the schema, a category sets the file's like any
     field, and who asked reaches the log line as it does through tune. soft
     is no field, and the door refuses it before anything is written."""
-    for name in catalog.strategy_files(FIXTURE_PLAYBOOK):
-        shutil.copy(os.path.join(FIXTURE_PLAYBOOK, name), tmp_path / name)
-    monkeypatch.setenv("COUNTRIX_STRATEGIES", str(tmp_path))
+    monkeypatch.setenv("COUNTRIX_STRATEGIES", catalog_copy)
     monkeypatch.setattr(catalog, "mirror", lambda cx, cat, directory=None: None)
-
-    class Offline(tools.Context):
-        def connect(self):
-            return contextlib.nullcontext("cx")
     ctx = Offline(dsn="postgresql://nowhere")
     with pytest.raises(Refusal):
         ctx.call("add_strategy", id="tank-cap", name="Tank cap", kind="constraint",
                  body="At most one tank.", reason="a test", require="team.tanks <= 1", soft=True,
                  penalty=2)
-    assert not os.path.exists(tmp_path / "tank-cap.md")
+    assert not os.path.exists(os.path.join(catalog_copy, "tank-cap.md"))
     _, added = ctx.call(
         "add_strategy", id="tank-cap", name="Tank cap", kind="heuristic",
         body="At most one tank.", reason="a test", when="not (team.tanks <= 1)",
@@ -287,10 +267,8 @@ def test_add_strategy_stores_a_charge_with_a_numeric_penalty(tmp_path, monkeypat
     assert stored.penalty.source == "2" and stored.category == "shape" and stored.weighs
 
 
-def test_the_tuning_log_tool_refuses_fewer_than_one_line(tmp_path, monkeypatch):
-    for name in catalog.strategy_files(FIXTURE_PLAYBOOK):
-        shutil.copy(os.path.join(FIXTURE_PLAYBOOK, name), tmp_path / name)
-    monkeypatch.setenv("COUNTRIX_STRATEGIES", str(tmp_path))
+def test_the_tuning_log_tool_refuses_fewer_than_one_line(catalog_copy, monkeypatch):
+    monkeypatch.setenv("COUNTRIX_STRATEGIES", catalog_copy)
     ctx = tools.Context(dsn="postgresql://nowhere")
     for lines in (0, -3):
         with pytest.raises(Refusal, match="lines is 1 or more"):
@@ -311,10 +289,6 @@ def test_a_board_tool_hands_its_function_one_draft(tmp_path, monkeypatch):
 
         def rendered(self):
             return ""
-
-    class Offline(tools.Context):
-        def connect(self):
-            return contextlib.nullcontext("cx")
     monkeypatch.setattr(tables, "load", lambda cx: None)
     monkeypatch.setattr(board_facts, "generate", lambda world, draft: seen.append(draft) or Stub())
     Offline(dsn="postgresql://nowhere").call(
@@ -325,101 +299,6 @@ def test_a_board_tool_hands_its_function_one_draft(tmp_path, monkeypatch):
     for name in ("facts", "infer", "board"):
         properties = list(tools.REGISTRY.get(name).schema["properties"])
         assert properties[:len(boards.BOARD)] == list(boards.BOARD)
-
-
-def test_readiness_is_the_first_unmet_condition(monkeypatch):
-    """One definition of ready for the entrypoint, compose, /health and the
-    orchestrator: no tables, then a pending migration, then no heroes."""
-
-    class Rows:
-        def __init__(self, n):
-            self.n = n
-
-        def fetchone(self):
-            return (self.n,)
-
-    class Connection:
-        def __init__(self, heroes):
-            self.heroes = heroes
-
-        def execute(self, sql, params=None):
-            assert "heroes" in sql
-            return Rows(self.heroes)
-
-    def board(tables, pending, heroes):
-        monkeypatch.setattr(schema, "table_count", lambda cx: tables)
-        monkeypatch.setattr(schema, "pending", lambda cx: pending)
-        return schema.state(Connection(heroes))
-
-    assert board(0, ["001_initial_schema.sql"], 0) == "empty"
-    assert board(35, ["099_future.sql"], 0) == "stale"
-    assert board(35, ["099_future.sql"], 54) == "stale"
-    assert board(35, [], 0) == "unfilled"
-    assert board(35, [], 54) == "current"
-
-
-def test_the_probe_exits_one_when_the_database_never_answers(monkeypatch, capsys):
-    monkeypatch.setenv("DATABASE_URL", "postgresql://nobody@127.0.0.1:9/nowhere")
-    monkeypatch.setattr(schema, "CONNECT_TRIES", 2)
-    monkeypatch.setattr(schema.time, "sleep", lambda seconds: None)
-    assert schema.main() == 1
-    captured = capsys.readouterr()
-    assert captured.out == "" and "never became reachable" in captured.err
-    assert "port 9" in captured.err                    # the last try's own error
-
-
-def test_the_probe_exits_one_when_there_is_no_database(monkeypatch, capsys):
-    """No DATABASE_URL and no cluster is no database to wait for: one line
-    on stderr and exit 1 at once, which ends the container under set -e."""
-    def nothing():
-        raise psql.NoDatabaseError("nothing to point at")
-    monkeypatch.delenv("DATABASE_URL", raising=False)
-    monkeypatch.setattr(schema.psql, "default_dsn", nothing)
-    assert schema.main() == 1
-    captured = capsys.readouterr()
-    assert captured.out == "" and "no database: nothing to point at" in captured.err
-
-
-def test_a_migration_that_fails_is_named_and_the_files_before_it_stay_recorded():
-    """Each file commits with its ledger row, the files before the ledger's
-    own with it; one that fails is rolled back and named, so the ledger
-    never lags the schema and a retry starts at the file that broke."""
-
-    class Connection:
-        """Commits what was executed since the last commit or rollback; the
-        ledger exists once the migration that makes it has run."""
-
-        def __init__(self):
-            self.ledger, self.open, self.recorded = False, [], []
-
-        def cursor(self):
-            return contextlib.nullcontext(self)
-
-        def execute(self, sql, params=None):
-            if sql == "fails":
-                raise psycopg.errors.DuplicateTable('relation "heroes" already exists')
-            self.ledger = self.ledger or sql == "makes the ledger"
-            if sql.startswith("INSERT INTO schema_migrations"):
-                self.open.append(params[0])
-            return self
-
-        def fetchone(self):                     # to_regclass('schema_migrations')
-            return ("schema_migrations" if self.ledger else None,)
-
-        def commit(self):
-            self.recorded += self.open
-            self.open = []
-
-        def rollback(self):
-            self.open = []
-
-    files = [schema.Migration(path="migrations/%s" % name, sql=sql) for name, sql in (
-        ("001_a.sql", "runs"), ("002_b.sql", "makes the ledger"), ("003_c.sql", "runs"),
-        ("004_d.sql", "fails"), ("005_e.sql", "runs"))]
-    cx = Connection()
-    with pytest.raises(schema.SchemaError, match=r'^004_d\.sql: relation "heroes" already exists$'):
-        schema.apply(cx, files)
-    assert cx.recorded == ["001_a.sql", "002_b.sql", "003_c.sql"] and cx.open == []
 
 
 def test_a_query_cell_arrives_as_json():

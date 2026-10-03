@@ -1,5 +1,6 @@
 """Prove the exact search on the built database: a brute force of every
-legal six on a board, against the search's own answer.
+legal six on a board, against the search's own answer, and the null
+draw's spread over the real roster.
 
 The search (inference.solver) is exact by construction and the suite
 checks it against a full enumeration on the synthetic World. This checks it
@@ -17,11 +18,19 @@ tests' package; pytest does not collect it:
     .venv/bin/python -m tests.verification.inference.prove_exact world  OUT
     .venv/bin/python -m tests.verification.inference.prove_exact slice  OUT BOARD INDEX COUNT
     .venv/bin/python -m tests.verification.inference.prove_exact merge  OUT BOARD COUNT
+    .venv/bin/python -m tests.verification.inference.prove_exact draw   OUT
 
 `world` pickles the database's World into OUT once, so the slices do not
 each load it; start COUNT slices of a board at once, in the background,
 then merge. BOARDS names the boards; the playbook is the one in force.
 Each slice writes OUT/BOARD.INDEX-of-COUNT.json.
+
+`draw` holds the tie-break on the real roster, as test_stages holds it on
+the synthetic World: the null objective - the meta at 0 and the playbook
+in force's limits and assumptions, so every legal six ties and the board's
+draw alone picks - solved on DRAW_MAP under SEEDS boards' seeds. Every
+released hero is seated on some seed, and each within a quarter of its
+role's mean; the report counts each role's seats, the fewest and the most.
 
 A swap board (`keep` set) proves blue's swap search (inference.swaps): its
 Solver carries the keep term - the cost, in share points of the unlocked
@@ -45,13 +54,15 @@ import psycopg
 from db import psql
 from facts import tables
 from facts.model import ROLES, World
-from inference import catalog, swaps
+from inference import catalog, scoring, swaps
 from inference.base import OFF
 from inference.result import Span
 from inference.scoring import Candidate, quantized, rank_key
 from inference.solver import RANK_CAP, Solver
 
 K = 6                        # the sixes a board's seat keeps
+DRAW_MAP = "King's Row"      # the null draw's board: nothing picked, no side
+SEEDS = 2000                 # the boards' seeds the null draw is counted over
 
 
 class Board(NamedTuple):
@@ -234,9 +245,44 @@ def merge(out: str, name: str, count: int) -> bool:
     return same
 
 
+def draw(out: str) -> bool:
+    """The null draw over SEEDS boards' seeds -> whether it seats every
+    released hero, each within a quarter of its role's mean. The seed a
+    board's draw hashes is swapped for one per solve."""
+    started = time.time()
+    world = _world(out)
+    playbook = [s for s in catalog.load() if s.kind != "heuristic"]
+    m = world.resolve(DRAW_MAP, (), (), ())[0]
+    seated = {h.id: 0 for h in world.heroes.values() if h.released}
+    seeds = iter(range(SEEDS))
+    board_seed = scoring.board_seed
+    scoring.board_seed = lambda m, side: "draw %d" % next(seeds)
+    try:
+        for _ in range(SEEDS):
+            six = Solver(world, m, red=[], locked=[], catalog=playbook,
+                         base=OFF).solve(top=1).ranked[0]
+            for h in six.heroes:
+                seated[h.id] += 1
+    finally:
+        scoring.board_seed = board_seed
+    even, roles = True, {}
+    for role in ROLES:
+        seen = sorted((n, world.heroes[i].name) for i, n in seated.items()
+                      if world.heroes[i].role == role)
+        mean = sum(n for n, _ in seen) / len(seen)
+        even = even and all(abs(n - mean) <= mean / 4 for n, _ in seen)
+        roles[role] = {"heroes": len(seen), "mean": round(mean, 1),
+                       "fewest": [seen[0][1], seen[0][0]], "most": [seen[-1][1], seen[-1][0]]}
+    never = sorted(world.heroes[i].name for i, n in seated.items() if not n)
+    print(json.dumps({"draw": DRAW_MAP, "seeds": SEEDS, "roles": roles, "never": never,
+                      "even": even, "seconds": round(time.time() - started, 1)},
+                     ensure_ascii=False))
+    return even and not never
+
+
 def main(argv: list[str]) -> int:
-    """world OUT | slice OUT BOARD INDEX COUNT | merge OUT BOARD COUNT -> 0, or 1 where the
-    search and the brute force disagree."""
+    """world OUT | slice OUT BOARD INDEX COUNT | merge OUT BOARD COUNT | draw OUT -> 0, or 1
+    where the search and the brute force disagree or the draw seats the roster unevenly."""
     command, out = argv[0], argv[1]
     if command == "world":
         with psycopg.connect(psql.default_dsn()) as cx:
@@ -247,6 +293,8 @@ def main(argv: list[str]) -> int:
     if command == "slice":
         slice_(out, argv[2], int(argv[3]), int(argv[4]))
         return 0
+    if command == "draw":
+        return 0 if draw(out) else 1
     return 0 if merge(out, argv[2], int(argv[3])) else 1
 
 
