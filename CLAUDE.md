@@ -59,7 +59,8 @@ The solver searches exactly, in the process that calls it: a board is a
 few searches of tens of milliseconds each, one after another, and spawns
 no worker. `.venv/bin/python -m tests.verification.inference.prove_exact`
 checks it by hand against a brute force of every legal six on a board of the
-built database, in slices under five minutes each (its docstring says how).
+built database, in slices under five minutes each, and its `draw` stage holds
+the null draw even over the real roster (its docstring says how).
 
 Without the database, two generated sections regenerate on their own:
 `.venv/bin/python -c "from door.mcp import tools; tools.REGISTRY.write_docs()"`
