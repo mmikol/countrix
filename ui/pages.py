@@ -109,7 +109,7 @@ def view_board() -> str:
             "<div class='slots' id='blueslots'></div><div class='roles' id='blueroster'>"
             "</div></section>"
             "<section class='team red'><h2>red team <span class='tscore' id='redscore'"
-            " title=\"their picks as a share of their best counter to yours\">"
+            " title=\"the pull of their likely six\">"
             "</span>"
             "<button class='clearteam' data-clear='red'>clear</button>"
             "</h2>"

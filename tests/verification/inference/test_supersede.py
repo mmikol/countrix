@@ -54,4 +54,4 @@ def test_a_board_no_newer_one_replaced_runs_to_the_end(
         return False
     b = engine.board(synthetic_world, DRAFT, catalog=scratch_playbook,
                      brief=dataclasses.replace(BRIEF, superseded=superseded))
-    assert b.fill is not None and b.countered is not None and len(asked) > 10
+    assert b.fill is not None and len(asked) > 10

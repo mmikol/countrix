@@ -22,7 +22,7 @@ def test_the_strategies_handler_lists_the_playbook_in_force():
 def test_the_board_handler_serves_both_seats_and_the_current_comp(db):
     """What the page's board shows: blue's optimal, red's likely six on the
     other side around red's picks, the current comp partial until blue holds
-    six and evaluated once it does, and no countered case."""
+    six and evaluated once it does."""
     for side, other in (("attack", "defense"), ("defense", "attack")):
         data, code = serve.handle_board(db, {
             "map": ["King's Row"], "red": ["Zarya"], "blue": ["Ana"], "side": [side]})
@@ -32,7 +32,6 @@ def test_the_board_handler_serves_both_seats_and_the_current_comp(db):
         assert data["expected"]["locked"] == ["Zarya"] and len(data["expected"]["blue"]) == 6
         assert data["current"]["partial"] and data["current"]["blue"] == ["Ana"]
         assert data["blue"]["cited"] and all(p["evidence"] for p in data["blue"]["picks"])
-        assert data["countered"] is None                   # the page never reads it
     data, code = serve.handle_board(db, {
         "blue": ["Reinhardt", "Zarya", "Widowmaker", "Bastion", "Ana", "Lúcio"]})
     current = data["current"]

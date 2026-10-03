@@ -136,7 +136,7 @@ def test_an_unscored_seat_walks_its_stages_at_no_cost(synthetic_world):
     cost, not the one the board was asked for."""
     draft = Draft("Harbor Gate", ("Mortar",), ORIGIN, side="attack")
     board = engine.board(synthetic_world, draft, catalog=ASSUMPTIONS_ONLY,
-                         brief=engine.Brief(base=OFF, solve_countered=False, swap=COST))
+                         brief=engine.Brief(base=OFF, swap=COST))
     assert board.swaps["status"] == "none" and len(board.stages) == 2
     for row in board.stages:
         assert "Keep the six: no swap pays for its cost (0)." in row["blurb"], row
@@ -175,7 +175,7 @@ def test_the_board_carries_the_plan_on_a_staged_map_and_none_elsewhere(synthetic
     """A board on a staged map carries a row a stage, in the payload and in
     the text the board tool prints; a map without stages carries none, and
     a brief can leave the plan out."""
-    brief = engine.Brief(base=DEFAULT, solve_countered=False)
+    brief = engine.Brief(base=DEFAULT)
     board = engine.board(synthetic_world, Draft("Harbor Gate", ("Mortar",), ORIGIN,
                                                 side="attack"), catalog=staged, brief=brief)
     assert [r["stage"] for r in board.to_dict()["stages"]] == ["Assault", "Escort"]

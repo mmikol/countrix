@@ -506,7 +506,7 @@ The suite holds the search to enumeration:
 `test_the_search_reaches_the_enumerated_maximum` and its neighbours in
 `tests/verification/inference/test_solver.py` compare the best sixes, the
 score floats and the ranks with a full enumeration's on synthetic boards -
-blue's optimal, the fill, the countered case, bans, locks and plateaus - and
+blue's optimal, the fill, bans, locks and plateaus - and
 `tests/verification/inference/test_bounds.py` holds every rule and the whole
 bound to every completion of random branches. On the built database,
 `.venv/bin/python -m tests.verification.inference.prove_exact` brute-forces

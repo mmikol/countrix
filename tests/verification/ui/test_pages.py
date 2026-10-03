@@ -378,5 +378,5 @@ def test_the_math_page_states_the_equation_and_the_layers():
     # the counter: blue's own six above the optimal that ignores its picks
     counter = page[page.index("<p id='counter'>"):]
     assert "shows blue's six above the optimal" in counter[:counter.index("</p>")]
-    # the page solves no countered case: the hedge is the board tool's
-    assert "row is the hedge" not in page
+    # red is never solved: nothing scores blue's six against red's best reply
+    assert "if countered optimally" not in page and "Red is never solved" in page

@@ -40,15 +40,12 @@ SIX = likely(12, 7.5, 7, 12, 7, 8)          # 53.5 pull
 
 
 def test_the_verdict_reads_blues_standing():
-    """Blue's share of its optimal, through its fill while half-drafted, with
-    the countered hedge where it was solved; red is never a share."""
+    """Blue's share of its optimal, through its fill while half-drafted; red
+    is never a share."""
     from inference import plan
     seated = plan.momentum(plan.Seats(comp(["a"] * 6, 8, 10), SIX))
     assert seated["verdict"] == "blue 80 / 100 of its optimal" and seated["blue"] == 80
-    assert set(seated) == {"blue", "countered", "partial", "verdict", "badges"}
-    hedged = plan.momentum(plan.Seats(comp(["a"] * 6, 9, 10), SIX,
-                                      countered=comp(["a"] * 6, 3, 10)))
-    assert hedged["countered"] == 30 and "your picks hold 30 / 100" in hedged["verdict"]
+    assert set(seated) == {"blue", "partial", "verdict", "badges"}
     half = plan.momentum(plan.Seats(comp(["a"], 2, 10, partial=True), SIX,
                                     fill=comp(["a"] * 6, 7, 10)))
     assert half["verdict"] == "blue 70 / 100 of its optimal (the best six from its picks)"
@@ -94,22 +91,16 @@ def test_the_badge_is_worded_on_the_server():
     assert full["badges"]["blue"]["tip"] == "your picks reach 90% of the best six for this board"
 
 
-def test_blue_is_read_through_its_fill_and_the_countered_case_fills_its_picks(
-        synthetic_world, scratch_playbook):
+def test_blue_is_read_through_its_fill_while_half_drafted(synthetic_world, scratch_playbook):
     """Blue's share is its fill's while it is half-drafted - the picks alone
-    would sum over a smaller team and read low - and the countered case fills
-    blue's picks too, against red's best counter, the one red six the board
-    solves."""
+    would sum over a smaller team and read low."""
     from inference import engine
     b = engine.board(synthetic_world, Draft("Ember Ruins", ("Anvil",), ("Anvil",)),
                      catalog=scratch_playbook, brief=BRIEF)
     assert b.current.partial
     assert b.momentum["blue"] == b.fill.to_dict()["normalized"]
-    assert b.momentum["verdict"].startswith(
+    assert b.momentum["verdict"] == (
         "blue %d / 100 of its optimal (the best six from its picks)" % b.momentum["blue"])
-    assert b.countered.kind == "countered" and len(b.countered.blue) == 6
-    assert "Anvil" in b.countered.locked and not b.countered.partial
-    assert b.momentum["countered"] == b.countered.to_dict()["normalized"]
 
 
 def test_the_plan_names_every_maps_derived_style(synthetic_world, harbor_gate_board):

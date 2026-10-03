@@ -21,7 +21,6 @@ result.py's and the prose plan.py's. Every search is exact
 (inference.solver) and runs in this process, one after another.
 """
 
-import contextlib
 import dataclasses
 import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -110,15 +109,13 @@ BOARD_TOP = 5               # the alternatives each of a board's seats keeps
 class Brief:
     """What a caller asks of one board beyond the draft: the playbook tab's
     weights ({heuristic id: 0..10}, META, the default engine's meta, and
-    SWAP, the swap cost - for this board only), whether to solve the
-    countered case - the MCP board prints it, the page never reads it - the
-    check that says a newer request from the same client has superseded
-    this one, the default engine's weights, the playbook's meta.md's (None)
-    unless a caller names others (OFF turns it off), the swap cost in share
-    points, meta.md's (None) unless a caller names another, whether to
-    search blue's swaps, and whether to walk the plan stage by stage."""
+    SWAP, the swap cost - for this board only), the check that says a newer
+    request from the same client has superseded this one, the default
+    engine's weights, the playbook's meta.md's (None) unless a caller names
+    others (OFF turns it off), the swap cost in share points, meta.md's
+    (None) unless a caller names another, whether to search blue's swaps,
+    and whether to walk the plan stage by stage."""
     weights: Mapping[str, float] | None = None
-    solve_countered: bool = True
     superseded: Callable[[], bool] | None = None
     base: BaseWeights | None = None
     swap: float | None = None
@@ -261,27 +258,25 @@ def _evaluated(
 
 def _current(
         world: World, draft: Draft, *, optimal: _Optimal, catalog: list[Strategy],
-        base: BaseWeights, seat: Seat, kind: ResultKind,
-        barred: list[str] | None = None) -> Result:
-    """`seat`'s picks (`draft.blue`, from that seat's perspective) as they
-    stand against the other seat's (`draft.red`), on the span of the seat's
-    `optimal`: its Solver's scale and floor, and its score, the 100. A full
-    six is ranked against every legal six through the optimal's search, and
-    reads "evaluate" where `kind` is "current", any other kind staying as
-    given; a partial team is scored on the scale the optimal's search
-    froze, and says so. `barred` is the limits the picks break when their
-    comp is not allowed (_barred): it is scored nowhere and ranked against
-    nothing, and says why."""
+        base: BaseWeights, barred: list[str] | None = None) -> Result:
+    """Blue's picks (`draft.blue`) as they stand against red's (`draft.red`),
+    on the span of blue's `optimal`: its Solver's scale and floor, and its
+    score, the 100. A full six is ranked against every legal six through
+    the optimal's search, and reads "evaluate"; a partial team reads
+    "current", scored on the scale the optimal's search froze, and says so.
+    `barred` is the limits the picks break when their comp is not allowed
+    (_barred): it is scored nowhere and ranked against nothing, and says
+    why."""
     full = len(draft.blue) == TEAM_SIZE
-    label: ResultKind = "evaluate" if full and kind == "current" else kind
+    label: ResultKind = "evaluate" if full else "current"
     if full and barred is None:
-        return _evaluated(world, draft, catalog=catalog, base=base, seat=seat, kind=label,
+        return _evaluated(world, draft, catalog=catalog, base=base, seat="blue", kind=label,
                           optimal=optimal)
     started = time.monotonic()
     seated = _seat_board(world, draft)
     blue_h = seated.board.blue
     picks = [h.name for h in blue_h]
-    result = seated.result(label, seat, catalog=catalog, base=base, blue=picks,
+    result = seated.result(label, "blue", catalog=catalog, base=base, blue=picks,
                            locked=[] if full else list(picks), partial=not full)
     solver = optimal.solver
     if blue_h:
@@ -342,13 +337,6 @@ def board(
                      the brief's, or its weights' SWAP), with blue's share
                      before and after (None without blue picks, or when the
                      brief does not ask for it)
-        countered    blue's picks against red's best counter to the board -
-                     how you hold if they answer you perfectly, the one red
-                     six the board solves: a full six as it stands, a
-                     half-drafted one filled, on the scale of blue's best
-                     counter to that six (None without blue picks, when the
-                     brief does not ask for it, when blue's picks are not
-                     allowed, or when no six answers)
         fill         blue's locked picks with the empty slots filled by the
                      solver - the best six that keeps what you hold, on
                      blue's optimal's scale (None unless one to five are
@@ -385,9 +373,9 @@ def board(
     CHECK_EVERY branches (inference.solver) a search asks the brief's check,
     and a board it reports superseded stops there and raises
     supersede.Superseded. A search past its budget (solver.Unbounded)
-    refuses the board when it is blue's optimal; a fill or the countered case
-    it happens in reads None, and a fill that runs out leaves blue's picks
-    allowed, since nothing proved them otherwise.
+    refuses the board when it is blue's optimal; a fill it happens in reads
+    None and leaves blue's picks allowed, since nothing proved them
+    otherwise.
     """
     brief = Brief() if brief is None else brief
     catalog = catalog_module.weighted(
@@ -401,14 +389,14 @@ def board(
     expected = _likely(world, m, red_h, bans_h, draft, catalog, base)
     # blue's seat: its own picks are `blue`, and red is its revealed picks alone -
     # the default engine's counter term reads red's likely six where it has none
-    # (base.opponent), as infer does. Red is never optimized
+    # (base.opponent), as infer does. Red is never solved
     blue_seat = dataclasses.replace(draft, blue=())
     ours = draft                                       # blue's current comp and fill
     solve = _Pass(world, catalog, base, watch)
-    blue = solve.optimal(blue_seat, seat="blue")
+    blue = solve.optimal(blue_seat)
     unsolved = False
     try:
-        fill = solve.filled(ours, seat="blue", of=blue)
+        fill = solve.filled(ours, of=blue)
         stuck = False
     except Infeasible:
         # the exact search proved no six keeps blue's picks and meets the
@@ -420,16 +408,8 @@ def board(
         fill, stuck, unsolved = None, False, True
     # a full six is ranked against every legal six through its seat's search;
     # 100 is the seat's optimal, whatever it holds. The limits bind blue's picks
-    cur = solve.current(ours, blue, seat="blue", stuck=stuck)
-    countered = None
-    if cur.barred is None and brief.solve_countered and draft.blue:
-        # a what-if for blue, and the one place a red six is solved: red's best
-        # counter to the board, on the other side; where none answers, not solved
-        with contextlib.suppress(Infeasible, Unbounded):
-            theirs = dataclasses.replace(draft.flipped(), blue=())
-            red = solve.optimal(theirs, seat="red").result
-            countered = solve.countered(dataclasses.replace(draft, red=tuple(red.blue)))
-    mo = momentum(Seats(current=cur, expected=expected, fill=fill, countered=countered))
+    cur = solve.current(ours, blue, stuck=stuck)
+    mo = momentum(Seats(current=cur, expected=expected, fill=fill))
     # the swap cost, read once: the swaps above the picks and the chosen
     # stage's row are one answer
     cost = swap_in_force(brief) if brief.search_swaps or brief.walk_stages else 0.0
@@ -443,7 +423,7 @@ def board(
     staged = solve.stages(m, draft, blue, shown.blue, cost, suggested) if brief.walk_stages else []
     return Board(map_name=expected.map_name, side=draft.side, stage=draft.stage,
                  bans=list(draft.bans),
-                 blue=blue.result, current=cur, fill=fill, countered=countered, momentum=mo,
+                 blue=blue.result, current=cur, fill=fill, momentum=mo,
                  plan=plan(world, m, draft.side, list(draft.bans), red_h, shown),
                  shapes=[list(s) for s in legal_shapes(catalog)], expected=expected,
                  swaps=suggested, stages=staged)
@@ -465,56 +445,41 @@ def _drafting(seat: Draft) -> bool:
 
 
 class _Pass:
-    """One pass of a board: the world, the weighted playbook and the default
-    engine's weights it is solved under, and the board's Watch, which every
-    search asks as it runs."""
+    """One pass of a board, blue's seat alone - red is never solved: the
+    world, the weighted playbook and the default engine's weights it is
+    solved under, and the board's Watch, which every search asks as it
+    runs."""
 
     def __init__(self, world: World, catalog: list[Strategy], base: BaseWeights,
                  watch: supersede.Watch) -> None:
         self.world, self.catalog, self.base, self.watch = world, catalog, base, watch
 
-    def optimal(self, draft: Draft, *, seat: Seat, kind: ResultKind = "infer",
+    def optimal(self, draft: Draft, *, kind: ResultKind = "infer",
                 scale_of: Solver | None = None) -> _Optimal:
-        """`seat`'s optimal six on `draft`, on `scale_of`'s scale where given."""
+        """Blue's optimal six on `draft`, on `scale_of`'s scale where given."""
         self.watch.check()
         return _optimal(self.world, draft, catalog=self.catalog, base=self.base,
-                        top=BOARD_TOP, seat=seat, kind=kind, check=self.watch.check,
+                        top=BOARD_TOP, seat="blue", kind=kind, check=self.watch.check,
                         scale_of=scale_of)
 
-    def current(self, draft: Draft, optimal: _Optimal, *, seat: Seat,
-                stuck: bool | None = None) -> Result:
-        """`seat`'s picks as they stand, on its optimal's scale; a full six is
-        ranked against every legal six. With `stuck` - blue's seat, True where
-        the fill's search proved no six keeps the picks and meets the limits -
-        the limits bind the picks, and a comp they rule out is not allowed;
-        None leaves the picks as the other side's facts."""
+    def current(self, draft: Draft, optimal: _Optimal, *, stuck: bool) -> Result:
+        """Blue's picks as they stand, on its optimal's scale; a full six is
+        ranked against every legal six. The limits bind the picks: with
+        `stuck` - True where the fill's search proved no six keeps them and
+        meets the limits - a comp they rule out is not allowed."""
         self.watch.check()
-        barred = None if stuck is None else _barred(self.world, draft, optimal, stuck)
         return _current(self.world, draft, optimal=optimal, catalog=self.catalog,
-                        base=self.base, seat=seat, kind="current", barred=barred)
+                        base=self.base, barred=_barred(self.world, draft, optimal, stuck))
 
-    def filled(
-            self, draft: Draft, *, seat: Seat, of: _Optimal,
-            kind: ResultKind = "fill") -> Result | None:
-        """`seat`'s picks (`draft.blue`) with the empty slots filled by the
+    def filled(self, draft: Draft, *, of: _Optimal) -> Result | None:
+        """Blue's picks (`draft.blue`) with the empty slots filled by the
         solver on the seat's scale, read on its span (`of`): how close the
         best completion comes. None unless the seat is half-drafted."""
         if not _drafting(draft):
             return None
-        fill = self.optimal(draft, seat=seat, kind=kind, scale_of=of.solver).result
+        fill = self.optimal(draft, kind="fill", scale_of=of.solver).result
         fill.scale_to(of.span)
         return fill
-
-    def countered(self, draft: Draft) -> Result | None:
-        """Blue's picks (`draft.blue`) against red's best counter (`draft.red`):
-        how they hold if red answers perfectly, on the scale of blue's best
-        counter to that six. A full six is ranked against every legal six; a
-        half-drafted one is filled, as the fill reads blue's picks."""
-        top = self.optimal(dataclasses.replace(draft, blue=()), seat="blue")
-        if _drafting(draft):
-            return self.filled(draft, seat="blue", of=top, kind="countered")
-        return _current(self.world, draft, optimal=top, catalog=self.catalog,
-                        base=self.base, seat="blue", kind="countered")
 
     def swaps(self, draft: Draft, blue: _Optimal, seat: _Seat, cost: float) -> Swaps:
         """Blue's swaps (inference.swaps): the best six reachable from blue's
