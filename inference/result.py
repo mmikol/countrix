@@ -281,9 +281,9 @@ HEADINGS: dict[ResultKind, str] = {
     "infer": "optimal comp", "evaluate": "evaluation", "current": "current comp",
     "countered": "if countered optimally", "fill": "your picks, the rest filled",
     "expected": "their likely starting comp"}
-# the reason red's likely six carries no share: it is drawn, never scored
+# the reason red's likely six carries no share: it is filled, never scored
 LIKELIHOOD = (
-    "unscored - a likelihood from the map's pick rates and the wiki's synergies, which"
+    "unscored - filled from the map's pick rates and the wiki's synergies, which"
     " nothing scores")
 
 
@@ -375,7 +375,7 @@ class Result:
         """Why the result carries no share of a best, or None when it does.
         A comp its own picks rule out says so first (bar). The optimal six is
         100 by definition - it is the reference, and scored always; red's
-        likely six is a likelihood, never scored, and says so, the default
+        likely six is a greedy fill, never scored, and says so, the default
         engine on or off; any other comp reads unscored when nothing can be a
         share of anything: the best six scores no higher than the seat's
         floor, as every six does with the default engine off under a playbook
@@ -549,7 +549,7 @@ class Result:
 
     def _share_label(self, unscored: str | None) -> str:
         """The score's share of the best, or why there is none."""
-        if self.kind == "expected":                # a likelihood, not a score
+        if self.kind == "expected":                # a greedy fill, not a score
             return "(from the map's pick rates and the synergies, no strategy read)"
         if unscored is not None:
             return "(unscored)"

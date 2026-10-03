@@ -9,7 +9,7 @@ the board's server - the roster and facts endpoints, and the handler that
 routes to them, to the engine's routes ui/serve.py answers and to the
 pages ui/pages.py renders. Every click re-reads the database: the facts
 panel is the FactSet for (map, side, red, blue, bans); the comps panel is
-the inference layer's board - red's most likely starting comp, blue's
+the inference layer's board - red's likely starting comp, blue's
 picks filled and its optimal counter to red's, each seat's picks scored
 as a share of its own optimal, the fight odds and the game plan; the
 playbook panel is the strategies catalog as it sits on disk. JSON

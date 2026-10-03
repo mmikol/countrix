@@ -51,11 +51,12 @@ Endothermic Blaster's 12). A movement tool's hit (Reinhardt's Charge, 300
 pinned to a wall) is not burst: the dash is control, which the cc
 mechanism reads, and counting it twice made the charge a one-shot.
 
-The graph. The wiki decides every pair it has an edge on, either way. On a
-pair it has none on, the loser's TOP_ANSWERS best derived answers - score
-at least THRESHOLD, net above 0, ranked by score, then net, then name -
-count at DERIVED_WEIGHT against a wiki edge's WIKI_WEIGHT, so every tally
-stays an integer.
+The graph. The wiki decides every pair it has an edge on, either way. Of
+each loser's TOP_ANSWERS best derived answers - score at least THRESHOLD,
+net above 0, ranked by score, then net, then name - those on a pair the
+wiki has no edge on count at DERIVED_WEIGHT against a wiki edge's
+WIKI_WEIGHT, so every tally stays an integer; the others are not
+replaced.
 """
 
 import math
@@ -720,9 +721,9 @@ def pairing(win: Features, lose: Features) -> Pairing:
 def derive(world: World) -> None:
     """The matrix over the released heroes (world.matrix, {(winner, loser):
     Pairing}) and the derived edges the graph fills with (world.derived,
-    {(loser, winner): DerivedEdge}): each loser's TOP_ANSWERS best answers
-    on the pairs the wiki has no edge on. Deterministic: heroes by id,
-    ties by name."""
+    {(loser, winner): DerivedEdge}): of each loser's TOP_ANSWERS best
+    answers, those on a pair the wiki has no edge on. Deterministic: heroes
+    by id, ties by name."""
     released = sorted((h for h in world.heroes.values() if h.released), key=lambda h: h.id)
     supports = [h.hps for h in released if h.role == "support"]
     feats = {h.id: features(h, max(supports, default=0.0)) for h in released}

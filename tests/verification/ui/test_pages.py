@@ -316,8 +316,12 @@ def test_the_math_page_quotes_each_weight_from_the_playbooks_meta_file(
 
 @pytest.mark.parametrize(("module", "name", "phrase"), [
     (base, "RATE_PICK_HALF", "t_p = pick_p / ( pick_p + %s )"),
-    (compute, "SYNERGY_PULL", "likelihood(h) = pick(h, map) + %s &times; partners"),
+    (compute, "SYNERGY_PULL", "pull(h) = pick(h, map) + %s &times; partners"),
     (scale, "REFERENCE_SIZE", "against %s random legal sixes"),
+    (scale, "SCALE_POOL", "each role's %s released heroes"),
+    (base, "COIN_FLIP", "t_p &middot; ( win_p &minus; %s )"),
+    (pages, "MAX_TANKS", "at most %s tanks"),
+    (pages, "MAX_BANS", "within a match's %s bans"),
     (scoring, "NEED_BUDGET", "min( 1, max( %s, the largest w on n's guard ) / &Sigma; w"),
     (scoring, "NEED_BUDGET", "one state costs %s at most"),
     (scoring, "SCORE_PLACES", "by their score to %s decimal places"),
@@ -356,10 +360,10 @@ def test_the_math_page_states_the_equation_and_the_layers():
     # the formula, the scale, how a heuristic's reach compares with the base, the empty case
     assert "The function: STRATEGIES( FACTS )" in page
     flat = " ".join(page.split())
-    assert "<b>The default engine</b>" in page and "only this term reads the likely six" in flat
+    assert "<b>The default engine</b>" in page and "Only this term reads a derived edge" in flat
     assert "score(x) = base(x)\n         + &Sigma; heuristics h" in page
     assert "norm_h(v) = clamp(" in page
-    assert "A heuristic moves a six by its weight at most" in flat
+    assert "A heuristic on a metric moves a six by its weight at most" in flat
     assert "What 100 means" in page and "not a win probability" in page
     assert "When nothing scores" in page
     # how a six is chosen: the five steps in order, then what a reader must not assume
