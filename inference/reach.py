@@ -13,8 +13,7 @@ opposite - the search tries every map but a few reds, and a board it never visit
 seat the hero. A hero it finds nothing for is one worth looking at: a wrong number, a
 tool no metric reads, a rule that charges it for what it is not, or a board this search
 does not reach. The heroes it seats nowhere under the shipped playbook are named in
-tests/verification/inference/test_reach.py, as UNSEATED. Each board's optimal six is exact
-(inference.solver), so a board found is a proof of the hero's seat there. The
+tests/verification/inference/test_reach.py, as UNSEATED. The
 `reach` tool runs the search; `.venv/bin/python -m tests.verification.inference.record_reach`
 records a board per released hero in tests/fixtures/reach.json beside the objective
 it ran under, and the suite checks none is lost.

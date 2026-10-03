@@ -16,31 +16,21 @@ tools mirror it into the database.
 
 Fields: kind, category, metric, direction, weight, when, require,
 bonus, penalty (strategy.TUNABLE), params.NAME, and body, the prose
-rewritten whole within three sentences under the file's title. Every
-value is checked by strategy.checked_value, the rule the loader reads a
-file by, before any file is touched. Each of the three takes a reason and
-writes in one order (_commit): the edited (or new) file is loaded through
-the catalog before it is written, so a metric that does not exist or an
-expression that does not parse is refused and nothing changes. Every
-accepted change is one line in tuning-log.md, beside the playbook's files
-in force: the compose stack bind-mounts that directory, so a
-change made through a container lands on the host and in git with the file
-it changed.
+rewritten whole. Each value is checked as the loader checks a file, and
+the edited file is loaded through the catalog before it is written
+(_commit), so a refused change writes nothing. Every accepted change is
+one line in tuning-log.md beside the playbook in force, a folder the
+compose stack bind-mounts, so a change made in a container lands on the
+host.
 
     tune("meta", "synergy", 0.2, "the wiki's pairs should count for more")
     tune("meta", "swap", 15, "a swap costs a fight's ultimate charge")
     tune("meta", "body", prose, "the synergy clause names the imputed cells")
 
-The id `meta` names meta.md, the default engine's weights beside the
-strategy files: its fields are meta, rate, synergy and counter
-(base.DIALS) and the swap cost, swap (base.FIELDS), each checked by
-catalog.meta_dial - a swap cost the file leaves out is written in place,
-as any field is - and `body`, the prose the playbook tab and the docs
-catalog show, rewritten whole; the file is read back by catalog.parse_meta
-before it is written, then documented and logged like any other change
-(_tune_meta). A playbook folder with no meta.md is seeded from the shipped
-one's by its first such change, and the log line says so. No strategy may
-take the name, nor swap's (catalog.RESERVED).
+The id `meta` names meta.md, the default engine's weights (_tune_meta):
+its dials and the swap cost (base.FIELDS) and its body. A playbook folder
+with no meta.md is seeded from the shipped one's by its first such
+change, and no strategy may take the name (catalog.RESERVED).
 """
 
 import functools

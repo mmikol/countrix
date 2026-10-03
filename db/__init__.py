@@ -2,10 +2,7 @@
 
 `data/` and `psql/` are the layer itself: pull, clean, store. db/ is the
 bottom of the import graph and imports nothing above it: the door (door/)
-drives the pulls through its tools. Reads need no door tool: the board
-opens its own connection through db.psql.default_dsn(), and a door tool
-opens one through its Context; facts.tables.load reads over the connection
-it is handed, and inference/ reads only the World.
+drives the pulls through its tools, and reads need none (door/__init__.py).
 
     data/         the sources, one package each (blizzard, wiki), and what
                   they share: the page cache (cache) and name matching
@@ -19,17 +16,12 @@ it is handed, and inference/ reads only the World.
                   request that raised (a Refusal 400, anything else 500 with
                   its traceback on stderr) and the one JSON reader
 
-This file holds what the whole layer must agree on: where things live (ROOT
-and the paths under it), the shape of a `sources` row (Source), the roles
-the roster pull stores in role_id order (ROLES), the ability and perk
-vocabularies the migrations seed (ABILITY_KINDS, PERK_TIERS, PerkTier),
-the scope every rates snapshot is pinned to, the one error a caller can fix
-(Refusal), which every layer raises and every door answers as the caller's,
-where a progress line goes (Log) and the stderr writer a pull, a Context
-and the MCP server default to (to_stderr), the hour every age is read in
-(SECONDS_PER_HOUR), write_whole, a file written whole or not at all, and
-embed, which rewrites one generated section of a markdown file for every
-layer that generates docs.
+This file holds what the whole layer must agree on, each name with its own
+comment or docstring: where things live (ROOT), the `sources` row (Source),
+the roles, the vocabularies the migrations seed, the rates snapshot's
+scope, the one error a caller can fix (Refusal), where a progress line
+goes (Log, to_stderr), the hour, and the two file writers (write_whole,
+embed).
 docs/db.md names the tables each pull writes, and the schema.
 
 Every row carries a source_id, and that is the only distinction drawn

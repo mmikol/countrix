@@ -3,11 +3,8 @@ FactSet.
 
     generate(world, Draft("King's Row", red=("Zarya", "Pharah"), blue=("Ana",)))
 
-    for each domain D in { HEROES, MAPS, META }:
-        INDEPENDENT(D) = ⋃ facts(s)      over each selection s in D   s alone: its own row
-        DEPENDENT(D)   = ⋃ facts(s ⋈ t)  over the other selections t  s joined with t
-        FACTS(D)       = INDEPENDENT(D) ∪ DEPENDENT(D)
-    FACTS       = FACTS(HEROES) ∪ FACTS(MAPS) ∪ FACTS(META)      F1..
+The equation of the FACTS, independent and dependent per domain, is the
+math page's and docs/architecture.md's.
 
 FACTS are derived from the authoritative data - what the sources say about
 the heroes, the maps and the meta, pulled and set - for this board, and

@@ -10,18 +10,7 @@ every source.
     cache_key        a request as a file name in the cache
     session          a requests session that identifies this project
     PullContext      what a pull's run() takes beside its connection: the page
-                     cache, the session, the log (stderr unless the caller
-                     names another - over stdio, stdout is the MCP wire) and
-                     the cutoff. Without one a page is kept forever (a build
-                     from the caches); a refresh's cutoff, the moment it
-                     began, refetches every page written before it, so the
-                     pulls of one refresh fetch a shared article once. A
-                     page that fails to refetch keeps its cached copy and is
-                     listed in the context's stale, so a flaky source
-                     degrades to yesterday's numbers, never to an empty
-                     table, and the pull says so. Every page served adds
-                     its write time to the context's captured, so a pull
-                     dates what it read by when its pages were fetched
+                     cache, the session, the log and the refresh's cutoff
 
 Each source package (blizzard, wiki) names its own endpoints
 and its own `sources` row, so provenance lives with the source. Fetching
