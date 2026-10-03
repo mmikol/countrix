@@ -28,7 +28,6 @@
 Nothing here knows a particular source.
 """
 
-import json
 import os
 import re
 import threading
@@ -57,22 +56,22 @@ class NoDatabaseError(Exception):
 
 # Every way the database can be out of reach, which a health endpoint reports
 # as degraded: the connection and its queries (psycopg.Error); no DATABASE_URL
-# and no cluster to use (NoDatabaseError, from default_dsn); the embedded
-# cluster's files and socket (OSError); and pgserver's .handle_pids.json,
-# left empty by a process killed while writing it (JSONDecodeError).
-UNREACHABLE = (psycopg.Error, NoDatabaseError, OSError, json.JSONDecodeError)
+# and no cluster to use, or an embedded cluster that would not start, an
+# emptied pid file among the causes (NoDatabaseError, from default_dsn); and
+# the embedded cluster's files and socket (OSError).
+UNREACHABLE = (psycopg.Error, NoDatabaseError, OSError)
 
 # pgserver's own lock (fasteners, over fcntl) excludes other processes but
 # not this process's threads, and get_server reads its instance cache before
 # taking it, so two first touches from a threaded server (ui/board.py) could
 # interleave the read-truncate-write of the pid file. The first touch is
 # serialised here. What remains: a .handle_pids.json left empty by a process
-# killed mid-write makes the first touch in each later process raise
-# JSONDecodeError, reported as degraded, and later touches in that process
-# get pgserver's cached handle, with the process unregistered. The file is
-# pgserver's and is not repaired here; removing it while no process uses the
-# cluster clears the fault (pgserver 0.1.4's DiskList reads a missing file
-# as []).
+# killed mid-write makes pgserver's first touch in each later process raise
+# JSONDecodeError, which _embedded reports as NoDatabaseError, degraded, and
+# later touches in that process get pgserver's cached handle, with the
+# process unregistered. The file is pgserver's and is not repaired here;
+# removing it while no process uses the cluster clears the fault (pgserver
+# 0.1.4's DiskList reads a missing file as []).
 _FIRST_TOUCH = threading.Lock()
 
 
@@ -100,13 +99,26 @@ def boot() -> str:
 def _embedded() -> str:
     """The embedded cluster's URI: pgserver starts the cluster when it is not
     running and runs initdb when it is not built. A host without pgserver
-    has none to run: NoDatabaseError, naming DATABASE_URL."""
+    has none to run: NoDatabaseError, naming DATABASE_URL. A start that
+    fails in a way UNREACHABLE does not name - pg_ctl's error or its
+    ten-second timeout, a pid file with no socket or port, an emptied
+    .handle_pids.json, the handle a failed start leaves cached for the rest
+    of the process - is NoDatabaseError too, so every reader reports it as
+    the database out of reach."""
     if pgserver is None:
         raise NoDatabaseError("no DATABASE_URL and no embedded cluster: pgserver is not"
                               " installed here (the image and CI filter it out; linux/arm64"
                               " has no wheel) - set DATABASE_URL")
     with _FIRST_TOUCH:
-        return pgserver.get_server(DEFAULT_DB_DIR).get_uri()
+        try:
+            return pgserver.get_server(DEFAULT_DB_DIR).get_uri()
+        except UNREACHABLE:
+            raise
+        except Exception as error:      # any other pgserver failure: the cluster is out of reach
+            raise NoDatabaseError(
+                "the embedded cluster at db/psql/cluster did not start (%s - %s) - see"
+                " db/psql/cluster/log and restart this process after a failed start"
+                % (type(error).__name__, error)) from error
 
 
 IDENTIFIER_RE = re.compile(r"[a-z_][a-z0-9_]*\Z")
@@ -119,7 +131,7 @@ def identifier(name: str) -> Identifier:
     table in the statement itself composes it with psycopg.sql through here.
     The names all come from a literal or from the catalog today, and this is
     what keeps it so."""
-    if not IDENTIFIER_RE.match(name or ""):
+    if not IDENTIFIER_RE.match(name):
         raise ValueError("not a SQL identifier: %r" % (name,))
     return Identifier(name)
 
@@ -168,11 +180,13 @@ def register_source(cursor: psycopg.Cursor, source: Source, cao: datetime) -> in
     return scalar(cursor)
 
 
-def current_patch(cursor: psycopg.Cursor) -> int | None:
-    """The most recent released patch, to stamp on a capture's snapshot."""
+def current_patch(cursor: psycopg.Cursor, captured: datetime) -> int | None:
+    """The patch live at a capture, to stamp on its snapshot: the most recent
+    released on or before the capture's date, taken in the session's time
+    zone, as a snapshot's captured_at::date reads it."""
     row = cursor.execute(
-        "SELECT patch_id FROM patches WHERE released <= CURRENT_DATE"
-        " ORDER BY released DESC, patch_id DESC LIMIT 1"
+        "SELECT patch_id FROM patches WHERE released <= %s::date"
+        " ORDER BY released DESC, patch_id DESC LIMIT 1", (captured,)
     ).fetchone()
     return row[0] if row else None
 

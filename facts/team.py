@@ -230,44 +230,35 @@ def _mean(values: Iterable[float | None]) -> float:
     return sum(known) / len(known) if known else 0.0
 
 
-# the registry's sections, in its order: the helpers team_metrics sums
-SECTIONS = ("shape", "durability", "damage", "sustain", "tools", "cohesion", "meta", "on_map",
-            "versus")
+# the registry's sections, one helper each: _bag merges them in the registry's order
+SECTIONS = frozenset({
+    "shape", "durability", "damage", "sustain", "tools", "cohesion", "meta", "on_map",
+    "versus"})
 # each section's keys, read once off an empty team (_section_keys)
 _KEYS: dict[str, frozenset[str]] = {}
 
 
-def _bags(
+def _bag(
         world: World, heroes: list[Hero], m: Map | None, enemies: list[Hero],
-        wanted: Collection[str]) -> list[MetricBag]:
-    """The `wanted` sections' bags for these picks, in registry order: the
+        wanted: frozenset[str]) -> MetricBag:
+    """The `wanted` sections' keys for these picks. The
     map's section reads the meta's, and the meta and versus sections the
-    most-banned pick."""
+    most-banned pick: max_ban_* name it and banproof_coverage takes its
+    answers away; with no ban rate on the team it is the first pick."""
     top_ban = max(heroes, key=lambda h: h.ban or 0) if heroes else None
-    out = []
-    for name in SECTIONS:
-        if name not in wanted:
-            continue
-        if name == "shape":
-            out.append(_shape(heroes, m))
-        elif name == "durability":
-            out.append(_durability(heroes))
-        elif name == "damage":
-            out.append(_damage(heroes))
-        elif name == "sustain":
-            out.append(_sustain(world, heroes))
-        elif name == "tools":
-            out.append(_tools(heroes))
-        elif name == "cohesion":
-            out.append(_cohesion(world, heroes))
-        elif name == "meta":
-            out.append(_meta(heroes, m, top_ban))
-        elif name == "on_map":
-            meta = _meta(heroes, m, top_ban)
-            out.append(_on_map(heroes, m, number(meta["win_mean"]), number(meta["pick_mass"])))
-        else:
-            out.append(_versus(world, heroes, enemies, top_ban))
-    return out
+    # the whole bag, which every leaf of the search reads, tests no section
+    every = wanted is SECTIONS
+    meta = _meta(heroes, m, top_ban) if every or "meta" in wanted or "on_map" in wanted else {}
+    return {
+        **(_shape(heroes, m) if every or "shape" in wanted else {}),
+        **(_durability(heroes) if every or "durability" in wanted else {}),
+        **(_damage(heroes) if every or "damage" in wanted else {}),
+        **(_sustain(world, heroes) if every or "sustain" in wanted else {}),
+        **(_tools(heroes) if every or "tools" in wanted else {}),
+        **(_cohesion(world, heroes) if every or "cohesion" in wanted else {}),
+        **(meta if every or "meta" in wanted else {}),
+        **(_on_map(heroes, m, meta) if every or "on_map" in wanted else {}),
+        **(_versus(world, heroes, enemies, top_ban) if every or "versus" in wanted else {})}
 
 
 def _section_keys(world: World) -> dict[str, frozenset[str]]:
@@ -275,10 +266,7 @@ def _section_keys(world: World) -> dict[str, frozenset[str]]:
     too, so one call apiece names them."""
     if not _KEYS:
         # read whole, then set at once: a second thread never sees half of it
-        keys: dict[str, frozenset[str]] = {}
-        for name in SECTIONS:
-            [bag] = _bags(world, [], None, [], (name,))
-            keys[name] = frozenset(bag)
+        keys = {name: frozenset(_bag(world, [], None, [], frozenset({name}))) for name in SECTIONS}
         _KEYS.update(keys)
     return _KEYS
 
@@ -288,24 +276,12 @@ def team_metrics(world: World, heroes: Iterable[Hero], m: Map | None = None,
     """Every TEAM_METRICS key for these picks, on this map, vs these
     enemies; with `only`, the keys of the sections that hold those keys,
     and no others - a caller reading a few keys (inference.scale's field)
-    skips the rest. Each section's helper returns its keys in registry
-    order, and the bag keeps that order."""
-    heroes, enemies = list(heroes), list(enemies)
+    skips the rest."""
+    wanted = SECTIONS
     if only is not None:
         keys, named = _section_keys(world), set(only)
-        bag: MetricBag = {}
-        for part in _bags(world, heroes, m, enemies,
-                          [name for name in SECTIONS if keys[name] & named]):
-            bag.update(part)
-        return bag
-    # the most-banned pick: max_ban_* name it and banproof_coverage takes its
-    # answers away; with no ban rate on the team it is the first pick
-    top_ban = max(heroes, key=lambda h: h.ban or 0) if heroes else None
-    meta = _meta(heroes, m, top_ban)
-    return {**_shape(heroes, m), **_durability(heroes), **_damage(heroes),
-            **_sustain(world, heroes), **_tools(heroes), **_cohesion(world, heroes),
-            **meta, **_on_map(heroes, m, number(meta["win_mean"]), number(meta["pick_mass"])),
-            **_versus(world, heroes, enemies, top_ban)}
+        wanted = frozenset(name for name in SECTIONS if keys[name] & named)
+    return _bag(world, list(heroes), m, list(enemies), wanted)
 
 
 def _shape(heroes: list[Hero], m: Map | None) -> MetricBag:
@@ -502,18 +478,17 @@ def _meta(heroes: list[Hero], m: Map | None, top_ban: Hero | None) -> MetricBag:
             "trend_sum": sum(h.trend for h in heroes if h.trend is not None)}
 
 
-def _on_map(heroes: list[Hero], m: Map | None, win_mean: float,
-            pick_mass: float) -> MetricBag:
+def _on_map(heroes: list[Hero], m: Map | None, meta: MetricBag) -> MetricBag:
     """The picks on this map's rates; without a map, the all-ranks figures the
-    meta section read, and zeros."""
+    meta section read (`meta`), and zeros."""
     if m is None:
-        return {"map_win_mean": win_mean, "map_pick_mass": pick_mass,
+        return {"map_win_mean": meta["win_mean"], "map_pick_mass": meta["pick_mass"],
                 "map_specialists": 0, "map_offmap": 0, "home_map_hits": 0}
     wins = [h.map_win(m.id) for h in heroes]
     deltas = [
         win - h.win for h, win in zip(heroes, wins, strict=True)
         if win is not None and h.win is not None]
-    return {"map_win_mean": _mean(wins) if any(w is not None for w in wins) else win_mean,
+    return {"map_win_mean": _mean(wins) if any(w is not None for w in wins) else meta["win_mean"],
             "map_pick_mass": sum(h.map_pick(m.id) or 0 for h in heroes),
             "map_specialists": sum(1 for d in deltas if d >= SPECIALIST_DELTA),
             "map_offmap": sum(1 for d in deltas if d <= -SPECIALIST_DELTA),

@@ -3,8 +3,8 @@
 The page over the three layers. Every click - a map, a side, a ban, a hero
 on either roster - becomes a request that reads the database, and back
 come every fact about that board (the facts layer's, in
-[`facts/`](../facts/__init__.py)), the optimal six for both seats with the
-current picks scored, and the playbook as it sits on disk. No layer imports
+[`facts/`](../facts/__init__.py)), blue's optimal six with blue's picks
+scored, red's likely six, and the playbook as it sits on disk. No layer imports
 the board or its pages.
 
 ```bash
@@ -15,12 +15,14 @@ An `http.server` handler over psycopg, no web framework, no build step.
 The board computes the facts and the comps in its own process, as the
 compose stack's `ui` container does. It writes nothing.
 
-## `board.py` and `pages.py` - the page and its endpoints
+## `board.py`, `serve.py` and `pages.py` - the page and its endpoints
 
 `pages.py` renders the page, a shell over the static files that injects
-only `TEAM` (six) and `BANS` (five). `board.py` serves it and the JSON
-endpoints behind the host guard `db/web.py` puts on both servers
-([security.md](security.md)).
+only `TEAM` (six), `BANS` (five) and `SWAP_MAX` (the swap cost's ceiling,
+`base.SWAP_RANGE`). `board.py` serves it and the JSON endpoints behind
+the host guard `db/web.py` puts on both servers
+([security.md](security.md)); `serve.py` answers the board, the catalog
+and the health for it.
 
 | route | serves |
 | --- | --- |
@@ -28,10 +30,10 @@ endpoints behind the host guard `db/web.py` puts on both servers
 | `/static/<file>` | `board.css`, `board.js`, `comps.js`, `playbook.js` and `bebas-neue.woff2`, nothing else |
 | `/api/roster` | the roster `facts/roster.py` builds, which the door's `roster` tool lists too: every hero (role, subrole, health pool, portrait, status, release day) and every map (mode, top style, sided or not, its stages in play order), with the role icons and the patches newer than the rates |
 | `/api/facts?map=&side=&red=&blue=&bans=[&stage=]` | the FactSet for the board as JSON: the facts and their count; a stage the map lists adds the ground in play (`map.ground`) |
-| `/api/board?map=&side=&red=&blue=&bans=[&stage=&weights=&client=]` | the board solved at any step of the draft, every seat on the stage in play (the whole map without one), under the playbook tab's weights: the `board` tool's answer ([mcp.md](mcp.md#the-tools)) without the countered case, which the page never reads, from `serve.handle_board`. One board solves at a time; another waits, and answers 429 after a minute (`serve.Admission`) |
+| `/api/board?map=&side=&red=&blue=&bans=[&stage=&weights=&client=]` | the board solved at any step of the draft, every seat on the stage in play (the whole map without one), under the playbook tab's weights: the `board` tool's answer ([mcp.md](mcp.md#the-tools)), from `serve.handle_board`. One board solves at a time; another waits, and answers 429 after a minute (`serve.Admission`); a newer board from the same `client` stops one still solving, which answers 400 (`serve.LATEST`, a lane per client) |
 | `/api/strategies` | the catalog: every constraint, heuristic and assumption with its kind, form, frontmatter and body, from `serve.handle_strategies` |
 | `/health` | the engine's health, from `serve.handle_health`: ok or degraded, the strategies, the drafts pending and the heroes, and the error naming what is out of reach. The ui container's healthcheck and `orchestrator.py` read it |
-| `/math` | `static/math.html` in the page shell, the numbers it quotes filled in by `pages.py` - the default engine's four weights and the swap cost from the playbook's `meta.md`, and from the code `SWAP_MAX`, the counter graph's four constants, `RATE_PICK_HALF`, `SYNERGY_PULL`, `REFERENCE_SIZE`, `NEED_BUDGET`, the search's `SCORE_PLACES` and `RANK_CAP`, and the healing formation's radius and teammates: the equation, how a six is chosen, the scoring function with the default engine under the playbook, the board and how the layers fit |
+| `/math` | `static/math.html` in the page shell, the numbers it quotes filled in by `pages.py` - the default engine's four weights and the swap cost from the playbook's `meta.md`, and from the code `SWAP_MAX`, the counter graph's four constants, `RATE_PICK_HALF`, `COIN_FLIP`, `SYNERGY_PULL`, `REFERENCE_SIZE`, `SCALE_POOL`, `NEED_BUDGET`, the search's `SCORE_PLACES` and `RANK_CAP`, the counter graph's mechanisms, `MAX_TANKS`, `MAX_BANS`, the weight slider's top, and the healing formation's radius and teammates: the equation, how a six is chosen, the scoring function with the default engine under the playbook, the board and how the layers fit |
 
 The board answers GET alone: any other method is a 501, after the host
 guard.
@@ -70,11 +72,12 @@ else is drawn before it.
 **The rosters.** One tile renderer draws both rosters and the ban picker
 as the same hero select: portrait tiles in tank, damage and support
 columns, lit when picked, dotted when on the other team, crossed out when
-banned. A tile dims once the queue's two-tank limit or the playbook's
-shape limits - the `(tanks, damage, supports)` triples the board result
-carries - leave no legal six that seats one more of its role, and a click
-on it is refused with a note. The limits hold both teams: they are the
-game's form, not blue's alone. An **announced** hero, one the wiki knows
+banned. A tile dims once its team's limits leave no room for one more of
+its role, and a click on it is refused with a note. Blue's limits are the
+queue's two tanks and the playbook's shape limits - the
+`(tanks, damage, supports)` triples the board result carries; red's are
+the queue's two tanks alone, since the playbook's limits are blue's and
+red's picks are never ruled out. An **announced** hero, one the wiki knows
 ahead of release, sits in its role column as the same tile, dimmed and
 tagged "coming soon", with its portrait or a silhouette. It has no click
 handler, so it never enters the state, and the solver never fields it;
@@ -86,7 +89,8 @@ each at its pick's place), under the board's verdict; a click trades that
 pick in place, and the board solves again. The suggestion is one joint
 answer ([The swaps](inference.md#the-swaps)): taking one leaves the rest
 the board's answer from the new picks, and a half-drafted seat's empty
-slots show the rest of its six (`swaps.open`). Nothing is drawn for red.
+slots show the fill's heroes (`swaps.open`), as they do without a swap.
+Nothing is drawn for red.
 
 **The stage picker** beside the map lists the map's stages after WHOLE
 MAP, hidden on a map without stages and cleared when the map changes; a
@@ -107,10 +111,12 @@ then two seats, neither with a score. Blue's (left) shows
 the six the plan describes - *your picks, the rest filled* from one to
 five picks, *your six* at six - over blue's *optimal vs red's picks* (*vs
 red's likely six* before red reveals one, alone before any pick), which
-blue's own picks never constrain. Red's (right) is their most likely
-starting comp, a two-two-two filled slot by slot from the map's pick rates
-and the wiki's synergies, past the bans; it reads no strategy, and only a
-new map, side or ban sends it back to *searching*. Under a six's cards sit
+blue's own picks never constrain. Red's (right) is their likely six,
+*their picks, the rest likely* once red reveals one: red's picks, then a
+two-two-two filled slot by slot from the map's pick rates and the wiki's
+synergies, past the bans, with the six's pull in its title. Red is never
+optimized: it reads no strategy, and only a new map, ban or red pick sends
+it back to *searching*. Under a six's cards sit
 the search's numbers (the candidates, every six of the legal shapes its
 answer covers; the seconds; the lean), the default engine's
 three terms - `base.rates`, `base.synergy`, `base.counters`, a bar each
@@ -119,34 +125,27 @@ with the fact it read, always shown - then the strategies in three tabs -
 filter, each bar's tooltip saying why it paid or did not, and last the
 alternatives. The bars share one scale.
 
-**The badges** above the pickers are each seat's comp as a share of its
-own optimal: blue's picks against blue's optimal, red's against red's best
-counter to your picks (solved for that scale, not shown), each read from
-the seat's floor, the lowest of its reference sixes, up to its optimal
-([The share](inference.md#the-share)). A seat still
-drafting reads the share the best six from its picks reaches, in the badge
-and the strip alike, and the tooltip says so; before any pick the badge
-shows the suggested six's 100. Where blue's own picks break one of the
-playbook's limits the badge reads *not allowed*, the limit named in the
-tip, and the comp has no score, share or odds. The engine words each badge
-(`momentum.badges`, a label and a tip); the page only shows it.
-
-**The fight odds** strip is two bars stacked on one track, blue's over
-red's. With both seats scored, each bar is its side's share over the two
-shares' sum, a split of 100, the share in the tooltip; with one seat
-scored, its share alone; with neither, the engine's verdict sits under
-them. Not a fitted probability. The default engine scores every seat, so
-the page's boards always carry a share; a seat reads *unscored*, picks or
-not, the engine's reason in the tooltips, only where the optimal scores no
-higher than the seat's floor, as every six does when a caller turns the
-engine off under a playbook that scores nothing. A seat whose picks are
-not allowed reads its badge's *not allowed*.
+**The badges** above the pickers: blue's is its comp as a share of blue's
+optimal, read from the seat's floor, the lowest of its reference sixes,
+up to its optimal ([The share](inference.md#the-share)). Blue still
+drafting reads the share the best six from its picks reaches, and the
+tooltip says so; before any pick the badge shows the suggested six's 100.
+Where blue's own picks break one of the playbook's limits the badge reads
+*not allowed*, the limit named in the tip, and the comp has no score or
+share; where the optimal scores no higher than the floor, as every six
+does when a caller turns the engine off under a playbook that scores
+nothing, it reads *unscored*, the engine's reason in the tooltip. Red's
+badge is its likely six's pull - each hero's pick rate here plus 2 for
+each documented synergy pair on the six - since red is never scored. The engine
+words each badge (`momentum.badges`, a label and a tip); the page only
+shows it.
 
 **The suggestions.** Blue's empty slots carry the fill - the best six that
-keeps your locked picks, the optimal six before any pick - each a click
-from locking, its reasons in the tooltip and on the comps tab. A filled
+keeps your locked picks, the optimal six before any pick - and red's carry
+its likely six around its picks, each a click from locking, its reasons
+(and for red its pull) in the tooltip and on the comps tab. A filled
 slot's tooltip is the reason this board gives its hero: blue's from the
-fill or the six, red's from their current comp.
+fill or the six, red's from their likely six.
 
 **The facts panel** filters by text and by scope and says how many it
 holds beside the filter ("12 of 464 facts" under a filter); the tab
@@ -198,15 +197,16 @@ sequenceDiagram
     Facts-->>Board: F1..Fn - every fact about those heroes,<br/>the map, each team, the matchup
     Board->>Solver: /api/board (map, side, red, blue, bans)
     Solver->>Solver: blue's seat: shapes the limits allow · every legal six,<br/>bounded and pruned · the best proved, a few dozen scored in full
-    Solver->>Solver: red's seat, the other side: their best counter to your picks
-    Solver->>Solver: both current comps: six locked -> ranked among every legal six;<br/>fewer -> scored with the optimal search's bounds
+    Solver->>Solver: red's likely six: their picks, the rest by pick rate and synergy pull
+    Solver->>Solver: blue's current comp: six locked -> ranked among every legal six;<br/>fewer -> scored with the optimal search's bounds
     Solver->>Facts: the FactSet for each (map, side, red, the six)
-    Solver-->>Board: the game plan, the fight odds, blue's optimal with reasons and [F#]<br/>citations, red's likely starting comp, the suggestions for the empty slots
+    Solver-->>Board: the game plan, blue's optimal with reasons and [F#]<br/>citations, red's likely six with its pull, the suggestions for the empty slots
 ```
 
 Sides exist on Escort and Hybrid maps only, and the facts say which side
 each team holds. The rates do not split by side, so a strategy brings the
 side in through a `when` that reads `map.side`. The shipped playbook holds
-none, so today the side reaches no score; the two in the [fixture
+one, `defenders-stack-barriers`, which pays stacked barrier health on
+defense at a hard choke; the two in the [fixture
 playbook](../tests/fixtures/playbook/) show the form - engage tools and
 anti-heal on attack, deployables, barriers and reach on defense.

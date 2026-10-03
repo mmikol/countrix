@@ -19,19 +19,18 @@ import itertools
 import math
 import os
 import random
-import shutil
 
 import pytest
 
 from facts import compute
 from facts.draft import Draft
 from facts.team import TEAM_METRICS
-from inference import bounds, catalog, expr
+from inference import bounds, catalog, expr, intervals, ranges
 from inference.base import OFF
 from inference.expr import scope
 from inference.scoring import Candidate
 from inference.solver import Solver, _open
-from tests.verification.inference import ASSUMPTIONS_ONLY, DEFAULT, FIXTURE_PLAYBOOK
+from tests.verification.inference import ASSUMPTIONS_ONLY, DEFAULT
 
 SCRATCH = {
     "solo-mobility": (
@@ -67,36 +66,33 @@ LIMITS = {
 }
 
 
-def playbook(tmp_path):
-    """The reference playbook with the scratch strategies beside it."""
-    for name in os.listdir(FIXTURE_PLAYBOOK):
-        shutil.copy(os.path.join(FIXTURE_PLAYBOOK, name), tmp_path)
-    for sid, body in SCRATCH.items():
-        (tmp_path / ("%s.md" % sid)).write_text(
-            "---\nname: %s\nkind: heuristic\n%s\n---\nx\n" % (sid, body), "utf-8")
-    for sid, body in LIMITS.items():
-        (tmp_path / ("%s.md" % sid)).write_text(
-            "---\nname: %s\nkind: constraint\n%s\n---\nx\n" % (sid, body), "utf-8")
-    return catalog.load(str(tmp_path))
+def playbook(directory):
+    """The reference playbook, copied to `directory` (catalog_copy), with the
+    scratch strategies beside it."""
+    for kind, rules in (("heuristic", SCRATCH), ("constraint", LIMITS)):
+        for sid, body in rules.items():
+            with open(os.path.join(directory, "%s.md" % sid), "w", encoding="utf-8") as handle:
+                handle.write("---\nname: %s\nkind: %s\n%s\n---\nx\n" % (sid, kind, body))
+    return catalog.load(directory)
 
 
 def test_every_metric_and_every_expression_rule_has_a_bound():
     """A metric without a rule, or a node type or operator the whitelist
     admits without an interval rule, would leave the bound nothing to read:
     the tables must cover the registry and the whitelist exactly."""
-    assert set(bounds.TEAM_RULES) == set(TEAM_METRICS)
-    assert set(bounds.MATCHUP_RULES) == set(compute.MATCHUP_METRICS)
-    assert set(bounds.NODES) == set(expr._RULES)
-    assert set(bounds.OPERATORS) == {*expr.BINARY, *expr.UNARY, *expr.COMPARE}
+    assert set(ranges.TEAM_RULES) == set(TEAM_METRICS)
+    assert set(ranges.MATCHUP_RULES) == set(compute.MATCHUP_METRICS)
+    assert set(intervals.NODES) == set(expr._RULES)
+    assert set(intervals.OPERATORS) == {*expr.BINARY, *expr.UNARY, *expr.COMPARE}
 
 
 def holds(value, abstract):
     """Whether a concrete value lies in an abstract one."""
-    if isinstance(abstract, bounds.Top):
+    if isinstance(abstract, intervals.Top):
         return not isinstance(value, list | dict) or len(value) <= abstract.size
-    if isinstance(abstract, bounds.Exact):
+    if isinstance(abstract, intervals.Exact):
         return value == abstract.value
-    if isinstance(abstract, bounds.Seq):
+    if isinstance(abstract, intervals.Seq):
         return isinstance(value, list | tuple) and len(value) == len(abstract.items) and all(
             holds(v, a) for v, a in zip(value, abstract.items, strict=True))
     if isinstance(value, bool | int | float):
@@ -186,7 +182,7 @@ CASES = {
 @pytest.mark.parametrize(("rules", "base", "imputed", "keeps"), list(CASES.values()),
                          ids=list(CASES))
 def test_every_bound_holds_every_completion_of_random_branches(
-        synthetic_world, tmp_path, rules, base, imputed, keeps):
+        synthetic_world, catalog_copy, rules, base, imputed, keeps):
     """On random branches of each board, for every six the branch can still
     become: each team and matchup metric lies in its rule's range, each
     strategy's expressions lie in their abstract values, the tie-break lies
@@ -195,25 +191,25 @@ def test_every_bound_holds_every_completion_of_random_branches(
     the bound is the default engine's and the keep term's, nothing else's
     slack beside it, and on some branch it is within a hair of a
     completion's score."""
-    rules = playbook(tmp_path) if rules == "scratch" else ASSUMPTIONS_ONLY
+    rules = playbook(catalog_copy) if rules == "scratch" else ASSUMPTIONS_ONLY
     world = imputing(synthetic_world) if imputed else synthetic_world
     keep = frozenset(world.hero(name).id for name in KEEP) if keeps else frozenset()
     rng = random.Random("bounds|%s|%s|%s%s" % (len(rules), base, imputed,
                                                "|keep" if keeps else ""))
     closest = math.inf
-    keys = sorted(bounds.RULES)
+    keys = sorted(ranges.RULES)
     checked = 0
     for draft in BOARDS:
         m, red, locked, banned = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
         solver = Solver(world, m, red=red, locked=locked, banned=banned,
                         side=draft.side, catalog=rules, base=base, keep=keep, swap=KEEP_COST)
         static = bounds._board_values(solver)
-        expressions = [(s, e, bounds.abstract(e, s.params, static))
+        expressions = [(s, e, intervals.abstract(e, s.params, static))
                        for s in rules for e in (s.when, s.require, s.bonus, s.penalty)
                        if e is not None]
         for walk, frame, open_roles in branches(solver, rng, 60):
-            branch = bounds.Branch(frame.picks, open_roles)
-            env = bounds.evaluate(bounds.plan(walk.space, keys), branch)
+            branch = ranges.Branch(frame.picks, open_roles)
+            env = ranges.evaluate(ranges.rule_order(walk.space, keys), branch)
             top = walk.of(frame, open_roles)
             tiebreak = walk.tiebreak(frame, open_roles)
             for six in completions(walk, frame, open_roles):
@@ -242,25 +238,29 @@ def test_every_bound_holds_every_completion_of_random_branches(
 def test_an_expression_reads_three_ways_where_a_branch_leaves_it_open():
     """A comparison a branch cannot settle reads either; `and`, `or` and an
     if join the outcomes they can take; a division by a range that holds 0
-    reads anything; a name the board settles is its value."""
-    static = {"enemy.flyers": bounds.Iv(1.0, 1.0), "map.side": bounds.Exact("attack")}
+    reads anything, and a floor division's quotient that underflows to 0
+    still floors below it; a name the board settles is its value."""
+    static = {"enemy.flyers": intervals.Iv(1.0, 1.0), "map.side": intervals.Exact("attack")}
 
     def read(source, **env):
-        compiled = bounds.abstract(expr.Expr(source), {"LIMIT": 2.0}, static)
+        compiled = intervals.abstract(expr.Expr(source), {"LIMIT": 2.0}, static)
         return compiled({"team." + k: v for k, v in env.items()})
-    maybe = bounds.Iv(1.0, 3.0)
-    assert read("team.tanks >= 2", tanks=maybe) == bounds.MAYBE
-    assert read("team.tanks >= 1", tanks=maybe) == bounds.TRUE
-    assert read("team.tanks > params.LIMIT + 1", tanks=maybe) == bounds.FALSE
-    assert read("1 <= team.tanks <= 3 and map.side == 'attack'", tanks=maybe) == bounds.TRUE
-    assert read("team.tanks and 5", tanks=bounds.Iv(0.0, 2.0)) == bounds.Iv(0.0, 5.0)
-    assert read("team.tanks or 5", tanks=bounds.Iv(0.0, 2.0)) == bounds.Iv(0.0, 5.0)
-    assert read("7 if enemy.flyers else team.tanks", tanks=maybe) == bounds.Iv(7.0, 7.0)
-    assert read("1 / team.tanks", tanks=bounds.Iv(0.0, 2.0)) == bounds.WHOLE
-    assert read("1 / team.tanks", tanks=bounds.Iv(0.0, 0.0)) == bounds.FALSE
-    assert read("team.tanks ** 2", tanks=bounds.Iv(-1.0, 3.0)) == bounds.Iv(0.0, 9.0)
-    assert read("len(team.subroles)", subroles=bounds.Top(6)) == bounds.Iv(0.0, 6.0)
-    assert read("'x' in team.subroles", subroles=bounds.Top(6)) == bounds.MAYBE
-    assert read("team.style_top == 'dive'", style_top=bounds.ANY) == bounds.MAYBE
-    assert read("-team.tanks % 3", tanks=maybe) == bounds.Iv(0.0, 3.0)
-    assert set(bounds.NODES) >= {ast.BoolOp, ast.Compare}
+    maybe = intervals.Iv(1.0, 3.0)
+    assert read("team.tanks >= 2", tanks=maybe) == intervals.MAYBE
+    assert read("team.tanks >= 1", tanks=maybe) == intervals.TRUE
+    assert read("team.tanks > params.LIMIT + 1", tanks=maybe) == intervals.FALSE
+    assert read("1 <= team.tanks <= 3 and map.side == 'attack'", tanks=maybe) == intervals.TRUE
+    assert read("team.tanks and 5", tanks=intervals.Iv(0.0, 2.0)) == intervals.Iv(0.0, 5.0)
+    assert read("team.tanks or 5", tanks=intervals.Iv(0.0, 2.0)) == intervals.Iv(0.0, 5.0)
+    assert read("7 if enemy.flyers else team.tanks", tanks=maybe) == intervals.Iv(7.0, 7.0)
+    assert read("1 / team.tanks", tanks=intervals.Iv(0.0, 2.0)) == intervals.WHOLE
+    assert read("1 / team.tanks", tanks=intervals.Iv(0.0, 0.0)) == intervals.FALSE
+    tiny = read("team.tanks // 1e10", tanks=intervals.Iv(-1e-320, -1e-320))
+    assert tiny.lo <= -1e-320 // 1e10 == -1.0 <= tiny.hi
+    assert read("team.tanks // 2", tanks=intervals.Iv(0.0, 0.0)) == intervals.FALSE
+    assert read("team.tanks ** 2", tanks=intervals.Iv(-1.0, 3.0)) == intervals.Iv(0.0, 9.0)
+    assert read("len(team.subroles)", subroles=intervals.Top(6)) == intervals.Iv(0.0, 6.0)
+    assert read("'x' in team.subroles", subroles=intervals.Top(6)) == intervals.MAYBE
+    assert read("team.style_top == 'dive'", style_top=intervals.ANY) == intervals.MAYBE
+    assert read("-team.tanks % 3", tanks=maybe) == intervals.Iv(0.0, 3.0)
+    assert set(intervals.NODES) >= {ast.BoolOp, ast.Compare}

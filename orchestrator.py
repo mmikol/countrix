@@ -8,10 +8,10 @@
     python orchestrator.py status     what is running, how fresh the data is, the URLs
     python orchestrator.py down       stop everything (the database volume stays)
 
-It imports the standard library, db's ROOT, db.web's JSON reader and the
-catalog, to check the playbook before the stack starts; run it with
-.venv/bin/python, since the catalog loads psycopg. Exit code 0 means
-everything answered.
+It imports the standard library, db's ROOT, db.web's JSON reader,
+facts.draft's TEAM_SIZE and the catalog, to check the playbook before the
+stack starts; run it with .venv/bin/python, since the catalog loads
+psycopg. Exit code 0 means everything answered.
 """
 
 import json
@@ -23,6 +23,7 @@ from collections.abc import Callable
 from typing import Any, NamedTuple, NotRequired, TypedDict
 
 from db import ROOT, web
+from facts.draft import TEAM_SIZE
 from inference import catalog
 from inference.strategy import CatalogError
 
@@ -77,8 +78,8 @@ def get_json(url: str, timeout: float = 10) -> dict[str, Any] | None:
 def wait_for(url: str, seconds: float, what: str) -> dict[str, Any]:
     """The first JSON the URL answers, an error included, polled until
     `seconds` pass; then the run stops."""
-    started = time.time()
-    while time.time() - started < seconds:
+    started = time.monotonic()
+    while time.monotonic() - started < seconds:
         data = get_json(url)
         if data is not None:
             return data
@@ -158,12 +159,12 @@ def probe() -> Probe | None:
     """One board solved on the board -> {"seconds", "picks"}, or None when it
     did not answer with a six: unreachable, erroring, or a playbook whose
     limits seat no composition."""
-    started = time.time()
+    started = time.monotonic()
     data = get_json(PROBE, timeout=2 * MINUTE)
     picks = (data or {}).get("blue", {}).get("blue") or []
-    if len(picks) != 6:                            # a six, or the solve failed
+    if len(picks) != TEAM_SIZE:                    # a six, or the solve failed
         return None
-    return Probe(seconds=round(time.time() - started, 1), picks=picks)
+    return Probe(seconds=round(time.monotonic() - started, 1), picks=picks)
 
 
 def _state_problem(data: dict[str, Any]) -> str | None:
@@ -287,12 +288,13 @@ def dotenv() -> dict[str, str]:
 
 def stale_mount(inf: dict[str, Any] | None) -> bool:
     """The playbook's folder reads as empty or missing inside the board's
-    container - a bind mount gone stale - rather than a file in it that does
-    not load, whose error the verdict prints as it is."""
+    container - a bind mount gone stale, in the catalog's own words for
+    either - rather than a file in it that does not load, whose error the
+    verdict prints as it is."""
     if not inf or inf.get("strategies"):
         return False
     error = str(inf.get("error", ""))
-    return "no strategies in " in error or "no strategies directory at " in error
+    return catalog.NO_STRATEGIES in error or catalog.NO_FOLDER in error
 
 
 def playbook_problem() -> str | None:

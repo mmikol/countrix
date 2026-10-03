@@ -1,7 +1,7 @@
 """python -m door.mcp                        serve the tools over stdio
-python -m door.mcp --http [--host HOST] [--port PORT] [--allow-host NAME ...]
+python -m door.mcp --http [--host HOST] [--port PORT]
                                           serve them over Streamable HTTP (/mcp, /health),
-                                          answering to the local names and each NAME
+                                          answering to the local names alone
 python -m door.mcp list                   list the tools
 python -m door.mcp call NAME [JSON-ARGS]  run one tool and print its text"""
 
@@ -15,21 +15,21 @@ from door.mcp import http, lifecycle, stdio, tools
 from door.mcp.server import Server
 
 
-def _status(ctx: tools.Context) -> Callable[[], dict[str, object]]:
+def _status(ctx: tools.Context) -> Callable[[], lifecycle.DataHealth]:
     """The data container's /health: the database's state and counts, or
     degraded with the reason when the database is out of reach. It reads
     the database directly, not through the door: a read writes nothing."""
-    def status() -> dict[str, object]:
+    def status() -> lifecycle.DataHealth:
         try:
             found = lifecycle.read_status(ctx)
-            return {"status": "ok", "state": found["state"],
-                    "table_count": found["table_count"],
-                    "pending_migrations": found["pending_migrations"],
-                    "heroes": found["counts"].get("heroes", 0),
-                    "announced": found["counts"].get("announced", 0),
-                    "newest_capture": found["newest_capture"]}
+            return lifecycle.DataHealth(
+                status="ok", state=found["state"], table_count=found["table_count"],
+                pending_migrations=found["pending_migrations"],
+                heroes=found["counts"].get("heroes", 0),
+                announced=found["counts"].get("announced", 0),
+                newest_capture=found["newest_capture"])
         except psql.UNREACHABLE as error:     # the server is up even if the DB is not
-            return {"status": "degraded", "error": str(error)}
+            return lifecycle.DataHealth(status="degraded", error=str(error))
     return status
 
 
@@ -56,14 +56,14 @@ def _call(ctx: tools.Context, name: str, text: str) -> int:
 
 def _http_command_line(argv: list[str]) -> argparse.Namespace:
     """`--http`'s flags, spelled as the board spells them: where the door
-    listens, and, repeated, a host name it answers to beside the local
-    ones. A bad flag or port prints the usage and exits 2."""
+    listens. It answers to the local names alone - the door is never
+    published (docs/security.md). A bad flag or port prints the usage and
+    exits 2."""
     parser = argparse.ArgumentParser(
         prog="python -m door.mcp --http",
         description="Serve the tools over Streamable HTTP (/mcp, /health).")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8020)
-    parser.add_argument("--allow-host", action="append", default=[], metavar="NAME")
     return parser.parse_args(argv)
 
 
@@ -76,7 +76,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if argv[0] == "--http":
         args = _http_command_line(argv[1:])
-        http.serve(server, args.host, args.port, _status(ctx), allowed_hosts=args.allow_host)
+        http.serve(server, args.host, args.port, _status(ctx))
         return 0
     if argv[0] == "list":
         for t in tools.REGISTRY.bind(ctx):

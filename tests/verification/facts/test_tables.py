@@ -64,11 +64,11 @@ def test_an_announced_hero_moves_no_maps_style(synthetic_world):
     wisp.win = 99.0
     wisp.map_rates = {
         m.id: MapRate(win, None) for m, win in zip(_maps(w), (1.0, 99.0, 99.0), strict=True)}
-    tables.map_styles(w)
+    tables.derive_map_styles(w)
     assert before == {m.id: (dict(m.styles), dict(m.rate_lift)) for m in w.maps.values()}
     # released, the same rates move dive on every map
     wisp.status = "released"
-    tables.map_styles(w)
+    tables.derive_map_styles(w)
     assert all(m.rate_lift["dive"] != before[m.id][1]["dive"] for m in w.maps.values())
 
 
@@ -101,7 +101,7 @@ def test_a_heros_best_maps_are_its_largest_positive_lifts_ties_by_name(synthetic
     kite = w.hero("Kite")
     kite.map_rates[w.map("Harbor Gate").id] = MapRate(kite.win + 2.0, 8.0)
     kite.map_rates[4] = MapRate(kite.win + 3.0, 5.0)
-    tables.best_maps(w)
+    tables.derive_best_maps(w)
     assert [w.maps[mid].name for mid in kite.best_maps] == [
         "Anchor Bay", "Ember Ruins", "Harbor Gate"]
 

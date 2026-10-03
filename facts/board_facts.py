@@ -3,11 +3,8 @@ FactSet.
 
     generate(world, Draft("King's Row", red=("Zarya", "Pharah"), blue=("Ana",)))
 
-    for each domain D in { HEROES, MAPS, META }:
-        INDEPENDENT(D) = ⋃ facts(s)      over each selection s in D   s alone: its own row
-        DEPENDENT(D)   = ⋃ facts(s ⋈ t)  over the other selections t  s joined with t
-        FACTS(D)       = INDEPENDENT(D) ∪ DEPENDENT(D)
-    FACTS       = FACTS(HEROES) ∪ FACTS(MAPS) ∪ FACTS(META)      F1..
+The equation of the FACTS, independent and dependent per domain, is the
+math page's and docs/architecture.md's.
 
 FACTS are derived from the authoritative data - what the sources say about
 the heroes, the maps and the meta, pulled and set - for this board, and
@@ -28,11 +25,11 @@ This module writes the meta, the bans and the map; facts.hero_facts writes
 a hero's facts, and facts.team_facts a team's and the matchup's.
 """
 
-from typing import Literal, NotRequired, TypedDict
+from typing import NotRequired, TypedDict
 
 from facts import compute, hero_facts, team_facts
-from facts.compute import TERRAIN_STANDOUT
-from facts.draft import MAX_BANS, Draft, board_side, board_stage, is_sided, opposite
+from facts.compute import TERRAIN_STANDOUT, GroundSource
+from facts.draft import MAX_BANS, Draft, Side, board_side, board_stage, is_sided, opposite
 from facts.factset import FactSet
 from facts.model import TERRAIN_FEATURES, Map, Resolved, World
 
@@ -59,7 +56,7 @@ class GroundValue(TypedDict):
     ground in play, and whose text it was read off (compute.ground)."""
     feature: str
     z: float
-    source: Literal["stage", "map"]
+    source: GroundSource
 
 
 class GroundFact(TypedDict):
@@ -67,10 +64,6 @@ class GroundFact(TypedDict):
     the ordinary map, largest first."""
     stage: str
     features: list[GroundValue]
-
-
-def _g(value: float) -> str:
-    return "%g" % value if isinstance(value, float) else str(value)
 
 
 # --- the board -------------------------------------------------------------
@@ -117,7 +110,7 @@ def _meta_facts(fs: FactSet, world: World) -> None:
             "WARNING: %d patch(es) shipped since the rates were captured,"
             " newest %s (%s) - treat rates as pre-patch"
             % (len(world.newer_patches), name, released),
-            value=len(world.newer_patches), source="patches")
+            value=len(world.newer_patches), source="patches", warn=True)
 
 
 def _ban_facts(fs: FactSet, world: World, board: Resolved) -> None:
@@ -143,7 +136,7 @@ def _ban_facts(fs: FactSet, world: World, board: Resolved) -> None:
 
 # --- the map ---------------------------------------------------------------
 
-def _map_facts(fs: FactSet, world: World, m: Map, side: str = "", stage: str = "") -> None:
+def _map_facts(fs: FactSet, world: World, m: Map, side: Side = "", stage: str = "") -> None:
     """The map's own facts - its mode and sides, its ground and the ground
     in play, the styles it rewards - then the heroes who do well on it."""
     _map_mode(fs, m, side)
@@ -154,8 +147,9 @@ def _map_facts(fs: FactSet, world: World, m: Map, side: str = "", stage: str = "
     _map_heroes(fs, world, m)
 
 
-def _map_mode(fs: FactSet, m: Map, side: str) -> None:
-    """The mode, who attacks, and the stages or phases in play order."""
+def _map_mode(fs: FactSet, m: Map, side: Side) -> None:
+    """The mode, who attacks, and the stages in play order: the arenas, or
+    the phases of a route."""
     fs.add("map", m.name, "map.mode", "%s is a %s map" % (m.name, m.mode),
         value=m.mode, source="map_modes")
     if is_sided(m):
@@ -176,7 +170,7 @@ def _map_mode(fs: FactSet, m: Map, side: str) -> None:
         fs.add("map", m.name, "map.side", "%s (%s) has no attacking or defending side"
             % (m.name, m.mode), value="", source="derived:map.side")
     if compute.arenas(m):
-        fs.add("map", m.name, "map.stages", "%s stages: %s"
+        fs.add("map", m.name, "map.arenas", "%s stages: %s"
             % (m.name, ", ".join(m.stages)), value=m.stages, source="map_stages")
     elif compute.phases(m):
         fs.add("map", m.name, "map.phases", "%s phases, in order: %s"
@@ -244,8 +238,8 @@ def _map_styles(fs: FactSet, m: Map) -> None:
             source="derived:map.style")
     top = m.style_top                   # None exactly when the map has no styles
     if top is not None:
-        fs.add("map", m.name, "map.style_top", "%s rewards %s: %s (%s sd over the runner-up)"
-            % (m.name, top, _halves(m, top), _g(m.style_margin)),
+        fs.add("map", m.name, "map.style_top", "%s rewards %s: %s (%g sd over the runner-up)"
+            % (m.name, top, _halves(m, top), m.style_margin),
             value=top, source="derived:map.style_top")
 
 

@@ -16,8 +16,8 @@ import os
 from typing import NamedTuple
 
 from facts import compute, counters, scalars
-from facts.draft import MAX_BANS, TEAM_SIZE
-from inference import base, catalog, scale, scoring, solver
+from facts.draft import MAX_BANS, MAX_TANKS, TEAM_SIZE
+from inference import base, catalog, scale, scoring, solver, strategy
 
 GITHUB_MARK = (
     "<svg viewBox='0 0 16 16' width='15' height='15' aria-hidden='true'><path fill='currentColor' d='M8 0C3.58 0 0 3.58 0 8"  # noqa: E501
@@ -99,7 +99,6 @@ def view_board() -> str:
             "<div class='banbody'><div class='slots' id='banslots'></div>"
             "<div class='roles' id='banroster'></div></div></div>"
             "<div class='warnbox' id='vintage' style='display:none'></div>"
-            "<div class='momentum' id='momentum'></div>"
             "<div class='teams'>"
             "<section class='team blue'><h2>blue team <span class='tscore' id='bluescore'"
             " title=\"your picks as a share of blue's optimal\">"
@@ -110,7 +109,7 @@ def view_board() -> str:
             "<div class='slots' id='blueslots'></div><div class='roles' id='blueroster'>"
             "</div></section>"
             "<section class='team red'><h2>red team <span class='tscore' id='redscore'"
-            " title=\"their picks as a share of their best counter to yours\">"
+            " title=\"the pull of their likely six\">"
             "</span>"
             "<button class='clearteam' data-clear='red'>clear</button>"
             "</h2>"
@@ -129,11 +128,11 @@ def view_board() -> str:
             "<span id='chips'></span><span id='factsn' class='count'></span></div>"
             "<table class='facts'><tbody id='factbody'></tbody></table></section>"
             "<section class='panel' id='tab-playbook'><div id='playbook'></div></section>"
-            "</main><script>var TEAM = %d, BANS = %d, SWAP_MAX = %g;</script>"
+            "</main><script>var TEAM = %d, BANS = %d, TANKS = %d, SWAP_MAX = %g;</script>"
             "<script src='/static/comps.js'></script>"
             "<script src='/static/playbook.js'></script>"
             "<script src='/static/board.js'></script>")
-    return shell % (REPO_URL, GITHUB_MARK, TEAM_SIZE, MAX_BANS, base.SWAP_RANGE[1])
+    return shell % (REPO_URL, GITHUB_MARK, TEAM_SIZE, MAX_BANS, MAX_TANKS, base.SWAP_RANGE[1])
 
 
 def page(title: str, body: str) -> str:
@@ -171,6 +170,12 @@ def view_math() -> str:
         "RATE_PICK_HALF": base.RATE_PICK_HALF,
         "SYNERGY_PULL": compute.SYNERGY_PULL,
         "REFERENCE_SIZE": format(scale.REFERENCE_SIZE, ","),
+        "SCALE_POOL": scale.SCALE_POOL,
+        "COIN_FLIP": base.COIN_FLIP,
+        "MECHANISMS": len(counters.MECHANISMS),
+        "MAX_TANKS": MAX_TANKS,
+        "MAX_BANS": MAX_BANS,
+        "WEIGHT_MAX": strategy.WEIGHT_RANGE[1],
         "NEED_BUDGET": scoring.NEED_BUDGET,
         "SCORE_PLACES": scoring.SCORE_PLACES,
         "RANK_CAP": solver.RANK_CAP,

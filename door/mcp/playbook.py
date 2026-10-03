@@ -3,15 +3,20 @@ reference, the catalog and the default engine's weights, the tools that
 write a strategy file or meta.md - tune, add_strategy, infer_strategy - and
 the tuning log.
 
-Every write validates through the catalog, rewrites the docs catalog for the
-shipped playbook and logs a reasoned line (inference.tune does all three),
-then reloads the strategies table from the files (_remirror): the database
-half of the write, and the one step this module adds. The frontmatter
-fields the writes take are declared from inference.strategy.FIELDS, the
-rule that checks them, so the door admits what a file may hold.
+Every write opens the database before it changes anything, so a database
+out of reach fails the call with every file as it was. The write then
+validates through the catalog, rewrites the docs catalog for the shipped
+playbook and logs a reasoned line (inference.tune does all three), and
+reloads the strategies table from the files on that connection
+(_remirror): the database half of the write, and the one step this module
+adds. The frontmatter fields the writes take are declared from
+inference.strategy.FIELDS, the rule that checks them, so the door admits
+what a file may hold.
 """
 
 import os
+
+import psycopg
 
 from db import ROOT, Refusal
 from door.mcp.registry import Context, tool
@@ -90,11 +95,11 @@ BY: Properties = {
                                            % tune.BY_SESSION}}
 
 
-def _remirror(ctx: Context) -> None:
+def _remirror(cx: psycopg.Connection) -> None:
     """A playbook write's database half: the strategies table reloaded from
-    the files the write changed."""
-    with ctx.connect() as cx:
-        catalog.mirror(cx, catalog.load())
+    the files the write changed, on the connection its tool opened before
+    the write."""
+    catalog.mirror(cx, catalog.load())
 
 
 @tool(
@@ -117,8 +122,8 @@ def _remirror(ctx: Context) -> None:
         "field": {
             "type": "string",
             "description": "%s; for id %s: %s" % (
-                " | ".join((*TUNABLE, "params.NAME", tune.META_PROSE)), META,
-                " | ".join((*base.FIELDS, tune.META_PROSE)))},
+                " | ".join((*TUNABLE, "params.NAME", tune.PROSE_FIELD)), META,
+                " | ".join((*base.FIELDS, tune.PROSE_FIELD)))},
         "value": {"description": "the new value: a number, a word (kind, category, metric,"
                                  " direction) or an expression; meta.md's weights are"
                                  " numbers within %g..%g, its swap cost one within"
@@ -130,15 +135,17 @@ def _remirror(ctx: Context) -> None:
 def tune_tool(      # _tool: inference.tune holds the bare name
         ctx: Context, id: str, field: str, value: object, reason: str,
         by: str = tune.BY_SESSION) -> ToolReply:
-    change = tune.tune(id, field, value, reason, by=by)
-    _remirror(ctx)
+    with ctx.connect() as cx:
+        change = tune.tune(id, field, value, reason, by=by)
+        _remirror(cx)
     return ToolReply("tuned %s: %s %s -> %s\n%s" % (
         change["id"], change["field"], change["old"], change["new"], change["line"]), change)
 
 
 @tool(
-    "add_strategy", "Store a new strategy in inference/strategies/ from its name,"
-    " kind and prose plus the frontmatter /strategy inferred - a constraint's"
+    "add_strategy", "Store a new strategy in the playbook in force"
+    " (inference/strategies/ unless COUNTRIX_STRATEGIES names another folder) from"
+    " its name, kind and prose plus the frontmatter /strategy inferred - a constraint's"
     " require, a limit that always holds and is never weighted; a heuristic's"
     " metric/direction/weight, or its when/bonus/penalty and weight; params for"
     " either. An assumption is prose and needs nothing. The prose is three"
@@ -156,8 +163,9 @@ def tune_tool(      # _tool: inference.tune holds the bare name
 def add_strategy(
         ctx: Context, id: str, name: str, kind: str, body: str, reason: str,
         by: str = tune.BY_SESSION, **fields: object) -> ToolReply:
-    added = tune.add(id, name, kind, body, fields, reason, by=by)
-    _remirror(ctx)
+    with ctx.connect() as cx:
+        added = tune.add(id, name, kind, body, fields, reason, by=by)
+        _remirror(cx)
     note = ("\nstored as a DRAFT: the solver ignores it until /strategy infers its frontmatter"
             if added["form"] == "draft" else "")
     return ToolReply("added %s as %s/%s -> %s\n%s%s" % (
@@ -181,15 +189,16 @@ def add_strategy(
 def infer_strategy(
         ctx: Context, id: str, reason: str, by: str = tune.BY_SESSION,
         unset: list[str] | None = None, **fields: object) -> ToolReply:
-    done = tune.complete(id, fields, reason, by=by, unset=unset or ())
-    _remirror(ctx)
+    with ctx.connect() as cx:
+        done = tune.complete(id, fields, reason, by=by, unset=unset or ())
+        _remirror(cx)
     return ToolReply("%s is now %s: %s\n%s" % (id, done["form"], ", ".join(
         "%s=%s" % kv for kv in done["set"].items()), done["line"]), done)
 
 
 @tool(
-    "tuning_log", "The record of every change to the playbook's frontmatter -"
-    " the strategies' and meta.md's - newest last.",
+    "tuning_log", "The record of every change to the playbook - a strategy's"
+    " frontmatter or prose, a strategy added, meta.md - newest last.",
     {"lines": {"type": "integer", "description": "how many, 1 or more (default 20)"}})
 def tuning_log(ctx: Context, lines: int = 20) -> ToolReply:
     if lines < 1:

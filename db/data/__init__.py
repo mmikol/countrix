@@ -2,8 +2,8 @@
 page to table, plus what they share.
 
     README.md     the folder explained: the flow from page to table, the pull
-                  contract, the cache, the request policies, the name keys,
-                  every module, and the checklist for a new pull or table
+                  contract, the cache, the request policies, a pointer to
+                  each package, and the checklist for a new pull or table
     blizzard/     the official site: heroes (roster, roles, portraits,
                   text), meta (rates as dated snapshots)
     wiki/         the MediaWiki endpoint: heroes (kits, numbers, keywords),

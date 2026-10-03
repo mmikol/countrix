@@ -2,10 +2,14 @@
 load. No server and no database - these read ui/pages.py's output
 and the scripts' source. The scripts are pinned at their seams - the routes
 and query keys they send, the ids they write, the globals and payload keys
-they read - against what the shell and the server write. The two decisions
-only the client can make, the stale-reply guard and the HTML escape, are
-pinned in the script; any other decision worth pinning is made on the
-server, as the seat badge is (momentum.badges), and tested there."""
+they read - against what the shell and the server write. The decisions
+only the client can make are pinned in the script: the stale-reply guard;
+the HTML escape; the meta and swap-cost weights, never pruned as a stale
+heuristic's are; the swaps and suggested slots, drawn only for the picks
+the board in hand answered, held while a board solves and never offering a
+picked hero; and a taken swap, checked against the bans and the role caps
+as a pick is. Any other decision worth pinning is made on the server, as
+the seat badge is (momentum.badges), and tested there."""
 
 import os
 import re
@@ -14,12 +18,13 @@ import pytest
 
 from facts import board_facts, compute
 from facts.draft import Draft
-from inference import base, catalog, engine, scale, scoring, serve, solver
+from facts.records import Patch
+from inference import base, catalog, engine, scale, scoring, solver
 from inference.result import Badge, Momentum, OpenSlot, Pick, StageRow, SwapPair, Swaps
 from inference.scoring import Contribution
 from inference.strategy import WEIGHT_RANGE, StrategyRecord
 from tests.verification.inference import BRIEF, FIXTURE_PLAYBOOK
-from ui import board, pages
+from ui import board, pages, serve
 
 
 def scripts():
@@ -76,18 +81,15 @@ def test_the_page_is_a_shell_over_static_files():
     assert "/static/board.css" in body and "/static/board.js" in body
     order = [body.index("/static/%s.js" % n) for n in ("comps", "playbook", "board")]
     assert order == sorted(order)      # board.js loads last: it calls the others
-    assert "id='momentum'" in body and "id='plan'" in body
+    assert "id='plan'" in body and "id='momentum'" not in body     # red is never scored: no odds
     # scores live in the boxes
     assert "id='bluescore'" in body and "id='redscore'" in body
     assert "data-clear='red'" in body and "data-clear='blue'" in body
-    # the momentum strip sits above both boxes
-    assert body.index("id='momentum'") < body.index("id='blueslots'")
-    assert "id='momentum'" not in body[body.index("id='tab-comps'"):]
     # blue on the left, red on the right, like the boxes
     assert body.index("id='inf-blue'") < body.index("id='inf-red'")
     assert body.index("id='blueslots'") < body.index("id='redslots'")
     page = pages.view_math()
-    assert "<p id='fight-odds'><b>Fight odds.</b>" in page
+    assert "id='fight-odds'" not in page and "Red is never optimized" in page
     # a table of contents: every link resolves to an id on the page
     toc = page[page.index("<nav class='toc'>"):page.index("</nav>")]
     targets = re.findall(r"href='#([^']+)'", toc)
@@ -99,7 +101,7 @@ def test_the_page_is_a_shell_over_static_files():
     # and the page says what the short name stands for
     assert "<b>Countrix</b> is short for <b>Counter Utility Matrix</b>" in page
     css = pages.static_file("board.css")[0].decode()
-    for rule in (".tile.capped", ".tile.soon", ".momentum .verdict", ".inf-six + .inf-six"):
+    for rule in (".tile.capped", ".tile.soon", ".inf-six + .inf-six"):
         assert rule in css, rule
     assert "id='clearall'" in body
     header = body.split("</header>")[0]
@@ -109,11 +111,11 @@ def test_the_page_is_a_shell_over_static_files():
     assert links.count("<a ") == 2
     assert links.rstrip().endswith("GitHub</a></span>")
     # the page hands the scripts the counts they need
-    assert "var TEAM = 6, BANS = 5, SWAP_MAX = 50;" in body
+    assert "var TEAM = 6, BANS = 5, TANKS = 2, SWAP_MAX = 50;" in body
     data, ctype = pages.static_file("board.js")
     assert ctype.startswith("application/javascript") and b"function paint" in data
     data, ctype = pages.static_file("comps.js")
-    assert ctype.startswith("application/javascript") and b"function renderResult" in data
+    assert ctype.startswith("application/javascript") and b"function resultHTML" in data
     data, ctype = pages.static_file("playbook.js")
     assert ctype.startswith("application/javascript") and b"function renderPlaybook" in data
     assert pages.static_file("math.html") is None          # the article is not served on its own
@@ -164,7 +166,7 @@ def test_the_scripts_write_the_ids_and_read_the_globals_the_shell_holds():
         assert attribute in script, attribute
     shell = re.search(r"<script>var (.*?);</script>", body).group(1)
     names = [part.split(" = ")[0] for part in shell.split(", ")]
-    assert names == ["TEAM", "BANS", "SWAP_MAX"]
+    assert names == ["TEAM", "BANS", "TANKS", "SWAP_MAX"]
     for name in names:
         assert re.search(r"\b%s\b" % name, script), name
     assert script.count("min='%g' max='%g' step='0.01'" % WEIGHT_RANGE) == 2
@@ -173,8 +175,8 @@ def test_the_scripts_write_the_ids_and_read_the_globals_the_shell_holds():
 def test_the_scripts_read_payload_keys_the_server_writes(synthetic_world, monkeypatch):
     """Each key a script reads off a payload is one the server writes: the
     board and a seat on it, a pick, a contribution, the momentum and a
-    badge, a strategy, a fact, and the roster with its heroes and maps. No
-    script reads the raw sum."""
+    badge, a strategy, a fact, and the roster with its heroes, maps and
+    patches. No script reads the raw sum."""
     script = scripts()
 
     def read(keys, written):
@@ -184,20 +186,21 @@ def test_the_scripts_read_payload_keys_the_server_writes(synthetic_world, monkey
     solved = engine.board(synthetic_world, Draft("Harbor Gate", ("Mortar",), ("Balm",)),
                           catalog=catalog.load(FIXTURE_PLAYBOOK), brief=BRIEF).to_dict()
     read(
-        "plan momentum shapes current red_current fill expected blue map side swaps stages",
+        "plan momentum shapes current fill expected blue map side swaps stages",
         solved)
-    read("pairs open verdict status", Swaps.__annotations__)
+    read("pairs open verdict", Swaps.__annotations__)
     read("out in at portrait why", SwapPair.__annotations__)
     read("hero portrait why", OpenSlot.__annotations__)
     read("stage kind current played six swaps blurb solved", StageRow.__annotations__)
     read(
-        "picks contributions alternatives considered seconds playstyle cited scoring unscored"
-        " tie blue", solved["current"])
+        "picks contributions alternatives considered seconds playstyle cited tie blue",
+        solved["current"])
     read("hero role why evidence portrait", Pick.__annotations__)
+    read("locked picks", solved["expected"])
     read(
         "id kind applies ok weighted form when bonus penalty norm spread need metric raw"
         " weight fact text", Contribution.__annotations__)
-    read("blue red odds verdict badges", Momentum.__annotations__)
+    read("badges", Momentum.__annotations__)
     read("label tip", Badge.__annotations__)
     read(
         "id name kind form weight direction metric need when require penalty bonus params body",
@@ -207,12 +210,14 @@ def test_the_scripts_read_payload_keys_the_server_writes(synthetic_world, monkey
     read("strategies meta", playbook)
     read("meta rate synergy counter swap body", playbook["meta"])
     fact = board_facts.generate(synthetic_world, Draft()).to_dict()["facts"][0]
-    read("id key subject text scope team source", fact)
+    read("id key subject text scope team source warn", fact)
     monkeypatch.setattr(board.tables, "load", lambda cx: synthetic_world)
+    synthetic_world.newer_patches = [Patch("a patch", "2026-09-30")]
     roster = board.api_roster(None).body
     read("heroes maps role_icons newer_patches", roster)
     read("name role subrole portrait status release_date", roster["heroes"][0])
     read("name mode style sided stages", roster["maps"][0])
+    read("name", roster["newer_patches"][0])
     assert not re.search(r"\.score\b", script)
 
 
@@ -248,19 +253,25 @@ def test_the_swap_cost_slider_rides_the_weights_key_the_engine_reads_to_its_ceil
 
 def test_the_swap_row_and_the_slots_it_fills_follow_the_picks_the_board_answered():
     """A swap and a suggested slot are drawn only for the picks the board in
-    hand answered - the current comp's picks, in the order sent - so a local
-    change hides them until the next board lands; a picked hero is never
-    suggested again; the swap row and the stage plan wait with the rest while
-    a board is solving; and a swap is checked against the bans and the role
-    caps as a pick is."""
+    hand answered - the current comp's picks, in the order sent, and red's
+    likely six's revealed ones - so a local change hides them until the next
+    board lands; a picked hero is never suggested again; red's empty slots
+    show its likely six; the swap row and the stage plan wait with the rest
+    while a board is solving; and a swap is checked against the bans and the
+    role caps as a pick is."""
     script = scripts()
     assert "answered() ? d.swaps : null" in function(script, "paintSwaps")
     suggest = function(script, "paintSuggestions")
     assert "answered() ? d.swaps : null" in suggest and "sw.open.filter(free)" in suggest
+    assert "redAnswered() ? d.expected.picks" in suggest and "st.red.indexOf(p.hero)" in suggest
     assert "d.current.blue" in function(script, "answered")
+    assert "d.expected.locked" in function(script, "redAnswered")
     assert "'blueswaps', 'stageplan'" in function(script, "solving")
     take = function(script, "takeSwap")
     assert "st.bans.indexOf(into)" in take and "roleCap('blue'" in take
+    # the playbook's limits are blue's: red meets the queue's tank limit alone
+    assert "if (team === 'red') return role === 'tank' ? TANKS : null;" in function(
+        script, "roleCap")
 
 
 def test_a_reply_to_an_older_request_is_dropped_and_its_board_cancelled():
@@ -274,15 +285,14 @@ def test_a_reply_to_an_older_request_is_dropped_and_its_board_cancelled():
 
 
 def test_an_apostrophe_cannot_close_a_single_quoted_attribute():
-    """King's Row in a title='...' attribute, or the label's own "each side's",
-    must not end the attribute at the apostrophe."""
+    """King's Row in a title='...' attribute must not end the attribute at the
+    apostrophe."""
     script = scripts()
     esc = function(script, "esc")
     replaced = "King's Row <b> \"x\" & y"
     for pattern, entity in re.findall(r"\.replace\(/(.)/g,\s*'([^']+)'\)", esc):
         replaced = replaced.replace(pattern, entity)
     assert "'" not in replaced and "<" not in replaced and '"' not in replaced
-    assert "title='each side\\'s" not in script and "title='each side&#39;s" in script
 
 
 @pytest.mark.parametrize(("dial", "phrase"), [
@@ -309,8 +319,12 @@ def test_the_math_page_quotes_each_weight_from_the_playbooks_meta_file(
 
 @pytest.mark.parametrize(("module", "name", "phrase"), [
     (base, "RATE_PICK_HALF", "t_p = pick_p / ( pick_p + %s )"),
-    (compute, "SYNERGY_PULL", "likelihood(h) = pick(h, map) + %s &times; partners"),
+    (compute, "SYNERGY_PULL", "pull(h) = pick(h, map) + %s &times; partners"),
     (scale, "REFERENCE_SIZE", "against %s random legal sixes"),
+    (scale, "SCALE_POOL", "each role's %s released heroes"),
+    (base, "COIN_FLIP", "t_p &middot; ( win_p &minus; %s )"),
+    (pages, "MAX_TANKS", "at most %s tanks"),
+    (pages, "MAX_BANS", "within a match's %s bans"),
     (scoring, "NEED_BUDGET", "min( 1, max( %s, the largest w on n's guard ) / &Sigma; w"),
     (scoring, "NEED_BUDGET", "one state costs %s at most"),
     (scoring, "SCORE_PLACES", "by their score to %s decimal places"),
@@ -349,10 +363,10 @@ def test_the_math_page_states_the_equation_and_the_layers():
     # the formula, the scale, how a heuristic's reach compares with the base, the empty case
     assert "The function: STRATEGIES( FACTS )" in page
     flat = " ".join(page.split())
-    assert "<b>The default engine</b>" in page and "only this term reads the likely six" in flat
+    assert "<b>The default engine</b>" in page and "Only this term reads a derived edge" in flat
     assert "score(x) = base(x)\n         + &Sigma; heuristics h" in page
     assert "norm_h(v) = clamp(" in page
-    assert "A heuristic moves a six by its weight at most" in flat
+    assert "A heuristic on a metric moves a six by its weight at most" in flat
     assert "What 100 means" in page and "not a win probability" in page
     assert "When nothing scores" in page
     # how a six is chosen: the five steps in order, then what a reader must not assume
@@ -367,5 +381,5 @@ def test_the_math_page_states_the_equation_and_the_layers():
     # the counter: blue's own six above the optimal that ignores its picks
     counter = page[page.index("<p id='counter'>"):]
     assert "shows blue's six above the optimal" in counter[:counter.index("</p>")]
-    # the page solves no countered case: the hedge is the board tool's
-    assert "row is the hedge" not in page
+    # red is never solved: nothing scores blue's six against red's best reply
+    assert "if countered optimally" not in page and "Red is never solved" in page

@@ -26,17 +26,17 @@ def test_the_entry_point_lists_tools_and_refuses_nonsense(capsys):
 
 
 def test_the_http_mode_takes_the_flags_the_board_takes(monkeypatch, capsys):
-    """--host, --port and a repeated --allow-host, as the board spells
-    them; the old HOST:PORT positional is a usage error like a port that is
-    not a number."""
+    """--host and --port, as the board spells them, and no --allow-host:
+    the door is never published. The old HOST:PORT positional is a usage
+    error like a port that is not a number."""
     served = []
-    monkeypatch.setattr(http, "serve", lambda server, host, port, status, allowed_hosts=(): (
-        served.append((host, port, list(allowed_hosts)))))
+    monkeypatch.setattr(http, "serve", lambda server, host, port, status: (
+        served.append((host, port))))
     assert main(["--http"]) == 0
-    assert main(["--http", "--host", "0.0.0.0", "--port", "9",
-                 "--allow-host", "x", "--allow-host", "y"]) == 0
-    assert served == [("127.0.0.1", 8020, []), ("0.0.0.0", 9, ["x", "y"])]
-    for argv in (["--http", "--port", "x"], ["--http", "127.0.0.1:8020"]):
+    assert main(["--http", "--host", "0.0.0.0", "--port", "9"]) == 0
+    assert served == [("127.0.0.1", 8020), ("0.0.0.0", 9)]
+    for argv in (["--http", "--port", "x"], ["--http", "127.0.0.1:8020"],
+                 ["--http", "--allow-host", "x"]):
         with pytest.raises(SystemExit) as usage:
             main(argv)
         assert usage.value.code == 2
@@ -69,6 +69,20 @@ def test_health_is_degraded_when_the_database_is_out_of_reach_and_crashes_otherw
     monkeypatch.setattr(lifecycle, "read_status", broken)
     with pytest.raises(RuntimeError, match="a bug"):
         status()
+
+
+def test_health_carries_every_key_data_health_declares_but_the_error(monkeypatch):
+    """An ok /health is read_status reshaped into DataHealth: the state
+    compose's healthcheck waits on, and the counts orchestrator.py prints."""
+    monkeypatch.setattr(lifecycle, "read_status", lambda ctx: lifecycle.DbStatus(
+        dsn="postgresql://db/overwatch", state="current", table_count=33,
+        counts={"heroes": 50, "announced": 1}, snapshots=[], newest_capture="2026-09-30",
+        pending_migrations=[]))
+    reply = _status(tools.Context(dsn="postgresql://nowhere"))()
+    assert reply == {"status": "ok", "state": "current", "table_count": 33,
+                     "pending_migrations": [], "heroes": 50, "announced": 1,
+                     "newest_capture": "2026-09-30"}
+    assert set(reply) == set(lifecycle.DataHealth.__annotations__) - {"error"}
 
 
 def test_an_in_process_call_is_validated_against_the_tools_schema():

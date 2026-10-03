@@ -59,7 +59,7 @@ def _holds_once(stat: Stat, figure: float) -> bool:
     """A row whose value is `figure` and whose words hold it once."""
     if stat.value is None or abs(stat.value - figure) > SAME:
         return False
-    said = [float(x) for x in FIGURE_RE.findall(stat.text or "")]
+    said = [float(x) for x in FIGURE_RE.findall(stat.text)]
     return not said or sum(1 for x in said if abs(x - figure) <= SAME) == 1
 
 

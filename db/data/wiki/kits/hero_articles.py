@@ -19,7 +19,7 @@ from db.data.cache import PullContext
 from db.data.normalizer import ability_key
 from db.data.wiki import Articles, fetch_articles, markup
 from db.data.wiki.kits.kit_rows import HeroKit
-from db.data.wiki.kits.six_a_side import SixKit, parse_six_a_side, with_stats
+from db.data.wiki.kits.six_a_side import SixKit, infobox, parse_six_a_side, with_stats
 
 
 class HeroProfile(NamedTuple):
@@ -49,17 +49,11 @@ def parse_hero_profile(text: str) -> HeroProfile | None:
     article rather than in a Cargo table, so it comes from the same page fetch
     the stat supplement already makes.
     """
-    params = _infobox(text)
+    params = infobox(text)
     if params is None:
         return None
     return HeroProfile(health=_pool(params, "health"), shield=_pool(params, "shield"),
                        armor=_pool(params, "armor"))
-
-
-def _infobox(text: str) -> dict[str, str] | None:
-    """The parameters of an article's character infobox; None without one."""
-    block = next(markup.find_templates(text, r"Infobox character"), None)
-    return markup.parse_params(block) if block is not None else None
 
 
 def _pool(params: dict[str, str], field: str) -> int | None:
@@ -77,9 +71,9 @@ def parse_announcement(text: str) -> Announcement | None:
     """An article marked {{Upcoming}} -> {role, subrole, release_date} from
     its infobox and its release sentence; None for a released hero (no
     marker) or an infobox without a role."""
-    if not UPCOMING_RE.search(text or ""):
+    if not UPCOMING_RE.search(text):
         return None
-    params = _infobox(text)
+    params = infobox(text)
     if params is None:
         return None
     role = markup.wikitext_to_text(params.get("role", "")).strip().lower()

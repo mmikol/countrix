@@ -68,7 +68,6 @@ class Hero:
     # rows never filled reads zero rather than raising, and a reader sees
     # the fields in one place.
     pool: int = 0
-    keywords: set[str] = field(default_factory=set)
     form_armor: float = 0.0
     dps: float = 0.0
     burst: float = 0.0
@@ -167,10 +166,10 @@ class Map:
         self.stage_terrain: dict[str, dict[str, StageTerrain]] = {}   # stage -> feature; text only
         self.stage_z: dict[str, dict[str, float]] = {}          # stage -> {feature: z}
         self.terrain: dict[str, float] = {}     # feature -> mentions per thousand words, with text
-        self.terrain_z = dict.fromkeys(TERRAIN_FEATURES, 0.0)   # see tables.map_terrain
-        self.rate_lift: dict[str, float] = {}                   # style -> z: see tables.map_styles
-        self.terrain_lean: dict[str, float] = {}                # style -> z: see tables.map_terrain
-        self.styles: dict[str, float] = {}                      # style -> sd: see tables.map_styles
+        self.terrain_z = dict.fromkeys(TERRAIN_FEATURES, 0.0)   # see tables.derive_map_terrain
+        self.rate_lift: dict[str, float] = {}     # style -> z: see tables.derive_map_styles
+        self.terrain_lean: dict[str, float] = {}  # style -> z: see tables.derive_map_terrain
+        self.styles: dict[str, float] = {}        # style -> sd: see tables.derive_map_styles
 
     @property
     def style_top(self) -> str | None:
@@ -266,7 +265,10 @@ class World:
             twice: list[str] = []
             for n in names:
                 hid = heroes[n].id
-                twice.append(n) if hid in seen else seen.add(hid)
+                if hid in seen:
+                    twice.append(n)
+                else:
+                    seen.add(hid)
             if twice:
                 raise Refusal(
                     "%s picks the same hero twice: %s" % (label, ", ".join(sorted(set(twice)))))

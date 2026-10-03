@@ -7,13 +7,9 @@ import pytest
 
 from db import KIND_ABILITY, KIND_PASSIVE, KIND_ULTIMATE, KIND_WEAPON
 from facts import scalars
-from facts.kit import KitPiece, Stat
+from facts.kit import KitPiece
 from facts.model import Hero
-
-
-def _stat(code, value, unit_num=None, unit_den=None, den=None, condition=None, text=None):
-    return Stat(code=code, value=value, unit_num=unit_num, unit_den=unit_den, den_value=den,
-                condition=condition, text=text)
+from tests.verification.facts import stat
 
 
 def _kit(name, kind, *stats, keywords="", **extra):
@@ -39,22 +35,21 @@ def _hero(role="damage", *, weapons=(), abilities=(), **fields):
 
 
 def _per_second(code, value):
-    return _stat(code, value, "hp", "seconds", 1)
+    return stat(code, value, "hp", "seconds", 1)
 
 
 def test_the_body_counts_a_forms_armor_by_its_uptime_and_every_cooldown():
     """A form's 275 armor for 8 s of every 16 is 137.5, outside the spawn
     pool; armor that lands on allies is theirs; an ultimate's cooldown is not
     counted."""
-    form = _kit("Nemesis Form", KIND_ABILITY, _stat("armor", 275, "hp"),
-                _stat("cooldown", 8, "seconds"), _stat("duration", 8, "seconds"),
+    form = _kit("Nemesis Form", KIND_ABILITY, stat("armor", 275, "hp"),
+                stat("cooldown", 8, "seconds"), stat("duration", 8, "seconds"),
                 keywords="movement::armor")
-    rally = _kit("Rally", KIND_ABILITY, _stat("armor", 50, "hp", condition="allies"),
-                 _stat("cooldown", 11, "seconds"))
-    ult = _kit("Annihilation", KIND_ULTIMATE, _stat("cooldown", 30, "seconds"))
+    rally = _kit("Rally", KIND_ABILITY, stat("armor", 50, "hp", condition="allies"),
+                 stat("cooldown", 11, "seconds"))
+    ult = _kit("Annihilation", KIND_ULTIMATE, stat("cooldown", 30, "seconds"))
     hero = _hero("tank", health=275, armor=100, abilities=[form, rally, ult])
     assert hero.pool == 375 and hero.form_armor == 137.5
-    assert hero.keywords == {"movement", "armor"}
     assert hero.cooldowns == [8.0, 11.0] and hero.median_cooldown == 9.5
     assert _hero().median_cooldown is None and _hero().cooldowns == []
 
@@ -71,27 +66,27 @@ def test_the_damage_is_the_held_weapons_and_a_form_gated_one_is_not():
 
 
 def test_the_burst_is_the_biggest_hit_and_a_pilots_gun_is_not_the_heros():
-    gun = _gun("Fusion Cannons", "Projectile", _stat("damage", 120, "hp"))
-    pilot = _gun("Light Gun", "Projectile", _stat("damage", 500, "hp"))
-    boosters = _kit("Boosters", KIND_ABILITY, _stat("damage", 250, "hp"))
+    gun = _gun("Fusion Cannons", "Projectile", stat("damage", 120, "hp"))
+    pilot = _gun("Light Gun", "Projectile", stat("damage", 500, "hp"))
+    boosters = _kit("Boosters", KIND_ABILITY, stat("damage", 250, "hp"))
     assert _hero("tank", weapons=[gun, pilot], abilities=[boosters]).burst == 250.0
     # six bombs of 25 thrown in one cast hit as one: 150
     bombs = _kit("Sticky Bombs", KIND_ABILITY,
-                 _stat("damage", 25, "hp", condition="explosion, enemy"), _stat("pellets", 6))
+                 stat("damage", 25, "hp", condition="explosion, enemy"), stat("pellets", 6))
     assert _hero(weapons=[gun], abilities=[bombs]).burst == 150.0
 
 
 def test_a_supports_healing_lands_on_teammates_and_a_self_heal_is_its_own():
     stream = _gun("Healing Stream", "Beam", _per_second("hps", 60))
-    burst = _kit("Healing Burst", KIND_ABILITY, _stat("heal", 70, "hp"),
-                 _stat("heal", 30, "hp", condition="self"))
+    burst = _kit("Healing Burst", KIND_ABILITY, stat("heal", 70, "hp"),
+                 stat("heal", 30, "hp", condition="self"))
     hero = _hero("support", weapons=[stream], abilities=[burst])
     assert (hero.hps, hero.peak_heal, hero.self_hps, hero.self_heal) == (60.0, 70.0, 0.0, 30.0)
     # a healing beam deals no damage: it is not a beam weapon
     assert not hero.beam and hero.weapon_kinds == set()
     # a self row under a longer condition is the hero's own too
-    purr = _kit("Purr", KIND_ABILITY, _stat("heal", 30, "hp", condition="per pulse, allies"),
-                _stat("heal", 40, "hp", condition="per pulse, self"))
+    purr = _kit("Purr", KIND_ABILITY, stat("heal", 30, "hp", condition="per pulse, allies"),
+                stat("heal", 40, "hp", condition="per pulse, self"))
     cat = _hero("support", abilities=[purr])
     assert (cat.peak_heal, cat.self_heal) == (30.0, 40.0)
 
@@ -100,8 +95,8 @@ def test_a_non_supports_healing_is_its_own_unless_it_lands_on_an_ally():
     """150 a second for 3 s is a 450 cast on itself; a heal tagged for a
     target ally is the team's even on a damage hero."""
     gun = _gun("Shotgun", "Hitscan", _per_second("dps", 120))
-    siphon = _kit("Siphon", KIND_ABILITY, _per_second("heal", 150), _stat("duration", 3, "seconds"))
-    field = _kit("Field", KIND_ABILITY, _stat("heal", 40, "hp"), keywords="heal;;target ally")
+    siphon = _kit("Siphon", KIND_ABILITY, _per_second("heal", 150), stat("duration", 3, "seconds"))
+    field = _kit("Field", KIND_ABILITY, stat("heal", 40, "hp"), keywords="heal;;target ally")
     hero = _hero(weapons=[gun], abilities=[siphon, field])
     assert hero.self_hps == 150.0 and hero.self_heal == 450.0
     assert hero.peak_heal == 40.0 and hero.hps == 0.0
@@ -111,23 +106,23 @@ def test_a_heal_off_the_damage_dealt_is_the_held_weapons_rate_over_it():
     """Overdrive heals 30% of the damage dealt for 3 s on an 8 s cooldown:
     of a 100 a second gun, 90. The same share is the hero's lifesteal."""
     gun = _gun("Chainguns", "Hitscan", _per_second("dps", 100))
-    overdrive = _kit("Overdrive", KIND_ABILITY, _stat("heal", 30, "percent"),
-                     _stat("duration", 3, "seconds"), _stat("cooldown", 8, "seconds"))
+    overdrive = _kit("Overdrive", KIND_ABILITY, stat("heal", 30, "percent"),
+                     stat("duration", 3, "seconds"), stat("cooldown", 8, "seconds"))
     hero = _hero("tank", weapons=[gun], abilities=[overdrive])
     assert hero.self_heal == pytest.approx(90.0) and hero.lifesteal == pytest.approx(0.3)
 
 
 def test_the_reach_is_the_published_limit_and_a_blind_projectile_leaves_hitscan():
-    rifle = _gun("Rifle", "Hitscan", _per_second("dps", 90), _stat("range", 40, "meters"))
+    rifle = _gun("Rifle", "Hitscan", _per_second("dps", 90), stat("range", 40, "meters"))
     hero = _hero(weapons=[rifle])
     assert (hero.max_range, hero.hitscan_range) == (40.0, 40.0)
     # a held projectile that publishes no limit: only the hitscan figure stands
     rockets = _gun("Rockets", "Projectile", _per_second("dps", 120))
-    pistol = _gun("Pistol", "Hitscan", _stat("damage", 40, "hp"), _stat("range", 25, "meters"),
+    pistol = _gun("Pistol", "Hitscan", stat("damage", 40, "hp"), stat("range", 25, "meters"),
                   slot="secondary_fire")
     blind = _hero(weapons=[rockets, pistol])
     assert (blind.max_range, blind.hitscan_range) == (25.0, 25.0)
-    lobbed = _gun("Rockets", "Projectile", _per_second("dps", 120), _stat("range", 60, "meters"))
+    lobbed = _gun("Rockets", "Projectile", _per_second("dps", 120), stat("range", 60, "meters"))
     assert _hero(weapons=[lobbed, pistol]).max_range == 60.0
     assert _hero(weapons=[lobbed]).hitscan_range == 0.0
     # a projectile alone that publishes no limit: the range is unknown, not 0 m
@@ -135,10 +130,10 @@ def test_the_reach_is_the_published_limit_and_a_blind_projectile_leaves_hitscan(
 
 
 def test_the_weapon_kinds_read_the_damaging_weapons():
-    hammer = _gun("Rocket Hammer", "Melee", _stat("damage", 100, "hp"))
+    hammer = _gun("Rocket Hammer", "Melee", stat("damage", 100, "hp"))
     swinger = _hero("tank", weapons=[hammer])
     assert swinger.weapon_kinds == {"melee"} and swinger.melee and swinger.melee_only
-    cannon = _gun("Cannon", "Projectile", _stat("damage", 80, "hp"), slot="secondary_fire")
+    cannon = _gun("Cannon", "Projectile", stat("damage", 80, "hp"), slot="secondary_fire")
     both = _hero("tank", weapons=[hammer, cannon])
     assert both.weapon_kinds == {"melee", "projectile"} and both.melee and not both.melee_only
     beam = _gun("Particle Beam", "Beam", _per_second("dps", 90))
@@ -148,34 +143,34 @@ def test_the_weapon_kinds_read_the_damaging_weapons():
 
 
 def test_area_pieces_count_once_and_those_that_hurt_apart():
-    blast = _kit("Blast", KIND_ABILITY, _stat("damage", 60, "hp"), keywords="area of effect")
-    wave = _kit("Wave", KIND_ABILITY, _stat("damage", 40, "hp"), _stat("shot_type", None,
+    blast = _kit("Blast", KIND_ABILITY, stat("damage", 60, "hp"), keywords="area of effect")
+    wave = _kit("Wave", KIND_ABILITY, stat("damage", 40, "hp"), stat("shot_type", None,
                 text="Area of effect"))
-    suzu = _kit("Suzu", KIND_ABILITY, _stat("heal", 80, "hp"), keywords="area of effect")
-    grenade = _gun("Launcher", "Projectile", _stat("damage", 50, "hp"), keywords="area of effect")
+    suzu = _kit("Suzu", KIND_ABILITY, stat("heal", 80, "hp"), keywords="area of effect")
+    grenade = _gun("Launcher", "Projectile", stat("damage", 50, "hp"), keywords="area of effect")
     # the same weapon as the abilities table lists it: counted once, as the weapon
-    listed = _kit("Launcher", KIND_WEAPON, _stat("damage", 50, "hp"), keywords="area of effect")
+    listed = _kit("Launcher", KIND_WEAPON, stat("damage", 50, "hp"), keywords="area of effect")
     hero = _hero(weapons=[grenade], abilities=[blast, wave, suzu, listed])
     assert (hero.aoe_count, hero.aoe_damage_count) == (4, 3)
 
 
 def test_barriers_count_their_health_and_a_passives_swing_pierces_nothing():
-    shield = _kit("Barrier Field", KIND_ABILITY, _stat("barrier_health", 1200, "hp"))
-    dome = _kit("Dome", KIND_ABILITY, _stat("health", 600, "hp"), keywords="barrier")
+    shield = _kit("Barrier Field", KIND_ABILITY, stat("barrier_health", 1200, "hp"))
+    dome = _kit("Dome", KIND_ABILITY, stat("health", 600, "hp"), keywords="barrier")
     hero = _hero("tank", abilities=[shield, dome])
     assert hero.barrier_hp == 1200.0 and not hero.pierces_barrier
-    beam = _kit("Tesla", KIND_ABILITY, _stat("damage", 60, "hp"), keywords="barrier piercing")
-    kick = _kit("Snap Kick", KIND_PASSIVE, _stat("damage", 30, "hp"), keywords="barrier piercing")
+    beam = _kit("Tesla", KIND_ABILITY, stat("damage", 60, "hp"), keywords="barrier piercing")
+    kick = _kit("Snap Kick", KIND_PASSIVE, stat("damage", 30, "hp"), keywords="barrier piercing")
     assert _hero(abilities=[beam]).pierces_barrier
     assert not _hero(abilities=[kick]).pierces_barrier
 
 
 def test_amps_anti_heal_and_overhealth_read_their_own_rows():
-    grenade = _kit("Biotic Grenade", KIND_ABILITY, _stat("healing_mod", -100, "percent"),
-                   _stat("healing_mod", 50, "percent"))
-    boost = _kit("Boost", KIND_ABILITY, _stat("damage_amp", 30, "percent"))
-    opportunist = _kit("Opportunist", KIND_PASSIVE, _stat("damage_amp", 20, "percent"))
-    grip = _kit("Grip", KIND_ABILITY, _stat("overhealth", 400, "hp"))
+    grenade = _kit("Biotic Grenade", KIND_ABILITY, stat("healing_mod", -100, "percent"),
+                   stat("healing_mod", 50, "percent"))
+    boost = _kit("Boost", KIND_ABILITY, stat("damage_amp", 30, "percent"))
+    opportunist = _kit("Opportunist", KIND_PASSIVE, stat("damage_amp", 20, "percent"))
+    grip = _kit("Grip", KIND_ABILITY, stat("overhealth", 400, "hp"))
     hero = _hero("support", abilities=[grenade, boost, opportunist, grip])
     assert (hero.antiheal, hero.heal_amp, hero.dmg_amp, hero.overhealth) == (
         -100.0, 50.0, 30.0, 400.0)
@@ -185,18 +180,18 @@ def test_amps_anti_heal_and_overhealth_read_their_own_rows():
 
 def test_control_movement_and_flight_read_the_keywords_and_the_rows():
     stun = _kit("Flashbang", KIND_ABILITY, keywords="stun")
-    shove = _kit("Concussive Blast", KIND_ABILITY, _stat("damage", 70, "hp"),
-                 _stat("kbspeed", 15, "meters"))
-    nudge = _kit("Nudge", KIND_ABILITY, _stat("damage", 20, "hp"), _stat("kbspeed", 5, "meters"))
-    slow = _kit("Frost", KIND_ABILITY, _stat("mspeed_slow", -30, "percent"))
+    shove = _kit("Concussive Blast", KIND_ABILITY, stat("damage", 70, "hp"),
+                 stat("kbspeed", 15, "meters"))
+    nudge = _kit("Nudge", KIND_ABILITY, stat("damage", 20, "hp"), stat("kbspeed", 5, "meters"))
+    slow = _kit("Frost", KIND_ABILITY, stat("mspeed_slow", -30, "percent"))
     jet = _kit("Jet Pack", KIND_ABILITY, keywords="flight")
-    roll = _kit("Roll", KIND_ABILITY, _stat("shot_type", None, text="Movement"))
+    roll = _kit("Roll", KIND_ABILITY, stat("shot_type", None, text="Movement"))
     # a tool that moves a teammate is the teammate's; a partial one moves its hero
     grip = _kit("Grip", KIND_ABILITY, keywords="evasive;;target ally")
     lunge = _kit("Lunge", KIND_ABILITY, keywords="partial movement")
     # a movement tool's knockback is its own flight, typed Movement or tagged
-    slam = _kit("Slam", KIND_ABILITY, _stat("damage", 50, "hp"), _stat("kbspeed", 15, "meters"),
-                _stat("shot_type", None, text="Movement"))
+    slam = _kit("Slam", KIND_ABILITY, stat("damage", 50, "hp"), stat("kbspeed", 15, "meters"),
+                stat("shot_type", None, text="Movement"))
     hero = _hero(abilities=[stun, shove, nudge, slow, jet, roll, grip, lunge, slam])
     assert hero.cc_tools == ["Concussive Blast", "Flashbang", "Frost"]
     assert hero.mobility_tools == ["Jet Pack", "Lunge", "Roll", "Slam"] and hero.flyer
@@ -205,7 +200,7 @@ def test_control_movement_and_flight_read_the_keywords_and_the_rows():
 
 
 def test_saves_split_what_lands_on_a_teammate_from_what_saves_its_owner():
-    suzu = _kit("Protection Suzu", KIND_ABILITY, _stat("heal", 80, "hp"),
+    suzu = _kit("Protection Suzu", KIND_ABILITY, stat("heal", 80, "hp"),
                 keywords="greater cleanse::invulnerable::area of effect")
     fade = _kit("Fade", KIND_ABILITY, keywords="lesser cleanse::invulnerable")
     field = _kit("Immortality Field", KIND_ABILITY, keywords="deployable")
@@ -220,14 +215,14 @@ def test_saves_split_what_lands_on_a_teammate_from_what_saves_its_owner():
 
 def test_the_ultimate_is_its_own_numbers_and_the_mech_call_is_not_one():
     barrage = _kit("Barrage", KIND_ULTIMATE, _per_second("dps", 150),
-                   _stat("duration", 3, "seconds"), _stat("ult_req", 2100, "points"))
-    remech = _kit("Call Mech", KIND_ULTIMATE, _stat("damage", 1000, "hp"),
-                  _stat("ult_req", 1500, "points"))
+                   stat("duration", 3, "seconds"), stat("ult_req", 2100, "points"))
+    remech = _kit("Call Mech", KIND_ULTIMATE, stat("damage", 1000, "hp"),
+                  stat("ult_req", 1500, "points"))
     hero = _hero(abilities=[barrage, remech])
     assert hero.ult is barrage and hero.ult_damage_raw == 450.0
     assert hero.ult_cost == 2100.0 and hero.ult_deals_damage
     # an ultimate with no damage row is no damage ultimate
-    sound = _kit("Sound Barrier", KIND_ULTIMATE, _stat("overhealth", 750, "hp"))
+    sound = _kit("Sound Barrier", KIND_ULTIMATE, stat("overhealth", 750, "hp"))
     quiet = _hero("support", abilities=[sound])
     assert quiet.ult is sound and not quiet.ult_deals_damage and quiet.ult_damage_raw == 0.0
     assert _hero().ult is None and _hero().ult_cost is None

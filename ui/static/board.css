@@ -1,7 +1,7 @@
 /* the display face ships beside this file, its SIL OFL 1.1 in OFL.txt: nothing loads from another host */
 @font-face { font-family:"Bebas Neue"; src:url('/static/bebas-neue.woff2') format('woff2'); font-display:swap; }
-:root { color-scheme: dark; --bg:#0d1017; --panel:#151a23; --panel2:#1b212c;
-  --line:#2a3240; --text:#e9ecf1; --muted:#8d97a8; --red:#ff4b57; --red2:#a8232d;
+:root { color-scheme: dark; --bg:#0d1017; --panel2:#1b212c;
+  --line:#2a3240; --text:#e9ecf1; --muted:#8d97a8; --red:#ff4b57;
   --blue:#3ea6ff; --blue2:#1f5fa8; --gold:#f5a623; --green:#5ad17a; }
 * { box-sizing:border-box; }
 body { margin:0; background:var(--bg) fixed; color:var(--text);
@@ -166,19 +166,8 @@ table.facts tr.warn td { color:#ff9d8f; } table.facts tr.derived td.text { color
 
 /* the comps panel: the game plan, then the two seats side by side */
 .plan { padding:12px 14px; margin-bottom:10px; border-radius:10px; border:1px solid var(--line); background:linear-gradient(170deg,#1b2436 0%,#161a24 70%); }
-.plan .lbl, .momentum .lbl, .stages .lbl { font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); }
+.plan .lbl, .stages .lbl { font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); }
 .plan .text { margin-top:6px; line-height:1.55; font-size:13.5px; }
-.momentum { display:flex; flex-wrap:wrap; align-items:center; gap:8px 16px; padding:10px 14px; margin:14px 0 0; border-radius:10px; border:1px solid var(--line); background:#151a24; }
-.momentum .verdict { flex:1 0 100%; color:var(--muted); font-size:12px; }   /* why neither bar has a figure */
-.momentum .lbl { flex:0 0 auto; }
-.momentum .mbars { flex:1; display:grid; grid-template-columns:44px 1fr 74px; gap:5px 10px; align-items:center; }   /* the two bars stacked on one track width */
-.momentum .mbar { display:contents; }
-.momentum .mbar .side { font-family:"Bebas Neue",Impact,sans-serif; font-size:16px; letter-spacing:.08em; }
-.momentum .mbar.blue .side { color:var(--blue); } .momentum .mbar.red .side { color:var(--red); }
-.momentum .mbar .trk { height:8px; background:#0b0e14; border:1px solid var(--line); border-radius:4px; overflow:hidden; }
-.momentum .mbar .fill { display:block; height:100%; border-radius:4px; transition:width .25s; }
-.momentum .mbar.blue .fill { background:var(--blue); } .momentum .mbar.red .fill { background:var(--red); }
-.momentum .mbar .val { font:600 13px/1 -apple-system,"Segoe UI",sans-serif; text-align:right; white-space:nowrap; min-height:1em; }
 .seats { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
 @media (max-width:1100px) { .seats { grid-template-columns:1fr; } }
 .seat { padding:12px 14px; border-radius:10px; border:1px solid var(--line); }
@@ -186,14 +175,11 @@ table.facts tr.warn td { color:#ff9d8f; } table.facts tr.derived td.text { color
 .seat.red { background:linear-gradient(170deg,#2b141a 0%,#1b212c 60%); border-color:#5a2730; }
 .seat.red .card .pic { border-bottom-color:var(--red); }
 .seat.red .inf-head h3 { color:var(--red); } .seat.blue .inf-head h3 { color:var(--blue); }
-.seats .comp { grid-template-columns:repeat(3,1fr); }
-.seats .bars { grid-template-columns:1fr; }
 .inf-head { display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; }
 .inf-six + .inf-six { margin-top:16px; padding-top:12px; border-top:1px solid var(--line); }   /* blue's six above its optimal */
 .seat .meta { margin:10px 0 0; }
 .inf-head h3 { margin:0; font-size:24px; color:var(--gold); }
-.comp { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin:12px 0; }
-@media (max-width:900px) { .comp { grid-template-columns:repeat(3,1fr); } }
+.comp { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:12px 0; }
 .card { background:#10141c; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
 .card .pic { aspect-ratio:3/4; position:relative; background:#0b0e14;
   border-bottom:2px solid var(--blue); }
@@ -202,6 +188,8 @@ table.facts tr.warn td { color:#ff9d8f; } table.facts tr.derived td.text { color
   text-transform:uppercase; background:rgba(0,0,0,.6); padding:2px 6px; border-radius:3px; }
 .slot.suggested { border:1px dashed var(--blue); cursor:pointer; opacity:.7; }
 .slot.suggested:hover { opacity:1; box-shadow:0 0 16px rgba(62,166,255,.35); }
+.team.red .slot.suggested { border-color:var(--red); }
+.team.red .slot.suggested:hover { box-shadow:0 0 16px rgba(255,75,87,.35); }
 /* the swaps above blue's picks: the incoming hero over the pick it replaces */
 .swaps { display:flex; flex-wrap:wrap; gap:8px; margin:2px 0 0; }
 .swaps:empty { display:none; }
@@ -241,8 +229,8 @@ table.facts tr.warn td { color:#ff9d8f; } table.facts tr.derived td.text { color
 .ev { display:inline-block; background:#1d2430; color:var(--gold); border-radius:3px;
   padding:0 5px; font-size:11px; margin:1px 3px 1px 0; font-family:ui-monospace,monospace;
   cursor:help; }
-.bars { display:grid; grid-template-columns:1fr 1fr; gap:4px 22px; margin-top:6px; }
-@media (max-width:900px) { .bars { grid-template-columns:1fr; } }
+.bars { display:grid; grid-template-columns:1fr; gap:4px 22px; margin-top:6px;
+  max-height: 19rem; overflow-y: auto; overscroll-behavior: contain; }
 .bar { display:grid; grid-template-columns:150px 1fr 54px; align-items:center; gap:8px;
   font-size:12px; }
 .bar .lbl { color:#c9d0db; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -290,8 +278,7 @@ table.facts tr.warn td { color:#ff9d8f; } table.facts tr.derived td.text { color
 .hcard p { margin:6px 0 0; color:#c9d0db; font-size:12.5px; }
 .legend { color:var(--muted); font-size:12px; margin:6px 0 0; }
 
-/* --- the strategies under a comp: two panes, a filter, and a bounded height ---
-   the playbook is 244 rules; listing them all under the board buried it */
+/* --- the strategies under a comp: three panes, a filter, and a bounded height --- */
 .basebars { margin-top: 10px; }
 .basebars .legend { margin: 0 0 4px; }
 .barsbox { margin-top: 10px; }
@@ -299,21 +286,20 @@ table.facts tr.warn td { color:#ff9d8f; } table.facts tr.derived td.text { color
 .barstabs button {
   font: inherit; font-size: 11px; letter-spacing: .04em; text-transform: uppercase;
   padding: 3px 9px; border: 1px solid var(--line); background: transparent;
-  color: var(--dim); border-radius: 2px; cursor: pointer;
+  color: var(--muted); border-radius: 2px; cursor: pointer;
 }
-.barstabs button.on { color: var(--ink); border-color: var(--ink); }
+.barstabs button.on { color: var(--text); border-color: var(--text); }
 .barstabs button .n { opacity: .65; margin-left: 3px; }
 .barstabs .barfind {
   font: inherit; font-size: 11px; margin-left: auto; min-width: 9em; flex: 1 1 9em;
-  padding: 3px 7px; border: 1px solid var(--line); background: transparent; color: var(--ink);
+  padding: 3px 7px; border: 1px solid var(--line); background: transparent; color: var(--text);
   border-radius: 2px;
 }
-.bars { max-height: 19rem; overflow-y: auto; overscroll-behavior: contain; }
 .barpane[hidden] { display: none; }
 .bar[hidden] { display: none; }
 .barcount { margin: 4px 0 0; font-size: 11px; min-height: 1em; }
-.barstabs button .cost { color: var(--bad, #c0392b); margin-left: 3px; }
-.barstabs button[data-pane="costing"].on { border-color: var(--bad, #c0392b); color: var(--bad, #c0392b); }
+.barstabs button .cost { color: #c0392b; margin-left: 3px; }
+.barstabs button[data-pane="costing"].on { border-color: #c0392b; color: #c0392b; }
 /* the name, and what it is short for */
 .top h1 .expand { font-size: .44em; letter-spacing: .1em; text-transform: uppercase;
                   opacity: .55; margin-left: .6em; white-space: nowrap; }
@@ -336,4 +322,3 @@ table.facts tr.warn td { color:#ff9d8f; } table.facts tr.derived td.text { color
 @media (prefers-reduced-motion: reduce) { .legend.searching { animation: none; opacity: .6 } }
 .waiting { opacity: .4; transition: opacity .15s ease; }
 body.solving #bluescore, body.solving #redscore { opacity: .5; letter-spacing: .1em; }
-body.solving .badge, body.solving .odds { opacity: .5; }

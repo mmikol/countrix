@@ -16,7 +16,7 @@ and the board is reachable from this machine only.
 | **the door and the board** | any process on this machine calling every tool on the MCP door, the writes, refreshes and rebuilds included; a browser page trying the same through DNS rebinding, or reading the board, the playbook and the solver's answers from either HTTP server |
 | **SQL** | the `query` tool: the project's database users are superusers, and a superuser's `SELECT` can read files off the disk it runs on |
 | **files** | tools that write into the playbook: a path that escapes the folder, a file the catalog would refuse, an oversized body |
-| **the containers** | a compromised process inside one reaching the internet, escalating, filling the host, or calling every tool on the door, which answers the whole stack network as `data:8020` |
+| **the containers** | a compromised process inside one reaching the internet, escalating, filling the host, or calling every tool on the door, which listens on the whole stack network |
 | **your account** | the CLI signed in on the host, whose sessions call the tools |
 
 ## What stands in the way
@@ -32,19 +32,27 @@ person or through `/strategy`.
 
 **The board writes nothing.** It answers `GET` alone, so a slider's
 weight stays in the session. Its code writes no playbook file and no row,
-and its container mounts the playbook read-only.
+its container mounts the playbook read-only, and it connects as
+`matrix_reader`, which the database holds to `SELECT`. Its network,
+`reader`, joins it to `db` alone, so it cannot reach the door on
+`data:8020`. That holds against a compromised board too, once
+`POSTGRES_PASSWORD` and `COUNTRIX_MCP_TOKEN` are set (below): on Docker
+Desktop a container can still reach the host's published 127.0.0.1:8020
+through `host.docker.internal`, and there the token is the control.
 
 **Every server answers only to its own names.** The door and the board
 stand on `db/web.py`, which checks each request's `Host` and `Origin`
 before any route runs, on every method. Each must be a local name
-(`db.web.LOCAL_HOSTS`) or one the server was started with: its compose
-service name (`data`) or a published board's public name. Anything else
-is 403, a missing `Host` and `Origin: null` included.
+(`db.web.LOCAL_HOSTS`) or one the server was started with, a published
+board's public name. Anything else is 403, a missing `Host` and
+`Origin: null` included.
 A page rebound by DNS sends its own host name, so the Host check stops it.
 
 **The door checks who is knocking.** It listens on 0.0.0.0:8020 inside
-its container, so every container on the stack network reaches it as
-`data`. `door/mcp/http.py` takes one JSON-RPC message a request, caps it
+its container and answers to the local names alone; a process on the
+stack network can still claim one in its `Host`, so there the token is
+the control.
+`door/mcp/http.py` takes one JSON-RPC message a request, caps it
 at one megabyte, refuses a body not labelled `application/json` with
 415, allows 120 tool calls per client address a minute and answers 429
 past that, and asks for `Authorization: Bearer <token>` when
@@ -55,7 +63,9 @@ stays open for the healthchecks.
 refusal's reason or 500 with the error's type and message
 (`db.web.failure`), and the traceback goes to stderr; the door's JSON-RPC
 says the same with `isError` and `INTERNAL`. Each server logs one line to
-stderr for every request that fails and every board it solves.
+stderr for every request that fails; the board logs one for every board it
+solves, and the door one for every tool call before it runs, with the
+client's address and the tool's name.
 
 **SQL runs as the reader.** The `query` tool in `door/mcp/lifecycle.py`
 runs one read-only statement under a ten-second timeout, refuses names
@@ -90,13 +100,14 @@ mounts to ask for a dump before it rebuilds.
 
 **The board holds its time.** The ui container solves in the page's own
 process, one board at a time. A board waits for the one in flight, and
-answers 429 after a minute (`serve.Admission` in `inference/serve.py`), so
+answers 429 after a minute (`serve.Admission` in `ui/serve.py`), so
 a burst of boards queues instead of starving the page; a search that
 cannot prove its answer within its budget refuses (`solver.Unbounded`)
 instead of holding the solver.
 
-**Two containers reach out.** All five share one network: Docker
-publishes a port only for a container on a routable network. What keeps
+**Two containers reach out.** Both networks are routable: Docker
+publishes a port only for a container on one. `stack` joins every
+container but `ui`; `reader` joins `ui` to `db` alone. What keeps
 `ui`, `db` and `backup` off the internet is that their code opens no
 connection out; `backup` connects to `db` alone. `data` and
 `refresher` fetch from two fixed hosts, Blizzard's site and the wiki. The

@@ -20,12 +20,8 @@ the hero, 0 neither.
 A tank's article rates each damage and support hero on the PRIORITY TARGET
 and RISK scales and never on the MATCHUP one: whom to kill first and how
 dangerous it is to try, not who wins. So the label is no answer, and the
-prose decides. Doomfist's article rates Sierra HIGH PRIORITY TARGET | LOW
-RISK, as it rates Mercy, whose prose calls her a very difficult target to
-pin down; the LOW RISK is half a cue, and the prose says she is vulnerable
-only once he closes the gap, which weighs no cue - no edge. Of the thirteen
-cells rated HIGH or EXTREMELY HIGH PRIORITY with LOW RISK, the prose makes
-five answers, seven none and one the other way.
+prose decides (test_wiki_matchups holds Doomfist's article on Sierra:
+HIGH PRIORITY TARGET | LOW RISK, and no edge).
 
 A pair both articles speak about keeps its edge when they agree or one
 says neither; when they contradict there is no edge. The same articles'
@@ -79,7 +75,7 @@ RISK_WEIGHTS = {"extreme": -1.0, "extremely high": -1.0, "extermely high": -1.0,
 RISK_RATING_RE = re.compile(r"^(.*?)\s*RISK$", re.I)
 
 # Names the wiki's prose uses for a hero besides the article title, its
-# name unpunctuated and a former name (names.RENAMED).
+# name unpunctuated and a former name (normalizer.RENAMED).
 NICKNAMES = {
     "soldier76": ("Soldier",), "wreckingball": ("Hammond", "Ball"),
     "junkerqueen": ("Queen",), "reinhardt": ("Rein",), "torbjorn": ("Torb",),
@@ -90,7 +86,6 @@ PRONOUN_RE = (r"he|she|him|her(?= (?:an?|the|to|at|in|on|with|from|for"
         r"|can|would|should|has|does)\b|[.,;:!?]|$)|(?P<possessive>his|hers?)")
 HE_RE = re.compile(r"\b(?:he|him|his|himself)\b", re.I)
 SHE_RE = re.compile(r"\b(?:she|hers?|herself)\b", re.I)
-SECOND_PERSON_RE = re.compile(r"\byou(?:r|rself)?\b", re.I)
 
 FOE = r"(?:the |an? )?(?:enemy )?foe"
 # A subject with what it owns: "foe", "foe's Defense Matrix".
@@ -325,7 +320,7 @@ def normalise(text: str, hero: str, other: str, pronouns: Pronouns = (None, None
                      for i, (_, _, names) in enumerate(sides))
     token = re.compile(r"\b(?:(?:%s)|%s)(?P<owns>'s)?(?!\w)" % (named, PRONOUN_RE), re.I)
     text = text.replace("\u2019", "'")
-    second_person = bool(SECOND_PERSON_RE.search(text))
+    second_person = bool(strategy_sections.SECOND_PERSON_RE.search(text))
     last = sides[-1]
 
     def replace(match: re.Match[str]) -> str:
@@ -344,16 +339,6 @@ def normalise(text: str, hero: str, other: str, pronouns: Pronouns = (None, None
         return owned if match.group("possessive") else plain
 
     return token.sub(replace, text)
-
-
-def sentences(text: str) -> list[str]:
-    parts: list[str] = []
-    start = 0
-    for end in matchup_tables.SENTENCE_END_RE.finditer(text):
-        parts.append(text[start: end.end()])
-        start = end.end()
-    parts.append(text[start:])
-    return [part.strip() for part in parts if part.strip()]
 
 
 def score_sentence(sentence: str) -> tuple[float, float]:
@@ -392,7 +377,7 @@ def read_cell(cell: str, hero: str, other: str, pronouns: Pronouns = (None, None
         return Reading((steps > 0) - (steps < 0), "rating")
 
     advantage, threat = max(risk, 0.0), max(-risk, 0.0)
-    said = sentences(text)
+    said = matchup_tables.split_sentences(text)
     read = normalise("\n".join(said), hero, other, pronouns).split("\n") if said else []
     for place, normalised in enumerate(read):
         gained, lost = score_sentence(normalised)
@@ -430,7 +415,7 @@ def combine(readings_by_hero: Mapping[str, list[tuple[str, Reading]]],
             hero_ids: Mapping[str, int]) -> tuple[set[Edge], list[tuple[int, int]], list[str]]:
     """Readings per article -> ({Edge}, contradicted pairs, unresolved names).
     hero_ids is {name_key: hero_id}."""
-    seats: set[Edge] = set()
+    verdict_edges: set[Edge] = set()
     unmatched: list[str] = []
     for hero in sorted(readings_by_hero):
         hero_id = hero_ids[name_key(hero)]
@@ -441,10 +426,11 @@ def combine(readings_by_hero: Mapping[str, list[tuple[str, Reading]]],
             elif other_id != hero_id and reading.verdict:
                 winner, loser = ((hero_id, other_id) if reading.verdict > 0
                                  else (other_id, hero_id))
-                seats.add((loser, winner))
+                verdict_edges.add((loser, winner))
 
-    contradicted = sorted({(min(pair), max(pair)) for pair in seats if pair[::-1] in seats})
-    edges = {pair for pair in seats if pair[::-1] not in seats}
+    contradicted = sorted({(min(pair), max(pair))
+                           for pair in verdict_edges if pair[::-1] in verdict_edges})
+    edges = {pair for pair in verdict_edges if pair[::-1] not in verdict_edges}
     return edges, contradicted, unmatched
 
 

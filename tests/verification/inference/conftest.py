@@ -1,7 +1,7 @@
-"""The inference tests' shared fixtures: a private copy of the reference
-playbook, for the tests that write to one; a two-file scratch playbook that
-scores every seat of a board on the synthetic World; and the Harbor Gate
-board the engine and plan tests read."""
+"""The inference tests' shared fixtures: a two-file scratch playbook that
+scores every seat of a board on the synthetic World, and the Harbor Gate
+board the engine and plan tests read. The private copy of the reference
+playbook, catalog_copy, is tests/conftest.py's."""
 
 import os
 import shutil
@@ -11,15 +11,6 @@ import pytest
 from facts.draft import Draft
 from inference import catalog
 from tests.verification.inference import BRIEF, FIXTURE_PLAYBOOK
-
-
-@pytest.fixture()
-def catalog_copy(tmp_path):
-    """A private copy of the reference playbook - its strategy files and its
-    meta.md - to tune without touching the repo."""
-    for name in [*catalog.strategy_files(FIXTURE_PLAYBOOK), catalog.META_FILE]:
-        shutil.copy(os.path.join(FIXTURE_PLAYBOOK, name), tmp_path / name)
-    return str(tmp_path)
 
 
 @pytest.fixture()

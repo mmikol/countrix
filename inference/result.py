@@ -2,9 +2,10 @@
 
 A Result is one seat's six on one board: who is in it and why, each pick
 citing the board facts that justify it, the score and its breakdown per
-strategy, and the runners-up. A Board holds the seven Results board()
-solves, with the verdict, the seat badges, the plan and blue's swaps read
-off them. Both render as JSON-ready data (to_dict) and as text (rendered).
+strategy, and the runners-up. A Board holds blue's Results board() solves
+and red's likely six, with the verdict, the seat badges, the plan and
+blue's swaps read off them. Both render as JSON-ready data (to_dict: a ResultRecord, a
+BoardRecord) and as text (rendered).
 """
 
 from collections.abc import Callable, Iterable
@@ -12,28 +13,31 @@ from dataclasses import dataclass, field
 from typing import Literal, NotRequired, TypedDict
 
 from facts.board_facts import GroundValue
-from facts.draft import TEAM_SIZE, Seat
+from facts.draft import TEAM_SIZE, Seat, Side
 from facts.factset import Fact, FactSet
+from facts.hero_facts import RateValue
 from facts.model import ROLES, TERRAIN_FEATURES
 from facts.records import Snapshot
 from facts.team import SPECIALIST_DELTA, text
 from inference import base as base_module
 from inference import catalog as catalog_module
-from inference.base import BaseWeights
+from inference.base import BaseRecord, BaseWeights
+from inference.catalog import KindCounts
 from inference.scoring import Candidate, Contribution
 from inference.solver import RANK_CAP, Tied
 from inference.strategy import Strategy
 
-# A result or a board as to_dict() serves it: a JSON object, read by the shells.
-type Payload = dict[str, object]
 # what a result is, which its heading names
-type ResultKind = Literal["infer", "evaluate", "current", "countered", "fill", "expected"]
+type ResultKind = Literal["infer", "evaluate", "current", "fill", "expected"]
+# a stage of the plan: a phase of one route or an arena of its own
+type StageKind = Literal["phase", "arena"]
 
 
 class Pick(TypedDict):
     """One hero of a result's six, with the reason it is there and the ids of
     the facts the reason cites. A solved six carries each hero's subrole and
-    portrait; red's likely six carries neither."""
+    portrait; red's likely six carries neither, and its pull instead
+    (facts.compute.expected_picks)."""
     hero: str
     role: str
     locked: bool
@@ -41,6 +45,7 @@ class Pick(TypedDict):
     evidence: list[str]
     subrole: NotRequired[str]
     portrait: NotRequired[str | None]
+    pull: NotRequired[float]
 
 
 class Alternative(TypedDict):
@@ -58,12 +63,6 @@ class Consideration(TypedDict):
     name: str
 
 
-class Odds(TypedDict):
-    """The two shares pitted against each other: each seat's part of 100."""
-    blue: int
-    red: int
-
-
 # One swap the board suggests above blue's picks: the pick that goes (`out`),
 # the hero that comes in (`in`), where the pick sits in blue's picks as sent
 # (`at`), the incoming hero's portrait and the reason it is in the six. A
@@ -73,25 +72,17 @@ SwapPair = TypedDict("SwapPair", {
 
 
 class OpenSlot(TypedDict):
-    """A hero the board draws in one of blue's empty slots: the swap's six
-    where a swap is suggested, else the fill's."""
+    """A hero the board draws in one of blue's empty slots: the fill's,
+    whether or not a swap is suggested, as the rest of the board shows it."""
     hero: str
     role: str
     portrait: str | None
     why: str
 
 
-class SwapOdds(TypedDict):
-    """The fight odds before the swaps and after them; None where they
-    cannot be read - red has no picks, or a seat's share waits."""
-    before: Odds | None
-    after: Odds | None
-
-
 # what came of blue's swap search: a swap suggested; the picks kept, no swap
-# gaining its cost; a swap withheld, since it would not raise the fight odds;
-# or none searched, the seat unscored or the search refused
-type SwapStatus = Literal["suggested", "keep", "withheld", "none"]
+# gaining its cost; or none searched, the seat unscored or the search refused
+type SwapStatus = Literal["suggested", "keep", "none"]
 
 
 class Swaps(TypedDict):
@@ -99,8 +90,8 @@ class Swaps(TypedDict):
     search, the stage it was solved on, the cost in share points, the six
     the swaps make (the six the picks keep where none is suggested), each
     swap, the heroes the empty slots show - the fill's, as the rest of the
-    board shows it - blue's share before and after, the fight odds before
-    and after, and the verdict in words."""
+    board shows it - blue's share before and after, and the verdict in
+    words."""
     status: SwapStatus
     stage: str
     cost: float
@@ -109,7 +100,6 @@ class Swaps(TypedDict):
     open: list[OpenSlot]
     before: int | None
     after: int | None
-    odds: SwapOdds
     verdict: str
 
 
@@ -133,7 +123,7 @@ class StageRow(TypedDict):
     terrain at or over the standout on its ground, the rules it turns on
     and off, the blurb, and whether its search finished within budget."""
     stage: str
-    kind: Literal["phase", "arena"]
+    kind: StageKind
     current: bool
     played: bool
     six: list[str]
@@ -157,17 +147,76 @@ class Badges(TypedDict):
 
 
 class Momentum(TypedDict):
-    """Who the picks favour: each seat's share of its optimal, blue's share
-    against red's best counter, whether either seat is half-drafted, the
-    fight odds, the verdict in words and the badge above each picker. A
-    share is None where it cannot be read."""
+    """Where blue's picks stand: blue's share of its optimal, whether blue is
+    half-drafted, the verdict in words and the badge above each picker -
+    blue's share, red's likely six's pull. The share is None where it cannot
+    be read."""
     blue: int | None
-    red: int | None
-    countered: int | None
     partial: bool
-    odds: Odds | None
     verdict: str
     badges: Badges
+
+
+class ResultRecord(TypedDict):
+    """A result as to_dict() serves it, the JSON the shells read: the board
+    it was solved on, the score - None where the comp is not allowed -
+    whether it scores and why not, the heuristics' weights and the default
+    engine's it was scored under, its share of the seat's best - None where
+    it is partial or unscored - the picks, the breakdown, the breaches, the
+    runners-up, its rank, the sixes tied at its score and the words for it,
+    the search's size and time, the playbook's counts, the facts it cites,
+    id to text, and the assumptions and drafts."""
+    kind: ResultKind
+    seat: Seat
+    map: str | None
+    red: list[str]
+    blue: list[str]
+    locked: list[str]
+    bans: list[str]
+    side: Side
+    stage: str
+    partial: bool
+    score: float | None
+    scoring: bool
+    unscored: str | None
+    weights: dict[str, float]
+    base: BaseRecord
+    normalized: int | None
+    playstyle: str
+    picks: list[Pick]
+    contributions: list[Contribution]
+    violations: list[str]
+    alternatives: list[Alternative]
+    rank: int | None
+    outranked: bool
+    tied: int
+    tie: str | None
+    considered: int
+    seconds: float
+    strategies: KindCounts
+    cited: dict[str, str]
+    considerations: list[Consideration]
+    pending: list[str]
+
+
+class BoardRecord(TypedDict):
+    """A board as to_dict() serves it, the JSON the shells read: the board
+    it was solved on, the plan, blue's swaps and the plan stage by stage,
+    blue's results - the fill None where the board has none - the momentum,
+    the shapes the roster allows, and red's likely six."""
+    map: str | None
+    side: Side
+    stage: str
+    bans: list[str]
+    plan: str
+    swaps: Swaps | None
+    stages: list[StageRow]
+    blue: ResultRecord
+    current: ResultRecord
+    fill: ResultRecord | None
+    momentum: Momentum
+    shapes: list[list[int]]
+    expected: ResultRecord
 
 
 @dataclass(frozen=True, slots=True)
@@ -210,12 +259,10 @@ def not_allowed(rules: list[str]) -> str:
 # what each kind of result is, as its rendered heading names it
 HEADINGS: dict[ResultKind, str] = {
     "infer": "optimal comp", "evaluate": "evaluation", "current": "current comp",
-    "countered": "if countered optimally", "fill": "your picks, the rest filled",
-    "expected": "their likely starting comp"}
-# the reason red's likely six carries no share while the default engine is on:
-# it is drawn, never scored
+    "fill": "your picks, the rest filled", "expected": "their likely starting comp"}
+# the reason red's likely six carries no share: it is filled, never scored
 LIKELIHOOD = (
-    "unscored - a likelihood from the map's pick rates and the wiki's synergies, which"
+    "unscored - filled from the map's pick rates and the wiki's synergies, which"
     " nothing scores")
 
 
@@ -237,7 +284,7 @@ class Result:
     catalog: list[Strategy]
     base: BaseWeights                  # the default engine's weights it was scored under
     bans: list[str] = field(default_factory=list)
-    side: str = ""
+    side: Side = ""
     stage: str = ""                    # the stage in play; empty for the whole map
     seat: Seat = "blue"
     partial: bool = False
@@ -272,10 +319,12 @@ class Result:
     def scale_to(self, span: Span) -> None:
         """Set what 100 and 0 mean here - the seat's best score and its floor -
         and write each alternative's share of the span, None while the result
-        reads unscored. An unscored field ties, where no six ranks above
-        another, so the rank goes too: every six would read first."""
+        reads unscored or the board waits (waiting(): the optimal no higher
+        than the floor, which the optimal itself never reads as unscored).
+        An unscored field ties, where no six ranks above another, so the rank
+        goes too: every six would read first."""
         self.best, self.floor = span.best, span.floor
-        scoring = self.unscored() is None
+        scoring = self.unscored() is None and self.waiting() is None
         for alt in self.alternatives:
             alt["normalized"] = _pct(alt["score"], self.best, self._zero()) if scoring else None
         if not scoring:
@@ -307,24 +356,26 @@ class Result:
         """Why the result carries no share of a best, or None when it does.
         A comp its own picks rule out says so first (bar). The optimal six is
         100 by definition - it is the reference, and scored always; red's
-        likely six is a likelihood, never scored, and says so while the
-        default engine is on; any other comp reads unscored when nothing can
-        be a share of anything: the best six scores no higher than the seat's
+        likely six is a greedy fill, never scored, and says so, the default
+        engine on or off; any other comp reads unscored when nothing can be a
+        share of anything: the best six scores no higher than the seat's
         floor, as every six does with the default engine off under a playbook
         that scores nothing."""
         if self.barred is not None:
             return self.barred
         if self.kind == "infer":
             return None
-        if self.kind == "expected" and self.base.on:
+        if self.kind == "expected":
             return LIKELIHOOD
         return self.waiting()
 
     def waiting(self) -> str | None:
         """The reason nothing on this board scores, or None: the optimal six
         scores no higher than the seat's floor, so no comp is a share of it.
-        Read off any result, the optimal included (a seat with no picks has no
-        comp to read it from)."""
+        Read off any result, the optimal included: unscored() gives it for
+        every allowed comp but the optimal and red's likely six, and the
+        swaps read it off blue's optimal, whose own unscored() is None by
+        definition."""
         best, floor = self._hundred(), self._zero()
         if best > floor:
             return None
@@ -374,7 +425,7 @@ class Result:
             likely=c.get("likely", False), answers=c.get("answers", 0),
             exposures=c.get("exposures", 0), derived=c.get("derived", []))
 
-    def to_dict(self) -> Payload:
+    def to_dict(self) -> ResultRecord:
         """The result as JSON-ready data. The facts it cites ride along as
         `cited`, id to text; the board's whole FactSet is the facts route's."""
         cited = {}
@@ -388,16 +439,16 @@ class Result:
                 "red": self.red, "blue": self.blue, "locked": self.locked,
                 "bans": self.bans, "side": self.side, "stage": self.stage,
                 "partial": self.partial,
-                # a comp its own picks rule out carries no score at all
-                "score": None if self.barred else round(self.score, 3),
+                # a comp its own picks rule out carries no score at all, nor
+                # red's likely six, which nothing scores
+                "score": None if self.barred or self.kind == "expected" else round(self.score, 3),
                 "scoring": scoring, "unscored": unscored,
                 "weights": {s.id: s.weight for s in self.catalog if s.kind == "heuristic"},
                 # the default engine's weights it was scored under: the meta and its dials
                 "base": self.base.record(),
-                # a partial team has no share to report: the sum runs over the picks
-                # it has, so a perfectly played draft reads 16 after one pick and can
-                # fall when the right third pick lands. The fill result carries the
-                # number that means something - the best six reachable from here
+                # a partial team has no share to report: its score covers only the
+                # picks it has. The fill result carries the number that means
+                # something - the best six reachable from here
                 "normalized": self.share() if scoring and not self.partial else None,
                 "playstyle": self.playstyle, "picks": self.picks,
                 "contributions": self.contributions, "violations": self.violations,
@@ -411,9 +462,16 @@ class Result:
 
     def rendered(self) -> str:
         """The result as text: the heading, the six and its score, and a line
-        each for the picks, the breakdown and the alternatives."""
+        each for the picks, the breakdown and the alternatives. Red's likely
+        six has no score: its line gives the six's pull, and each pick's."""
         counts = catalog_module.counts(self.catalog)
         unscored = self.unscored()
+        picks = ["  %-8s %-14s %s" % (p["role"], p["hero"] + ("*" if p["locked"] else ""), p["why"])
+                 for p in self.picks]
+        if self.kind == "expected":
+            pull = sum(p.get("pull", 0.0) for p in self.picks)
+            return "\n".join([self._headline(), "  %s - %.1f pull %s" % (
+                ", ".join(self.blue), pull, self._share_label(unscored)), *picks])
         under = (" under the meta at %g, %d constraints, %d heuristics and %d assumptions"
                  % (self.base.meta, counts["constraint"], counts["heuristic"],
                     counts["assumption"]))
@@ -435,9 +493,7 @@ class Result:
                          % (len(self.blue), TEAM_SIZE))
         if self.violations:
             lines.append("  VIOLATES: " + ", ".join(self.violations))
-        lines += ["  %-8s %-14s %s" % (p["role"], p["hero"] + ("*" if p["locked"] else ""),
-                                       p["why"])
-                  for p in self.picks]
+        lines += picks
         lines.append(self._breakdown())
         lines += ["  alt %d: %s (%.2f)" % (i, ", ".join(alt["blue"]), alt["score"])
                   for i, alt in enumerate(self.alternatives, start=1)]
@@ -479,7 +535,7 @@ class Result:
 
     def _share_label(self, unscored: str | None) -> str:
         """The score's share of the best, or why there is none."""
-        if self.kind == "expected":                # a likelihood, not a score
+        if self.kind == "expected":                # a greedy fill, not a score
             return "(from the map's pick rates and the synergies, no strategy read)"
         if unscored is not None:
             return "(unscored)"
@@ -497,20 +553,17 @@ class Result:
 
 @dataclass(kw_only=True, eq=False)
 class Board:
-    """Both seats of one draft: the seven Results board() solves, the verdict
-    and prose it reads off them, and the shape limits the roster enforces.
+    """One draft: blue's Results board() solves, red's likely six, the verdict
+    and prose read off them, and the shape limits the roster enforces.
     Carries the same to_dict()/rendered() pair as Result, so the shells hand a
     board to the caller the way they hand a single seat."""
     map_name: str | None
-    side: str
+    side: Side
     stage: str
     bans: list[str]
     blue: Result
-    red: Result
     current: Result
-    red_current: Result
     fill: Result | None
-    countered: Result | None
     momentum: Momentum
     plan: str
     shapes: list[list[int]]
@@ -518,26 +571,22 @@ class Board:
     swaps: Swaps | None = None          # blue's swaps, None without blue picks
     stages: list[StageRow] = field(default_factory=list)    # the plan stage by stage
 
-    def to_dict(self) -> Payload:
+    def to_dict(self) -> BoardRecord:
         """The board as JSON-ready data."""
         return {"map": self.map_name, "side": self.side, "stage": self.stage, "bans": self.bans,
                 "plan": self.plan, "swaps": self.swaps, "stages": self.stages,
-                "blue": self.blue.to_dict(), "red": self.red.to_dict(),
-                "current": self.current.to_dict(), "red_current": self.red_current.to_dict(),
-                "countered": self.countered.to_dict() if self.countered else None,
+                "blue": self.blue.to_dict(), "current": self.current.to_dict(),
                 "fill": self.fill.to_dict() if self.fill else None, "momentum": self.momentum,
                 "shapes": self.shapes,
                 "expected": self.expected.to_dict()}
 
     def rendered(self) -> str:
-        """The board as text: the plan, each seat, and the verdict."""
+        """The board as text: the plan, blue's results, red's likely six and the
+        verdict."""
         parts = ["game plan:\n" + self.plan]
-        parts += [r.rendered() for r in (self.blue, self.red, self.current, self.red_current)
-                  if r.blue or r.kind != "current"]
+        parts += [r.rendered() for r in (self.blue, self.current) if r.blue or r.kind != "current"]
         if self.fill:
             parts.append(self.fill.rendered())
-        if self.countered:
-            parts.append(self.countered.rendered())
         parts.append(self.expected.rendered())
         parts.append("momentum: " + self.momentum["verdict"])
         if self.swaps is not None:
@@ -584,12 +633,11 @@ def _reasons(fs: FactSet, hero_name: str, locked: bool) -> tuple[str, list[str]]
     def own(key: str) -> list[Fact]:
         return [f for f in fs.find(key, hero_name) if f.team in (None, "blue")]
 
-    def cite(key: str, template: Callable[[Fact], str]) -> bool:
-        for f in own(key):
-            why.append(template(f))
-            evidence.append(f.id)
-            return True
-        return False
+    def cite(key: str, template: Callable[[Fact], str]) -> None:
+        found = own(key)
+        if found:
+            why.append(template(found[0]))
+            evidence.append(found[0].id)
 
     cite("hero.vs_answers", lambda f: "answers %s" % ", ".join(f.value))
     partners = own("hero.with_ally")
@@ -604,8 +652,12 @@ def _reasons(fs: FactSet, hero_name: str, locked: bool) -> tuple[str, list[str]]
     cite("hero.map_style_fit", lambda f: "fits the %s style" % f.value)
     cite("hero.home_map", lambda f: "top-%d map by rate" % f.value)
     cite("hero.vs_answered_by", lambda f: "CAUTION: answered by %s" % ", ".join(f.value))
+    def overall(f: Fact) -> str:
+        rate: RateValue = f.value
+        return "wins %.1f%% across all ranks%s" % (rate["win"], rated)
+
     if not evidence:
-        cite("hero.rate", lambda f: "wins %.1f%% across all ranks%s" % (f.value["win"], rated))
+        cite("hero.rate", overall)
     if locked:
         why.insert(0, "locked")
     return "; ".join(why), evidence

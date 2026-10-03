@@ -259,7 +259,7 @@ class Expr:
         """Evaluate against a Scope, which scope() builds from the namespaces."""
         try:
             return eval(self.code, _GLOBALS, sc)  # nosec B307  # whitelisted AST, no builtins
-        except TypeError as error:            # e.g. a text metric in arithmetic
+        except (TypeError, ValueError) as error:    # a text metric in arithmetic, int() of a name
             raise ExprError("%r: %s" % (self.source, error)) from error
         except (RecursionError, MemoryError, OverflowError) as error:
             raise ExprError("%r: %s: %s" % (self.source, type(error).__name__, error)) from error

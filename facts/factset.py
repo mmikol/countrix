@@ -1,23 +1,53 @@
 """The FactSet: a board's facts numbered F1..
 
 A Fact is one sentence and the structured claim behind it (scope, subject,
-key, value, unit, source); the FactSet numbers them in emission order and
-files each under the metrics it states, so the inference layer finds a fact
-by metric and a person reads the same facts as numbered sentences.
-facts.board_facts writes a board's facts into one.
+key, value, unit, source), and whether it warns; the FactSet numbers them
+in emission order and files each under the metrics it states, so the
+inference layer finds a fact by metric and a person reads the same facts
+as numbered sentences. Both serve as JSON through to_dict: a Fact as a
+FactRecord, and the FactSet as a FactSetRecord, the payload of /api/facts
+and of the facts tool. facts.board_facts writes a board's facts into one.
 """
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, TypedDict
 
-from facts.draft import Draft, Seat
+from facts.draft import Draft, Seat, Side
+
+
+class FactRecord(TypedDict):
+    """A fact as to_dict serves it: its fields, the value made plain JSON."""
+    id: str
+    scope: str
+    subject: str
+    team: Seat | None
+    key: str
+    text: str
+    value: Any                  # arbitrary JSON, as Fact.value is
+    unit: str | None
+    source: str
+    warn: bool
+
+
+class FactSetRecord(TypedDict):
+    """A board's facts as to_dict serves them: the board they describe, its
+    names resolved, how many facts it holds, and each fact in id order."""
+    map: str | None
+    red: list[str]
+    blue: list[str]
+    bans: list[str]
+    side: Side
+    stage: str
+    count: int
+    facts: list[FactRecord]
 
 
 @dataclass(frozen=True, slots=True)
 class Fact:
     """One numbered fact: the sentence a person reads and the structured claim
-    behind it, filed under its scope, subject and key."""
+    behind it, filed under its scope, subject and key, and whether it warns -
+    the board marks a warning by the flag, never by the sentence's words."""
     id: str
     scope: str
     subject: str
@@ -30,12 +60,13 @@ class Fact:
     value: Any
     unit: str | None
     source: str
+    warn: bool = False
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> FactRecord:
         return {"id": self.id, "scope": self.scope, "subject": self.subject,
                 "team": self.team, "key": self.key, "text": self.text,
                 "value": _plain(self.value), "unit": self.unit,
-                "source": self.source}
+                "source": self.source, "warn": self.warn}
 
 
 def _plain(value: object) -> object:
@@ -60,13 +91,14 @@ class FactSet:
     def add(
             self, scope: str, subject: str, key: str, text: str, *, source: str,
             value: object = None, unit: str | None = None, team: Seat | None = None,
-            also: Sequence[str] = ()) -> str:
+            also: Sequence[str] = (), warn: bool = False) -> str:
         """`also` names the other metrics this one sentence states, so a caller
         looking for one of them finds the fact that carries it. The fact keeps
-        the key it is worded around; `also` only adds index entries."""
+        the key it is worded around; `also` only adds index entries. `warn`
+        marks a fact the board shows as a warning."""
         fid = "F%d" % (len(self.facts) + 1)
         fact = Fact(id=fid, scope=scope, subject=subject, team=team, key=key, text=text,
-            value=value, unit=unit, source=source)
+            value=value, unit=unit, source=source, warn=warn)
         self.facts.append(fact)
         for under in dict.fromkeys((key, *also)):
             self._by_key.setdefault(under, []).append(fact)
@@ -87,7 +119,7 @@ class FactSet:
     def rendered(self) -> str:
         return "\n".join("[%s] %s" % (f.id, f.text) for f in self.facts)
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> FactSetRecord:
         draft = self.draft
         return {"map": draft.map_name, "red": list(draft.red), "blue": list(draft.blue),
                 "bans": list(draft.bans), "side": draft.side, "stage": draft.stage,

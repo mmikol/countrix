@@ -1,16 +1,13 @@
-/* the comps tab: the game plan, the fight odds, the two seats and the badges above
+/* the comps tab: the game plan, the two seats and the badges above
    the pickers; loaded before board.js, which calls into it */
 /* the list under a comp: every strategy the playbook holds, one bar each - lit
    when it applied to this comp, greyed when it did not (its guard unmet, or
-   nothing to read). Split into met and unmet, each its own scrolling pane with
-   a filter, because the playbook is 244 rules and a page that lists them all at
-   once buries the board. Sorted by name inside a pane: a rule is looked up by
-   the name it is known by, not by where the catalog happens to put it. */
-var BARS_SEQ = 0;
+   nothing to read) - in three panes behind tabs, satisfied, costing and did not
+   read, with one filter. Sorted by name inside a pane: a rule is looked up by
+   the name it is known by. */
 
 /* three ways a rule can end a board: it never read, it read and charged, or it
-   read and was satisfied. The middle one is what a comp is paying for and had
-   nowhere to show before. */
+   read and was satisfied. The middle one is what a comp is paying for. */
 function verdictOf(c) {
   if (c.applies === false) return 'unread';
   if (c.ok === false || (c.weighted || 0) < -1e-9) return 'costing';
@@ -77,7 +74,6 @@ function playbookBars(contribs, mx) {
   contribs.forEach(function (c) { group[verdictOf(c)].push(c); });
   Object.keys(group).forEach(function (k) { group[k].sort(byName); });
   var cost = group.costing.reduce(function (s, c) { return s + (c.weighted || 0); }, 0);
-  var id = 'bars' + (++BARS_SEQ);
   var pane = function (key) {
     return "<div class='barpane' data-pane='" + key + "'" + (key === 'met' ? '' : ' hidden') + '>' +
       (group[key].length ? group[key].map(function (c) { return barRow(c, mx); }).join('')
@@ -87,7 +83,7 @@ function playbookBars(contribs, mx) {
     return "<button" + (key === 'met' ? " class='on'" : '') + " data-pane='" + key + "'>" + label +
       " <span class='n'>" + group[key].length + '</span>' + (extra || '') + '</button>';
   };
-  return "<div class='barsbox' id='" + id + "'>" +
+  return "<div class='barsbox'>" +
     "<div class='barstabs'>" +
       tab('met', 'satisfied') +
       tab('costing', 'costing', cost ? " <span class='cost'>" + cost.toFixed(2) + '</span>' : '') +
@@ -134,13 +130,13 @@ function wireBars(root) {
   });
 }
 
-/* the comps panel: the game plan, the fight odds strip above the boxes, the two
-   seats side by side and the badge above each picker */
+/* the comps panel: the game plan, the two seats side by side and the badge
+   above each picker */
 function renderInf() {
   var d = INF;
   if (!d || d.error) {
     el('inf-blue').innerHTML = "<div class='warnbox'>" + esc(d ? d.error : 'no result') + '</div>';
-    el('inf-red').innerHTML = ''; el('momentum').innerHTML = ''; el('plan').innerHTML = '';
+    el('inf-red').innerHTML = ''; el('plan').innerHTML = '';
     el('stageplan').innerHTML = '';
     ['bluescore', 'redscore'].forEach(function (id) { el(id).textContent = ''; el(id).title = ''; });
     paint();                              /* the last board's suggestions go with it */
@@ -150,42 +146,23 @@ function renderInf() {
   el('plan').innerHTML = "<span class='lbl'>game plan</span><div class='text'>" + text.map(esc).join('<br>') + '</div>' + (basis ? "<div class='basis'>" + esc(basis) + '</div>' : '');
   renderStages(d.stages);
   var mo = d.momentum;                  /* every board carries it, the badges included */
-  /* the strip is two bars, blue's and red's. With both seats scored the bars
-     are the odds - each share over the two shares' sum, a split of 100 - and
-     the tooltip keeps the share; with one seat scored its bar is its share
-     alone; a seat that cannot be scored reads its badge's word - unscored,
-     or not allowed where its picks break a limit - picks or not, its reason
-     in the tooltip. While neither bar has a figure the engine's verdict says
-     why under them */
-  var bar = function (side, value, res) {
-    var odds = mo.odds ? mo.odds[side] : null, unscored = !!res && res.scoring === false;
-    var word = unscored ? mo.badges[side].label
-             : odds !== null ? odds + '%'
-             : typeof value === 'number' ? value + ' / 100' : '';
-    var tip = unscored ? res.unscored || ''
-            : typeof value === 'number' ? side + ' ' + value + ' / 100 of its optimal' : '';
-    return "<span class='mbar " + side + "' title='" + esc(tip) + "'><span class='side'>" + side + "</span><span class='trk'><span class='fill' style='width:" +
-      (odds !== null ? odds : typeof value === 'number' ? value : 0) + "%'></span></span><span class='val'>" + word + '</span></span>';
-  };
-  var figureless = typeof mo.blue !== 'number' && typeof mo.red !== 'number';
-  el('momentum').innerHTML = "<span class='lbl' title='each side&#39;s comp as a share of the best six it could field here'>fight odds</span>" +
-    "<span class='mbars'>" + bar('blue', mo.blue, d.current) + bar('red', mo.red, d.red_current) + '</span>' +
-    (figureless && mo.verdict ? "<span class='verdict'>" + esc(mo.verdict) + '</span>' : '');
-  /* neither seat carries a score. Red's is what they are likely to field, from
-     the map and the meta alone. Blue's shows the six the plan describes - the
-     fill around one to five picks, the picks themselves at six - above the
-     optimal, which blue's own picks never constrain; before any pick, the
-     optimal alone. The picks' scores are the badges above the pickers */
-  renderResult(d.expected, el('inf-red'), 'red - most likely starting comp' + (d.map ? ' on ' + d.map : ''));
+  /* red is never optimized: its box is its likely six - its picks and, for
+     each open slot, the hero the map's pick rates and the wiki's synergies
+     pull first - with the six's pull. Blue's shows the six the plan describes -
+     the fill around one to five picks, the picks themselves at six - above
+     the optimal, which blue's own picks never constrain; before any pick,
+     the optimal alone. The picks' figures are the badges above the pickers */
+  var revealed = d.expected && d.expected.locked ? d.expected.locked.length : 0;
+  el('inf-red').innerHTML = resultHTML(d.expected, (revealed ? 'red - their picks, the rest likely'
+    : 'red - likely starting comp') + (d.map ? ' on ' + d.map : '') + ' · ' + mo.badges.red.label);
+  wireBars(el('inf-red'));
   var held = d.current && d.current.blue ? d.current.blue.length : 0;
-  /* each result names its own six blue: red_current.blue is red's picks */
-  var revealed = d.red_current && d.red_current.blue ? d.red_current.blue.length : 0;
   var ours = d.fill ? resultHTML(d.fill, 'blue - your picks, the rest filled')
            : held >= TEAM ? resultHTML(d.current, 'blue - your six') : '';
   el('inf-blue').innerHTML = ours + resultHTML(d.blue, 'blue - optimal vs red\'s ' + (revealed ? 'picks' : 'likely six') + (d.side ? ', on ' + d.side : ''));
   wireBars(el('inf-blue'));
   /* the badge above each picker is the engine's (momentum.badges): its
-     label, and on hover what the figure is a share of */
+     label, and on hover what the figure means */
   el('bluescore').textContent = mo.badges.blue.label; el('bluescore').title = mo.badges.blue.tip;
   el('redscore').textContent = mo.badges.red.label; el('redscore').title = mo.badges.red.tip;
   if (d.shapes && d.shapes.length) SHAPES = d.shapes;   /* what the roster dims */
@@ -212,11 +189,6 @@ function renderStages(rows) {
 
 /* a count with thousands separators: 14,101 candidates */
 function commas(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
-/* one seat's six in its container - a seat is a reference, so it carries no score */
-function renderResult(d, container, title) {
-  container.innerHTML = resultHTML(d, title);
-  wireBars(container);          // the tabs and the filter live on the new nodes
-}
 /* a six: its title, the six as cards, the search's numbers, the strategies
    met and the alternatives */
 function resultHTML(d, title) {

@@ -13,9 +13,10 @@ from door.mcp.server import PARSE_ERROR, Response, Server, error_response
 
 
 def serve(mcp: Server, stdin: Iterable[str] | None = None, stdout: TextIO | None = None) -> None:
-    """Answer every line of stdin until it ends."""
-    stdin = stdin or sys.stdin
-    stdout = stdout or sys.stdout
+    """Answer every line of stdin until it ends; the process's own stdin
+    and stdout where none is given."""
+    stdin = sys.stdin if stdin is None else stdin
+    stdout = sys.stdout if stdout is None else stdout
     for line in stdin:
         line = line.strip()
         if not line:

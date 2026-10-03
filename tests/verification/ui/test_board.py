@@ -1,27 +1,13 @@
-"""The board's server: its roster and facts speak what the MCP tools serve.
-Its board and catalog are inference/serve.py's handlers, tested in
-tests/verification/inference/test_serve.py. No HTTP server is spun up - the handler is
+"""The board's server: its facts speak what the MCP tools serve. Its roster
+is facts.roster's, tested in tests/verification/facts/test_roster.py, and
+its board and catalog are ui/serve.py's handlers, tested in
+tests/verification/ui/test_serve.py. No HTTP server is spun up - the handler is
 thin routing; tests/verification/ui/test_board_server.py serves it."""
 
 import pytest
 
 from db import Refusal
 from ui import board
-
-
-@pytest.mark.invariant
-def test_roster_endpoint_carries_portraits_and_maps(db):
-    data, code = board.api_roster(db)
-    assert code == 200
-    assert {h["role"] for h in data["heroes"]} == {"tank", "damage", "support"}
-    assert all(h["status"] in ("released", "announced") for h in data["heroes"])
-    assert all(h["portrait"] for h in data["heroes"] if h["status"] == "released")
-    assert all(h["pool"] > 0 for h in data["heroes"])     # the door's roster, pool and all
-    assert any(m["name"] == "King's Row" for m in data["maps"])
-    for h in data["heroes"]:                          # an announced hero rides in its role, dated
-        if h["status"] == "announced":
-            assert h["role"] in ("tank", "damage", "support") and "release_date" in h
-    db.rollback()
 
 
 @pytest.mark.invariant
@@ -49,7 +35,4 @@ def test_bans_ride_the_query_string(db):
                                       "bans": ["Widowmaker", "Sombra"]})
     assert code == 200 and data["bans"] == ["Widowmaker", "Sombra"]
     assert any(f["scope"] == "bans" for f in data["facts"])
-    data, _ = board.api_roster(db)
-    assert any(m["name"] == "King's Row" and m["sided"] for m in data["maps"])
-    assert any(m["name"] == "Ilios" and not m["sided"] for m in data["maps"])
     db.rollback()

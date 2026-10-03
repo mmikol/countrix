@@ -1,8 +1,9 @@
 """The search on a board, held to a full enumeration: the best sixes of
-every legal six, element for element, on both seats, around locked picks,
-past bans, in the countered case and on a plateau where every six ties;
+every legal six, element for element, for blue's optimal and its fill,
+around locked picks, past bans and on a plateau where every six ties;
 a full six's rank; shape limits, a charge for a rule broken that never
-prunes, a need and its budget, partners that only pay together, the scale
+prunes, a bonus that reads a name refused by its expression, a need and
+its budget, partners that only pay together, the scale
 a ban leaves alone, the ranking order and its tie-breaks, the reference
 sample of a small roster, and the budget a search refuses past. Every
 board is the synthetic World's: no database."""
@@ -16,20 +17,27 @@ import shutil
 import pytest
 
 from db import Refusal
-from db.data.normalizer import name_key
-from facts.draft import Draft, opposite
+from facts.draft import Draft
 from facts.records import Synergy
 from facts.team import team_metrics
 from inference import catalog
 from inference.base import OFF
-from inference.scoring import Candidate, rank_key
+from inference.scoring import rank_key
 from inference.shapes import legal_shapes
 from tests.verification.inference import (
     ASSUMPTIONS_ONLY,
     DEFAULT,
     FIXTURE_PLAYBOOK,
     evaluated,
+    hazard_playbook,
     heal_rate,
+)
+from tests.verification.inference.enumeration import (
+    enumerated,
+    legal_sixes,
+    seated,
+    verdicts,
+    widened,
 )
 
 # the reference playbook's shape limit tightened to Role Queue's two-two-two
@@ -40,70 +48,6 @@ K = 6                   # the sixes a board's seat keeps: its best and BOARD_TOP
 # a swap search's reference picks and its raw cost a pick dropped: the keep term
 # the gate holds the bound to beside the plain objective
 KEEP, KEEP_COST = ("Kite", "Needle", "Myrrh"), 0.4
-
-
-def shape(six):
-    """A six's (tanks, damage, supports)."""
-    return tuple(sum(1 for h in six if h.role == r) for r in ("tank", "damage", "support"))
-
-
-def legal_sixes(world, playbook, locked=(), banned=()):
-    """Every six of the world's released heroes that holds the locked picks,
-    fields no banned hero and takes a shape the playbook allows."""
-    shapes = set(legal_shapes(playbook))
-    taken = {h.id for h in (*locked, *banned)}
-    free = [h for h in world.heroes.values() if h.released and h.id not in taken]
-    sixes = ([*locked, *rest] for rest in itertools.combinations(free, 6 - len(locked)))
-    return [six for six in sixes if shape(six) in shapes]
-
-
-def enumerated(solver):
-    """Every legal six of a solver's board that keeps the limits, scored by
-    the solver's own objective and ranked: the answer the search must give,
-    found without it."""
-    banned = [solver.world.heroes[i] for i in solver.banned]
-    sixes = legal_sixes(solver.world, solver.catalog, solver.locked, banned)
-    scored = [solver.score(solver.prepare(Candidate(six)), detail=False) for six in sixes]
-    return sorted((c for c in scored if not c.violations), key=rank_key)
-
-
-def verdicts(sixes):
-    """Sixes as the comparison reads them: the score's float, the tie-break
-    and the names."""
-    return [(c.score, c.tiebreak, sorted(c.names)) for c in sixes]
-
-
-def seated(world, draft, playbook, base, scale_of=None, keep=(), swap=0.0):
-    """The Solver of a board's seat, on `scale_of`'s scale where given; with
-    `keep`, the swap search's keep term: `swap` for each of those heroes a
-    six holds."""
-    from inference.solver import Solver
-    m, red, locked, banned = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
-    solver = Solver(world, m, red=red, locked=locked, banned=banned, side=draft.side,
-                    stage=draft.stage, catalog=playbook, base=base,
-                    keep=frozenset(world.hero(name).id for name in keep), swap=swap)
-    if scale_of is not None:
-        solver.adopt_scale(scale_of)
-    return solver
-
-
-def widened(world):
-    """The world with three stronger twins of each role's best hero: seven a
-    role, 38,038 legal sixes under the open queue, room for the bound to
-    prune."""
-    world = copy.copy(world)
-    world.heroes, world.by_key = dict(world.heroes), dict(world.by_key)
-    next_id = max(world.heroes) + 1
-    for role in ("tank", "damage", "support"):
-        best = max((h for h in world.heroes.values() if h.role == role and h.released),
-                   key=lambda h: h.win)
-        for i in range(3):
-            twin = dataclasses.replace(best, id=next_id, name="%s %d" % (best.name, i + 2),
-                                       win=best.win + 1 + i)
-            world.heroes[twin.id] = twin
-            world.by_key[name_key(twin.name)] = twin.id
-            next_id += 1
-    return world
 
 
 def paired(world, a, b):
@@ -170,7 +114,7 @@ def test_the_search_reaches_the_enumerated_maximum(synthetic_world, catalog_copy
                 missed.append("%s, keeping %s: %s" % (draft, KEEP, verdicts(ranked)[:2]))
             pruned = pruned or solver.leaves < len(full)
             assert solver.considered == len(legal_sixes(
-                world, playbook, solver.locked, [world.heroes[i] for i in solver.banned]))
+                world, playbook, solver.locked, solver.banned_heroes))
             if world is together:
                 assert {a.name, b.name} <= set(full[0].names)   # the pair pays, and is fielded
             top = engine.infer(world, draft, catalog=playbook, top=K - 1, base=base)
@@ -181,41 +125,27 @@ def test_the_search_reaches_the_enumerated_maximum(synthetic_world, catalog_copy
 
 
 @pytest.mark.parametrize("base", [OFF, DEFAULT], ids=["base-off", "base-on"])
-def test_every_seat_of_a_board_is_the_enumerated_maximum(synthetic_world, base):
-    """A board's seats are each an exact search: blue's optimal against red's
-    picks, red's against blue's on the other side, the fill around blue's
-    picks on blue's scale, red's fill on red's, and the countered case -
-    blue's best counter to red's optimal six, and blue's picks filled against
-    it on that scale. Each is the enumeration's best six, and the board shows
-    each seat's six and alternatives in the enumeration's order."""
+def test_every_search_of_a_board_is_the_enumerated_maximum(synthetic_world, base):
+    """A board's searches are each exact: blue's optimal against red's picks
+    and the fill around blue's picks on blue's scale. Each is the
+    enumeration's best six, and the board shows each six and its
+    alternatives in the enumeration's order."""
     from inference import engine
     playbook = catalog.load(FIXTURE_PLAYBOOK)
     for draft in (Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm", "Rook"), side="attack"),
                   Draft("Ember Ruins", ("Anvil",), ("Needle",), ("Myrrh",))):
         board = engine.board(synthetic_world, draft, catalog=playbook,
-                             brief=engine.Brief(base=base, swaps=False))
-        blue_seat = dataclasses.replace(draft, blue=())
-        red_seat = Draft(draft.map_name, draft.blue, (), draft.bans, opposite(draft.side))
-        blue = seated(synthetic_world, blue_seat, playbook, base)
-        red = seated(synthetic_world, red_seat, playbook, base)
-        blue.freeze_bounds()
-        red.freeze_bounds()
-        theirs = Draft(draft.map_name, draft.blue, draft.red, draft.bans, opposite(draft.side))
-        against = dataclasses.replace(draft, red=tuple(board.red.blue), blue=())
-        countered = seated(synthetic_world, against, playbook, base)
-        countered.freeze_bounds()
-        seats = [(board.blue, blue), (board.red, red),
-                 (board.fill, seated(synthetic_world, draft, playbook, base, blue)),
-                 (board.countered, seated(synthetic_world, dataclasses.replace(
-                     against, blue=draft.blue), playbook, base, countered))]
+                             brief=engine.Brief(base=base, search_swaps=False))
+        blue = seated(synthetic_world, dataclasses.replace(draft, blue=()), playbook, base)
+        blue.freeze_scale()
+        seats = [(board.blue, blue),
+                 (board.fill, seated(synthetic_world, draft, playbook, base, blue))]
         for result, solver in seats:
             full = enumerated(solver)
             assert verdicts(solver.solve(top=K).ranked) == verdicts(full[:K]), draft
             shown = [sorted(result.blue), *(sorted(a["blue"]) for a in result.alternatives)]
             assert shown == [sorted(c.names) for c in full[:len(shown)]], draft
             assert abs(result.score - full[0].score) < 1e-12
-        red_fill = seated(synthetic_world, theirs, playbook, base, red)
-        assert verdicts(red_fill.solve(top=K).ranked) == verdicts(enumerated(red_fill)[:K])
 
 
 @pytest.mark.parametrize("playbook", ["assumptions", "healing floor"])
@@ -274,7 +204,7 @@ def test_a_full_six_is_ranked_against_every_legal_six(synthetic_world, monkeypat
         assert evaluation.rank == 1 + above and not evaluation.outranked, place
         result = evaluated(synthetic_world, dataclasses.replace(
             draft, blue=tuple(six.names)), catalog=playbook)
-        assert result.rank == 1 + above
+        assert result.rank == 1 + above and len(result.picks) == 6
     monkeypatch.setattr(solver_module, "RANK_CAP", 5)
     weak = full[len(full) // 2]
     evaluation = solver_module.evaluate_comp(solved, weak.heroes)
@@ -326,18 +256,17 @@ def test_shape_limits_bound_the_search_and_a_stricter_one_narrows_it(synthetic_w
     assert roles == ["damage", "damage", "support", "support", "tank", "tank"]
 
 
-def test_a_shape_limit_on_a_dial_is_still_a_shape_limit(tmp_path):
+def test_a_shape_limit_on_a_dial_is_still_a_shape_limit(catalog_copy):
     """A cap written on a dial - `team.supports <= params.MAX_SUPPORTS` -
     reads the six's shape and its own number: the shapes the roster enforces
     and the search enumerates leave out every six past the dial, and moving
     the dial moves the cap."""
-    shutil.copytree(FIXTURE_PLAYBOOK, tmp_path, dirs_exist_ok=True)
-    everything = legal_shapes(catalog.load(str(tmp_path)))
+    everything = legal_shapes(catalog.load(catalog_copy))
     for cap in (3, 2):
-        (tmp_path / "support-cap.md").write_text(
-            "---\nname: support cap\nkind: constraint\nrequire: team.supports <="
-            " params.MAX_SUPPORTS\nparams:\n  MAX_SUPPORTS: %d\n---\nx\n" % cap, "utf-8")
-        shapes = legal_shapes(catalog.load(str(tmp_path)))
+        with open(os.path.join(catalog_copy, "support-cap.md"), "w", encoding="utf-8") as handle:
+            handle.write("---\nname: support cap\nkind: constraint\nrequire: team.supports <="
+                         " params.MAX_SUPPORTS\nparams:\n  MAX_SUPPORTS: %d\n---\nx\n" % cap)
+        shapes = legal_shapes(catalog.load(catalog_copy))
         assert shapes == [s for s in everything if s.supports <= cap], cap
 
 
@@ -356,6 +285,23 @@ def test_a_charge_for_a_rule_broken_is_a_heuristic_and_never_prunes(synthetic_wo
     [term] = [c for c in cand.contributions if c["id"] == "anti-air"]
     assert (term["kind"], term["form"]) == ("heuristic", "scored") and "ok" not in term
     assert term["applies"] and term["penalty"] == 2.5 and term["weighted"] == -2.5
+
+
+def test_a_bonus_that_reads_a_name_is_refused_naming_its_expression(synthetic_world, tmp_path):
+    """A bonus or penalty is a number. One that reads a text metric passes
+    the catalog, which checks only that its names are registered, and the
+    score refuses it with an ExprError naming the expression."""
+    from inference import scoring
+    from inference.expr import ExprError
+    (tmp_path / "lean.md").write_text(
+        "---\nname: lean\nkind: heuristic\nbonus: team.style_lean\n---\nx\n", "utf-8")
+    w = synthetic_world
+    objective = scoring.Objective(w, w.map("Harbor Gate"), red=[],
+                                  catalog=catalog.load(str(tmp_path)), base=OFF)
+    cand = scoring.Candidate(
+        [w.hero(n) for n in ("Anvil", "Mortar", "Balm", "Myrrh", "Sorrel", "Tansy")])
+    with pytest.raises(ExprError, match=r"'team\.style_lean' - a bonus or penalty is a number"):
+        objective.score(objective.prepare(cand))
 
 
 def test_a_rule_guarded_on_the_six_itself_is_a_need_and_a_state_has_a_budget(
@@ -396,7 +342,8 @@ def test_a_need_alone_on_its_guard_weighs_its_own_weight(synthetic_world, tmp_pa
     """The budget the needs on one guard share is NEED_BUDGET or their
     largest weight, whichever is more, so no slider is capped: a need alone
     on its guard weighs what its file or its slider says, past the budget
-    too, and two needs on one guard cost the larger weight together."""
+    too, and two needs on one guard cost the larger weight together. A guard
+    is its when and its params, as the gates read it."""
     from inference import scoring
     world = synthetic_world
     rule = ("---\nname: %s\nkind: heuristic\ndirection: maximize\nmetric: %s\nweight: %s\n"
@@ -415,6 +362,15 @@ def test_a_need_alone_on_its_guard_weighs_its_own_weight(synthetic_world, tmp_pa
     both = catalog.weighted(catalog.load(str(tmp_path)), {"solo": 3.0})
     assert weights(both) == {"solo": 2.25, "solo-cc": 0.75}
     assert weights(catalog.weighted(both, {"solo": 0.5})) == {"solo": 0.5, "solo-cc": 1.0}
+    # one when's text over two params guards two states: each need has a budget of its own
+    guarded = (
+        "---\nname: %s\nkind: heuristic\ndirection: maximize\nmetric: %s\nweight: 2\n"
+        "when: team.supports <= params.N\nparams:\n  N: %d\n---\nx\n")
+    apart = tmp_path / "apart"
+    apart.mkdir()
+    (apart / "at-one.md").write_text(guarded % ("At one", "team.mobility_count", 1), "utf-8")
+    (apart / "at-three.md").write_text(guarded % ("At three", "team.cc_count", 3), "utf-8")
+    assert weights(catalog.load(str(apart))) == {"at-one": 2.0, "at-three": 2.0}
 
 
 def test_partners_that_only_pay_together_are_brought_in_together(synthetic_world, tmp_path):
@@ -472,7 +428,7 @@ def test_a_ban_does_not_rescale_the_board(synthetic_world):
         m, red_h, _, bans_h = world.resolve("Harbor Gate", red, [], bans)
         solver = solver_module.Solver(world, m, red=red_h, locked=[], banned=bans_h,
                                       side="attack", catalog=catalog, base=DEFAULT)
-        solver.freeze_bounds()
+        solver.freeze_scale()
         cand = solver.prepare(scoring.Candidate([world.hero(n) for n in six]))
         return solver.score(cand, detail=False).score
 
@@ -566,39 +522,20 @@ def test_the_floor_is_the_lowest_reference_six(synthetic_world):
     playbook = catalog.load(FIXTURE_PLAYBOOK)
     solver = solver_module.Solver(world, m, red=red, locked=[], side="attack",
                                   catalog=playbook, base=DEFAULT)
-    solver.freeze_bounds()
+    solver.freeze_scale()
     scores = [solver.score(c, detail=False).score for c in scale._prepared(solver)]
     assert solver.floor == min(scores) < max(scores)
     fill = solver_module.Solver(world, m, red=red, locked=locked, side="attack",
                                 catalog=playbook, base=DEFAULT)
     fill.adopt_scale(solver)
-    assert fill.floor == solver.floor and fill.bounds == solver.bounds
-
-
-# a board that reads the terrain: a rule and a limit Forge's hazards turn on
-HAZARD_RULES = {
-    "hazard-cc": "---\nname: Hazards reward crowd control\nkind: heuristic\n"
-                 "metric: team.cc_count\ndirection: maximize\nweight: 1\n"
-                 "when: map.hazards >= 1.5\n---\nPush them off.\n",
-    "hazard-needs-cc": "---\nname: Hazards need crowd control\nkind: constraint\n"
-                       "require: team.cc_count >= 1 or map.hazards < 1.5\n---\nAlways.\n"}
-
-
-def hazard_playbook(world, directory):
-    """The reference playbook's assumptions and HAZARD_RULES, and Ember
-    Ruins' Forge stage whose text raises its hazards past the map's."""
-    for sid, text in HAZARD_RULES.items():
-        with open(os.path.join(directory, "%s.md" % sid), "w", encoding="utf-8") as handle:
-            handle.write(text)
-    world.map("Ember Ruins").stage_z["Forge"]["hazards"] = 2.5
-    return [*ASSUMPTIONS_ONLY, *catalog.load(str(directory))]
+    assert fill.floor == solver.floor and fill.scale == solver.scale
 
 
 def test_every_stage_of_a_map_shares_one_scale_and_reads_its_own_floor(
         synthetic_world, tmp_path):
     """The scale is measured on the whole map, each heuristic read wherever
     the board settles its gate: a stage that turns a rule on and a limit
-    that reads the terrain move no bound. The floor is the board's own -
+    that reads the terrain move no low or high. The floor is the board's own -
     the lowest reference six under its stage's gates and limits - so a
     stage that reads as the map floors where the map does, off the same
     measured sixes. Each stage is searched exactly: its best sixes are the
@@ -613,11 +550,11 @@ def test_every_stage_of_a_map_shares_one_scale_and_reads_its_own_floor(
                                     base=DEFAULT)
         for stage in ("", "Courtyard", "Forge")}
     for solver in solvers.values():
-        solver.freeze_bounds()
+        solver.freeze_scale()
     assert [solvers[s].gates["hazard-cc"] for s in solvers] == [False, False, True]
     assert [solvers[s].reads_the_stage() for s in solvers] == [False, False, True]
-    assert solvers[""].bounds == solvers["Courtyard"].bounds == solvers["Forge"].bounds
-    assert "hazard-cc" in solvers[""].bounds
+    assert solvers[""].scale == solvers["Courtyard"].scale == solvers["Forge"].scale
+    assert "hazard-cc" in solvers[""].scale
     for solver in solvers.values():
         scores = [solver.score(c, detail=False).score for c in scale._prepared(solver)]
         assert solver.floor == min(scores)

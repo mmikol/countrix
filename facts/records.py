@@ -63,12 +63,11 @@ class Pairing(NamedTuple):
 
 class DerivedEdge(NamedTuple):
     """A counter edge the matrix derives on a pair the wiki leaves out: the
-    winner answers the loser, by the winner's score against it and its net
-    over the reverse, through the mechanisms that fired."""
+    winner answers the loser, by the winner's score against it, through the
+    mechanisms that fired."""
     winner: int
     loser: int
     score: float
-    net: float
     fired: tuple[Fired, ...]
 
 

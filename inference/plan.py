@@ -1,5 +1,5 @@
-"""The board in prose: the momentum verdict read off the two current comps,
-the badge above each picker, the game plan - the ground, what to play on
+"""The board in prose: the verdict read off blue's current comp, the badge
+above each picker, the game plan - the ground, what to play on
 it, what red's picks mean, the family of heroes to stay in and what the
 six is built for - and a blurb a stage of the plan (stage_blurb), worded
 from the facts, the default engine's terms and the strategies the solver
@@ -7,11 +7,11 @@ scored. No sentence comes from anywhere else.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 from facts import compute
 from facts.board_facts import StageTerrainValue, TerrainValue
-from facts.draft import TEAM_SIZE
+from facts.draft import TEAM_SIZE, Side
 from facts.factset import FactSet
 from facts.model import Hero, Map, World
 from facts.team import team_metrics, text
@@ -22,7 +22,6 @@ from inference.result import (
     Badge,
     Badges,
     Momentum,
-    Odds,
     Result,
     StageRules,
     StageSwap,
@@ -31,64 +30,32 @@ from inference.result import (
 
 
 class Seats(NamedTuple):
-    """What the verdict reads off a board: the two current comps; the two
-    optimals, whose reason a seat with no picks is read by; the two fills,
-    the best six reachable from a half-drafted seat's picks, which that seat
-    is read through; and blue's picks against red's best counter."""
+    """What the verdict reads off a board: blue's current comp; its fill, the
+    best six reachable from half-drafted picks, which the seat is read
+    through; and red's likely six, which nothing scores."""
     current: Result
-    red_current: Result
-    blue: Result | None = None
-    red: Result | None = None
+    expected: Result
     fill: Result | None = None
-    red_fill: Result | None = None
-    countered: Result | None = None
 
 
 def momentum(seats: Seats) -> Momentum:
-    """Who the picks favour, read off the two current comps on their own
-    optimals' scales: blue's share of its best counter to red's selection,
-    red's share of its best counter to blue's. A seat with no picks has no
-    comp to read, so its reason is read off its optimal instead.
+    """Where blue's picks stand, read off blue's current comp on its
+    optimal's scale, and the badge above each picker.
 
     A half-drafted seat is read through its fill - the best six reachable from
-    what it has - on both sides alike. Scoring the picks alone sums over a
-    smaller team, so a perfectly played draft would read low and could fall
-    when the right pick lands; that measures how many picks are in, not how
-    good they are, and a seat read that way against one read through its
-    fill would always trail. Each seat's badge is worded here too, so the
-    page shows the engine's words and decides nothing."""
-    cur, red_cur = seats.current, seats.red_current
-    badges = Badges(blue=_badge(cur, seats.fill), red=_badge(red_cur, seats.red_fill))
-    blue_why = cur.unscored() if cur.blue or seats.blue is None else seats.blue.waiting()
-    red_why = red_cur.unscored() if red_cur.blue or seats.red is None else seats.red.waiting()
-    if blue_why and red_why:                       # neither seat can be a share of anything
-        return Momentum(blue=None, red=None, countered=None, partial=False, odds=None,
-                        verdict=blue_why, badges=badges)
-    blue_share, red_share, countered_share = _shares(seats, blue_why, red_why)
-    odds = fight_odds(blue_share, red_share)
-    partial = bool((cur.blue and cur.partial) or (red_cur.blue and red_cur.partial))
-    verdict = _verdict_line(cur, red_cur, blue_share, red_share, partial, odds, blue_why, red_why)
-    if countered_share is not None:
-        verdict += "; if red plays its best counter, your picks hold %d / 100" % countered_share
-    return Momentum(blue=blue_share, red=red_share, countered=countered_share, partial=partial,
-                    odds=odds, verdict=verdict, badges=badges)
-
-
-def _shares(
-        seats: Seats, blue_why: str | None,
-        red_why: str | None) -> tuple[int | None, int | None, int | None]:
-    """Blue's share of its optimal, red's of its best counter, and blue's
-    against red's best counter; None where a seat has no picks or its share
-    waits. Each half-drafted seat is read through its fill where one was
-    solved, and the countered case is a fill of blue's picks too, so the
-    three are measured the same way."""
-    cur, red_cur, countered = seats.current, seats.red_current, seats.countered
-    blue_share = _now(cur, seats.fill).share() if cur.blue and not blue_why else None
-    red_share = _now(red_cur, seats.red_fill).share() if red_cur.blue and not red_why else None
-    countered_share = None
-    if countered is not None and countered.blue and not countered.unscored():
-        countered_share = countered.share()
-    return blue_share, red_share, countered_share
+    what it has. Scoring the picks alone sums over a smaller team, so a
+    perfectly played draft would read low and could fall when the right pick
+    lands; that measures how many picks are in, not how good they are. Red is
+    never optimized and never scored: its badge is its likely six's pull.
+    Each badge is worded here, so the page shows the engine's words and
+    decides nothing."""
+    cur, fill = seats.current, seats.fill
+    badges = Badges(blue=_badge(cur, fill), red=_likely_badge(seats.expected))
+    why = cur.unscored()
+    share = _now(cur, fill).share() if cur.blue and why is None else None
+    partial = bool(cur.blue and cur.partial)
+    verdict = _verdict_line(share, partial, fill is not None, why)
+    return Momentum(blue=share, partial=partial, verdict=verdict, badges=badges)
 
 
 def _now(current: Result, fill: Result | None) -> Result:
@@ -98,85 +65,51 @@ def _now(current: Result, fill: Result | None) -> Result:
 
 
 def _badge(current: Result, fill: Result | None) -> Badge:
-    """The badge above a seat's picker: "not allowed", with the limits the
+    """The badge above blue's picker: "not allowed", with the limits the
     picks break, where the playbook rules the comp out; "unscored", with the
-    reason, whenever the seat's current comp cannot be a share of anything -
-    picks or not; before any pick the suggested six's 100, the seat's optimal
-    by definition; else the picks' share of the seat's optimal, a
-    half-drafted seat read through the best six its picks reach, as the
-    verdict reads it. The tip says what the figure is a share of."""
+    reason, whenever the current comp cannot be a share of anything - picks
+    or not; before any pick the suggested six's 100, the seat's optimal by
+    definition; else the picks' share of the seat's optimal, a half-drafted
+    seat read through the best six its picks reach where that fill was
+    solved, as the verdict reads it. The tip says what the figure is a share
+    of, and whether a fill was read."""
     why = current.unscored()
     if why is not None:
         return Badge(label=NOT_ALLOWED if current.barred else "unscored", tip=why)
     if not current.blue:
-        return Badge(label="100 / 100", tip="no %s picks yet: the suggested six is this"
-                                            " seat's optimal, 100" % current.seat)
+        return Badge(label="100 / 100", tip="no blue picks yet: the suggested six is this"
+                                            " seat's optimal, 100")
     share = _now(current, fill).share()
-    red = current.seat == "red"
-    whose = "their" if red else "your"
-    of = "their best counter to yours" if red else "the best six for this board"
-    reach = ("the best six from %s picks reaches" if current.partial else "%s picks reach") % whose
-    return Badge(label="%d / 100" % share, tip="%s %d%% of %s" % (reach, share, of))
+    # a half-drafted seat whose fill was not solved is read off its picks: say so
+    filled = current.partial and fill is not None
+    reach = "the best six from your picks reaches" if filled else "your picks reach"
+    return Badge(label="%d / 100" % share, tip="%s %d%% of the best six for this board"
+                                                % (reach, share))
 
 
-def fight_odds(blue_share: int | None, red_share: int | None) -> Odds | None:
-    """The fight odds: the two shares pitted against each other - each side's
-    share of the two shares' sum, so the pair reads as a split of 100; defined
-    only when both seats score."""
-    if blue_share is None or red_share is None or blue_share + red_share <= 0:
-        return None
-    blue = round(100.0 * blue_share / (blue_share + red_share))
-    return Odds(blue=blue, red=100 - blue)
+def _likely_badge(likely: Result) -> Badge:
+    """The badge above red's picker: the pull of red's likely six - its
+    revealed picks, and for each open slot the hero the map's pick rates and
+    the wiki's synergies pull first (facts.compute.expected_picks). The pull
+    ranks heroes; it is no share and no probability."""
+    pull = sum(p.get("pull", 0.0) for p in likely.picks)
+    held = any(p["locked"] for p in likely.picks)
+    six = "their picks and the likeliest heroes for the rest" if held else "their likely six"
+    tip = (
+        "%s: %.1f pull - each hero's pick rate here, plus %g for each documented synergy"
+        " pair on the six" % (six, pull, compute.SYNERGY_PULL))
+    return Badge(label="%.0f pull" % pull, tip=tip)
 
 
-def _verdict_line(
-        cur: Result, red_cur: Result, blue_share: int | None, red_share: int | None,
-        partial: bool, odds: Odds | None, blue_why: str | None, red_why: str | None) -> str:
-    """The verdict in words, before the countered hedge."""
-    if (blue_why and cur.blue) or (red_why and red_cur.blue):   # one seat scores, the other waits
-        return _one_seat_waits(cur, red_cur, blue_share, red_share, blue_why, red_why)
-    if blue_share is not None and red_share is not None:
-        return _gap_line(blue_share, red_share, partial, odds)
-    if red_share is not None:
-        return ("red has revealed picks and blue has none: red %d / 100 of its best counter"
-                % red_share)
-    if blue_share is not None:
-        return "no red picks revealed yet: blue %d / 100 of its optimal" % blue_share
-    return "no picks yet on either side"
-
-
-def _one_seat_waits(cur: Result, red_cur: Result, blue_share: int | None, red_share: int | None,
-                    blue_why: str | None, red_why: str | None) -> str:
-    """Each seat on its own: a seat with picks has its share, unless its
-    reason for none waits, or its picks are not allowed."""
-    def waits(why: str | None) -> str:
-        if (why or "").startswith(NOT_ALLOWED):
-            return why or ""
-        return "unscored: " + (why or "").split(": ", 1)[-1]
-    sides = [
-        "no blue picks yet" if not cur.blue else
-        "blue %d / 100 of its optimal" % blue_share if blue_share is not None else
-        "blue " + waits(blue_why),
-        "no red picks revealed yet" if not red_cur.blue else
-        "red %d / 100 of its best counter" % red_share if red_share is not None else
-        "red " + waits(red_why)]
-    return "; ".join(sides)
-
-
-def _gap_line(blue_share: int, red_share: int, partial: bool, odds: Odds | None) -> str:
-    """Both seats scored: who is ahead and by how much, and the fight odds."""
-    gap = blue_share - red_share
-    if abs(gap) < 5:
-        line = "even - blue %d, red %d" % (blue_share, red_share)
-    elif gap > 0:
-        line = "blue ahead by %d - blue %d, red %d" % (gap, blue_share, red_share)
-    else:
-        line = "red ahead by %d - blue %d, red %d" % (-gap, blue_share, red_share)
-    if partial:
-        line += " (partial picks)"
-    if odds:
-        line += "; fight odds blue %d%%, red %d%%" % (odds["blue"], odds["red"])
-    return line
+def _verdict_line(share: int | None, partial: bool, filled: bool, why: str | None) -> str:
+    """Blue's standing in words: a half-drafted seat says whether it was read
+    through its fill or, where none was solved, off its picks alone."""
+    if why is not None:                  # picks not allowed, or a board that waits
+        return "blue " + why if why.startswith(NOT_ALLOWED) else why
+    if share is None:
+        return "no blue picks yet: the suggested six is blue's optimal, 100 / 100"
+    how = (" (the best six from its picks)" if filled else " (its picks alone)") if partial else ""
+    return "blue %d / 100 of its optimal%s" % (share, how)
 
 
 MODE_GROUND = {
@@ -265,7 +198,7 @@ def _family(world: World, m: Map | None, style: str, role: str,
 
 
 def plan(
-        world: World, m: Map | None, side: str, bans: Sequence[str],
+        world: World, m: Map | None, side: Side, bans: Sequence[str],
         red_h: Sequence[Hero], six: Result) -> str:
     """The game plan in prose for `six`, the six the comps tab shows for blue
     - blue's optimal before any blue pick, the fill around one to five, the
@@ -310,7 +243,7 @@ def _keeps(six: Result, yours: Sequence[str]) -> str | None:
     return None
 
 
-def _ground(m: Map | None, side: str, facts: FactSet | None) -> list[str]:
+def _ground(m: Map | None, side: Side, facts: FactSet | None) -> list[str]:
     """The ground: the map's mode, the terrain its facts stress, and the side."""
     if m is None:
         return ["No map yet, so this is the meta's best six: what is winning right now, built"
@@ -390,14 +323,18 @@ def _them(
 
 
 def _unrevealed(six: Result) -> str | None:
-    """Their likely six while red has revealed nothing: the six searched as
-    its counter says so; blue's own six counters nothing, and the plan only
-    names it."""
-    if not six.red:
+    """Their likely six while red has revealed nothing, as the default
+    engine's counter term read it: a six searched with that term on counters
+    it, and says so; blue's own six, or a six searched with the term off,
+    only names it. None where no counter term read it."""
+    read = next((c for c in six.contributions
+                 if c["id"] == base.COUNTERS and c.get("likely") and c.get("against")), None)
+    if read is None:
         return None
-    if six.kind != "evaluate":
-        return "No red pick yet: the six counters their likely six (%s)." % ", ".join(six.red)
-    return "No red pick yet: their likely six is %s." % _and(six.red)
+    likely = read.get("against", [])
+    if six.kind != "evaluate" and read["applies"]:
+        return "No red pick yet: the six counters their likely six (%s)." % ", ".join(likely)
+    return "No red pick yet: their likely six is %s." % _and(likely)
 
 
 def _answered(six: Result) -> dict[str, list[str]]:
@@ -465,7 +402,7 @@ def _above_all(blue_r: Result, lean: str) -> str | None:
 
 
 def _basis(
-        m: Map | None, side: str, bans: Sequence[str], red_h: Sequence[Hero],
+        m: Map | None, side: Side, bans: Sequence[str], red_h: Sequence[Hero],
         queue: str, yours: int) -> str:
     """What the plan rests on, the rates named by the queue they were
     captured in, and blue's picks where the six keeps them."""
@@ -486,15 +423,18 @@ def _basis(
 def stage_blurb(
         m: Map, stage: str, index: tuple[int, int], rules: StageRules,
         swaps: Sequence[StageSwap], gains: Sequence[str], cost: float, *,
-        origin: bool = False, solved: bool = True, infeasible: bool = False,
+        outcome: Literal["origin", "solved", "unsolved", "infeasible"] = "solved",
         lean: str = "") -> str:
     """A stage of the plan in four sentences at most, each dropped when it
     has nothing to say: the ground - the stage, its place on the route
     (`index`, phase and phases; (0, 0) for an arena), and what its own text
     stresses, else that it reads as the map; what changes here - the rules
-    its ground turns on and off; the swaps and what the six gains most on
-    (`gains`, titled), or the six kept under the cost; and how to play it,
-    where the six's lean turns (`lean`, empty where it holds)."""
+    its ground turns on and off; what came of its search (`outcome`): the
+    six the board suggests played as it is (origin), no six within the
+    search's budget (unsolved) or the stage's limits (infeasible), else the
+    swaps and what the six gains most on (`gains`, titled), or the six kept
+    under the cost; and how to play it, where the six's lean turns (`lean`,
+    empty where it holds)."""
     place = ", phase %d of %d" % index if index[1] > 1 else ""
     stressed = compute.stage_standouts(m, stage)[:TERRAIN_NAMED]
     if stressed:
@@ -509,23 +449,24 @@ def stage_blurb(
         changes.append("%s drop%s out" % (_and(rules["off"]), "" if len(rules["off"]) > 1 else "s"))
     if changes:
         read.append("; ".join(changes))
-    if origin:
+    if outcome == "origin":
         read.append("Play the six the board suggests here")
-    elif infeasible:
+    elif outcome == "infeasible":
         read.append("No six keeps this stage's limits: keep the six before it")
-    elif not solved:
+    elif outcome == "unsolved":
         read.append("Not solved within the search's budget: keep the six before it")
     elif swaps:
         said = _and("%s for %s" % (s["out"], s["in"]) for s in swaps)
         read.append("Swap %s%s" % (said, ": the six gains most on %s" % _and(gains)
                                    if gains else ""))
     else:
-        read.append("Keep the six: no swap pays for its cost (%s)" % _cost(cost))
+        read.append("Keep the six: no swap pays for its cost (%s)" % cost_text(cost))
     if lean in STYLE_PLAY:
         read.append("The six turns %s here: %s" % (lean, STYLE_PLAY[lean]))
     return " ".join(_sentence(r) for r in read)
 
 
-def _cost(value: float) -> str:
-    """A cost as the blurb writes it: whole where it is whole."""
+def cost_text(value: float) -> str:
+    """A swap cost as the blurb and the swaps' verdict write it: whole where
+    it is whole."""
     return "%d" % value if value == int(value) else "%g" % value

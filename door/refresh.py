@@ -25,7 +25,7 @@ from collections.abc import Callable, Iterable
 from datetime import datetime, timedelta
 from typing import NamedTuple, NoReturn
 
-from db import CACHE_DIRS, SECONDS_PER_HOUR
+from db import SECONDS_PER_HOUR
 from door.mcp import tools
 
 DEFAULT_AT = "05:00"      # the daily time when COUNTRIX_REFRESH_AT names none
@@ -68,18 +68,19 @@ def _page_ages(cache_dirs: Iterable[str]) -> list[float]:
             for path in cache_dirs if os.path.isdir(path) for name in os.listdir(path)]
 
 
-def cache_age_hours(cache_dirs: Iterable[str] | None = None) -> float | None:
-    """Hours since the newest cached page across the sources; None if there
-    is no cache at all (a first build)."""
-    ages = _page_ages(cache_dirs or CACHE_DIRS.values())
+def cache_age_hours(cache_dirs: Iterable[str]) -> float | None:
+    """Hours since the newest cached page in `cache_dirs`, the sources'
+    caches; None if there is no cache at all (a first build)."""
+    ages = _page_ages(cache_dirs)
     return min(ages) / SECONDS_PER_HOUR if ages else None
 
 
-def full_due(cache_dirs: Iterable[str] | None = None) -> bool:
-    """A full refresh is due when the slow-moving cache (the wiki's) is older
-    than FULL_DAYS, or absent. Its age is the median page's: the daily
-    refresh refetches one file (the Patches table), a full one all of them."""
-    ages = _page_ages(cache_dirs or [CACHE_DIRS["wiki"]])
+def full_due(cache_dirs: Iterable[str]) -> bool:
+    """A full refresh is due when the slow-moving cache in `cache_dirs` (the
+    wiki's) is older than FULL_DAYS, or absent. Its age is the median page's:
+    the daily refresh refetches one file (the Patches table), a full one all
+    of them."""
+    ages = _page_ages(cache_dirs)
     if not ages:
         return True
     return statistics.median_high(ages) > FULL_DAYS * 24 * SECONDS_PER_HOUR
@@ -94,13 +95,14 @@ class Refreshed(NamedTuple):
 
 def refresh_once(ctx: tools.Context, log: tools.Log = print) -> Refreshed:
     """One refresh -> (ok, text): daily (patches, rates, strategies) or full
-    (every source), as full_due() decides - its text each tool's headline,
-    joined by "; ". Never raises; a failure returns (False, the error)."""
-    started = time.time()
+    (every source), as full_due decides from the context's wiki cache - its
+    text each tool's headline, joined by "; ". Never raises; a failure
+    returns (False, the error)."""
+    started = time.monotonic()
     try:
         # inside the try: full_due() lists and stats the page cache, which can
         # raise OSError like the refresh it decides, and the promise above has to hold
-        full = full_due()
+        full = full_due([ctx.caches["wiki"]])
         log("refresh: starting a %s refresh at %s" % (
             "FULL" if full else "daily", datetime.now().strftime("%Y-%m-%d %H:%M")))
         if full:
@@ -113,19 +115,19 @@ def refresh_once(ctx: tools.Context, log: tools.Log = print) -> Refreshed:
     except Exception as error:  # noqa: BLE001  # a failed refresh leaves yesterday's data in place
         log(traceback.format_exc().rstrip())
         log("refresh: FAILED after %.0fs: %s: %s"
-            % (time.time() - started, type(error).__name__, error))
+            % (time.monotonic() - started, type(error).__name__, error))
         return Refreshed(False, str(error))
-    log("refresh: done in %.0fs - %s" % (time.time() - started, text))
+    log("refresh: done in %.0fs - %s" % (time.monotonic() - started, text))
     return Refreshed(True, text)
 
 
 def run_forever(
         ctx: tools.Context, at: str, log: tools.Log = print,
         sleep: Callable[[float], object] = time.sleep) -> NoReturn:
-    """Refresh at once if the cache is stale, then daily at `at` (HH:MM). A
-    time that is not HH:MM refuses before the first refresh."""
+    """Refresh at once if the context's caches are stale, then daily at `at`
+    (HH:MM). A time that is not HH:MM refuses before the first refresh."""
     parse_at(at)
-    age = cache_age_hours()
+    age = cache_age_hours(ctx.caches.values())
     if age is None or age > MAX_AGE_HOURS:
         log("refresh: cached pages are %s - refreshing now"
             % ("absent" if age is None else "%.0fh old" % age))

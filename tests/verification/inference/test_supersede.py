@@ -2,12 +2,15 @@
 refusal the doors answer as the caller's, and a board no newer one
 replaced asks its check as it goes and runs to the end."""
 
+import dataclasses
+
 import pytest
 
 from facts.draft import Draft
 from tests.verification.inference import BRIEF
 
-# red revealed and one blue pick locked on a sided map: every seat of the board solves
+# red revealed and one blue pick locked on a sided map: blue's optimal, current comp and
+# fill all solve, and red's likely six forms around its pick
 DRAFT = Draft("Harbor Gate", ("Anvil",), ("Balm",), side="attack")
 
 
@@ -34,7 +37,7 @@ def test_a_superseded_board_stops_in_the_middle_of_a_search(
     monkeypatch.setattr(solver.Solver, "_branch", branch)
     with pytest.raises(supersede.Superseded):
         engine.board(synthetic_world, DRAFT, catalog=scratch_playbook,
-                     brief=BRIEF._replace(superseded=superseded))
+                     brief=dataclasses.replace(BRIEF, superseded=superseded))
     assert len(asked) == 41 and len(walked) < 45
     assert issubclass(supersede.Superseded, Refusal)
 
@@ -51,5 +54,5 @@ def test_a_board_no_newer_one_replaced_runs_to_the_end(
         asked.append(1)
         return False
     b = engine.board(synthetic_world, DRAFT, catalog=scratch_playbook,
-                     brief=BRIEF._replace(superseded=superseded))
-    assert b.fill is not None and b.countered is not None and len(asked) > 10
+                     brief=dataclasses.replace(BRIEF, superseded=superseded))
+    assert b.fill is not None and len(asked) > 10

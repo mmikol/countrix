@@ -27,8 +27,8 @@ A six is scored in one seat order, whatever order it arrives in: tanks,
 then damage, then supports, each by hero id (Candidate). The score is then a
 function of the hero set, down to its last bit, which the exact search and
 its proofs need. Sixes rank by rank_key: the score to SCORE_PLACES decimal
-places, then the tie-break, then the names; two scores closer than that
-tie, and the tie-break decides. The tie-break is the sum of the six's
+places, then the tie-break, then the names; two scores that round to the
+same value tie, and the tie-break decides. The tie-break is the sum of the six's
 draws: each hero's draw is a whole number hashed from the board's seed
 (the map and the side) and the hero's id, so it favours no hero for its
 rates or its name, every hero of a role has the same chance of winning a
@@ -41,10 +41,11 @@ from collections.abc import Iterable, Mapping, Sequence
 from typing import Literal, NamedTuple, NotRequired, TypedDict
 
 from facts import compute, counters
+from facts.draft import Side
 from facts.model import ROLES, Hero, Map, World
 from facts.team import NUMBER_TYPES, MetricBag, MetricValue, number, team_metrics
 from inference.base import COUNTERS, RATES, READS, SYNERGY, Base, BaseWeights, Terms
-from inference.expr import Expr, Scope, Value, scope
+from inference.expr import Expr, ExprError, Scope, Value, scope
 from inference.shapes import is_shape_limit
 from inference.strategy import Strategy, settled_by_board
 
@@ -61,7 +62,7 @@ class Interval(NamedTuple):
 
 # The records the objective passes around. A namespace is the metric bags by
 # section.
-type Bounds = dict[str, Interval]               # heuristic id -> low, high
+type Scale = dict[str, Interval]                # heuristic id -> low, high
 type Namespace = dict[str, MetricBag]
 
 
@@ -102,11 +103,12 @@ def _not_a_number(value: MetricValue | None) -> float:
     return 0.0
 
 
-def _amount(value: Value) -> float:
-    """A bonus or penalty expression's value, as the score adds it."""
-    if isinstance(value, (int, float, str)):          # a bool is an int
+def _amount(value: Value, source: str) -> float:
+    """A bonus or penalty expression's value, as the score adds it: a
+    number; anything else is the playbook's error, named by its `source`."""
+    if isinstance(value, (int, float)):               # a bool is an int
         return float(value)
-    raise TypeError("a bonus or penalty reads a number, got %r" % (value,))
+    raise ExprError("%r - a bonus or penalty is a number, got %r" % (source, value))
 
 
 def _slot_gate(held: list[bool | None], slot: int, s: Strategy, sc: Scope) -> bool:
@@ -231,7 +233,7 @@ def rank_key(c: Candidate) -> tuple[float, float, list[str]]:
     return (-quantized(c.score), -c.tiebreak, sorted(c.names))
 
 
-def board_seed(m: Map | None, side: str) -> str:
+def board_seed(m: Map | None, side: Side) -> str:
     """The seed a board's tie-break draws from: its map and its side. Red's
     picks, the bans and the locks leave it alone, so the six a tie settles
     holds still as the draft fills in."""
@@ -247,47 +249,52 @@ def draw(seed: str, hero_id: int) -> float:
     return float(int.from_bytes(digest.digest(), "big"))
 
 
-def _score_base(base: Base, cand: Candidate, out: list[Contribution] | None) -> float:
+def _score_base(engine: Base, cand: Candidate, out: list[Contribution] | None) -> float:
     """The default engine's value; with `out`, a breakdown term per part, the
     counter term naming the side it read and the edges each way."""
     terms = cand.terms
     if terms is None:
         raise RuntimeError("score() takes a prepared candidate: its base terms are unset")
     if out is not None:
-        w = base.scaled                     # each term's weight, the meta applied
+        w = engine.scaled                   # each term's weight, the meta applied
         for key, weight, raw in ((RATES, w.rate, terms.rates), (SYNERGY, w.synergy, terms.synergy),
                                  (COUNTERS, w.counter, float(terms.counters))):
             out.append({"id": key, "kind": "base", "form": "base", "applies": bool(weight),
                         "raw": raw, "weight": weight, "weighted": weight * raw,
                         "metric": READS[key]})
-        out[-1].update({"against": [h.name for h in base.opponent.heroes],
-                        "likely": base.opponent.likely, "answers": terms.answers,
+        out[-1].update({"against": [h.name for h in engine.opponent.heroes],
+                        "likely": engine.opponent.likely, "answers": terms.answers,
                         "exposures": terms.exposures,
-                        "derived": [counters.said(base.world, edge)
-                                    for edge in base.derived(cand.heroes)]})
-    return base.value(terms)
+                        "derived": [counters.said(engine.world, edge)
+                                    for edge in engine.derived(cand.heroes)]})
+    return engine.value(terms)
 
 
 class Objective:
     """The part of a board's search that scores a six: the default engine and
     the playbook's objective against this enemy, on this map, side, stage and
-    bans, with every `when` the board settles read once and each heuristic's
-    bounds, once frozen, turned into the norms the scoring loop reads. The
-    stage is one the map lists (facts.draft.board_stage), empty for the
-    whole map."""
+    bans, with every `when` the board settles read once and the scale - each
+    heuristic's low and high - once frozen, turned into the norms the scoring
+    loop reads. The stage is one the map lists (facts.draft.board_stage),
+    empty for the whole map."""
 
     def __init__(self, world: World, m: Map | None, *, red: Sequence[Hero],
-                 banned: Sequence[Hero] = (), side: str = "", stage: str = "",
+                 banned: Sequence[Hero] = (), side: Side = "", stage: str = "",
                  catalog: list[Strategy], base: BaseWeights,
                  keep: frozenset[int] = frozenset(), swap: float = 0.0) -> None:
         self.world, self.m, self.red = world, m, list(red)
         # the keep term: `swap` points for each hero of `keep`, by id, a six holds
         self.keep, self.swap = keep, swap
+        # the bans as given, which a sibling objective on this board is built
+        # from, and their ids, which the roster and the map's ban count read
+        self.banned_heroes = tuple(banned)
         self.banned = {h.id for h in banned}
         self.side, self.stage = side, stage
         self.catalog = catalog
-        # the default engine on this board; None while it is off
-        self.base = Base(world, m, red=self.red, banned=banned, weights=base) if base.on else None
+        # the default engine's weights as given, and the engine on this board,
+        # None while it is off
+        self.base = base
+        self.engine = Base(world, m, red=self.red, banned=banned, weights=base) if base.on else None
         # each hero's tie-break draw on this board (draw)
         seed = board_seed(m, side)
         self.draws = {h.id: draw(seed, h.id) for h in world.heroes.values()}
@@ -304,7 +311,7 @@ class Objective:
         # every stage of a map shares one scale (prepare's `measure`)
         self.measured: Namespace = self.static if not stage else dict(
             self.static, map=compute.map_metrics(m, side, ban_count=len(self.banned)))
-        self.bounds: Bounds = {}             # heuristic id -> (min, max)
+        self.scale: Scale = {}               # heuristic id -> (min, max)
         self._norms: list[Norm] = []
         # each strategy's gate - True or False where `when` is settled for the
         # whole board, None where the candidate decides it; each heuristic
@@ -318,15 +325,12 @@ class Objective:
         self._scored = [(r, gates[r.id], slots.get(r.id, 0)) for r in self.scored]
         self._heuristics = [(g, gates[g.id], slots.get(g.id, 0), *_split_key(g.metric))
                             for g in self.heuristics]
-        # a heuristic guarded on the six's own state is a need: see score().
-        # Needs that share a guard share a budget - NEED_BUDGET, or the
-        # largest of their weights where one is more - so the state costs
-        # that much at most however many rules the playbook writes about it,
-        # and no need weighs less than its own weight on a guard of its own
-        guards = {g.id: g.when.source for g in self.heuristics
-                  if g.need and g.when is not None}
-        written: dict[str, float] = {}
-        largest: dict[str, float] = {}
+        # needs that share a guard - its when and its params, as the gates key
+        # a slot - share one budget (NEED_BUDGET; see score())
+        guards = {g.id: (g.when.source, tuple(sorted(g.params.items())))
+                  for g in self.heuristics if g.need and g.when is not None}
+        written: dict[tuple[str, tuple[tuple[str, float], ...]], float] = {}
+        largest: dict[tuple[str, tuple[tuple[str, float], ...]], float] = {}
         for g in self.heuristics:
             if g.id in guards:
                 source = guards[g.id]
@@ -399,8 +403,8 @@ class Objective:
             else:
                 keep(None)
         cand.raw = raw
-        if self.base is not None:
-            cand.terms = self.base.terms(cand.heroes, number(ns["team"]["synergy_score"]))
+        if self.engine is not None:
+            cand.terms = self.engine.terms(cand.heroes, number(ns["team"]["synergy_score"]))
         cand.tiebreak = sum(self.draws[h.id] for h in cand.heroes)
         return cand
 
@@ -482,10 +486,10 @@ class Objective:
 
     # --- the frozen scale ------------------------------------------------------
 
-    def adopt_bounds(self, bounds: Mapping[str, Interval]) -> None:
+    def set_scale(self, scale: Mapping[str, Interval]) -> None:
         """Each heuristic's low and high on this board, frozen here or
         elsewhere: inference.scale draws them, and a fill takes its seat's."""
-        self.bounds = dict(bounds)
+        self.scale = dict(scale)
         self._freeze_norms()
 
     @property
@@ -499,7 +503,7 @@ class Objective:
         the sample never moved - normalises everything to 0.5."""
         self._norms = []
         for g in self.heuristics:
-            lo, hi = self.bounds.get(g.id, Interval(low=0.0, high=0.0))
+            lo, hi = self.scale.get(g.id, Interval(low=0.0, high=0.0))
             self._norms.append(Norm(
                 strategy=g, low=lo, span=hi - lo if hi > lo else None,
                 weight=g.weight * self._needs.get(g.id, 1.0),
@@ -508,7 +512,7 @@ class Objective:
     # --- the score -------------------------------------------------------------
 
     def score(self, cand: Candidate, detail: bool = True) -> Candidate:
-        """Score with the frozen bounds; with detail, fill the breakdown too.
+        """Score on the frozen scale; with detail, fill the breakdown too.
 
         The default engine's value comes first, where it is on; it reads no
         scale. The keep term follows it where a reference six is set, and
@@ -529,7 +533,7 @@ class Objective:
         held: list[bool | None] = [None] * self.gate_slots
         contributions: list[Contribution] = []
         out = contributions if detail else None
-        total = 0.0 if self.base is None else _score_base(self.base, cand, out)
+        total = 0.0 if self.engine is None else _score_base(self.engine, cand, out)
         if self.keep:
             total += self.swap * sum(1 for h in cand.heroes if h.id in self.keep)
         if out is not None:
@@ -586,9 +590,9 @@ class Objective:
             if applies:
                 sc["params"] = r.params_section
                 if r.bonus is not None:
-                    bonus = _amount(r.bonus.evaluate(sc))
+                    bonus = _amount(r.bonus.evaluate(sc), r.bonus.source)
                 if r.penalty is not None:
-                    penalty = _amount(r.penalty.evaluate(sc))
+                    penalty = _amount(r.penalty.evaluate(sc), r.penalty.source)
             weighted = r.weight * (bonus - penalty)
             total += weighted
             if out is not None:

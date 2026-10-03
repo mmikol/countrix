@@ -1,6 +1,7 @@
 """Tuning, adding and completing strategies: each change validated through
 the catalog before it is written, and logged with a reason."""
 
+import errno
 import os
 import shutil
 from pathlib import Path
@@ -28,18 +29,20 @@ def test_a_strategy_is_three_sentences_at_most(catalog_copy):
 
 
 def test_tune_edits_validates_and_logs(catalog_copy):
-    change = tune.tune("coverage", "weight", 3.5, "test: more coverage", catalog_copy)
+    change = tune.tune("coverage", "weight", 3.5, "test: more coverage", directory=catalog_copy)
     assert change["old"] == "3" and change["new"] == "3.5"
     cat = {h.id: h for h in catalog.load(catalog_copy)}
     assert cat["coverage"].weight == 3.5
-    change = tune.tune("under-healed", "params.HEAL_MARGIN", 0.8, "test", catalog_copy)
+    change = tune.tune("under-healed", "params.HEAL_MARGIN", 0.8, "test", directory=catalog_copy)
     assert cat["under-healed"].params["HEAL_MARGIN"] == 0.75 and change["old"] == "0.75"
     assert {h.id: h for h in catalog.load(catalog_copy)}[
         "under-healed"].params["HEAL_MARGIN"] == 0.8
-    tune.tune("anti-air", "when", "enemy.flyers >= 1 and map.known == 1", "test", catalog_copy)
+    tune.tune(
+        "anti-air", "when", "enemy.flyers >= 1 and map.known == 1", "test",
+        directory=catalog_copy)
     assert {h.id: h for h in catalog.load(catalog_copy)}["anti-air"].when.source == \
         "enemy.flyers >= 1 and map.known == 1"
-    tune.tune("map-fit", "params.NEW_DIAL", 2, "a dial added from nothing", catalog_copy)
+    tune.tune("map-fit", "params.NEW_DIAL", 2, "a dial added from nothing", directory=catalog_copy)
     assert {h.id: h for h in catalog.load(catalog_copy)}["map-fit"].params["NEW_DIAL"] == 2
     log = Path(catalog_copy, "tuning-log.md").read_text(encoding="utf-8")
     assert "`coverage` weight: 3 -> 3.5 (test: more coverage)" in log
@@ -49,32 +52,51 @@ def test_tune_edits_validates_and_logs(catalog_copy):
 def test_who_asked_is_folded_onto_the_one_log_line(catalog_copy):
     """by is folded like the reason, so a line break in it cannot forge a
     second entry in the log; a blank one reads as the session."""
-    log = os.path.join(catalog_copy, "tuning-log.md")
-    tune.tune("coverage", "weight", 2, "r", catalog_copy, by="x]\n- 2026-01-01T00:00Z `forged` w")
-    assert len(tune.log_tail(20, log)) == 1
-    assert tune.log_tail(1, log)[0].endswith("[x] - 2026-01-01T00:00Z `forged` w]")
-    tune.tune("coverage", "weight", 3, "r", catalog_copy, by="  ")
-    lines = tune.log_tail(20, log)
+    forged = "x]\n- 2026-01-01T00:00Z `forged` w"
+    tune.tune("coverage", "weight", 2, "r", directory=catalog_copy, by=forged)
+    assert len(tune.log_tail(20, directory=catalog_copy)) == 1
+    assert tune.log_tail(1, directory=catalog_copy)[0].endswith(
+        "[x] - 2026-01-01T00:00Z `forged` w]")
+    tune.tune("coverage", "weight", 3, "r", directory=catalog_copy, by="  ")
+    lines = tune.log_tail(20, directory=catalog_copy)
     assert len(lines) == 2 and lines[1].endswith("[claude-code-session]")
     # the last n lines, and none for n below 1
-    assert tune.log_tail(0, log) == [] and tune.log_tail(-2, log) == []
-    assert tune.log_tail(1, log) == [lines[1]]
+    assert tune.log_tail(0, directory=catalog_copy) == []
+    assert tune.log_tail(-2, directory=catalog_copy) == []
+    assert tune.log_tail(1, directory=catalog_copy) == [lines[1]]
 
 
 def test_tune_refuses_bad_changes_and_changes_nothing(catalog_copy):
     before = Path(catalog_copy, "coverage.md").read_text(encoding="utf-8")
     with pytest.raises(tune.TuneError, match="not a registered fact key"):
-        tune.tune("coverage", "metric", "team.nope", "test", catalog_copy)
+        tune.tune("coverage", "metric", "team.nope", "test", directory=catalog_copy)
     with pytest.raises(tune.TuneError, match="within"):
-        tune.tune("coverage", "weight", 50, "test", catalog_copy)
+        tune.tune("coverage", "weight", 50, "test", directory=catalog_copy)
     with pytest.raises(tune.TuneError, match="reason"):
-        tune.tune("coverage", "weight", 2, "  ", catalog_copy)
+        tune.tune("coverage", "weight", 2, "  ", directory=catalog_copy)
     with pytest.raises(tune.TuneError, match="no strategy"):
-        tune.tune("nope", "weight", 2, "test", catalog_copy)
+        tune.tune("nope", "weight", 2, "test", directory=catalog_copy)
     with pytest.raises(tune.TuneError):
-        tune.tune("coverage", "when", "team.tanks ===", "test", catalog_copy)
+        tune.tune("coverage", "when", "team.tanks ===", "test", directory=catalog_copy)
     assert Path(catalog_copy, "coverage.md").read_text(encoding="utf-8") == before
     assert not os.path.exists(os.path.join(catalog_copy, "tuning-log.md"))
+
+
+def test_a_write_cut_short_leaves_the_playbook_file_as_it_was(catalog_copy, monkeypatch):
+    """A strategy file and meta.md are written into a .part file beside them
+    and renamed over them once whole: a write cut short before the rename
+    leaves the old file, which the catalog still reads, and logs nothing."""
+    def cut_short(part, path):
+        raise OSError(errno.ENOSPC, "No space left on device")
+    monkeypatch.setattr(os, "replace", cut_short)
+    for name, sid, field, value in (("coverage.md", "coverage", "weight", 2),
+                                    (catalog.META_FILE, "meta", "synergy", 0.2)):
+        before = Path(catalog_copy, name).read_bytes()
+        with pytest.raises(OSError, match="No space left"):
+            tune.tune(sid, field, value, "r", directory=catalog_copy)
+        assert Path(catalog_copy, name).read_bytes() == before
+    assert next(s for s in catalog.load(catalog_copy) if s.id == "coverage").weight == 3
+    assert not Path(catalog_copy, "tuning-log.md").exists()
 
 
 # --- authoring: name, kind and prose in; the rest inferred and stored ------------------
@@ -86,7 +108,7 @@ def test_a_bare_file_is_a_draft_the_solver_ignores(catalog_copy):
                      "# Shut off a heavy heal line\n\nOne anti-heal pick is worth more.\n")
     cat = catalog.load(catalog_copy)
     draft = next(h for h in cat if h.id == "heal-line")
-    assert draft.form == "draft" and draft.pending and not draft.solver_reads
+    assert draft.form == "draft" and draft.pending and not draft.weighs
     assert all(
         h.form == "assumption" and not h.pending for h in cat
         if h.id in ("vintage", "objective", "locked-picks"))
@@ -116,8 +138,8 @@ def test_add_stores_a_validated_strategy_and_complete_finishes_a_draft(catalog_c
     assert "when: enemy.heal_ratio >= params.HEAL_RATIO" in text and "  HEAL_RATIO: 1" in text
     assert text.rstrip().endswith("another damage dealer.")
     assert "# Shut off a heavy heal line" in text
-    assert "`shut-off-heals` added as heuristic/scored" in tune.log_tail(
-        1, os.path.join(catalog_copy, "tuning-log.md"))[0]
+    [line] = tune.log_tail(1, directory=catalog_copy)
+    assert "`shut-off-heals` added as heuristic/scored" in line
     # a draft: name, kind, prose - then completed in one validated step
     draft = tune.add("sustain-first", "Prefer a team that can heal", "heuristic",
                      "More healing keeps a fight going.", None, "user", directory=catalog_copy)
@@ -128,7 +150,7 @@ def test_add_stores_a_validated_strategy_and_complete_finishes_a_draft(catalog_c
                          directory=catalog_copy)
     assert done["form"] == "heuristic" and done["set"]["weight"] == "2"
     cat = catalog.load(catalog_copy)
-    assert next(h for h in cat if h.id == "sustain-first").solver_reads
+    assert next(h for h in cat if h.id == "sustain-first").weighs
     # refusals leave nothing behind
     with pytest.raises(tune.TuneError, match="reason"):
         tune.add("no-reason", "No reason", "assumption", "x", None, "  ", directory=catalog_copy)
@@ -247,6 +269,21 @@ def test_a_file_whose_frontmatter_never_closes_is_refused():
         "---\nname: X\nweight: 2\n---\nbody\n", "1")
 
 
+def test_an_edit_sets_a_line_in_place_or_adds_it_where_the_header_keeps_it():
+    """A flat field is set in place or added above params:, a dial is set in
+    place or added at the end of its block, and a header with no params:
+    gains one before its trailing blank line."""
+    text = "---\nname: X\nweight: 1\nparams:\n  A: 1\n  B: 2\n---\nbody\n"
+    assert tune.edit_frontmatter(text, "weight", 2) == (text.replace("weight: 1", "weight: 2"), "1")
+    assert tune.edit_frontmatter(text, "metric", "team.tanks") == (
+        text.replace("params:", "metric: team.tanks\nparams:"), None)
+    assert tune.edit_frontmatter(text, "params.B", 3) == (text.replace("B: 2", "B: 3"), "2")
+    assert tune.edit_frontmatter(text, "params.C", 3) == (
+        text.replace("B: 2", "B: 2\n  C: 3"), None)
+    assert tune.edit_frontmatter("---\nname: X\n\n---\nbody\n", "params.A", 1) == (
+        "---\nname: X\nparams:\n  A: 1\n\n---\nbody\n", None)
+
+
 def test_a_catalog_error_is_the_operators_fault_and_a_tune_error_the_callers():
     """A tuning change the caller got wrong is a Refusal every door answers as
     the caller's error; a playbook that does not load is the operator's."""
@@ -270,7 +307,7 @@ def test_tune_sets_a_meta_weight_validated_and_logged(catalog_copy):
     assert weights.record() == {"meta": 0.0, "rate": 1.0, "synergy": 0.2, "counter": 0.05}
     assert not weights.on
     assert catalog.playbook_digest(catalog_copy) == digest
-    log = tune.log_tail(20, os.path.join(catalog_copy, "tuning-log.md"))
+    log = tune.log_tail(20, directory=catalog_copy)
     assert len(log) == 2
     assert "`meta` synergy: 0.1 -> 0.2 (user: the pairs should count for more)" in log[0]
     assert "`meta` meta: 1 -> 0 (the playbook alone for a while)" in log[1]
@@ -317,7 +354,7 @@ def test_tune_rewrites_meta_prose_and_keeps_its_weights_and_title(catalog_copy):
     assert after.weights == before.weights and change["old"] == before.body
     title = before.body.splitlines()[0]
     assert title.startswith("# ") and after.body == change["new"] == title + "\n\n" + prose
-    [line] = tune.log_tail(5, os.path.join(catalog_copy, "tuning-log.md"))
+    [line] = tune.log_tail(5, directory=catalog_copy)
     assert line.endswith("`meta` body: rewritten (the prose names the imputed cells)"
                          " [claude-code-session]")
     tune.tune("meta", "body", "# Weights\n\nOne line.", "a new title", directory=catalog_copy)
@@ -335,7 +372,7 @@ def test_tune_sets_the_swap_cost_where_the_file_has_none(catalog_copy):
     assert change["old"] is None and change["new"] == "15"
     after = catalog.read_meta(catalog_copy)
     assert after.swap == 15.0 and after.weights == before.weights
-    [line] = tune.log_tail(5, os.path.join(catalog_copy, "tuning-log.md"))
+    [line] = tune.log_tail(5, directory=catalog_copy)
     assert "`meta` swap: unset -> 15 (a swap costs a fight's charge)" in line
     assert tune.tune("meta", "swap", 20, "r", directory=catalog_copy)["old"] == "15"
     path = Path(catalog_copy, catalog.META_FILE)
@@ -363,7 +400,7 @@ def test_tune_rewrites_a_strategys_prose_under_its_title(catalog_copy):
     assert after == "%s\n%s\n\nOne claim. Why it holds.\n" % (header, title)
     assert change["new"] == next(s for s in catalog.load(catalog_copy) if s.id == sid).body
     assert title in change["old"]
-    [line] = tune.log_tail(5, os.path.join(catalog_copy, "tuning-log.md"))
+    [line] = tune.log_tail(5, directory=catalog_copy)
     assert line.endswith("`%s` body: rewritten (a stale clause goes) [claude-code-session]" % sid)
     for value, message in (("One. Two. Three. Four.", "at most 3 sentences"), (3, "prose"),
                            ("", "prose")):
@@ -382,7 +419,7 @@ def test_a_folder_with_no_meta_is_seeded_from_the_shipped_one(catalog_copy, monk
     assert catalog.engine_weights(catalog_copy).record() == {
         **shipped.record(), "counter": 0.07}
     assert change["old"] == str(shipped.counter)
-    [line] = tune.log_tail(5, os.path.join(catalog_copy, "tuning-log.md"))
+    [line] = tune.log_tail(5, directory=catalog_copy)
     assert "`meta` seeded from the shipped meta.md; counter: %s -> 0.07 (r)" % (
         shipped.counter) in line
     empty = tmp_path / "shipped"

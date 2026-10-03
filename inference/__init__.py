@@ -1,15 +1,20 @@
 """The INFERENCE LAYER: facts in, the optimal composition out.
 
+The default engine, which the playbook and the search both read:
+
+    base          the default engine: a six's win rates on the map, the
+                  wiki's synergies and its counters against the other side,
+                  under one meta weight, the three terms the search scores
+                  first and the playbook's sit on top of; and meta.md's
+                  fields and weights record (DIALS, FIELDS, BaseWeights),
+                  which catalog reads and tune writes. It imports only facts
+
 The playbook, which imports nothing from the search:
 
     strategies/   the playbook - STRATEGIES = CONSTRAINTS ∪ HEURISTICS ∪ ASSUMPTIONS:
-                  one markdown file per strategy, meta.md, the default
-                  engine's weights, and tuning-log.md, a line per change. A
-                  constraint is a limit (require: always holds, never
-                  weighted); a heuristic weighs what is left, a metric
-                  maximised or minimised or a bonus/penalty while a
-                  condition holds; an assumption is prose the agent holds a
-                  comp to
+                  one markdown file per strategy (inference.strategy),
+                  meta.md, the default engine's weights, and tuning-log.md,
+                  a line per change
     README.md     the citation record the playbook is rebuilt from: a line
                   per strategy id, shipped or removed, with the threads a
                   rule was drawn from or the user's word for an assumption
@@ -25,17 +30,18 @@ The playbook, which imports nothing from the search:
 
 The search, which reads the playbook:
 
-    base          the default engine: a six's win rates on the map, the
-                  wiki's synergies and its counters against the other side,
-                  under one meta weight, the terms the playbook's sit on top of
     scoring       the objective: what one six scores on one board, the
                   default engine's terms and then the playbook's
     shapes        the legal shapes: the role counts a six may take around the
                   locked picks
     scale         the board's one scale: the seeded reference sample and field
                   every heuristic is normalised against, and the board's floor
+    intervals     what a value can be over a branch of the search, and an
+                  expression read over such values
+    ranges        each team.* and matchup.* metric's range over a branch's
+                  completions, the rules the bound reads
     bounds        the search's bounds: the most any six a branch can reach
-                  scores, each metric's and expression's range over it
+                  scores, read off the intervals and the ranges
     solver        the exact search over every legal six under the constraints
                   and heuristics, by branch and bound; players are assumed to
                   play optimally
@@ -50,5 +56,4 @@ The search, which reads the playbook:
     supersede     latest wins: a board a newer request replaced stops at its
                   next check
     reach         the board each released hero is optimal on, within a match's bans
-    serve         the engine's handlers, which the board runs in-process
 """

@@ -1,5 +1,10 @@
 -- PLAYBOOK: judgements about the game, on top of the measurements.
 --
+-- That label is this file's history. PLAYBOOK now names the playbook, the
+-- strategies mirror 010 makes; the tables made here that still stand -
+-- counters, playstyle, synergies - are the wiki's relation tables, and the
+-- data dictionary files them under RELATIONS (schema.DOC_DOMAIN).
+--
 -- Nothing in this file is a count of matches. Six tables, six judgements:
 -- which playstyle a hero belongs to (the wiki), who answers whom and where a
 -- hero is strongest (counterpick.gg), and three of ours, hand-authored in

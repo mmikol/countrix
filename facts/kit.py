@@ -7,8 +7,9 @@ derives a kit piece's combat numbers from both at read time - a reload
 worded beside a firing rate, a figure that is a sum and not one hit, a
 percent worth its published cap, a row on the hero itself - so a fix to how
 a wording is read is a code change here and needs no re-pull. The rest of
-the facts package reads the measurements and the keywords, never the
-prose.
+the facts package reads the measurements and the keywords, and a stat's
+text or an ability's description only where a word or a figure in it
+settles a case (counters, scalars, kit_format).
 """
 
 import math
@@ -47,18 +48,21 @@ class Stat:
     its units, under a condition, and the wiki's own words for the stat. It is
     built by keyword, since its two unit columns and its two text columns sit
     side by side and a swapped pair would still read as a stat. A numeric
-    column arrives as a Decimal and is held as a float."""
+    column arrives as a Decimal and is held as a float, and a text column
+    with no words arrives as None and is held as ""."""
     code: str
     value: float | None
     unit_num: str | None
     unit_den: str | None
     den_value: float | None
-    condition: str | None
-    text: str | None
+    condition: str
+    text: str
 
     def __post_init__(self) -> None:
         self.value = float(self.value) if self.value is not None else None
         self.den_value = float(self.den_value) if self.den_value is not None else None
+        self.condition = self.condition or ""
+        self.text = self.text or ""
 
     def rendered(self) -> str:
         """The value with its units and condition; the wiki's words where no value
@@ -88,7 +92,7 @@ class Stat:
         """Overhealth in hp as published; a percent or a rate is worth its cap."""
         if self.unit_num == "hp" and self.unit_den is None:
             return self.value
-        found = OVERHEALTH_CAP_RE.search("%s %s" % (self.text or "", self.condition or ""))
+        found = OVERHEALTH_CAP_RE.search("%s %s" % (self.text, self.condition))
         return float(found.group(1) or found.group(2)) if found else None
 
 
@@ -96,8 +100,8 @@ class Figure(NamedTuple):
     """A flat row in hit points: its value, and the condition and words it was
     published under."""
     value: float
-    condition: str | None
-    text: str | None
+    condition: str
+    text: str
 
 
 class WeaponConfig(TypedDict, total=False):
@@ -109,18 +113,18 @@ class WeaponConfig(TypedDict, total=False):
     slot: str
 
 
-def _first_figure(text: str | None) -> float | None:
+def _first_figure(text: str) -> float | None:
     """The first figure in a line of the wiki's prose; of a range, its top."""
-    found = NUMBER_RE.search(text or "")
+    found = NUMBER_RE.search(text)
     return float(found.group(2) or found.group(1)) if found else None
 
 
-def on_self(condition: str | None) -> bool:
+def on_self(condition: str) -> bool:
     """A row on the hero itself: one comma-separated part of its condition is
     "self" ("splash, self, min", "per pulse, self", "self, 0% Energy, max") or
     a self- word ("bonus self-knockback", "self-healing"). "splash, enemy &
     self" reaches the enemy too, so it is not."""
-    return any(SELF_RE.fullmatch(part.strip()) for part in (condition or "").split(","))
+    return any(SELF_RE.fullmatch(part.strip()) for part in condition.split(","))
 
 
 def _reload_figure(stat: Stat, value: float) -> float | None:
@@ -128,10 +132,10 @@ def _reload_figure(stat: Stat, value: float) -> float | None:
     figure in its condition ("68.18 overall w/reload"), else the one its text
     words beside the firing rate, else `value` itself. None when neither the
     condition nor the text speaks of a reload."""
-    if RELOAD_RE.search(stat.condition or ""):
+    if RELOAD_RE.search(stat.condition):
         return _first_figure(stat.condition)
-    if RELOAD_RE.search("%s %s" % (stat.condition or "", stat.text or "")):
-        found = TEXT_RELOAD_RE.search(stat.text or "")
+    if RELOAD_RE.search("%s %s" % (stat.condition, stat.text)):
+        found = TEXT_RELOAD_RE.search(stat.text)
         return float(found.group(1)) if found else value
     return None
 
@@ -140,7 +144,7 @@ def _one_hit(stat: Figure, tick: float, lasts: float, singles: list[float]) -> b
     """A flat damage row that is one hit: not a sum, not the piece's rate over
     its duration (`tick` hp/s for `lasts` s), and not several of a single
     unconditioned hit at once."""
-    if SUMMED_RE.search("%s %s" % (stat.condition or "", stat.text or "")):
+    if SUMMED_RE.search("%s %s" % (stat.condition, stat.text)):
         return False
     if tick and lasts and abs(stat.value - tick * lasts) < 0.5:
         return False                    # the rate over its duration, not a hit
@@ -216,7 +220,7 @@ class KitPiece:
 
     def typed(self, text: str) -> bool:
         """The wiki's Type field names it: one shot_type row a type."""
-        return any((s.text or "").strip().lower() == text for s in self.stats.get("shot_type", ()))
+        return any(s.text.strip().lower() == text for s in self.stats.get("shot_type", ()))
 
     # --- rates -------------------------------------------------------------
 
@@ -253,7 +257,7 @@ class KitPiece:
             value = stat.value if stat.value is not None else _first_figure(stat.text)
             if value is None:
                 continue
-            worded = worded or bool(RELOAD_RE.search(stat.text or ""))
+            worded = worded or bool(RELOAD_RE.search(stat.text))
             with_reload = _reload_figure(stat, value)
             if stat.value is None and with_reload:
                 loaded.append(with_reload)      # prose: its first figure may be another fire mode
@@ -286,7 +290,7 @@ class KitPiece:
         # leave a tank dealing no damage. Only where nothing else scored.
         sustained = [
             s.value for s in self.stats.get(per_shot, ())
-            if s.value is not None and "over time" in (s.condition or "").lower()]
+            if s.value is not None and "over time" in s.condition.lower()]
         return max(sustained, default=None)
 
     def _with_reload(self, firing: float) -> float:
@@ -341,7 +345,7 @@ class KitPiece:
         crits = (self.max_stat("headshot") or 0) >= 1 and (self.max_stat("pellets") or 1) < 2
         singles = [s.value for s in self.flat("damage") if not s.condition]
         return [
-            s.value * (crit if crits and not SPLASH_RE.search(s.condition or "") else 1.0)
+            s.value * (crit if crits and not SPLASH_RE.search(s.condition) else 1.0)
             for s in self.flat("damage") if _one_hit(s, tick, lasts, singles)]
 
     def cast_hit(self) -> float | None:
@@ -352,7 +356,7 @@ class KitPiece:
         pieces = self.max_stat("pellets") or 1
         # every row a piece's own: under a condition, and not a sum
         apiece = all(
-            s.condition and not SUMMED_RE.search("%s %s" % (s.condition, s.text or ""))
+            s.condition and not SUMMED_RE.search("%s %s" % (s.condition, s.text))
             for s in rows)
         hits = [s.value for s in rows if not on_self(s.condition)]
         if self.kind != KIND_ABILITY or pieces < 2 or not hits or not apiece:
@@ -394,7 +398,7 @@ class KitPiece:
         timed = [
             (s.value, w.value) for w in self.stats.get("cooldown", ()) if w.value and w.condition
             for s in self.flat("damage")
-            if w.condition in (s.condition or "") and not on_self(s.condition)]
+            if w.condition in s.condition and not on_self(s.condition)]
         return max((hit * (1 + math.floor(lasts / wait)) for hit, wait in timed), default=0.0)
 
 
@@ -402,7 +406,7 @@ def dual_rate(guns: Iterable[KitPiece]) -> float | None:
     """Two guns fired together from one magazine, hp/s with the reload in; None
     unless exactly two publish a 'simultaneous fire' row and the same magazine."""
     pair = [w for w in guns if any(
-        "simultaneous fire" in (s.condition or "")
+        "simultaneous fire" in s.condition
         for c in ("damage_falloff_range", "spread") for s in w.stats.get(c, ()))]
     firing = [f for f in (w.plain_stat("dps") for w in pair) if f]
     shots = [r for r in (w.max_stat("fire_rate") for w in pair) if r]

@@ -5,16 +5,16 @@ layer.
     python -m ui.board            # serves http://localhost:8017
 
 http.server and psycopg, no web framework, no build step. This module is
-the board's server - its JSON endpoints and the handler that routes to
-them and to the pages ui/pages.py renders. Every click re-reads the
-database: the facts panel is the FactSet for (map, side, red, blue, bans);
-the comps panel is the inference layer's board - red's most likely starting
-comp, blue's picks filled and its optimal counter to red's, each seat's
-picks scored as a share of its own optimal, the fight odds and the game
-plan; the playbook panel is the strategies catalog as it sits on disk.
-JSON endpoints under /api/ serve them; /health is the engine's - the
-playbook and the database - for the container's healthcheck and
-orchestrator.py.
+the board's server - the roster and facts endpoints, and the handler that
+routes to them, to the engine's routes ui/serve.py answers and to the
+pages ui/pages.py renders. Every click re-reads the database: the facts
+panel is the FactSet for (map, side, red, blue, bans); the comps panel is
+the inference layer's board - red's likely six around its picks, with
+their pull, blue's picks filled and its optimal counter to red's, blue's
+picks scored as a share of its optimal, and the game plan; the
+playbook panel is the strategies catalog as it sits on disk. JSON
+endpoints under /api/ serve them; /health is the engine's - the playbook
+and the database - for the container's healthcheck and orchestrator.py.
 
 The board writes nothing: a weight set on the playbook panel rides with
 the session's own requests and never reaches a strategy file.
@@ -31,40 +31,29 @@ import argparse
 from urllib.parse import parse_qs, urlsplit
 
 import psycopg
-from psycopg.rows import TupleRow
 
 from db import psql, web
 from facts import board_facts, tables
 from facts.draft import Query, parse_board
 from facts.roster import roster_of
-from inference import serve
-from ui import pages
+from ui import pages, serve
 
 # --- JSON endpoints ---------------------------------------------------------
 
-def api_roster(cx: psycopg.Connection[TupleRow]) -> web.Reply:
+def api_roster(cx: tables.Connection) -> web.Reply:
     """The roster the door's roster tool lists, with the role icons and the
     patches newer than the rates the page draws beside it."""
     world = tables.load(cx)
     listed = roster_of(world)
     return web.Reply({"heroes": listed["heroes"], "maps": listed["maps"],
                       "role_icons": world.role_icons,
-                      "newer_patches": world.newer_patches}, 200)
+                      "newer_patches": [p._asdict() for p in world.newer_patches]}, 200)
 
 
-def api_facts(cx: psycopg.Connection[TupleRow], query: Query) -> web.Reply:
+def api_facts(cx: tables.Connection, query: Query) -> web.Reply:
     draft = parse_board(query)
     world = tables.load(cx)
     return web.Reply(board_facts.generate(world, draft).to_dict(), 200)
-
-
-def api_board(query: Query) -> web.Reply:
-    """The board solved at this stage of the draft: serve.handle_board over
-    a connection of its own. The query goes as received - the playbook
-    tab's weights and the page's client with it - and handle_board's parse
-    refuses anything malformed."""
-    with psycopg.connect(psql.default_dsn()) as cx:
-        return serve.handle_board(cx, query)
 
 
 # --- server -----------------------------------------------------------------
@@ -108,13 +97,13 @@ class Handler(web.Handler):
                 return self._json(*serve.handle_strategies())
             if path == "/health":
                 return self._json(*serve.handle_health())
-            if path == "/api/board":
-                return self._json(*api_board(query))
-            if path not in ("/api/roster", "/api/facts"):
+            if path not in ("/api/roster", "/api/facts", "/api/board"):
                 return self._not_found(path)
             with psycopg.connect(psql.default_dsn()) as cx:
                 if path == "/api/roster":
                     return self._json(*api_roster(cx))
+                if path == "/api/board":
+                    return self._json(*serve.handle_board(cx, query))
                 return self._json(*api_facts(cx, query))
         except Exception as error:  # noqa: BLE001  # the request boundary
             return self._failed(path, error)

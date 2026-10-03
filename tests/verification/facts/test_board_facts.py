@@ -7,6 +7,7 @@ import pytest
 from db import Refusal
 from facts import board_facts
 from facts.draft import Draft
+from facts.records import Patch
 
 
 def test_every_fact_is_keyed_and_the_meta_comes_first(synthetic_world):
@@ -37,25 +38,18 @@ def test_team_facts_appear_per_side_and_matchup_only_with_both(synthetic_world):
     assert fs.find("team.tanks", "red")
     fs = board_facts.generate(w, Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm", "Anvil")))
     assert fs.find("team.coverage", "blue") and fs.find("matchup.coverage_share")
-    # the crowd-control line names every blue pick that carries a tool, read off the picks
-    (cc,) = fs.find("team.cc_count", "blue")
-    assert cc.text == "blue team crowd control: 1 pick; Anvil: Quake Slam"
-    # the builder's counter: Mortar is answered by Anvil
-    fs = board_facts.generate(w, Draft("Harbor Gate", ("Mortar",), ("Anvil",)))
-    assert [f.text for f in fs.find("hero.vs_answered_by", "Mortar")] == [
-        "NOTE: red Mortar is answered by blue Anvil"]
 
 
-def test_board_context_facts_warn_and_cite(synthetic_world):
+def test_a_board_fact_that_warns_carries_its_flag(synthetic_world):
+    """A warning carries its flag, which the board marks it by; a patch
+    shipped since the rates is one. The sentences are test_hero_facts' and
+    test_team_facts'."""
     w = synthetic_world
     fs = board_facts.generate(w, Draft(None, ("Anvil",), ("Mortar",)))
-    assert [f.text for f in fs.find("hero.vs_answered_by", "Mortar")] == [
-        "WARNING: blue Mortar is answered by red Anvil"]
-    fs = board_facts.generate(w, Draft("Harbor Gate", (), ("Balm", "Anvil")))
-    assert [f.text for f in fs.find("hero.with_ally", "Balm")] == [
-        "blue Balm + Anvil (2/2): the charm keeps the hammer swinging"]
-    assert [f.text for f in fs.find("hero.map_win", "Balm")] == [
-        "Balm on Harbor Gate (this map): wins 52.0%, picked 10.0%, banned 10.0%"]
+    assert [f.key for f in fs.facts if f.warn] == ["hero.vs_answered_by"]
+    w.newer_patches = [Patch("a patch", "2026-09-30")]
+    (vintage,) = board_facts.generate(w, Draft()).find("meta.vintage_warning")
+    assert vintage.warn and vintage.text.startswith("WARNING: 1 patch(es) shipped")
 
 
 def test_bans_become_facts_and_a_banned_pick_is_refused(synthetic_world):

@@ -52,8 +52,8 @@ PREVIOUS_BLIZZARD = """(select ms.snapshot_id from meta_snapshots ms
     order by ms.captured_at desc, ms.snapshot_id desc limit 1)""" % LATEST_BLIZZARD
 
 
-def _rows(cx: Connection, sql: str, *args: object) -> list[TupleRow]:
-    return cx.execute(sql, args or None).fetchall()
+def _rows(cx: Connection, sql: str) -> list[TupleRow]:
+    return cx.execute(sql).fetchall()
 
 
 def _z_scores[K](values: dict[K, float]) -> dict[K, float]:
@@ -64,7 +64,7 @@ def _z_scores[K](values: dict[K, float]) -> dict[K, float]:
     return {k: round((v - mean) / sd, 3) if sd else 0.0 for k, v in values.items()}
 
 
-def map_terrain(w: World) -> None:
+def derive_map_terrain(w: World) -> None:
     """Map.terrain_z[F]: the map's mentions of F per thousand words, z-scored
     across the maps that have text; 0 for every F on a map with none.
     Map.terrain_lean[S]: the mean of terrain_z over TERRAIN_LEAN[S], z-scored
@@ -82,7 +82,7 @@ def map_terrain(w: World) -> None:
             w.maps[mid].terrain_lean[style] = z
 
 
-def stage_terrain(w: World) -> None:
+def derive_stage_terrain(w: World) -> None:
     """Map.stage_z[stage][F]: the stage's mentions of F per thousand words of its
     own text, z-scored across every stage that has text; a stage without text
     holds nothing."""
@@ -97,7 +97,7 @@ def stage_terrain(w: World) -> None:
             w.maps[mid].stage_z[stage][feature] = z
 
 
-def map_styles(w: World) -> None:
+def derive_map_styles(w: World) -> None:
     """Map.rate_lift[S]: for a playstyle S and a map, the mean, over released
     heroes tagged S, each weighted 1/(its tag count), of the hero's win rate
     on the map minus its overall win rate, z-scored across the maps.
@@ -127,7 +127,7 @@ def map_styles(w: World) -> None:
             for s in sorted(set(m.rate_lift) | set(m.terrain_lean))}
 
 
-def best_maps(w: World) -> None:
+def derive_best_maps(w: World) -> None:
     """Hero.best_maps: the three maps with the largest (map win rate - overall
     win rate), only where positive; ties by map name."""
     for h in w.heroes.values():
@@ -305,7 +305,7 @@ def _read_map_rates(cx: Connection, w: World) -> None:
                 float(win), float(pick) if pick is not None else None)
             if ban is not None:
                 w.heroes[hid].map_bans[mid] = float(ban)
-    best_maps(w)
+    derive_best_maps(w)
 
 
 def _read_terrain(cx: Connection, w: World) -> None:
@@ -313,27 +313,22 @@ def _read_terrain(cx: Connection, w: World) -> None:
     their z-scores."""
     for mid, feature, rate in _rows(cx, "select map_id, feature, per_thousand from map_terrain"):
         w.maps[mid].terrain[feature] = float(rate)
-    map_terrain(w)
+    derive_map_terrain(w)
     for mid, stage, feature, rate, mentions in _rows(cx, """
             select s.map_id, s.name, t.feature, t.per_thousand, t.mentions
             from stage_terrain t join map_stages s using(stage_id)"""):
         w.maps[mid].stage_terrain.setdefault(stage, {})[feature] = StageTerrain(
             float(rate), mentions)
-    stage_terrain(w)
+    derive_stage_terrain(w)
 
 
 def impute_synergy(w: World) -> None:
     """World.synergy_cell: the share of the written Team Synergy cells that
     claim their pair - what team.synergy_score reads a cell no article
-    writes at, since its score is unknown, not zero. A pair's score is its
-    claimed cells, one in each hero's article, so a pair neither article
-    writes reads twice this, which is the mean of the written pairs as they
-    read, a written pair's blank cell read at this too: the one value at
-    which a blank reads as the written read. Over every cell, or with a
-    blank cell counted 0, it would be deflated by the blanks it stands in
-    for. It is 0 while no cell is on record, as in a database migrated and
-    not yet pulled again, where no cell is known to be unwritten
-    (World.unwritten_cells)."""
+    writes at, since its score is unknown, not zero (docs/inference.md, Why
+    an unwritten synergy pair is not zero). It is 0 while no cell is on
+    record, as in a database migrated and not yet pulled again, where no
+    cell is known to be unwritten (World.unwritten_cells)."""
     pairs = {frozenset(cell) for cell in w.synergy_written} | set(w.synergies)
     written = sum(2 - w.unwritten_cells(*sorted(pair)) for pair in pairs)
     w.synergy_cell = (sum(s.score or 0 for s in w.synergies.values()) / written
@@ -386,7 +381,7 @@ def _read_provenance(cx: Connection, w: World) -> None:
             order by p.released desc""")]
 
 
-def _ally_lifesteal(w: World) -> None:
+def _derive_ally_lifesteal(w: World) -> None:
     """A heal that rides the teammates' damage (Cardiac Overdrive) at what the
     caster's five teammates of a 2-2-2 deal: each role's median dps over the
     released heroes, the caster's own seat taken out."""
@@ -400,7 +395,7 @@ def _ally_lifesteal(w: World) -> None:
         ally_lifesteal(hero, ally)
 
 
-def _benches(w: World) -> None:
+def _derive_benches(w: World) -> None:
     """The roster's healing benches, each role's median pool and the ultimate
     cap, over the released heroes' derived numbers: an announced hero sets
     nothing."""
@@ -430,9 +425,10 @@ def load(cx: Connection) -> World:
     `cx` is an open psycopg connection; this module never opens one of its
     own. The steps run in the order each relies on: the kit, and the 6v6
     laid over it, before derive_scalars, the rates before derive_rates,
-    best_maps and map_styles, the terrain before map_styles, the teammates'
-    lifesteal and the benches over the derived roster, and the counter
-    matrix over the derived kit and the wiki's counters, last."""
+    derive_best_maps and derive_map_styles, the terrain before
+    derive_map_styles, the teammates' lifesteal and the benches over the
+    derived roster, and the counter matrix over the derived kit and the
+    wiki's counters, last."""
     w = World()
     _read_heroes(cx, w)
     _read_abilities(cx, w)
@@ -446,10 +442,10 @@ def load(cx: Connection) -> World:
     _read_terrain(cx, w)
     _read_relations(cx, w)
     _read_provenance(cx, w)
-    map_styles(w)
+    derive_map_styles(w)
     for hero in w.heroes.values():
         derive_scalars(hero)
-    _ally_lifesteal(w)
-    _benches(w)
+    _derive_ally_lifesteal(w)
+    _derive_benches(w)
     counters.derive(w)
     return w

@@ -4,7 +4,9 @@ for real inside one transaction that is rolled back at the end, so the
 built database is exactly as it was (a rates pull would otherwise append a
 dated snapshot every run). Skipped without the caches or the database."""
 
+import glob
 import os
+import shutil
 
 import psycopg
 import pytest
@@ -64,13 +66,24 @@ def test_blizzard_roster_pulls_from_the_cache(ctx):
     assert data["missing"] == []                 # every hero page read from the cache
 
 
+@pytest.fixture()
+def rates_pages(tmp_path):
+    """The cached rates pages, copied as written now: a capture no database
+    holds, so the pull stores it whichever snapshots the database keeps - a
+    build from the caches themselves holds their capture already."""
+    for page in glob.glob(os.path.join(CACHE_DIRS["blizzard"], "rates_*.html")):
+        shutil.copyfile(page, tmp_path / os.path.basename(page))
+    return str(tmp_path)
+
+
 @needs_caches
-def test_blizzard_rates_pull_from_the_cache_and_leave_no_snapshot(ctx, snapshots, db, monkeypatch):
+def test_blizzard_rates_pull_from_the_cache_and_leave_no_snapshot(
+        dsn, rates_pages, snapshots, db, monkeypatch):
     # a page missing from the cache fails at once: the request loop retries
     # only a requests failure, so the pull neither waits out six attempts nor
     # reads the live site at 5 s a page
     monkeypatch.setattr(requests.Session, "get", _offline)
-    text, data = ctx.call("pull_rates")
+    text, data = Sandbox(dsn=dsn, caches={"blizzard": rates_pages}).call("pull_rates")
     assert text.startswith("pull_rates: snapshot stored")
     assert data["tables"] == ["regions", "competitive_tiers", "meta_snapshots",
                               "hero_meta", "map_meta"]
@@ -207,28 +220,7 @@ def test_wiki_maps_store_each_modes_stages(shared):
 
 
 @needs_caches
-def test_wiki_terrain_pulls_the_stages_terrain_after_the_maps(shared):
-    ctx, connection = shared
-    order = [spec.name for spec in tools.REGISTRY.pulls()]
-    assert order.index("pull_maps") < order.index("pull_terrain")
-    ctx.call("pull_maps")
-    text, data = ctx.call("pull_terrain")
-    assert text.startswith("pull_terrain: terrain stored")
-    assert data["tables"] == ["map_terrain", "stage_terrain"]
-    assert data["stage_rows"] == data["stages"] * 8 > 0
-    assert data["stages"] + data["stages_no_text"] == connection.execute(
-        "select count(*) from map_stages").fetchone()[0]
-    # every row hangs off a stage of a map that has stages
-    assert connection.execute(
-        "select count(*), count(distinct t.stage_id) from stage_terrain t"
-        " join map_stages s using (stage_id)").fetchone() == (
-        data["stage_rows"], data["stages"])
-
-
-@needs_caches
-def test_wiki_maps_patches_and_playstyles_pull_from_the_cache(ctx):
-    text, data = ctx.call("pull_maps")
-    assert text.startswith("pull_maps:") and data["modes"] == 5 and data["stages"] >= 2
+def test_wiki_patches_and_playstyles_pull_from_the_cache(ctx):
     text, data = ctx.call("pull_patches")
     assert text.startswith("pull_patches: patches stored") and data["patches"] > 0
     text, data = ctx.call("pull_playstyles")

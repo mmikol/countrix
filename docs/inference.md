@@ -20,27 +20,20 @@ Two things infer:
   where arithmetic cannot. It runs when you ask it to, never on its own,
   on your subscription.
 
-One input is written by hand: the playbook, which the solver reads. A pull
-tool fills every other table. The shipped playbook is eight assumptions,
-thirteen heuristics - `heal-rate`, scored ([The healing
-floor](#the-healing-floor)), and twelve that read the terrain of the ground
-in play - and one limit, `at-most-three-supports`, while it is rebuilt from the
-citations in [inference/README.md](../inference/README.md); the default
-engine scores every board beneath it ([The objective](#the-objective)).
-The solver tests run on the reference playbook in
-[tests/fixtures/playbook/](../tests/fixtures/playbook/), which holds a
-file of every form but the draft. The package's map is the
+One input is written by hand: the playbook, which the solver reads; [The
+catalog](#the-catalog) lists the shipped rules, and the default engine
+scores every board beneath them ([The objective](#the-objective)). A
+pull tool fills every other table. The solver tests run on the reference
+playbook in [tests/fixtures/playbook/](../tests/fixtures/playbook/),
+which holds a file of every form but the draft. The package's map is the
 [inference/__init__.py](../inference/__init__.py) docstring, and each
 module's docstring holds its detail.
 
 ## How a six is chosen
 
-A six is chosen by inference on maxims and facts. The maxims are the
-playbook, rules in markdown a person reads and turns; the facts are the
-data, what the database holds about the board. Together they make one
-objective, weighted and constrained, and the solver solves it exactly:
-the six it returns is the best of every legal six under that objective,
-proved, and not the best a search happened to meet. Five steps, in order:
+A six is chosen by inference on maxims and facts: the playbook's rules
+and the database's numbers about the board make one objective, weighted
+and constrained, and the solver solves it exactly. Five steps, in order:
 
 ```
 space  = every six of released, unbanned heroes that keeps the locked picks,
@@ -51,68 +44,47 @@ score  = meta x (rate x rates + synergy x synergy + counter x counters)
 COMP   = the legal six of highest score, exactly; the next best after it, in order
 ```
 
-1. **The space.** A six is a set: the same heroes in another order are
-   one six, held grouped as tanks, damage and supports. It keeps the
-   locked picks, leaves out the banned and the unreleased, and fields at
-   most two tanks, the queue's own limit. Today's 53 released heroes -
-   15 tanks, 24 damage, 14 supports - make 22,957,480 sixes, and
-   18,040,386 of them field two tanks or fewer.
-2. **The limits prune.** A constraint is a limit: it removes every six
-   that breaks it and adds nothing to one that keeps it. The shipped
-   playbook's one, `at-most-three-supports`, removes 822,822 sixes and
-   leaves 17,217,564 legal on an open board, about 17.2 million. A ban
-   or a locked pick leaves fewer: four bans on Ilios leave 10,572,870,
-   two locked picks on King's Row 163,242. Blue's own comp that breaks
-   a limit is not allowed; red's revealed picks are facts, and never
+1. **The space.** A six is a set, held grouped as tanks, damage and
+   supports. It keeps the locked picks, leaves out the banned and the
+   unreleased, and fields at most two tanks, the queue's own limit.
+   Today's 53 released heroes - 15 tanks, 24 damage, 14 supports - make
+   22,957,480 sixes, and 18,040,386 of them field two tanks or fewer.
+2. **The limits prune.** A limit removes every six that breaks it and
+   adds nothing to one that keeps it. The shipped limits - at most three
+   supports, at least one tank and at least one support
+   (`at-most-three-supports`, `six-fields-a-tank`,
+   `six-fields-a-support`) - leave 13,030,920 legal sixes on an open
+   board, and a ban or a locked pick leaves fewer. Blue's own comp that
+   breaks a limit is not allowed; red's revealed picks are facts, never
    ruled out ([The share](#the-share)).
-3. **The meta scores.** The default engine reads three things off the
-   facts and scores every legal six: each pick's win-rate edge over 50
-   on the map, trusted by its pick rate, so a rarely picked hero's edge
-   counts for less; the wiki's synergy scores among the six, cell by
-   cell, a cell no article writes read at the written cells' claim
-   share, as unknown and not as zero; and the counter graph against the
-   other side's
-   locked picks, else its likely six - the wiki's edges and, where the
-   wiki has none, answers derived from the kits. `meta.md`'s `meta`
-   weight scales the three together: 1 is the engine as calibrated, and
-   0 leaves the playbook alone ([The objective](#the-objective)).
-4. **The heuristics adjust.** Each heuristic reads the same facts,
-   through the metric functions the board words as facts, and adds or
-   subtracts, times its weight: a metric normalised to 0..1 on the
-   board's scale, or a bonus less a penalty where its `when` holds
-   ([How a strategy file works](#how-a-strategy-file-works)). The
-   shipped playbook's `heal-rate` charges a six that heals less than the
-   other side's rate up to its weight, 2 ([The healing
-   floor](#the-healing-floor)), and twelve more read the terrain of the
-   ground in play - chokes reward crowd control, sightlines want hitscan,
-   high ground rewards fliers, a payload rewards the longest gun - each
-   gated where its feature stands out, 0.5 sd or more above the ordinary
-   map's (a `STANDOUT` dial), or on what the ground is won on (a payload,
-   a capture point), two of them also on a stage their source names.
+3. **The meta scores.** The default engine scores every legal six on its
+   win rates, synergies and counters, and `meta.md`'s `meta` scales it
+   ([The objective](#the-objective)).
+4. **The heuristics adjust.** Each heuristic adds or subtracts, times its
+   weight, from the same facts ([How a strategy file
+   works](#how-a-strategy-file-works)). The shipped playbook's fourteen
+   were researched on 2026-10-03 from Blizzard's site and forums, the
+   wiki and the Reddit record (`inference/README.md`): the healing floor
+   ([The healing floor](#the-healing-floor)); the 6v6 shape, two of each
+   role; a save and a barrier on every six; one playstyle, with a need
+   for each of dive, brawl and poke; the damage to break two tanks and a
+   damage amplifier; and four rules on the ground in play - long
+   sightlines, hazard edges, Flashpoint and high ground, a defended choke
+   - each gated where its feature stands out, 0.5 sd or more above the
+   ordinary map's (a `STANDOUT` dial), or on the mode and the side.
 5. **The argmax.** The search returns the legal six of highest score,
    proved by branch and bound, and the next best in rank order as the
-   alternatives, five unless a caller asks for up to twenty. Ties break
-   by a draw per hero seeded by the map and the side, blind to rates and
-   names, so a board has one answer, and the board says how many sixes
-   tie. On an open board the search scores a few dozen sixes in full
-   and proves that none of the rest can beat them ([The
-   search](#the-search)). Every reason it gives cites a numbered fact
-   (F1, F2, ...): each pick's reasons, and each bar of the breakdown,
-   the engine's three terms among them.
+   alternatives ([The search](#the-search)). Every reason it gives cites
+   a numbered fact (F1, F2, ...).
 
-**The swaps.** Once blue has picks, the board asks one more question of
-the same objective: which of them to trade, and for whom. The answer is
-one six, the best reachable from the picks as they stand when each pick
-dropped costs the swap cost - `meta.md`'s `swap`, in share points of
-blue's span - searched exactly over every legal six, and the swaps are
-the picks it drops matched to the heroes it takes ([The
-swaps](#the-swaps)).
-
-**The plan stage by stage.** On a map with stages the board also lays
-out the map a stage at a time: each phase of a route keeps its heroes
-into the next unless a swap there beats the swap cost, and each arena is
-reached from the six the board suggests ([The plan stage by
-stage](#the-plan-stage-by-stage)).
+Once blue has picks, the board also answers which of them to trade ([The
+swaps](#the-swaps)) and lays the map out a stage at a time ([The plan
+stage by stage](#the-plan-stage-by-stage)). The weights are not learned
+([How the weights move](#how-the-weights-move)), and a score is not a
+probability ([The share](#the-share)). Each rule's reasons are in the Why
+sections: [the weights](#why-the-weights-are-the-playbooks), [the
+unwritten synergy pair](#why-an-unwritten-synergy-pair-is-not-zero) and
+[the exact search](#why-the-search-is-exact).
 
 **The ground in play.** A board is played on the whole map or on one of
 its stages - a Control or Flashpoint round, an Escort or Hybrid phase -
@@ -129,30 +101,6 @@ settles its gate, so every stage of a map shares one; the floor is the
 stage's own. With a stage named, the facts state the ground in play
 (`map.ground`), and a rule gated on the terrain cites it.
 
-**The weights are not learned.** No weight is fit to outcomes. A
-heuristic's starting weight is derived from its prose on the house
-scale, 0.25 a whisper, 1 the default, 2.5 strong and 4 dominant, when
-`/strategy` stores it. The engine's rate weight is 1, so its term reads
-in win-rate points, and its synergy and counter weights are set so that
-each term spreads a typical board's sixes about half as far as the rate
-term does ([The objective](#the-objective)). Every rule's weight and
-each of the engine's four can be changed: `/tune` changes a file's for
-good and logs why, a heuristic's slider on the playbook tab changes it
-for a session, and the Meta slider scales the whole engine ([How the
-weights move](#how-the-weights-move)). What a term counts inside is its
-definition and stays in code, recorded in a fixture's stamp: a derived
-counter edge at half a wiki edge (`WIKI_WEIGHT` 2, `DERIVED_WEIGHT` 1),
-the pick rate that halves a rate edge's trust (`RATE_PICK_HALF`), and
-the budget the needs on one guard share (`NEED_BUDGET`), which no single
-need's weight is ever cut below.
-
-**A score is not a probability.** A score is a sum of weighted terms in
-the objective's own units, and signed, since the rate term counts each
-pick's edge over 50. The board reads it as a share - a seat's six placed
-between the seat's floor, 0, and its optimal, 100 - and the fight odds
-split the two seats' shares. Neither is a fitted win probability ([The
-share](#the-share)).
-
 **The rates are a proxy.** Blizzard publishes rates for Competitive Role
 Queue, 5v5, one tank a side; no source publishes Open Queue 6v6, the
 mode the playbook assumes (`open-queue-ranked`). The rates stand in for
@@ -160,22 +108,6 @@ it, for direction and not for decimals, and a value a hero has only
 beside a second tank is missing from them: Zarya's, in a two-tank front
 line, is the plain case. The kit is read in 6v6
 ([architecture.md](architecture.md#the-scope)); the rates cannot be.
-
-**Why it is built this way.** Each step is one of the owner's rules, and
-each rule's reasons are below. Constraints prune and never weigh, so a
-rule either forbids a six or prices it, and a price is always a
-heuristic's ([How a strategy file works](#how-a-strategy-file-works)).
-Every term's weight is the playbook's and one meta scales the engine,
-so no term's weight hides in code ([Why the weights are the
-playbook's](#why-the-weights-are-the-playbooks)). An unwritten synergy
-cell is unknown, not zero, so a new hero is not charged for being new
-([Why an unwritten synergy pair is not
-zero](#why-an-unwritten-synergy-pair-is-not-zero)). The search is exact
-over every legal six, with no per-role shortlist deciding who can
-appear ([Why the search is exact](#why-the-search-is-exact)). Written as
-one pipeline, a board can be checked step by step: the space is
-counted, the limits are named, every term is a bar with the fact it
-read, and the argmax is proved.
 
 ## The objective
 
@@ -215,13 +147,16 @@ the sixes its three terms favour, scored and explained:
   answers from the kits at load: thirteen mechanisms (anti-air, a flier,
   barrier piercing, anti-heal, burst, control, a projectile eater and a
   weapon it cannot take, armor, dive, saves, reach, tank-busting) score
-  every ordered pair of released heroes, and each loser's six best
-  answers, scoring 0.5 or more and more than the reverse, weigh 1 each.
+  every ordered pair of released heroes, and of each loser's six best
+  answers, scoring 0.5 or more and more than the reverse, those on a
+  pair the wiki leaves out weigh 1 each; the others are not replaced.
   The other side is its locked picks, or, with none, its likely six on
-  this map past the bans (`compute.expected_picks`, the six the board's
-  red panel shows); either seat reads the other the same way. Only this
-  term reads the likely six or a derived edge: the `team.*` and `enemy.*`
-  counter metrics read the wiki's graph against the picks. The board
+  this map past the bans (`compute.expected_picks` with nothing
+  revealed), on the board and in `infer` alike. Only this term reads the
+  likely six or a
+  derived edge: every other term reads the side's revealed picks, and the
+  `team.*` and `enemy.*` counter metrics read the wiki's graph against
+  them. The board
   names every derived edge it counts with the mechanism and the numbers
   that fired.
 
@@ -232,12 +167,13 @@ per unit. The shipped file sets 1, 1, 0.26 and 0.05. `rate` is 1, so the
 rate term is in win-rate points; `synergy` and `counter` are set so that
 each term's median spread across a board's reference sample is about
 half the rate term's, about 2.1 points on a typical board; the module
-docstring holds the calibration, and [Why the weights are the
-playbook's](#why-the-weights-are-the-playbooks) why synergy moved from
-0.1. A heuristic still moves a six by its weight at most; the math page
-says how that compares with the base's spread. Each term is a bar of the
-breakdown, with the fact it read and its weight with the meta applied:
-the counter bar's fact names the six it read.
+docstring holds the rule, and [Why the weights are the
+playbook's](#why-the-weights-are-the-playbooks) what it measured and why
+synergy moved from 0.1. A heuristic on a metric still moves a six by its
+weight at most, a scored one by its weight times its bonus less its
+penalty; the math page says how that compares with the base's spread. Each
+term is a bar of the breakdown, with the fact it read and its weight
+with the meta applied: the counter bar's fact names the six it read.
 
 A `BaseWeights` rides the `Brief`, and `infer`'s `base`, into every
 `Objective`. Left unset it is the playbook in
@@ -261,60 +197,40 @@ a playbook that scores nothing, every six ties at zero and a board reads
 ### Why the weights are the playbook's
 
 The owner's rule is that constraints prune and never weigh, and that the
-heuristics and the meta carry every weight, each one his to turn. The
-heuristics' weights already lived in their files; the engine's three
-were constants in `inference/base.py`, where only a commit could move
-them and no slider reached them. They moved into `meta.md` so that the
-`tune` tool changes them as it changes a strategy's weight - validated,
-documented and logged - and one meta weight was put over them so that
-the whole engine can be leaned on or silenced at once, from the file for
-good or from the Meta slider for a session. The shipped file holds the
-calibrated values under a meta of 1, and 1.0 x w is w in floating point,
-so no score moved: the pinned boards and the reach fixture's boards stand
-as they were. That first `meta.md` was written by hand, with the code
-that reads it, since no tool could yet write one; `tune` with id `meta`
-now seeds a playbook folder that has none from the shipped file, and its
-log line says so. What a term counts inside - a derived counter edge
-against a wiki edge, the pick rate that halves a rate edge's trust, the
-needs' shared budget - stays in code as the term's definition: the
-counter tallies stay whole numbers, which the search's exactness leans
-on, and making those dials is on the backlog, the owner's call.
+heuristics and the meta carry every weight, each one the owner's to turn.
+So the engine's weights live in `meta.md` beside the strategy files,
+where the `tune` tool changes them as it changes a strategy's weight -
+validated, documented and logged - and one meta weight over them leans
+on or silences the whole engine at once, from the file for good or from
+the Meta slider for a session. What a term counts inside - a derived
+counter edge against a wiki edge, the pick rate that halves a rate
+edge's trust, the needs' shared budget - stays in code as the term's
+definition: the counter tallies stay whole numbers, which the search's
+exactness leans on.
 
-The synergy weight moved from 0.1 to 0.26 on the owner's word, by the
-calibration's own rule. At 0.1 the synergy score's median range over a
-board's reference sample was 21 while an unwritten pair read 0, so the
-term spread a typical board about 2.1 points, as the counter term does at
-0.05. Reading what no article writes as unknown moved that range: to
-12.8 when an unwritten pair read the written pairs' mean, where the rule
-gave 0.16, and to 8.1 once each unwritten cell reads the written cells'
-claim share ([Why an unwritten synergy pair is not
-zero](#why-an-unwritten-synergy-pair-is-not-zero)). A blank cell now
-reads close to a claim, so sixes differ less in synergy, and at 0.1 the
-term would have spread them about 0.8 points - two fifths of what the
-calibration aimed at, and short of what a heuristic at weight 1 moves.
-The rule, measured on the 30 maps with red's likely six against the
-seat, gives 2.1 / 8.1, 0.26, and the tune tool set it
-(`tuning-log.md`, which also records the 0.18 the half-mean reading
-briefly gave). The weight restores the term's say, not the zero's
-verdicts: a hero no article writes about still reads as the written
-heroes do on average.
+The synergy and counter weights follow the calibration's rule: each
+term's median range over a board's reference sample, red's likely six
+against the seat, is about half the rate term's, about 2.1 points on a
+typical board. The counter graph's median range is 41 - the wiki's edges
+at 2 and the kit's fill at 1 - so counter weighs 0.05; the synergy
+score's is 8.1, each unwritten cell read at the written cells' claim
+share, so synergy weighs 0.26. `tuning-log.md` records each setting and
+its reason.
 
 ### Why an unwritten synergy pair is not zero
 
 The wiki's synergy data is the Team Synergy column of each hero's
 article: a cell per teammate, rated, written in prose, or left as a
-placeholder. `synergies` holds the pairs an article claims, and until
-2026-09-28 a pair it lacked read 0 wherever a six was scored, whether an
-article had written it off ("no notable synergy", rated POOR) or no
-article had written a word about it. The two are not the same, and the
-second is the common case: at that day's pull, 747 of the 1,378 pairs of
-released heroes had no cell in either article. The holes are not spread
-evenly. The newest heroes' articles are near blank - no article writes a
-pair for D.Mon or Shion, and Sierra, Venture, Emre, Freja and Hazard have
-two to five written pairs each of 52, where the median hero has 24 - so
-a six holding one of them read "these heroes do not work together" where
-the truth was "nobody has written it down yet". The synergy term charged
-the newest heroes for being new, and nothing on the board said so.
+placeholder. A pair an article writes off ("no notable synergy", rated
+POOR) and a pair no article writes about are not the same, and the
+second is the common case: at the pull of 2026-09-28, 747 of the 1,378
+pairs of released heroes had no cell in either article. The holes are
+not spread evenly. The newest heroes' articles are near blank - no
+article writes a pair for D.Mon or Shion, and Sierra, Venture, Emre,
+Freja and Hazard have two to five written pairs each of 52, where the
+median hero has 24 - so a blank read as 0 would say "these heroes do not
+work together" where the truth is "nobody has written it down yet", and
+the synergy term would charge the newest heroes for being new.
 
 A pair has two cells, one in each hero's article, and a cell no article
 writes is unknown. It reads the share of the written cells that claim
@@ -351,72 +267,47 @@ side's likely six, which adds `SYNERGY_PULL` for each documented partner.
 A fixture's stamp (`base.stamp`) names the reading, so one recorded
 under an earlier reading reads as another objective.
 
-**Why a cell and not a pair.** The first reading, of 2026-09-28, was by
-the pair: a pair neither article wrote read the written pairs' mean,
-1.06 (670 claims over 631 written pairs), and a written pair read its
-claims. But 483 of the 631 written pairs have one cell written and the
-other blank, and the pair reading counted the blank as 0. A pair an
-article claims then read below a pair nobody wrote about: Ana's article
-claims Cassidy and Ashe and theirs are silent, so each pair read 1,
-while Ana with Tracer, which neither article writes, read 1.06. 405
-pairs read that way, and 78 that one article writes off and the other
-leaves blank read 0, though half of each is unknown. The mean itself
-counted those blanks as 0. A review proposed reading each blank cell at
-half that mean, 0.53, which keeps 1.06 for a pair neither article
-writes; but the written pairs would then read 1.47 on average against
-that 1.06, and the heroes no article writes about would be charged
-again, less than a zero charged them. Read at the claim share, Ana with
-Cassidy or Ashe reads 1.86 and Ana with Tracer 1.72.
-
-What each reading moved, on the shipped playbook, blue's optimal six per
-map with red unrevealed. The pair reading, at synergy 0.1, changed all
-30 boards: D.Mon, whose every pair is unwritten, gained 5 x 1.06 x 0.1 =
-0.53 points on every six he was in, and was seated on 28 maps where he
-had been on 15; Juno, 35 of whose 52 pairs are unwritten, on 21 where she
-had been on 1; Vendetta on 10 where he had been on 2; Baptiste, 36 of
-whose pairs are written, on 6 where he had been on 22. Of the eleven
-heroes the reach fixture then named unseated, ten came closer to a seat
-on their two best maps, and 34 of the fixture's 42 boards then still
-seated their hero. The cell reading with synergy at 0.26 changed 19 of
-the 30 boards from the pair reading's: Juno is seated on 11 maps where she
-was on 21, Baptiste on 12 where he was on 6, Reinhardt on 16 where he
-was on 11, D.Va on 1 where she was on 6, and D.Mon on 27 where he was
-on 28. The reach fixture, recorded again, then seated 49 of
-the 53 released heroes, as before, and the same four stayed unseated;
-under the half-mean reading at 0.18 it would have seated 47, Kiriko in
-and Cassidy, Hazard and Shion out. The synergy term is honest about the
-documented pairs and neutral about the rest; the rates and the counter
-graph decide between heroes the wiki has not compared.
+**Why a cell and not a pair.** 483 of the 631 written pairs have one
+cell written and the other blank. Read by the pair - a pair neither
+article writes at the written pairs' mean, 1.06, and a written pair at
+its claims - a pair one article claims reads below a pair nobody wrote
+about: Ana with Cassidy 1, Ana with Tracer 1.06. Read by the cell they
+read 1.86 and 1.72. The synergy term is honest about the documented
+pairs and neutral about the rest; the rates and the counter graph decide
+between heroes the wiki has not compared.
 
 ## The share
 
-Each seat's optimal six is its 100, and its 0 is the seat's floor: the
-lowest score among the reference sixes its scale drew (`Solver.floor`,
-from `inference/scale.py`), and a fill takes its seat's. A comp's share
-is its place on that span:
+Blue's optimal six is its 100, and its 0 is the seat's floor: the lowest
+score among the reference sixes its scale drew (`Solver.floor`, from
+`inference/scale.py`), and a fill takes the seat's. A comp's share is its
+place on that span:
 
 ```
 share = clamp((score - floor) / (best - floor), 0, 1) x 100
-odds  = each seat's share over the two shares' sum
 ```
 
 A score is signed, since the rate term counts each pick's edge over 50,
-so a share read from zero put every six below zero at 0, and against a
-six above zero the odds read 100 to 0. The floor puts both seats on a
-real scale; a mirror still reads 50 to 50. A best no higher than the
-floor leaves nothing to divide, and every comp but the optimal reads
-*unscored*.
+so a share read from zero put every six below zero at 0; the floor puts
+blue's comps on a real scale. A best no higher than the floor leaves
+nothing to divide, and every comp but the optimal reads *unscored*.
+
+Red is never optimized and never scored: the board's red is its likely
+six around its revealed picks (`compute.expected_picks`), each pick with
+its pull - its pick rate here plus `SYNERGY_PULL` for each partner
+already on the six - and red's badge is the six's total pull. No red
+share exists, so the board pits no red figure against blue's.
 
 A comp the limits rule out is not allowed: blue's full six that breaks
-one, or picks that no six keeping them completes within the limits (their
-fill is then not solved). The fill searches every six on the roster that
-keeps the picks, so a fill that ends with none is a proof, and only that
-rules the picks out. Such a comp carries no score, no share and no odds,
-and its breakdown keeps the limits alone; blue's optimal and red's seat
-still render. The badge and the strip read `not allowed: breaks <the
+one, or picks that no six keeping them completes within the limits
+(their fill is then not solved). The fill searches every six on the
+roster that keeps the picks, so a fill that ends with none is a proof,
+and only that rules the picks out. Such a comp carries no score and no
+share, and its breakdown keeps the limits alone; blue's optimal and
+red's likely six still render. The badge reads `not allowed: breaks <the
 limit's name>`, or, where the picks break no limit as they stand, `not
-allowed: no six that keeps these picks meets the playbook's limits`. Red's
-revealed picks are the other side's facts and are never ruled out.
+allowed: no six that keeps these picks meets the playbook's limits`.
+Red's revealed picks are the other side's facts and are never ruled out.
 The `infer` tool refuses such picks in the same words.
 
 ## The swaps
@@ -458,15 +349,9 @@ way back to an allowed six, and the verdict says so. Each dropped pick
 is paired with an incoming hero of its own role where the target has
 one, then with whichever is left, and carries its place among the picks
 as sent (`at`), so the page draws the incoming portrait over that slot
-and decides nothing; a half-drafted seat's other incoming heroes are the
-ones its empty slots show (`open`), the fill's where nothing is
-suggested.
-
-Where a swap is suggested, red's optimal, current comp and fill are
-solved again against the target, and the fight odds read off them as the
-board's own are read; a suggestion that would lower them is withheld,
-and the verdict names the swaps it held back. The gate reads the picks
-as they stand.
+and decides nothing; a half-drafted seat's empty slots show the fill's
+heroes (`open`), whether or not a swap is suggested, as the rest of the
+board does.
 
 **Why joint.** Each pick's best single swap, taken alone, can conflict:
 two tanks in for one slot, one hero taken twice, or a union of bests
@@ -477,8 +362,8 @@ answer from the new picks: with R' the picks after one swap, `net_R'(x)
 never searched for swaps; its picks are the other side's facts.
 
 The verdict reads `swap <pick> for <hero>: <before> -> <after> / 100 of
-the optimal, fight odds <before> -> <after>, at a cost of <c> / 100 a
-swap`, or `keep the picks: no swap gains its cost of <c> / 100`.
+the optimal, at a cost of <c> / 100 a swap`, or `keep the picks: no swap
+gains its cost of <c> / 100`.
 
 **Why swaps are scored.** The owner's words: swaps mid-fight should be
 scored, and the engine "needs to be dynamic". A six is not held for the
@@ -495,9 +380,8 @@ keep some of the reference and with nothing locked, as a board runs it.
 ## The plan stage by stage
 
 The board carries a row a stage of the map, in play order (`Board.stages`,
-`swaps.chain`), from one origin: the six the board suggests - blue's
-picks with the swaps taken, the fill around fewer, the optimal before
-any pick.
+`swaps.chain`), from one origin: the six the comps tab shows - blue's
+picks at six, the fill around fewer, the optimal before any pick.
 
 - **The phases of a route** (Hybrid, Escort) chain: each phase's six is
   the best reachable from the phase before, each hero changed costing
@@ -508,8 +392,10 @@ any pick.
 - **The arenas** (Control rounds, Flashpoint points) come up in no fixed
   order, so each is reached from the origin, never from the arena listed
   before it.
-- **A chosen stage** is the origin itself, and the phases before it read
-  as played, with no six.
+- **A chosen stage** is the board's own swap answer from the origin - the
+  swaps suggested above the picks, else the origin itself - and the
+  phases before it read as played, with no six; the phases after it go
+  on from its six.
 
 Red on every stage is its revealed picks, else its likely six. Two stages
 that score every six alike from the same six - the same gates and the
@@ -523,22 +409,22 @@ text stresses, else that it reads as the map; the rules its ground turns
 on and off against the whole map; the swaps and the two terms the six
 gains most on, or the six kept under the cost; and how to play it where
 the six's lean turns (`plan.stage_blurb`). A stage differs from its map
-only through its terrain and the rules that read it, since the rates are
-per map: under the shipped playbook, 8 of the 64 stages score a six of
-their own, on either side and with none - Havana's three, Midtown's and
-Neon Junction's escort phases, two of Rialto's and Route 66's Western Town
-Complex. 36 of the 64 have no text of their own on the wiki; fuller stage
+only through the ground in play - its terrain, its name and, on a Hybrid,
+its objective - and the rules that read them, since the rates are per
+map: under the shipped playbook of 2026-10-03, 1 of the 64 stages scores
+a six of its own, on either side and with none - Nepal's Sanctum, which
+`edges-reward-displacement` names; under the terrain rules it replaced, 8
+did. 36 of the 64 have no text of their own on the wiki; fuller stage
 texts are the lever (pm/backlog.md). At the shipped swap cost of 10 the
 plan keeps the board's six through every stage of an open board: the
 stages that score apart gain less than a swap costs, and a lower cost on
 the Swap cost slider shows them.
 
 **Rules that pull opposite ways.** Both rules of an opposing pair count,
-at the owner's word. Where a hard choke and high ground both stand out
-(Rialto's bridge, Route 66's Western Town Complex), the barrier pair
-partly offsets: the first 1000 of barrier health nets half a weight, and
-past 2000 nothing; the melee pair nets three quarters of a weight across
-the scale's range of melee picks.
+at the owner's word. Under the shipped playbook of 2026-10-03 the healing
+floor and the 6v6 shape pull apart: a third support raises a six's
+healing, and `two-of-each-role` charges it, so a six takes one only where
+the healing it adds outweighs that charge.
 
 `tests/verification/inference/test_stage_plan.py` holds each phase and each
 arena to an enumeration on the synthetic World.
@@ -547,7 +433,7 @@ arena to an enumeration on the synthetic World.
 
 `inference/solver.py` returns the best sixes of the whole legal space:
 every six of released, unbanned heroes that holds the locked picks, each
-once, at most two tanks and every limit kept - 17,217,564 on an open board
+once, at most two tanks and every limit kept - 13,030,920 on an open board
 under the shipped playbook. It walks that space by branch and bound. Each
 legal shape is filled role by role, a role's picks at rising places of its
 walk order, and a branch - the picks so far and the candidates each open
@@ -626,44 +512,25 @@ The suite holds the search to enumeration:
 `test_the_search_reaches_the_enumerated_maximum` and its neighbours in
 `tests/verification/inference/test_solver.py` compare the best sixes, the
 score floats and the ranks with a full enumeration's on synthetic boards -
-both seats, the fill, the countered case, bans, locks and plateaus - and
+blue's optimal, the fill, bans, locks and plateaus - and
 `tests/verification/inference/test_bounds.py` holds every rule and the whole
 bound to every completion of random branches. On the built database,
 `.venv/bin/python -m tests.verification.inference.prove_exact` brute-forces
-every legal six of a real board, in slices, against the search.
+every legal six of a real board, in slices, against the search, and its
+`draw` stage holds the tie-break's draw even over the real roster.
 
 ### Why the search is exact
 
 The owner's rule: the solver optimises exactly over the whole legal
 space - every six, duplicates removed, at most two tanks, the playbook's
 limits - and no per-role shortlist may restrict which heroes can appear.
-The search it replaces kept each role's six highest-standing heroes,
-swept the 13,101 sixes they allow, then climbed from the best of them by
-local search over the whole roster. It scored about 14,500 of 17 million
-sixes, and its answer was the best it met, not the best there is. On Samoa
-against D.Va, Roadhog, Sombra, Lúcio and Brigitte the investigation that
-led here found it returning a two-one-three where a two-two-two scored
-higher: the shape it needed was never searched from a good start, and no
-pool size could promise it would be.
-
-Replayed on that data, the old search still answers the two-one-three
-and the exact one the two-two-two, the same float a brute force of all
-17,217,564 legal sixes found. On the data of that day, where an unwritten
-synergy pair read the written pairs' mean, the old search happened to
-find the best six on each of 126 boards tried - every map against red's
-likely six, 90 seeded boards of random reds and bans, and six boards
-brute-forced in full - so its misses were rare, and nothing said when one
-happened. The exact search proves its answer, and costs less: 0.08 s a
-search against the old 2.3 s in one process, and a whole board
-0.19-0.33 s in one process against 1.1-3.7 s on twelve workers and
-3.8-11.2 s without them.
-
-Exactness retires what served the approximation: the process pool, its
-rounds and the two settings that sized it; the per-role pool and the
-`pool` knob of `infer`, `board` and `/api/board`; the field budget that
-held the swept fields in memory; and the check that tried the roster when
-the pools found no fill. `top` is the one knob left, and it buys the next
-best sixes in order.
+A search that sweeps a shortlist and climbs from its best can only return
+the best six it met: on Samoa against D.Va, Roadhog, Sombra, Lúcio and
+Brigitte one returned a two-one-three where a two-two-two scored higher,
+since the shape it needed was never searched from a good start, and no
+pool size could promise it would be. The exact search proves its answer
+and costs less, about 0.08 s a search and 0.2-0.3 s a board in one
+process. `top` is its one knob, and it buys the next best sixes in order.
 
 ## How a strategy file works
 
@@ -952,7 +819,7 @@ with three 7%.
 ## The catalog
 
 <!-- generated:catalog -->
-22 strategy files in `inference/strategies/`: 1 constraint (a limit), 13 heuristics (9 on a metric, 4 scored) and 8 assumptions. Regenerated by `.venv/bin/python -m door.mcp call db_docs`.
+25 strategy files in `inference/strategies/`: 3 constraints (limits), 14 heuristics (6 on a metric, 8 scored) and 8 assumptions. Regenerated by `.venv/bin/python -m door.mcp call db_docs`.
 
 #### The meta
 
@@ -969,95 +836,113 @@ params: MAX_SUPPORTS=3
 
 A six fields at most three supports, on every board. Open Queue sets no cap on supports, so this rule sets one: a six with a fourth support is never chosen. Measured as the six's support count.
 
+##### A six always fields a support (`six-fields-a-support`, shape, limit)
+
+`require team.supports >= params.MIN_SUPPORTS` - always holds
+params: MIN_SUPPORTS=1
+
+A six always fields at least one support, on every board. Supports are the team's backbone: most heroes heal only after several seconds out of combat, so a six with no support cannot sustain through a fight, and killing the supports is how the other side's heroes are told to win one. The six's support count is held at one or more, beside the cap of three.
+
+##### A six always fields a tank (`six-fields-a-tank`, shape, limit)
+
+`require team.tanks >= params.MIN_TANKS` - always holds
+params: MIN_TANKS=1
+
+A six always fields at least one tank, on every board. The tank leads the charge - it draws the other side's fire, holds space and breaks fortified positions and chokes - and a six with none leaves its supports with no one in front of them and nothing to walk behind against two tanks. The six's tank count is held at one or more, beside the queue's own cap of two.
+
 #### Heuristics
 
-##### Choke maps reward melee (`choke-maps-reward-melee`, map)
+##### Bring damage that breaks two tanks (`damage-breaks-two-tanks`, damage)
 
-`maximize team.melee` - picks with a melee weapon. weight 1; when `map.chokes >= params.STANDOUT or map.interiors >= params.STANDOUT`
+`maximize team.dps_floor` - summed published per-second damage figures (a floor: misses and healing ignored). weight 0.5
+
+A six brings enough sustained damage to burn through two tanks' worth of health. In 6v6 the second tank adds a pool, mitigation and often a second barrier to chew through before a kill, healing holds space but never takes it, and support-heavy lines are said to struggle to finish anyone. The summed published damage per second of the six's picks is the measure, a floor that ignores misses.
+
+##### Mobility wins races and high ground (`mobility-wins-races`, map)
+
+`maximize team.mobility_count` - picks with a movement or evasive ability. weight 1; when `map.mode == 'Flashpoint' or map.high_ground >= params.STANDOUT`
 params: STANDOUT=0.5
 
-A map of tight chokes and rooms puts the fight in someone's face, where a melee weapon does its full damage and a long gun does not. Reinhardt is the community's brawl tank because he swings his hammer at close quarters. Picks with a melee weapon are counted, read on the ground whose chokes or interiors stand 0.5 sd or more above the ordinary map's.
+On Flashpoint and on high ground, the picks that move win the ground. Flashpoint's next point opens across the largest maps in the game, so a slow six arrives one player at a time, and high ground goes to whoever can get up and back without the long way round the defenders are watching. Picks with a movement or evasive ability are counted on Flashpoint and on the ground whose high ground stands 0.5 sd or more above the ordinary map's.
 
-##### Chokes reward crowd control (`chokes-reward-crowd-control`, map)
+##### Long sightlines want long hitscan (`sightlines-want-long-hitscan`, map)
 
-`maximize team.cc_count` - picks with crowd control (stun, sleep, immobilize, hinder, knockback). weight 1; when `map.chokes >= params.STANDOUT or map.interiors >= params.STANDOUT`
+`maximize team.hitscan_reach` - hitscan picks whose weapon publishes a reach of 30 m or more. weight 1; when `map.sightlines >= params.STANDOUT`
 params: STANDOUT=0.5
 
-Where a map funnels both teams into a choke, crowd control decides who gets through it. A stun, a wall or a knockback at a doorway takes a pick out of the fight at the one moment the whole team is committed, and enclosed space leaves nowhere to dodge it. Picks with a crowd-control tool are counted, read on the ground whose chokes or interiors stand 0.5 sd or more above the ordinary map's.
+Long sightlines belong to long-reach hitscan. A hitscan shot lands the instant it is fired at any range the map offers, so on open lanes the fight opens where a Widowmaker, Ashe or Soldier: 76 already hits and projectiles and short guns do not, and Blizzard's designers add corner cover and run a train across Neon Junction to keep snipers from locking it down. Hitscan picks whose weapons reach 30 m or more are counted on the ground whose sightlines stand 0.5 sd or more above the ordinary map's.
 
-##### Capture points reward area effects (`control-area-healing`, map)
+##### A brawl six heals the scrum (`brawl-heals-the-scrum`, shape)
 
-`maximize team.aoe_count` - kit pieces tagged area of effect or shockwave. weight 0.25; when `map.objective == 'point'`
+`maximize team.hps_floor` - summed sustained healing onto teammates, hp per second over every teammate reached, reloads in. weight 0.5, a need; when `team.style_lean == 'brawl'`
 
-A capture-point fight happens on one point with the whole six stacked on it, so healing and damage that touch an area touch everyone. Lúcio's aura and Junkrat's splash both reach the whole point, and a Lúcio and Brigitte pairing was called too strong on king of the hill. Kit pieces tagged area of effect are counted, read wherever the ground is won on a point: Control, Flashpoint and a Hybrid's first phase.
+A brawl six outlasts the other side at close range by healing through the fight. Brawl moves as one tight group and trades damage face to face, so its supports need consistent healing, from an area or a high primary output, that keeps the tanks up through the trade, and area healing is called strongest when the team is grouped. Summed sustained healing onto teammates, an area heal counted once per teammate it reaches, is read while brawl is the six's majority playstyle, and a shortfall costs up to the weight.
 
-##### Escort lanes reward the longest gun (`escort-longest-gun`, map)
+##### A dive six moves together (`dive-moves-together`, shape)
 
-`maximize team.range_max` - the longest range on the team. weight 0.25; when `map.objective == 'payload'`
+`maximize team.mobility_count` - picks with a movement or evasive ability. weight 0.5, a need; when `team.style_lean == 'dive'`
 
-A payload runs down long lanes, and the pick with the longest reach on the six owns the lane before the fight closes. Every payload route opens onto a long sightline somewhere along the path, which is why the community names Escort as the mode that favours poke and Ashe as a Junkertown pick. The longest published range on the team is the measure, read wherever the ground is won on a payload: an Escort map and a Hybrid's later phase.
+A dive six moves as one: every pick reaches the target with the tanks and gets out when the cooldowns are spent. Dive takes several angles and rejoins at once, so a pick with no movement tool is the straggler the other side turns on, and a dive tank who lands without teammates dies fast. Picks with a movement or evasive ability are counted while dive is the six's majority playstyle, and a shortfall costs up to the weight.
 
-##### Flank routes want deployables (`flank-routes-want-deployables`, map)
+##### A poke six needs reach (`poke-needs-reach`, shape)
 
-`maximize team.deployables` - picks with deployables. weight 1; when `map.flanks >= params.STANDOUT`
-params: STANDOUT=0.5
+`maximize team.range_median` - median of each pick's longest published range. weight 0.5, a need; when `team.style_lean == 'poke'`
 
-A placed object fights a flanker while the team looks elsewhere: turrets counter flank pressure, a wall cuts the diver off, and a tree or a barrier gives the backline something to stand behind. Symmetra is rated one of the better damage picks in coordinated play for her turrets against flanks, and Torbjörn is the answer offered to a flanking Anran. Picks with deployables are counted, read on the ground whose flank routes stand 0.5 sd or more above the ordinary map's.
+A poke six wins the chip war before the fight closes, and it chips only what it reaches. Poke trades damage from range and from several angles, its tanks playing from the sides rather than the front, so a short-range pick idles through the poke or walks in alone. The median of the picks' longest published ranges is read while poke is the six's majority playstyle, and a shortfall costs up to the weight.
 
-##### High ground strands melee (`high-ground-strands-melee`, map)
+##### Carry a damage amplifier (`carry-a-damage-amplifier`, damage, scored)
 
-`minimize team.melee` - picks with a melee weapon. weight 0.25; when `map.high_ground >= params.STANDOUT`
-params: STANDOUT=0.5
+weight 0.5; bonus `min(team.dmg_amp, params.AMPS) / params.AMPS`
+params: AMPS=1
 
-On a map built around high ground a melee pick has no way to touch an enemy standing above and no quick way up. Reinhardt is named as the tank who suffers most where high ground matters, with nothing to throw at it but a Fire Strike, and brawl's movement tools are said to have no vertical component at all. Picks with a melee weapon are counted, minimised on the ground whose high ground stands 0.5 sd or more above the ordinary map's.
+A six carries a pick that amplifies its teammates' damage. A Discord Orb, a damage boost or a Nano Boost adds a kill threat without adding a gun: it makes a tank's large pool killable and turns a target that was surviving into one that is not, which counts most against two tanks. The rule pays its weight when at least one pick amplifies damage.
 
-##### Open ground punishes short reach (`open-ground-punishes-short-reach`, map)
+##### The tank line carries a barrier (`tank-line-barrier`, durability, scored)
 
-`maximize team.range_min` - the shortest longest-range. weight 1; when `map.open_ground >= params.STANDOUT`
-params: STANDOUT=0.5
+weight 1; penalty `max(0, 1 - team.barrier_hp / params.FRONT_BARRIER)`
+params: FRONT_BARRIER=600
 
-On open ground the pick with the shortest reach is the one who spends the fight unable to shoot back. Beams and shotguns that own a corridor are helpless across a canyon, so a comp is judged there by its shortest longest-range. The smallest of the picks' longest published ranges is the measure, read on the ground whose open ground stands 0.5 sd or more above the ordinary map's.
+The tank line carries a barrier that shields the team. In 6v6 the two tanks split the work, one holding ground behind a barrier while the other dives or peels; two tanks with no barrier between them are called no better than one, with nothing to stop a hit before it lands, and Blizzard added cover to its maps when the format lost a tank and its shields. Barrier health on the six is read against 600, a main tank's barrier: at 600 or more it costs nothing, and each part short of it costs that share of the weight.
 
-##### Sightlines want hitscan (`sightlines-want-hitscan`, map)
-
-`maximize team.hitscan` - picks with a hitscan weapon or ability. weight 1; when `map.sightlines >= params.STANDOUT`
-params: STANDOUT=0.5
-
-Long sightlines belong to hitscan weapons, which land at any distance the map offers while projectiles arc and slow. On such a map the fight opens at the range where a Soldier: 76, Ashe or Widowmaker is already hitting and a projectile kit is not. Picks with a hitscan weapon or ability are counted, read on the ground whose sightlines stand 0.5 sd or more above the ordinary map's.
-
-##### Vertical maps reward fliers (`vertical-maps-reward-fliers`, map)
-
-`maximize team.flyers` - picks that fly or hover. weight 0.25; when `map.high_ground >= params.STANDOUT`
-params: STANDOUT=0.5
-
-A map with high ground everywhere rewards the picks that travel between its levels without a staircase. Echo is named as the fill pick for maps with verticality, and the maps with the most high ground are called best for heroes that move easily between low and high ground. Picks that fly or hover are counted, read on the ground whose high ground stands 0.5 sd or more above the ordinary map's.
-
-##### Control points have edges (`control-points-have-edges`, map, scored)
+##### Edges reward displacement (`edges-reward-displacement`, map, scored)
 
 weight 1; when `map.hazards >= params.STANDOUT or (map.name == 'Nepal' and map.stage == 'Sanctum')`; bonus `min(max(team.cc_count - params.BOOP_FLOOR, 0), params.BOOP_CAP) * 0.5`
 params: BOOP_CAP=3, BOOP_FLOOR=2, STANDOUT=0.5
 
-Control stages are built around drops - the well on Ilios, the sanctum pit on Nepal, the edges of Lijiang Tower - and a knockback or a pull turns a full-health enemy into a kill. Roadhog hooking into the well and Lúcio booping on Lighthouse are the community's Control examples, and Orisa is named as good on maps with environmental hazards. Each pick with crowd control beyond the second earns half the rule's weight, up to three, read on the ground whose hazards stand 0.5 sd or more above the ordinary map's and on Nepal's sanctum, which the examples name.
+Where the ground has drops, displacement kills. A knockback, hook or pull over a pit, a ledge or a lava moat removes a full-health enemy outright, and the wiki's pages for Ilios, Lijiang Tower, Nepal and Samoa each name the abilities that do it on or beside the objective. Each pick with crowd control beyond the second earns half the weight, up to three, on the ground whose hazards stand 0.5 sd or more above the ordinary map's and on Nepal's Sanctum, which the wiki names.
 
-##### A hard choke needs a barrier (`hard-choke-needs-barrier`, map, scored)
+##### Commit to one playstyle (`commit-to-one-playstyle`, shape, scored)
 
-weight 1; when `map.chokes >= params.STANDOUT or (map.name == 'Havana' and map.stage in ['City Streets', 'Sea Fort'])`; bonus `min(team.barrier_hp / params.CHOKE_BARRIER, 1)`
-params: CHOKE_BARRIER=1000, STANDOUT=0.5
+weight 0.5; when `team.style_lean == ''`; penalty `1`
 
-A hard choke is crossed behind a barrier or not at all, and a map whose fights are chokes is a map where one barrier is worth a pick. The community's list of the places a shield is needed is a list of hard chokes - King's Row first point, Eichenwalde third, Havana first and third - and the maps left off it have long sightlines instead. Barrier health earns the rule's weight in full at 1000 and nothing past it, read on the ground whose chokes stand 0.5 sd or more above the ordinary map's and on Havana's first and third stages, which the list names.
+A six commits to one plan, dive, brawl or poke, carried by a strict majority of its picks. Each archetype wins one way - brawl walks in as one unit, dive collapses on one target from several angles, poke holds range from several angles - and a six split between them fights as two half-teams: a brawl tank in front of a poke backline can neither peel a dive nor swing at what stands far away. A six whose picks share no playstyle by a strict majority pays the weight.
 
-##### High ground looks over a barrier (`high-ground-over-barrier`, map, scored)
+##### Two of each role (`two-of-each-role`, shape, scored)
 
-weight 1; when `map.high_ground >= params.STANDOUT`; penalty `min(team.barrier_hp / params.BARRIER_HP, params.BARRIER_CAP) * 0.5`
-params: BARRIER_CAP=2, BARRIER_HP=1000, STANDOUT=0.5
+weight 1.5; penalty `team.shape_excess + max(0, params.TANKS - team.tanks)`
+params: TANKS=2
 
-A barrier faces one way and the enemy on the high ground above it shoots past it, so on a map built around high ground a barrier tank is a slow pick paying for a tool that does not work. Reinhardt is named as ineffective on Numbani's first two points for the high ground around them. Each 1000 of barrier health costs half the rule's weight, up to 2000, on the ground whose high ground stands 0.5 sd or more above the ordinary map's.
+A six plays two tanks, two damage and two supports. In 6v6 the second tank holds the off-angle and doubles the front's mitigation, so one tank facing two loses the trade for space, two damage picks make the pressure that lets the tanks take it, and each pick past two in a role gives one of those jobs up; a third support behind both tanks is the one off-shape six called strong. Each pick over two in a role costs the weight, and a six one tank short pays it once more.
+
+##### Defenders stack barriers at a choke (`defenders-stack-barriers`, side, scored)
+
+weight 1; when `map.side == 'defense' and map.chokes >= params.STANDOUT`; bonus `min(team.barrier_hp / params.STACKED, 1)`
+params: STACKED=2400, STANDOUT=0.5
+
+Defending a hard choke, a six stacks barrier health across the one lane the attackers must use. In 6v6 two tanks' barriers laid over a small choke held so well that matches made no progress until ultimates broke them - the double-shield hold - and the defenders pick that ground in their setup time. Barrier health pays the rule in proportion up to 2400, two barrier tanks' worth, on defense on the ground whose chokes stand 0.5 sd or more above the ordinary map's.
 
 ##### Heal at the other side's rate (`heal-rate`, sustain, scored)
 
 weight 2; penalty `matchup.heal_shortfall`
 
-A six heals at least the share of its total health that the other side heals of its own each second, and never less than the other side's healing in full; an unrevealed slot on that side is the 2-2-2 shape's missing role at the role's median pool and healing. With damage anti-heal on both sides, the healing half of the race between the two sixes breaks even at that share, and nothing in the kit sets a higher bar. The charge is the weight times the share of the need left unhealed.
+A six heals at least the share of its own pool that the other side heals of its own each second, and never less than the other side's healing in full; an unrevealed slot on that side reads as the 2-2-2's missing role at its median. In 6v6 the second tank on each side brings bigger pools and more incoming damage, so supports heal almost all fight, two light healers fall behind and a lone support is focused first, and with anti-heal on both sides the healing half of the race breaks even at that share. The charge is the weight times the share of that need the six leaves unhealed.
+
+##### Every six carries a save (`six-carries-a-save`, sustain, scored)
+
+weight 0.75; penalty `max(0, params.SAVES - team.team_saves)`
+params: SAVES=1
+
+Every six carries at least one save: an invulnerability, a death-prevention or a cleanse that lands on a teammate. 6v6 fights turn on ultimate combos and burst windows that land faster than any heal, and a Protection Suzu, Immortality Field, Life Grip, Transcendence or Projected Barrier makes the combo miss or breaks the stun chain before the kill. The picks carrying such a save are counted, Mercy's Resurrect among them, and a six short of one pays the weight.
 
 #### Assumptions
 
@@ -1065,7 +950,7 @@ A six heals at least the share of its total health that the other side heals of 
 
 *assumption* - prose the solver takes as given and the session holds a comp to
 
-The same board, playbook and weights always give the same six, the same score and the same alternatives: nothing is sampled when a board is solved, and every seed is a string read off the board. A score, a share and the fight odds are the playbook's arithmetic over the facts, not probabilities of winning, because nothing is fitted to match results. A higher score means a better six under these rules and weights, never a greater chance to win.
+The same board, playbook and weights always give the same six, the same score and the same alternatives: nothing is sampled when a board is solved, and every seed is a string read off the board. A score and a share are the playbook's arithmetic over the facts, not probabilities of winning, because nothing is fitted to match results. A higher score means a better six under these rules and weights, never a greater chance to win.
 
 ##### This is Open Queue Ranked (`open-queue-ranked`, assumptions)
 
@@ -1237,7 +1122,7 @@ the `team.*` metrics computed for the red side.
 | `map.style_top` (text) | the playstyle the map rewards most: the rates' lift plus the terrain's lean |
 | `map.style_margin` | top style score minus the runner-up, in sd |
 | `map.mode` (text) | the game mode |
-| `map.stages` | separate arenas, one played at a time: Control's 3, Flashpoint's 5; else 0 |
+| `map.arenas` | separate arenas, one played at a time: Control's 3, Flashpoint's 5; else 0 |
 | `map.phases` | named parts of one route, played in order: Hybrid's 2, an Escort map's named stretches; else 0 |
 | `map.bans` | bans already made in this match: a ban rate is a risk only before them |
 | `map.name` (text) | the map's name; empty with no map |

@@ -1,8 +1,8 @@
 """infer() and a full six scored alone: locked picks and the queue's shape,
-an answer to a flier, a full six ranked against every legal six, a board
-no six satisfies, bans, one scale per board, an announced hero, the fill that
-keeps a lock, a seat's search timed from where it began, and no rank in an
-unscored field. Every board is the synthetic World's: no database."""
+an answer to a flier, a board no six satisfies, bans, one scale per board,
+an announced hero, the fill that keeps a lock, a seat's search timed from
+where it began, and no rank in an unscored field. A full six's rank is
+test_solver's. Every board is the synthetic World's: no database."""
 
 import os
 
@@ -51,17 +51,6 @@ def test_infer_honours_a_hitscan_answer_to_a_flier(synthetic_world):
     assert any(world.hero(n).hitscan for n in r.blue)
     anti = next(c for c in r.contributions if c["id"] == "anti-air")
     assert not anti["applies"] and anti["weighted"] == 0.0      # answered: nothing to charge
-
-
-def test_a_full_six_is_ranked_against_the_field(synthetic_world):
-    """A scored six is ranked against the field."""
-    world = synthetic_world
-    fix = catalog.load(FIXTURE_PLAYBOOK)
-    six = ("Anvil", "Mortar", "Rook", "Needle", "Balm", "Tansy")
-    r = evaluated(world, Draft("Harbor Gate", ("Mortar", "Gale"), six), catalog=fix)
-    assert r.rank >= 1 and r.kind == "evaluate" and len(r.picks) == 6
-    with pytest.raises(Refusal, match="exactly 6"):
-        evaluated(world, Draft(blue=("Balm",)), catalog=fix)
 
 
 def test_a_board_no_six_satisfies_is_refused_by_infer_and_the_board_alike(
@@ -115,16 +104,9 @@ def test_scores_share_one_scale_per_board(synthetic_world):
     assert all(0 <= a["normalized"] <= 100 for a in r.alternatives)
     assert r.alternatives[0]["score"] < r.score        # below the optimum, if only by a hair
     assert r.alternatives[0]["normalized"] <= 100
-    best = engine.infer(world, Draft("Harbor Gate", red), catalog=fix, base=DEFAULT)
-    b = engine.board(world, Draft("Harbor Gate", red, tuple(best.blue)), catalog=fix, brief=BRIEF)
-    assert abs(b.current.score - best.score) < 1e-9 and b.blue.blue == best.blue
-    assert b.current.to_dict()["normalized"] == 100 and b.red.to_dict()["normalized"] == 100
-    # around Balm
     b = engine.board(world, Draft("Harbor Gate", red, tuple(r.blue)), catalog=fix, brief=BRIEF)
-    assert b.blue.blue == best.blue and b.current.to_dict()["normalized"] <= 100
-    again = engine.infer(world, Draft("Harbor Gate", red, ("Balm",)), catalog=fix, base=DEFAULT)
-    rescored = evaluated(world, Draft("Harbor Gate", red, tuple(again.blue)), catalog=fix)
-    assert abs(again.score - rescored.score) < 1e-9
+    assert abs(b.current.score - r.score) < 1e-9 and b.blue.blue == r.blue
+    assert b.current.to_dict()["normalized"] == 100
 
 
 def test_an_announced_hero_is_described_but_never_picked(synthetic_world):
@@ -155,9 +137,8 @@ def test_the_fill_is_the_optimal_whenever_the_optimal_holds_every_lock(synthetic
     """Locking a hero of the optimal six leaves the optimal six the best one
     that keeps the lock, so the fill must find it again. With the default
     engine off, under a playbook that scores nothing every six scores zero
-    and only the tie-break tells them apart: a search that moved on score
-    alone stood still there, and locking Reinhardt on King's Row came back
-    with Mizuki for Juno. With it on, the same playbook scores by the engine."""
+    and only the tie-break tells them apart; with it on, the same playbook
+    scores by the engine."""
     from inference import engine
     world = synthetic_world
     assert not any(s.weighs for s in ASSUMPTIONS_ONLY)
@@ -185,7 +166,7 @@ def test_a_seat_is_timed_from_when_its_search_began(
         return solve(solver, top)
     monkeypatch.setattr(Solver, "solve", slow)
     seat = engine._optimal(synthetic_world, draft, catalog=scratch_playbook, base=DEFAULT,
-                           top=1, seat="blue", kind="infer")
+                           top=1, kind="infer")
     assert 0.3 <= seat.result.seconds < 5 and seat.result.to_dict()["seconds"] >= 0.3
 
 

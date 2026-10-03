@@ -24,7 +24,7 @@ import random
 from collections.abc import Iterable, Iterator, Sequence
 
 from facts.model import ROLES, Hero
-from inference.scoring import Bounds, Candidate, Interval, Objective, SixKey
+from inference.scoring import Candidate, Interval, Objective, Scale, SixKey
 from inference.shapes import legal_shapes
 
 REFERENCE_SIZE = 1200
@@ -32,8 +32,8 @@ REFERENCE_SEED = 20260913
 SCALE_POOL = 6                    # each role's heroes in the field that fixes a board's scale
 
 
-def sample(objective: Objective, size: int = REFERENCE_SIZE) -> list[Candidate]:
-    """A seeded sample of `size` random legal sixes for this board,
+def sample(objective: Objective) -> list[Candidate]:
+    """A seeded sample of REFERENCE_SIZE random legal sixes for this board,
     unprepared; every legal six, in the seeded order, on a roster that holds
     fewer. Deterministic for a given map and side, and independent of the
     locked picks, the enemies and the bans, so every call on one board
@@ -65,7 +65,7 @@ def sample(objective: Objective, size: int = REFERENCE_SIZE) -> list[Candidate]:
     out: list[Candidate] = []
     seen: set[SixKey] = set()
     if shapes:
-        while len(out) < min(size, space):
+        while len(out) < min(REFERENCE_SIZE, space):
             t, d, s = rng.choice(shapes)
             heroes = (rng.sample(by_role["tank"], t) + rng.sample(by_role["damage"], d)
                       + rng.sample(by_role["support"], s))
@@ -103,11 +103,11 @@ def _on_board(objective: Objective, measured: list[Candidate]) -> list[Candidate
     return measured
 
 
-def _bounds_over(objective: Objective, prepared: Sequence[Candidate]) -> Bounds:
+def _scale_over(objective: Objective, prepared: Sequence[Candidate]) -> Scale:
     """{heuristic id: Interval(low, high)} over prepared sixes. A heuristic
     no six here values is left out: the objective reads a missing id as
     (0, 0)."""
-    out: Bounds = {}
+    out: Scale = {}
     for i, g in enumerate(objective.heuristics):
         values = [value for c in prepared if (value := c.raw[i]) is not None]
         if values:
@@ -133,11 +133,7 @@ def board_prior(objective: Objective, h: Hero) -> float:
 
 def _board_pool(objective: Objective, role: str) -> list[Hero]:
     """One role's top SCALE_POOL released heroes by the board's own prior."""
-    # not filtered by the bans, on purpose, exactly as sample() is not:
-    # this field is half the population that fixes the scale, and a ban
-    # that moved it would move the score of an unchanged six. Bans keep
-    # banned heroes out of the search's candidates; the measuring stick
-    # has to hold still
+    # not filtered by the bans, as sample() is not: the measuring stick holds still
     heroes = [h for h in objective.world.heroes.values() if h.role == role and h.released]
     heroes.sort(key=lambda h: (-board_prior(objective, h), h.name))
     return heroes[:SCALE_POOL]
@@ -148,10 +144,10 @@ def _board_field(objective: Objective) -> Iterator[list[Hero]]:
     nothing locked: each role's top SCALE_POOL by the board's own prior,
     over every legal shape.
 
-    It must not read the locked picks. The bounds it feeds are the board's
-    one scale: `infer`, the fill and `current` run with different locks on
-    the same board, and a scale that moved with them would make a current
-    comp and the optimal it is a share of two different numbers."""
+    It must not read the locked picks. The lows and highs it feeds are the
+    board's one scale: `infer`, the fill and `current` run with different
+    locks on the same board, and a scale that moved with them would make a
+    current comp and the optimal it is a share of two different numbers."""
     tanks, damage, supports = [_board_pool(objective, role) for role in ROLES]
     for t, d, s in legal_shapes(objective.catalog):
         if t > len(tanks) or d > len(damage) or s > len(supports):
@@ -165,11 +161,10 @@ def _board_field(objective: Objective) -> Iterator[list[Hero]]:
 def _field_sample(objective: Objective) -> list[Candidate]:
     """The board's field, measured (Objective.prepare) but unscored.
 
-    The sample alone is 1,200 random legal sixes, and the search picks from
-    comps far better than random, so a good six sat above the sample's high
-    on most metrics and every one of them normalised to the same 1.0: the
-    rule stopped telling them apart, and a weight raised past that bought
-    nothing. The field belongs in the population that sets the scale.
+    The field belongs in the population that sets the scale: the search
+    picks from comps far better than random, and against the sample alone a
+    good six sits above its high on most metrics, where every one
+    normalises to 1.0 and the rule cannot tell them apart.
 
     A six is read on the team keys its heuristics read alone where those
     are all it needs (Objective.lean_keys), the same values at a third of
@@ -186,16 +181,16 @@ def _field_sample(objective: Objective) -> list[Candidate]:
 
 
 def freeze(objective: Objective) -> float | None:
-    """Bounds per heuristic from the reference sample and the field, adopted
-    by the objective; -> the floor, the lowest score among the reference
-    sixes under them, None where no legal six is drawn. The sample is drawn
-    once here. The field is read only where a heuristic on a metric exists:
-    the bounds read nothing else, so a playbook without one skips it and
-    lands on the same scale. Both are measured on the whole map; the floor
-    is read on the board's stage."""
+    """The scale - each heuristic's low and high - from the reference sample
+    and the field, set on the objective; -> the floor, the lowest score
+    among the reference sixes on it, None where no legal six is drawn. The
+    sample is drawn once here. The field is read only where a heuristic on a
+    metric exists: the lows and highs read nothing else, so a playbook
+    without one skips it and lands on the same scale. Both are measured on
+    the whole map; the floor is read on the board's stage."""
     measured = _prepared(objective, measure=True)
     field = _field_sample(objective) if objective.heuristics else []
-    objective.adopt_bounds(_bounds_over(objective, measured + field))
+    objective.set_scale(_scale_over(objective, measured + field))
     return _floor(objective, _on_board(objective, measured))
 
 

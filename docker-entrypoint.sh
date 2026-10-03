@@ -56,6 +56,14 @@ predump() {
     esac
 }
 
+# exit 0 when the database holds no rates history to keep: no meta_snapshots
+# table, or no row in it - what a rebuild that failed leaves, so a migration
+# that fails on a fresh schema too asks for no dump on every restart. A check
+# that cannot tell exits 1, and the dump is asked for
+no_history() {
+    python -c 'import sys, psycopg; from db import psql; cx = psycopg.connect(psql.default_dsn()); sys.exit(1 if cx.execute("select to_regclass(%s)", ("meta_snapshots",)).fetchone()[0] and cx.execute("select 1 from meta_snapshots limit 1").fetchone() else 0)'
+}
+
 # a refused rebuild - a playbook that does not load - ends the container, and
 # the restart tries again once the file loads
 rebuild() {
@@ -77,7 +85,19 @@ case "$role" in
                 echo "data: schema behind the migrations - migrating in place"
                 if ! python -m door.mcp call db_migrate; then
                     echo "data: the migration failed (above) - a dump, then a rebuild from the caches" >&2
-                    predump
+                    # db_rebuild's own first check: a playbook that does not load
+                    # refuses it, and a dump asked for first is one more kept
+                    # on every restart
+                    python -c 'from inference import catalog; catalog.load()' || {
+                        echo "data: the playbook does not load (above) - no dump, no rebuild; the container retries on restart" >&2
+                        exit 1
+                    }
+                    # a rebuild that failed before left no history to dump
+                    if no_history; then
+                        echo "data: no rates history to keep - no dump first"
+                    else
+                        predump
+                    fi
                     rebuild
                 elif [ "$(db_state)" != current ]; then
                     echo "data: migrated, no heroes yet - running the first build"
@@ -86,7 +106,7 @@ case "$role" in
             *)
                 echo "data: database current" ;;
         esac
-        exec python -m door.mcp --http --host 0.0.0.0 --port 8020 --allow-host data ;;
+        exec python -m door.mcp --http --host 0.0.0.0 --port 8020 ;;
     ui|refresh)
         # as long as the data healthcheck's start_period: 90 waits of 10 s. The
         # probe runs as its own command, so set -e ends the container when it fails

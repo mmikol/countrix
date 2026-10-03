@@ -6,6 +6,8 @@ only this board has: on this map, against these opponents, beside these
 teammates. facts.board_facts calls write() once per pick, red first.
 """
 
+from typing import TypedDict
+
 from facts import counters
 from facts.compute import TREND_POINTS
 from facts.draft import KIT_FORMAT, Seat
@@ -64,7 +66,8 @@ def _hero_identity(fs: FactSet, world: World, h: Hero, team: Seat) -> None:
         fs.add("hero", name, "hero.announced", "CAUTION: %s is announced, not yet playable%s -"
             " the kit is the wiki's preview and there are no rates" % (
                 name, " (releases %s)" % h.release_date if h.release_date else ""),
-            value=str(h.release_date) if h.release_date else None, source="heroes", team=team)
+            value=str(h.release_date) if h.release_date else None, source="heroes", team=team,
+            warn=True)
     fs.add("hero", name, "hero.pool", "%s pool: %d (%d health, %d shield, %d armor)%s"
         % (name, h.pool, h.health, h.shield, h.armor,
             ", %g more armor from its forms, time-averaged" % h.form_armor
@@ -234,6 +237,14 @@ def _hero_perks(fs: FactSet, h: Hero, team: Seat) -> None:
 
 # --- the rates ----------------------------------------------------------------
 
+class RateValue(TypedDict):
+    """The hero.rate fact's value: the all-ranks win, pick and ban rates, a
+    pick or a ban the source leaves out read as None."""
+    win: float
+    pick: float | None
+    ban: float | None
+
+
 def _hero_rates(fs: FactSet, world: World, h: Hero, team: Seat) -> None:
     """The all-ranks rates, then each tier's up the ladder, named as Blizzard
     names it."""
@@ -242,7 +253,7 @@ def _hero_rates(fs: FactSet, world: World, h: Hero, team: Seat) -> None:
         fs.add("hero", name, "hero.rate", "%s across all ranks: wins %.1f%%, picked %.1f%%%s"
             % (name, h.win, h.pick or 0,
                 ", banned %.1f%%" % h.ban if h.ban is not None else ""),
-            value={"win": h.win, "pick": h.pick, "ban": h.ban}, source="hero_meta",
+            value=RateValue(win=h.win, pick=h.pick, ban=h.ban), source="hero_meta",
             team=team)
     for tier, (win, pick, ban) in h.by_tier.items():
         if win is not None:
@@ -275,8 +286,8 @@ def _hero_best_maps(fs: FactSet, world: World, h: Hero, team: Seat) -> None:
     line per map - with a map, the facts on it are the whole story."""
     name = h.name
     if h.best_maps and h.win is not None:
-        # the same intersection rule as the rates. best_maps is filled only for
-        # a hero with a win rate, from maps it has a rate on.
+        # best_maps is filled only for a hero with a win rate, from maps it
+        # has a rate on.
         overall = h.win
         fs.add("hero", name, "hero.best_map", "%s's three best maps by Blizzard's map rates,"
             " over its own %.1f%%: %s" % (name, overall, ", ".join(
@@ -381,7 +392,7 @@ def _hero_versus(
         fs.add("hero", name, "hero.vs_answered_by", "%s: %s %s is answered by %s %s"
             % ("WARNING" if team == "blue" else "NOTE", team, name, other_side,
                 ", ".join(threats)), value=threats,
-            source="counters", team=team)
+            source="counters", team=team, warn=team == "blue")
     wins = [o.name for o in opponents if world.is_countered_by(o.id, h.id)]
     if wins:
         fs.add("hero", name, "hero.vs_answers", "%s %s answers %s %s"

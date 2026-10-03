@@ -43,6 +43,10 @@ steps.
 `wiki/matchup_tables.py` and `wiki/strategy_sections.py` read the wiki's
 markup and store nothing.
 
+[db/data/README.md](../db/data/README.md) says how a pull is written:
+its contract, the page cache, the request policies and the checklist for
+a new pull or table.
+
 ### `psql/migrations/` - the schema as a sequence
 
 | folder | what it holds |
@@ -55,8 +59,9 @@ markup and store nothing.
 `wiki.heroes`, `wiki.maps`, `wiki.terrain`, `wiki.patches`,
 `blizzard.meta`, `wiki.playstyles`, `wiki.synergies`, `wiki.matchups` -
 then `load_authored`. Entity tables refresh in place;
-each rates pull appends a dated snapshot, the series the trend facts
-difference. The page caches (`.cache-blizzard/`, `.cache-wiki/` at the
+a rates pull of a new capture appends a snapshot dated by that capture,
+the series the trend facts difference, and a pull of pages already held
+stores nothing. The page caches (`.cache-blizzard/`, `.cache-wiki/` at the
 repo root) make every build after the first cost almost no requests.
 
 ```mermaid
@@ -69,7 +74,7 @@ stateDiagram-v2
     stale --> current: db_migrate<br/>keeps the data
     unfilled --> current: db_rebuild
     stale --> current: db_rebuild<br/>drops the rates history
-    current --> current: the refresher - pull_patches + pull_rates daily,<br/>sync_all weekly, entities upsert in place,<br/>rates APPEND a dated snapshot
+    current --> current: the refresher - pull_patches + pull_rates daily,<br/>sync_all weekly, entities upsert in place,<br/>rates APPEND a snapshot per new capture
 ```
 
 `db_rebuild` drops every table, reapplies the migrations and runs
@@ -191,8 +196,8 @@ was read. Every table but `sources` and `schema_migrations` carries both;
 | **HEROES** | `abilities` · `ability_kinds` · `ability_stats` · `heroes` · `kit_6v6` · `perk_stats` · `perk_tiers` · `perks` · `roles` · `stat_keys` · `subroles` · `weapon_config_slots` · `weapon_configs` · `weapon_stats` · `weapons` |
 | **MAPS** | `game_modes` · `map_modes` · `map_stages` · `map_terrain` · `maps` · `stage_terrain` |
 | **META** | `competitive_tiers` · `hero_meta` · `map_meta` · `meta_snapshots` · `patches` · `regions` |
-| **PLAYBOOK** | `counters` · `playstyle` · `synergies` · `synergy_cells` |
-| **INFERENCE** | `strategies` |
+| **RELATIONS** | `counters` · `playstyle` · `synergies` · `synergy_cells` |
+| **PLAYBOOK** | `strategies` |
 
 
 #### `abilities`
@@ -253,7 +258,7 @@ One row per measurement, not per stat. A wiki value like "0.67 shots/s (max char
 
 #### `counters`
 
-*PLAYBOOK · `005_playbook.sql`*
+*RELATIONS · `005_playbook.sql`*
 
 Who answers whom: one row means countered_by_id answers hero_id, read in one part of a hero's wiki article (pull_counters), which basis names. match-up: the Match-Up column of the article's "Match-Ups and Team Synergy" section, each written cell read from the article hero's seat as a verdict - the other hero answers this one, this one answers the other, or neither - a verdict either way one directed edge, and a pair the two articles contradict on no edge. strategy: a sentence of the article's ==Strategy== section that names another hero beside a counter cue and says which way it runs (db/data/wiki/strategy_sections.py); evidence is that sentence, and a pair the two articles' sections contradict on gets no edge. An edge both parts state has a row for each. Reloaded whole.
 
@@ -462,7 +467,7 @@ The game versions the meta moves with. A win rate is true of a patch, so a snaps
 
 #### `playstyle`
 
-*PLAYBOOK · `005_playbook.sql`*
+*RELATIONS · `005_playbook.sql`*
 
 Which playstyle a hero belongs to, straight from the wiki's team composition page. The style vocabulary (dive, brawl, poke) is whatever the page says, kept as text rather than a three-row lookup table: the page is the vocabulary, and a new style there should load, not break.
 
@@ -536,9 +541,9 @@ The stat vocabulary: one row per stat code a kit carries, added by pull_kits and
 
 #### `strategies`
 
-*INFERENCE · `010_constraints_and_heuristics.sql`*
+*PLAYBOOK · `010_constraints_and_heuristics.sql`*
 
-The mirror of the playbook: one row per markdown file in inference/strategies/ - its kind (constraint | heuristic | assumption, the last added by 013), the frontmatter a machine scores by (metric, direction, weight, expressions, params) and the prose body a person argues with. Reloaded whole by load_authored so a recommendation can cite the ids it was scored under; the files remain the truth.
+The mirror of the playbook: one row per markdown file in inference/strategies/ - its kind (constraint | heuristic | assumption, the last added by 013), the frontmatter a machine scores by (metric, direction, weight, expressions, params) and the prose body a person argues with. Reloaded whole by load_authored and after every playbook write (tune, add_strategy, infer_strategy), so db_status and the query tool see the playbook as rows under the user source; the files remain the truth.
 
 | column | type | null | references |
 | --- | --- | --- | --- |
@@ -570,7 +575,7 @@ The ten subroles, each belonging to exactly one role, each carrying the passive 
 
 #### `synergies`
 
-*PLAYBOOK · `005_playbook.sql`*
+*RELATIONS · `005_playbook.sql`*
 
 Which heroes work WITH which. Pulled from the Team Synergy column of the "Match-Ups and Team Synergy" section of every released hero's wiki article (pull_synergies). A cell is a claim unless it is a placeholder, rated below GOOD or MIRROR, or unrated and saying there is no synergy; a cell rated GOOD or better is a claim with no advice written too. score is 2 when both articles claim the pair, 1 when one does; note is the advice's first sentence, cut to a clause under 120 characters, or says the rating came with no advice. A pair no article claims has no row: synergy_cells says whether an article wrote it off or neither wrote it at all. No snapshot, region or tier: a judgement has no population behind it. Reloaded whole. Bidirectional, unlike counters. Synergy is a property of the PAIR: if Mei works with Tracer then Tracer works with Mei - one fact, one row. A counter is an arrow: Mei answering Tracer says nothing about the reverse. So each pair is stored once, lower hero_id first (a CHECK holds it), and read from either side.
 
@@ -583,7 +588,7 @@ Which heroes work WITH which. Pulled from the Team Synergy column of the "Match-
 
 #### `synergy_cells`
 
-*PLAYBOOK · `029_synergy_cells.sql`*
+*RELATIONS · `029_synergy_cells.sql`*
 
 Which teammates each released hero's wiki article writes a Team Synergy cell for, one row per cell (pull_synergies, from the cells synergies is read from): hero_id's article writes a cell about other_id. A written cell is any that is not a placeholder - a claim, a rating below GOOD, an unrated "no synergy" - so a cell with no row is one no article writes, and facts/tables.py reads it at the share of the written cells that claim; a pair with no row either way reads twice that, the written pairs' mean as they read. Reloaded whole with synergies.
 

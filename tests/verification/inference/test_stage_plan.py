@@ -8,6 +8,7 @@ board's payload. Scratch rules on map.objective and map.hazards make the
 stages score apart. No database."""
 
 import copy
+import dataclasses
 import os
 
 import pytest
@@ -16,10 +17,10 @@ from facts.draft import Draft
 from inference import catalog, engine, plan, swaps
 from inference.base import OFF
 from inference.result import StageRules
-from inference.scoring import Candidate, Objective, quantized
+from inference.scoring import Candidate, quantized
 from inference.solver import Solver
 from tests.verification.inference import ASSUMPTIONS_ONLY, DEFAULT
-from tests.verification.inference.test_swaps import netted, plain_seat
+from tests.verification.inference.enumeration import netted, plain_seat
 
 COST = 5.0                  # share points of blue's span a hero changed costs
 RULES = {
@@ -59,10 +60,9 @@ def planned(world, draft, playbook, base, origin, memo=None):
     walks them, and the plain Solver and raw cost they were walked on."""
     plain, span = plain_seat(world, draft, playbook, base)
     raw = swaps.raw_cost(COST, span) or 0.0
-    whole = Objective(world, plain.m, red=plain.red, side=plain.side, catalog=playbook, base=OFF)
     six = world.resolve(None, (), tuple(origin)).blue
-    rows = swaps.chain(swaps.Plan(plain=plain, whole=whole, chosen=draft.stage, origin=six,
-                                  raw=raw, cost=COST), memo)
+    rows = swaps.chain(swaps.ChainStart(plain=plain, chosen=draft.stage, origin=six, raw=raw,
+                                        cost=COST), memo)
     return rows, plain, raw
 
 
@@ -71,8 +71,7 @@ def reachable(plain, stage, reference, raw):
     of the stage scored on the board's scale less `raw` a reference hero
     dropped; the reference itself where no six beats it."""
     solver = Solver(plain.world, plain.m, red=plain.red, locked=(), side=plain.side,
-                    stage=stage, catalog=plain.catalog,
-                    base=plain.base.weights if plain.base is not None else OFF)
+                    stage=stage, catalog=plain.catalog, base=plain.base)
     solver.adopt_scale(plain)
     heroes = plain.world.resolve(None, (), tuple(reference)).blue
     ref = solver.score(solver.prepare(Candidate(heroes)), detail=False)
@@ -131,6 +130,18 @@ def test_the_chosen_stage_is_the_origin_and_the_phases_before_it_are_played(
     assert "Play the six the board suggests here" in escort["blurb"]
 
 
+def test_an_unscored_seat_walks_its_stages_at_no_cost(synthetic_world):
+    """A seat nothing scores has no span to take a share of: its stages are
+    walked at no swap cost, and each row that keeps the six quotes that
+    cost, not the one the board was asked for."""
+    draft = Draft("Harbor Gate", ("Mortar",), ORIGIN, side="attack")
+    board = engine.board(synthetic_world, draft, catalog=ASSUMPTIONS_ONLY,
+                         brief=engine.Brief(base=OFF, swap=COST))
+    assert board.swaps["status"] == "none" and len(board.stages) == 2
+    for row in board.stages:
+        assert "Keep the six: no swap pays for its cost (0)." in row["blurb"], row
+
+
 def test_two_stages_on_one_ground_are_one_search(forged, staged):
     """Courtyard has no text and Spire's names its high ground one mention
     short, so both read as Ember Ruins and score every six alike: from the
@@ -164,7 +175,7 @@ def test_the_board_carries_the_plan_on_a_staged_map_and_none_elsewhere(synthetic
     """A board on a staged map carries a row a stage, in the payload and in
     the text the board tool prints; a map without stages carries none, and
     a brief can leave the plan out."""
-    brief = engine.Brief(base=DEFAULT, countered=False)
+    brief = engine.Brief(base=DEFAULT)
     board = engine.board(synthetic_world, Draft("Harbor Gate", ("Mortar",), ORIGIN,
                                                 side="attack"), catalog=staged, brief=brief)
     assert [r["stage"] for r in board.to_dict()["stages"]] == ["Assault", "Escort"]
@@ -173,7 +184,7 @@ def test_the_board_carries_the_plan_on_a_staged_map_and_none_elsewhere(synthetic
                         catalog=staged, brief=brief)
     assert flat.stages == []
     off = engine.board(synthetic_world, Draft("Harbor Gate", ("Mortar",), ORIGIN, side="attack"),
-                       catalog=staged, brief=brief._replace(stages=False))
+                       catalog=staged, brief=dataclasses.replace(brief, walk_stages=False))
     assert off.stages == []
 
 
@@ -197,7 +208,7 @@ def test_a_stage_no_six_can_hold_says_so_and_not_that_it_ran_out(synthetic_world
     out of its budget."""
     m = synthetic_world.resolve("Ember Ruins", (), (), ())[0]
     none = StageRules(on=[], off=[])
-    stuck = plan.stage_blurb(m, "Forge", (0, 0), none, [], [], COST, solved=False,
-                             infeasible=True)
+    stuck = plan.stage_blurb(m, "Forge", (0, 0), none, [], [], COST, outcome="infeasible")
     assert "No six keeps this stage's limits" in stuck and "budget" not in stuck
-    assert "budget" in plan.stage_blurb(m, "Forge", (0, 0), none, [], [], COST, solved=False)
+    assert "budget" in plan.stage_blurb(m, "Forge", (0, 0), none, [], [], COST,
+                                        outcome="unsolved")

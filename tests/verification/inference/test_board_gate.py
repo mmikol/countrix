@@ -1,25 +1,26 @@
 """One gate for every door: the same over-limit board sent through the page's
 facts endpoint and its board handler, the three MCP board tools and the
-engine's two entry points is refused with the same message on each, and
-locked picks the playbook's limits rule out are refused by every infer.
+engine's two entry points is refused with the same message on each,
+locked picks the playbook's limits rule out are refused by every infer,
+and the alternatives a caller names meet the engine's one clamp.
 The page's board route is not listed: it opens a connection and hands the
 query to serve.handle_board, which is a door here. The synthetic World
 stands in for the database and the reference playbook for the live one,
 and every board solves in this process."""
 
-import contextlib
 import os
 import shutil
 
 import pytest
 
 from db import Refusal
-from door.mcp import tools
 from facts import tables
 from facts.draft import Draft
-from inference import catalog, engine, serve
+from inference import catalog, engine
+from tests.verification.door.mcp import Offline
 from tests.verification.inference import FIXTURE_PLAYBOOK
 from ui import board as page
+from ui import serve
 
 SEVEN = ("Balm", "Myrrh", "Sorrel", "Tansy", "Rook", "Needle", "Flint")
 
@@ -36,14 +37,6 @@ OVER_LIMIT = [
     pytest.param({"blue": SEVEN}, "more than 6 blue picks", id="seven-blue"),
     pytest.param({"blue": ("Anvil",), "bans": SEVEN[:6]}, "more than 5 bans", id="six-bans"),
 ]
-
-
-class Offline(tools.Context):
-    """The door's context, every tool family registered, over no database:
-    tables.load is stubbed."""
-
-    def connect(self, boot=False):
-        return contextlib.nullcontext("cx")
 
 
 @pytest.fixture()
@@ -112,3 +105,14 @@ def test_every_infer_refuses_locked_picks_its_limits_rule_out(
     for door in ("mcp infer", "engine infer"):
         with pytest.raises(Refusal, match=r"^not allowed: breaks At most three supports$"):
             in_force.get(door, doors[door])(board)
+
+
+def test_the_alternatives_a_caller_names_are_clamped_into_one_range():
+    """A caller naming top meets the engine's one clamp on the alternatives.
+    Only a top left out takes the default; 0 is a number like any other,
+    clamped to the floor, as a negative is, and a top past the ceiling reads
+    as the ceiling."""
+    from inference.engine import TOP_CEILING, TOP_DEFAULT, clamp_top
+    assert clamp_top(None) == TOP_DEFAULT == 5                 # the default
+    assert clamp_top(0) == clamp_top(-3) == 1
+    assert clamp_top(99) == TOP_CEILING == 20

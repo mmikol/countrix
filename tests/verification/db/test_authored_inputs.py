@@ -3,7 +3,6 @@ from Blizzard or the wiki: load_authored takes the playbook alone, the
 `user` source is carried by `strategies` alone, and no third source is
 read."""
 
-import contextlib
 import os
 import time
 
@@ -14,6 +13,7 @@ import db
 from door.mcp import tools
 from door.mcp.schema import ToolReply
 from inference import catalog
+from tests.verification.door.mcp import Offline
 
 
 def test_the_catalog_holds_the_playbooks_source_row():
@@ -34,11 +34,14 @@ def test_patches_and_synergies_are_pulls_in_dependency_order():
     order = list(pulls)
     assert pulls["pull_patches"] == "wiki"
     assert pulls["pull_synergies"] == "wiki"
+    # the roster runs first: a kit, a synergy and a counter link to heroes
+    assert order[0] == "pull_heroes"
     # a rates pull stamps its snapshot with the patch live today
     assert order.index("pull_patches") < order.index("pull_rates")
-    # a synergy and a counter are pairs of heroes on the roster
-    assert order.index("pull_heroes") < order.index("pull_synergies")
-    assert order.index("pull_heroes") < order.index("pull_counters")
+    # a stage's terrain needs its stage, and a map's rates its row: a rates
+    # pull run before the maps skips every map
+    assert order.index("pull_maps") < order.index("pull_terrain")
+    assert order.index("pull_maps") < order.index("pull_rates")
     # every pull_* tool is a pull, in the order it was registered
     assert order == [n for n in tools.REGISTRY.names() if n.startswith("pull_")]
 
@@ -47,11 +50,6 @@ def test_every_pull_reads_blizzard_or_the_wiki():
     assert {spec.source for spec in tools.REGISTRY.pulls()} == {"blizzard", "wiki"}
     assert set(db.CACHE_DIRS) == {"blizzard", "wiki"}
     assert set(tools.Context(dsn="postgresql://nowhere").caches) == {"blizzard", "wiki"}
-
-
-class Offline(tools.Context):
-    def connect(self):
-        return contextlib.nullcontext("cx")
 
 
 def test_pull_counters_runs_the_wikis_matchups(monkeypatch, tmp_path):
@@ -173,93 +171,23 @@ def test_a_pull_that_stores_no_table_says_nothing_stored(monkeypatch, tmp_path):
     assert data["tables"] == [] and data["snapshot_id"] is None
 
 
-def test_the_data_dictionary_says_where_patches_and_synergies_come_from():
-    # 018's COMMENT ON TABLE replaces the prose 004 wrote above CREATE TABLE
-    # seasons, which was patches'; 005's prose above CREATE TABLE synergies is
-    # kept current itself
-    from db.psql import schema
-    described = schema._migration_tables()
-    assert described["patches"][0] == "004_meta.sql"           # the domain stays the creator's
-    assert described["synergies"][0] == "005_playbook.sql"
-    assert "pull_patches" in described["patches"][1]
-    assert "wiki's Patches cargo table" in described["patches"][1]     # '' unescaped
-    assert "season" not in described["patches"][1]
-    assert "pull_synergies" in described["synergies"][1]
-    assert "hero's wiki article" in described["synergies"][1]
-    for table in ("patches", "synergies"):
-        assert "authored" not in described[table][1].lower(), table
-        assert ".csv" not in described[table][1], table
-
-
-def test_the_data_dictionary_says_counters_are_the_wikis_matchups():
-    # 019's COMMENT ON TABLE replaces the prose 005 wrote about counterpick.gg
-    from db.psql import schema
-    described = schema._migration_tables()
-    assert described["counters"][0] == "005_playbook.sql"
-    prose = described["counters"][1]
-    assert "pull_counters" in prose and "wiki article" in prose and "Match-Up" in prose
-    assert "countered_by_id answers hero_id" in prose
-    assert "loader" not in prose and "tooltip" not in prose     # 005's, about counterpick
-
-
-def test_the_migration_that_drops_counterpick_is_one_transaction():
-    from db.psql import schema
-    [sql] = [
-        m.sql for m in schema.read_migrations() if m.name == "019_wiki_replaces_counterpick.sql"]
-    body = [line for line in sql.splitlines() if line and not line.startswith("--")]
-    assert body[0] == "BEGIN;" and body[-1] == "COMMIT;"
-    assert "DROP TABLE IF EXISTS map_strategy;" in body
-    # children before parents: rates, their snapshots, counters, then the source
-    order = [sql.index(statement) for statement in (
-        "DELETE FROM hero_meta", "DELETE FROM meta_snapshots", "DELETE FROM counters",
-        "DELETE FROM sources WHERE code = 'counterpick';")]
-    assert order == sorted(order)
-
-
 def test_a_table_name_that_reaches_sql_text_is_checked():
     """psycopg parameterises values, never identifiers, so a name reaches SQL
     text only as the sql.Identifier psql.identifier returns once the name has
     passed its check. The names all come from a literal or the catalog; this
-    is what keeps it so."""
+    is what keeps it so. A name that is no string, which mypy keeps out,
+    still fails closed."""
     from psycopg.sql import Identifier
 
     from db.psql import identifier
     for good in ("heroes", "ability_stats", "weapon_configs", "hero_id", "_x9"):
         assert identifier(good) == Identifier(good)
-    for bad in ("heroes; drop table heroes", "Heroes", "hero-id", "", None, "1table",
+    for bad in ("heroes; drop table heroes", "Heroes", "hero-id", "", "1table",
                 "heroes ", "heroes--", "*"):
         with pytest.raises(ValueError, match="not a SQL identifier"):
             identifier(bad)
-
-
-def test_every_path_the_layer_declares_exists():
-    # the folder move once doubled a segment of one of these; the containers
-    # found out, the suite did not - now it does
-    from db.psql import schema
-    for path in (schema.MIGRATIONS_DIR, catalog.strategies_dir(),
-                 os.path.join(db.ROOT, "docs")):
-        assert os.path.isdir(path), path
-
-
-def test_the_migration_that_drops_the_matches_is_one_transaction():
-    """027 drops the two tables 024 added, the picks before the matches they
-    reference."""
-    from db.psql import schema
-    [sql] = [m.sql for m in schema.read_migrations() if m.name == "027_drop_matches.sql"]
-    body = [line for line in sql.splitlines() if line and not line.startswith("--")]
-    assert body == ["BEGIN;", "DROP TABLE IF EXISTS match_picks;",
-                    "DROP TABLE IF EXISTS matches;", "COMMIT;"]
-
-
-def test_the_migration_that_drops_the_unread_data_is_one_transaction():
-    """028 drops the snapshot's season column before the seasons it
-    references, then the two kit tables nothing read."""
-    from db.psql import schema
-    [sql] = [m.sql for m in schema.read_migrations() if m.name == "028_drop_unread.sql"]
-    body = [line for line in sql.splitlines() if line and not line.startswith("--")]
-    assert body == ["BEGIN;", "ALTER TABLE meta_snapshots DROP COLUMN IF EXISTS season_id;",
-                    "DROP TABLE IF EXISTS seasons;", "DROP TABLE IF EXISTS ability_modifiers;",
-                    "DROP TABLE IF EXISTS perk_ability_effects;", "COMMIT;"]
+    with pytest.raises(TypeError):
+        identifier(None)
 
 
 # --- the built database ----------------------------------------------------

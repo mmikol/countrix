@@ -236,7 +236,7 @@ def _load_perks(store_pass: _StorePass, hero_id: int, perks: list[PerkEntry]) ->
         # Blizzard has not published the hero yet: the wiki's perks are the
         # only ones, so they get rows of their own (blizzard.heroes replaces
         # them once the hero's page parses)
-        position = {"minor": 0, "major": 0}
+        position = dict.fromkeys(PERK_TIERS, 0)
         for entry in perks:
             tier = entry["tier"]
             position[tier] += 1
@@ -291,7 +291,7 @@ def store(
         source_id: int, six: Mapping[str, SixKit] = MappingProxyType({})) -> Stored:
     """Reload the kit tables from `by_hero` and `six` and set each profiled
     hero's pools, its 5v5 ones and the 6v6 ones its article gives (NULL
-    where it gives none). hero_ids is {name_key: hero_id}, as names.index
+    where it gives none). hero_ids is {name_key: hero_id}, as normalizer.index
     builds it; a hero it lacks is skipped and named in the result."""
     for table in RELOADED:
         cursor.execute(SQL("DELETE FROM {}").format(psql.identifier(table)))

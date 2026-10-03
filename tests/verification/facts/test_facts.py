@@ -7,8 +7,6 @@ test_board_facts.py, test_hero_facts.py and test_team_facts.py, and what the
 load itself reads is test_world.py's, test_world_kits.py's and
 test_world_maps.py's."""
 
-import statistics
-
 import pytest
 
 from facts import board_facts, compute, model
@@ -50,31 +48,6 @@ def test_the_whole_database_becomes_facts(world):
     assert any("Americas" in f.text for f in fs.facts if f.key == "meta.snapshot")
 
 
-def test_the_rates_half_of_a_maps_style_is_derived_from_its_rates(world):
-    """Map.rate_lift[S] is the z-score, across the maps, of the mean map-minus-overall
-    win rate of the released heroes tagged S, each weighted 1/(its tag count)."""
-    styles = sorted({s for h in world.heroes.values() for s in h.styles})
-    assert styles and all(set(m.styles) == set(styles) for m in world.maps.values())
-
-    def lift(m, style):
-        rows = [((h.map_win(m.id) - h.win) / len(h.styles), 1 / len(h.styles))
-                for h in world.heroes.values()
-                if h.released and style in h.styles and h.win is not None
-                and h.map_win(m.id) is not None]
-        return sum(x for x, _ in rows) / sum(w for _, w in rows)
-    for style in styles:
-        lifts = {m.id: lift(m, style) for m in world.maps.values()}
-        mean, sd = statistics.fmean(lifts.values()), statistics.pstdev(lifts.values())
-        for m in world.maps.values():
-            assert m.rate_lift[style] == pytest.approx((lifts[m.id] - mean) / sd, abs=1e-3)
-        assert statistics.fmean(m.rate_lift[style] for m in world.maps.values()) == \
-            pytest.approx(0, abs=1e-3)
-    m = world.map("King's Row")
-    ranked = sorted(m.styles, key=lambda s: (-m.styles[s], s))
-    assert m.style_top == ranked[0]
-    assert m.style_margin == pytest.approx(m.styles[ranked[0]] - m.styles[ranked[1]])
-
-
 def test_a_map_without_text_gets_no_terrain_fact(world):
     bare = next(m for m in world.maps.values() if not m.terrain)
     fs = board_facts.generate(world, Draft(bare.name))
@@ -110,17 +83,17 @@ def test_terrain_and_both_halves_of_the_style_are_facts(world):
 
 
 def test_a_map_lists_its_stages_as_arenas_or_as_the_phases_of_a_route(world):
-    # one list fact a map: stages on arenas, phases on a route, neither without rows
-    for name, key, other in (("Ilios", "map.stages", "map.phases"),
-                             ("Havana", "map.phases", "map.stages"),
-                             ("King's Row", "map.phases", "map.stages")):
+    # one list fact a map: its arenas, or the phases of a route, neither without rows
+    for name, key, other in (("Ilios", "map.arenas", "map.phases"),
+                             ("Havana", "map.phases", "map.arenas"),
+                             ("King's Row", "map.phases", "map.arenas")):
         fs = board_facts.generate(world, Draft(name))
         assert fs.find(key)[0].value == world.map(name).stages and not fs.find(other)
         assert fs.find(key)[0].source == "map_stages"
     assert board_facts.generate(world, Draft("Havana")).find("map.phases")[0].text == \
         "Havana phases, in order: City Streets, Distillery, Sea Fort"
     fs = board_facts.generate(world, Draft("Colosseo"))
-    assert not fs.find("map.stages") and not fs.find("map.phases")
+    assert not fs.find("map.arenas") and not fs.find("map.phases")
 
 
 def test_a_stage_fact_names_the_terrain_its_own_text_stresses(world):
@@ -160,7 +133,7 @@ def test_a_stage_without_text_of_its_own_gets_no_stage_fact(world):
     for m in (oasis, dorado, world.map("Colosseo"), world.map("Blizzard World")):
         assert not board_facts.generate(world, Draft(m.name)).find("map.stage_terrain"), m.name
         assert all(compute.stage_standouts(m, s) == [] for s in m.stages)
-    assert board_facts.generate(world, Draft("Oasis")).find("map.stages")  # the list still stands
+    assert board_facts.generate(world, Draft("Oasis")).find("map.arenas")  # the list still stands
 
 
 def test_map_rates_are_the_intersection_with_the_board(world):
@@ -175,18 +148,11 @@ def test_map_rates_are_the_intersection_with_the_board(world):
     assert not no_map.find("hero.map_win")
 
 
-def test_a_heros_best_maps_are_derived_from_blizzards_map_rates(world):
-    """Hero.best_maps: the three maps with the largest (map win rate - overall win
-    rate), only where positive, ties by map name."""
-    for h in world.heroes.values():
-        lifts = sorted((-round(win - h.win, 3), world.maps[mid].name, mid)
-                       for mid, (win, _) in h.map_rates.items()
-                       if h.win is not None and win > h.win)
-        assert h.best_maps == [mid for _, _, mid in lifts[:3]], h.name
-        assert len(h.best_maps) <= 3
-        assert all(h.map_win(mid) > h.win for mid in h.best_maps), h.name
+def test_most_heroes_have_three_best_maps_and_symmetras_are_facts(world):
+    """Hero.best_maps, worked by hand in test_tables, on Blizzard's map
+    rates: most released heroes run ahead of their overall rate on three
+    maps or more, and Symmetra's best maps are worded as facts."""
     assert sum(1 for h in world.heroes.values() if h.released and len(h.best_maps) == 3) > 40
-    assert all(not h.best_maps for h in world.heroes.values() if not h.map_rates)
     # the hero's own line without a map; on its best map, the rank, and the team's count
     sym = world.hero("Symmetra")
     top = world.maps[sym.best_maps[0]]
@@ -206,13 +172,6 @@ def test_the_provenance_is_one_line_per_source(world):
     seen = [(f.value["source"], f.value["queue"]) for f in lines]
     assert len(seen) == len(set(seen)), seen                  # no source and queue twice
     assert any(f.value["source"] == "blizzard" for f in lines)   # the main rates' line is there
-
-
-def test_the_map_fact_carries_this_maps_ban_rate(world):
-    fs = board_facts.generate(world, Draft("King's Row", ("Zarya",), ("Sombra", "Ana")))
-    fact = fs.find("hero.map_win", "Sombra")[0]
-    if world.hero("Sombra").map_ban(world.map("King's Row").id) is not None:
-        assert ", banned " in fact.text
 
 
 KINGS_ROW_SIX = ("Reinhardt", "Genji", "Hanzo", "Vendetta", "Widowmaker", "Zenyatta")

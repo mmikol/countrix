@@ -87,8 +87,8 @@ change only what a check or the user points at, and leave a report.
    hardening).
 
 7. **The backlog is current.** `pm/backlog.md` is the list of what is
-   worth doing next, ordered by payoff over blast radius. A run moves an
-   item that landed to *Done* with its commit, adds what a check or a
+   worth doing next, ordered by payoff over blast radius. A run drops an
+   item that landed - git log keeps what landed - adds what a check or a
    lesson below suggests (a smell named in check 5, a cap that bit, a
    measurement that changed), rewrites an item whose cost or risk the
    code now shows differently, and drops what no longer applies. Never
@@ -160,8 +160,9 @@ is a lesson the next run relearns.
   the solver's ties, in the order a set of names iterated, which the
   process hash seed sets: the parallel board and the sequential one
   disagreed on a fact's text, and PYTHONHASHSEED changed the six. Now:
-  every tie, in a fact's wording and in the scoring path, breaks by name;
-  a solver test flips the iteration order, and
+  a tie in a fact's wording breaks by name, and sixes rank by score, then
+  the board's draw, then the names; a solver test flips the iteration
+  order, and
   `test_a_board_is_the_same_under_any_hash_seed` solves boards under two
   hash seeds and holds the payloads byte for byte.
 - **The look and the rules described as they were.** The UI document

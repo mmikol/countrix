@@ -59,7 +59,8 @@ The solver searches exactly, in the process that calls it: a board is a
 few searches of tens of milliseconds each, one after another, and spawns
 no worker. `.venv/bin/python -m tests.verification.inference.prove_exact`
 checks it by hand against a brute force of every legal six on a board of the
-built database, in slices under five minutes each (its docstring says how).
+built database, in slices under five minutes each, and its `draw` stage holds
+the null draw even over the real roster (its docstring says how).
 
 Without the database, two generated sections regenerate on their own:
 `.venv/bin/python -c "from door.mcp import tools; tools.REGISTRY.write_docs()"`
@@ -85,12 +86,14 @@ db <- facts <- inference <- door <- ui.
   tool's schema by the same `Tool` wrapper on every path.
   The code that writes lives with what it writes - the pulls in `db/data`,
   the strategies table in `inference.catalog.mirror`, the playbook's files
-  in `inference.tune` - and only the tools call it. Reads bypass the door:
-  the board, `facts/` and `inference/` read through
-  `db.psql.default_dsn()` - `DATABASE_URL`, else the embedded pgserver
-  cluster at `db/psql/cluster`, started on first touch; only db_rebuild
-  creates it (`psql.boot`), and a read with neither raises
-  `psql.NoDatabaseError`.
+  in `inference.tune` - and only the tools call it. Reads need no door
+  tool: the board opens its own connection through
+  `db.psql.default_dsn()`, and a door tool opens one through its
+  `Context`; `facts.tables.load` reads over the connection it is handed,
+  and `inference/` reads only the World. `default_dsn()` is
+  `DATABASE_URL`, else the embedded pgserver cluster at `db/psql/cluster`,
+  started on first touch; only db_rebuild creates it (`psql.boot`), and a
+  read with neither raises `psql.NoDatabaseError`.
 - **One user input.** The strategies are the only data written by hand,
   and the only rows under the `user` source; every other table is pulled
   from Blizzard or the wiki.
@@ -117,12 +120,8 @@ db <- facts <- inference <- door <- ui.
   (`Strategy`, `CatalogError`); one bad file makes `catalog.load` raise
   everywhere. `meta.md` beside the strategy files is no strategy and no
   strategy may take its name: it holds the default engine's weights
-  (below). The shipped playbook is eight assumptions, thirteen
-  heuristics - `heal-rate`, scored (the healing floor,
-  `matchup.heal_shortfall`, docs/inference.md), and twelve on the terrain
-  of the ground in play (`map.<feature>`, `map.objective`) - and one
-  limit, `at-most-three-supports`, while
-  it is rebuilt rule by rule from the citation record in
+  (below). The shipped playbook, listed in docs/inference.md's generated
+  catalog, is rebuilt rule by rule from the citation record in
   `inference/README.md`. Solver behaviour is tested against the 19-file
   reference playbook in `tests/fixtures/playbook/` and its own `meta.md`
   (`DEFAULT` and `BRIEF` in tests/verification/inference/__init__.py), or
@@ -130,17 +129,11 @@ db <- facts <- inference <- door <- ui.
   playbook that scores nothing; no solver test reads
   `inference/strategies/`.
 - **The default engine scores first.** `inference/base.py` scores every six
-  on its win rates on the map (each pick's edge over 50, trusted by its pick
-  rate), the wiki's synergy scores - read cell by cell, one cell in each
-  hero's article: a claim 1, a write-off 0, and a cell no article writes
-  (no `synergy_cells` row) at the written cells' claim share
-  (`facts.tables.impute_synergy`), never 0 (docs/inference.md, Why an
-  unwritten synergy pair is not zero) - and the counter graph against the
-  other side - its locked picks, else its likely six: a wiki edge 2, and
-  on a pair the wiki leaves out a kit-derived one 1 (`facts/counters.py`,
-  which the team.* counter metrics never read) - and the playbook's terms
-  sit on top, so the shipped playbook's boards are scored, never
-  *unscored*. Its weights are the playbook's, in `meta.md`: `meta`, which
+  on its win rates on the map, the wiki's synergy scores and the counter
+  graph against the other side's locked picks, else its likely six, which
+  no other term reads (each term defined in docs/inference.md, The
+  objective, and on the math page); the playbook's terms sit on top, so
+  the shipped playbook's boards are scored, never *unscored*. Its weights are the playbook's, in `meta.md`: `meta`, which
   scales the whole engine, over the `rate`, `synergy` and `counter` dials
   (1, 1, 0.26, 0.05 shipped); `tune` with id `meta` changes them and the
   file's prose (`body`), and the playbook tab's Meta slider
@@ -164,34 +157,37 @@ db <- facts <- inference <- door <- ui.
   `tables.load` lays the wiki's 6v6 pools and lines (`heroes.*_6v6`,
   `kit_6v6`) over the 5v5 rows before `derive_scalars` (`facts/kit_format.py`).
   The 5v5 figures stay stored, and each change names the one it moved.
-- **The solver is deterministic.** `engine.board()` returns a Board of up to
-  seven Results (blue, red, current, red_current, fill, countered, expected);
-  fill is None unless one to five blue picks are locked, countered is None
-  without blue picks or when the caller's `Brief` leaves it out, as the
-  page's boards do. A Draft may name a stage the map lists (`stage`,
-  resolved by `facts.draft.board_stage`); every seat plays it, and it moves
-  the `map.*` metrics alone - the ground in play, `compute.ground`. Each
-  seat has one scale: reference sixes drawn from a string seed, the map
-  and the side, bounded against the enemy and measured on the whole map
-  (`prepare(measure=True)`), so the stages of a map share it; the lowest
-  of their scores under the board's own gates is the seat's floor, a
-  share's 0, as its optimal is the 100. current shares blue's optimal's scale, red_current red's, so within
-  a seat infer, the fill and current are comparable. The search is exact
-  (`inference/solver.py`, its bounds in `inference/bounds.py`): every
-  legal six of the released, unbanned roster, each once, by branch and
-  bound, in one total order - the score to `SCORE_PLACES` decimals, then
-  the six's tie-break draws, then sorted names - each six scored in one
-  seat order. A draw is a hash of the board's map and side and the hero's
-  id (`scoring.draw`), never a rate or a name, so with nothing scoring
-  every legal six ties and the draw alone picks; the optimal reports how
-  many sixes share its score (`Solver.ties`), and the `ties-are-drawn`
-  assumption says so in the playbook.
-  A new metric or expression construct needs a bound rule, and
+- **The solver is deterministic.** `engine.board()` returns a Board of up
+  to four Results (blue, current, fill, expected); fill is None unless one
+  to five blue picks are locked. Blue is the side the playbook optimizes,
+  and the only seat solved; red is never optimized or scored: `expected` is
+  red's likely six around its revealed picks, each pick with its pull
+  (`compute.expected_picks`), and red's badge is the six's total pull. A
+  Draft may name a stage the map lists (`stage`, resolved by
+  `facts.draft.board_stage`); every seat plays it, and it moves the `map.*`
+  metrics alone - the ground in play, `compute.ground`. Blue's seat has one
+  scale: the reference sample, drawn from a string seed of the map and the
+  side, and the board's field, which reads the enemy, both measured on the
+  whole map (`prepare(measure=True)`), so the stages of a map share it; the
+  lowest of the sample's scores under the board's own gates is the seat's
+  floor, a share's 0, as its optimal is the 100. current and the fill share
+  blue's optimal's scale, so infer, the fill and current are comparable.
+  The search is exact (`inference/solver.py`, its bounds in
+  `inference/bounds.py` over `inference/intervals.py` and
+  `inference/ranges.py`): every legal six of the released, unbanned roster,
+  each once, by branch and bound, in one total order - the score to
+  `SCORE_PLACES` decimals, then the six's tie-break draws, then sorted
+  names - each six scored in one seat order. A draw is a hash of the
+  board's map and side and the hero's id (`scoring.draw`), never a rate or
+  a name, so with nothing scoring every legal six ties and the draw alone
+  picks; the optimal reports how many sixes share its score
+  (`Solver.ties`), and the `ties-are-drawn` assumption says so in the
+  playbook. A new metric or expression construct needs a bound rule, and
   `tests/verification/inference/test_bounds.py` fails without one. Blue's
   picks the limits rule out - a full six that breaks one, or picks the
   fill's search proves no six completes - are not allowed: no score, no
-  share, no odds; red's picks are never ruled out. A search past its budget
-  refuses (`solver.Unbounded`), never guesses.
+  share; red's picks are never ruled out. A search past its budget refuses
+  (`solver.Unbounded`), never guesses.
 - **Blue's swaps are one joint answer.** With blue picks, `Board.swaps`
   (`inference/swaps.py`) is the best legal six reachable from them when
   each pick dropped costs the swap cost - `weights=swap:<v>`, else
@@ -200,28 +196,28 @@ db <- facts <- inference <- door <- ui.
   `Objective` (`keep`, `swap`) that the bound carries exactly, so the
   search stays one exact branch and bound; the keep term is never a
   contribution, and the target is scored again on the plain objective.
-  A swap needs its net to beat the six that keeps every pick; red is
-  re-solved against the target for the odds after, and a suggestion that
-  lowers them is withheld. Red is never searched for swaps. `BRIEF` in
-  tests/verification/inference/__init__.py turns them off (`Brief.swaps`); a
-  test that reads them names its cost.
+  A swap needs its net to beat the six that keeps every pick. Red is never
+  searched for swaps. `BRIEF` in
+  tests/verification/inference/__init__.py turns them off
+  (`Brief.search_swaps`); a test that reads them names its cost.
 - **The plan runs stage by stage.** On a map with stages, `Board.stages`
-  (`swaps.chain`) is a row a stage in play order from the six the board
-  suggests: each phase of a route the exact best reachable from the phase
+  (`swaps.chain`) is a row a stage in play order from the six the comps
+  tab shows: each phase of a route the exact best reachable from the phase
   before under the swap cost, greedy; each arena from that six; a chosen
-  stage the six itself, the phases before it played. Two stages with the
+  stage the board's swap answer, the phases before it played. Two stages with the
   same `Objective.ground_key` are one search. Each row's blurb is
   `plan.stage_blurb`, worded from the facts. `BRIEF` leaves it out too
-  (`Brief.stages`); test_stage_plan names its brief.
+  (`Brief.walk_stages`); test_stage_plan names its brief.
 - **The board** (`ui/board.py`, its pages in `ui/pages.py`) serves
   `/api/facts` and answers `/api/board`, `/api/strategies` and `/health`
-  with `inference/serve.py`'s handlers, all in its own process - the
+  with `ui/serve.py`'s handlers, all in its own process - the
   compose stack's `ui` container runs the engine.
   `serve.Admission` solves `BOARDS_AT_ONCE` (one) board at a time. The
   board answers GET alone and writes nothing: a slider's weight rides
   with the session's requests. Both HTTP servers, the board and the
   MCP door, stand on `db/web.py`: a request whose Host or Origin is not a
-  local name or one given with `--allow-host` is refused with 403.
+  local name or one given to the board with `--allow-host` is refused
+  with 403.
 - **Docker** runs one image as three roles, plus postgres and `backup`, the
   nightly `pg_dump` into `backups/` on postgres's image (`compose.yaml`,
   `docker-entrypoint.sh`). Migrations ship in the image, not a mount: once
@@ -251,9 +247,11 @@ db <- facts <- inference <- door <- ui.
   row, the one inventory of the schema's steps. The whole chain must build
   an empty database: an invariant test applies it to a scratch database
   on the target server and compares the tables with the built one.
-- Only a door tool in `door/mcp/` calls the playbook's writers -
-  `catalog.mirror` and `tune.tune`/`add`/`complete`. A new call site
-  elsewhere fails the test; route it through a tool.
+- Only a door tool in `door/mcp/` calls a writer - the playbook's,
+  `catalog.mirror` and `tune.tune`/`add`/`complete`, and the database's,
+  `schema.apply`/`rebuild`/`drop_all` and a pull's `run(connection, pull)`.
+  A new call site elsewhere fails `test_only_the_door_calls_the_writers`;
+  route it through a tool.
 - Each layer imports only the layers below it: `db/` imports nothing above
   it, `facts/` only `db/`, `inference/` `db/` and `facts/`, `door/` all
   three; `ui/`, `tests/` and `orchestrator.py` import any of them. An
@@ -285,18 +283,21 @@ db <- facts <- inference <- door <- ui.
   `WORLD_METRICS` and the key its function computes (the namespace must
   equal the registry), and in `TEXT_METRICS` when its value is a name or a
   list - `tests/verification/facts/test_metrics.py` checks every registry
-  key's kind against it - and a bound rule in `inference/bounds.py` (its
+  key's kind against it - and a range rule in `inference/ranges.py` (its
   aggregate: a sum, a mean, a count, fixed by the shape), which
   `tests/verification/inference/test_bounds.py` fails a key without; then
   regenerate the catalog vocabulary in docs/inference.md.
 - `tests/verification/ui/test_pages.py` pins the scripts at their seams
   (routes, query keys, element ids, the payload keys they read against what
   the server writes), and `tests/qa/test_stylesheet.py` holds that every
-  `board.css` class is used; a decision worth pinning is made on the
-  server, as the seat badge is
-  (`momentum.badges`). The math page renders the code constants it quotes
-  (`view_math` fills them in), so a literal percent in `ui/static/math.html`
-  is written `%%`.
+  `board.css` class is used. A decision only the client can make is pinned
+  in the script's source - the stale-reply guard, the HTML escape, the meta
+  and swap-cost weights never pruned, the swaps and suggested slots drawn
+  only for the picks the board in hand answered, a taken swap checked
+  against the bans and the role caps; any other decision worth pinning is
+  made on the server, as the seat badge is (`momentum.badges`). The math
+  page renders the code constants it quotes (`view_math` fills them in), so
+  a literal percent in `ui/static/math.html` is written `%%`.
 - `test_the_search_reaches_the_enumerated_maximum` in
   `tests/verification/inference/test_solver.py` is the regression gate on
   the search: synthetic boards - red revealed, locks, bans, a pair that pays

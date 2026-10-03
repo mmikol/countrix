@@ -11,24 +11,30 @@ from tests.verification.inference import BRIEF, FIXTURE_PLAYBOOK, evaluated
 
 def test_a_playbook_that_scores_nothing_reads_unscored(synthetic_world):
     """With the default engine off, limits and prose alone tie every
-    legal six at zero: the results carry no share of a best, say so, and the
-    verdict is the one line."""
+    legal six at zero: the results carry no share of a best, the optimal's
+    runners-up included, say so, and the verdict is the one line; red's
+    likely six says why it has none, as it does with the engine on."""
     from inference import engine
+    from inference.result import LIKELIHOOD
     world = synthetic_world
     reference = catalog.load(FIXTURE_PLAYBOOK)
     assert any(s.weighs for s in reference)
     limit_only = [h for h in reference if h.form == "limit"]
     assert limit_only and not any(s.weighs for s in limit_only)
     draft = Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm", "Anvil"))
-    b = engine.board(world, draft, catalog=limit_only, brief=engine.Brief(base=OFF, swaps=False))
+    b = engine.board(world, draft, catalog=limit_only,
+                     brief=engine.Brief(base=OFF, search_swaps=False))
     d = b.to_dict()
-    for key in ("blue", "red"):                     # the optimal is the reference: 100, always
-        assert d[key]["scoring"] is True and d[key]["normalized"] == 100
-    for key in ("current", "red_current", "fill", "countered"):
+    # the optimal is the reference: 100, always
+    assert d["blue"]["scoring"] is True and d["blue"]["normalized"] == 100
+    assert all(a["normalized"] is None for a in d["blue"]["alternatives"])
+    for key in ("current", "fill"):
         assert d[key]["scoring"] is False and d[key]["normalized"] is None
         assert all(a["normalized"] is None for a in d[key]["alternatives"])
+    assert d["expected"]["unscored"] == LIKELIHOOD and d["expected"]["normalized"] is None
     assert d["momentum"]["verdict"].startswith("unscored") and d["momentum"]["blue"] is None
-    assert {badge["label"] for badge in d["momentum"]["badges"].values()} == {"unscored"}
+    assert d["momentum"]["badges"]["blue"]["label"] == "unscored"
+    assert d["momentum"]["badges"]["red"]["label"].endswith(" pull")    # red is never scored
     assert "(unscored)" in b.current.rendered() and "UNSCORED:" in b.current.rendered()
     scored = engine.board(world, draft, catalog=reference, brief=BRIEF).to_dict()
     assert scored["current"]["scoring"] is True
@@ -38,16 +44,16 @@ def test_a_playbook_that_scores_nothing_reads_unscored(synthetic_world):
 
 
 def test_the_default_engine_scores_a_playbook_that_scores_nothing(synthetic_world):
-    """The same limits alone under the default engine: every seat scores and
-    carries a share, no badge reads unscored, and only red's likely six, a
-    likelihood nothing scores, says why it has none."""
+    """The same limits alone under the default engine: every blue result
+    scores and carries a share, no badge reads unscored, and red's likely
+    six, a fill nothing scores, says why it has none."""
     from inference import engine
     from inference.result import LIKELIHOOD
     reference = catalog.load(FIXTURE_PLAYBOOK)
     limit_only = [h for h in reference if h.form == "limit"]
     draft = Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm", "Anvil"))
     d = engine.board(synthetic_world, draft, catalog=limit_only, brief=BRIEF).to_dict()
-    for key in ("blue", "red", "current", "red_current", "fill", "countered"):
+    for key in ("blue", "current", "fill"):
         assert d[key]["scoring"] is True and d[key]["unscored"] is None, key
     assert 0 < d["fill"]["normalized"] <= 100 and d["momentum"]["blue"] is not None
     assert "unscored" not in {badge["label"] for badge in d["momentum"]["badges"].values()}
@@ -110,7 +116,6 @@ def test_a_pick_and_the_plan_name_the_queue_the_rates_were_captured_in(
                      catalog=scratch_playbook, brief=BRIEF)
     assert rates_queue(b.blue.facts) == "Role Queue"
     assert b.plan.split("\n")[-1].startswith("Based on: the Role Queue rates and counters")
-    rates = [
-        part for r in (b.blue, b.red) for p in r.picks for part in p["why"].split("; ")
-        if part.startswith("wins ")]
+    parts = [part for p in b.blue.picks for part in p["why"].split("; ")]
+    rates = [part for part in parts if part.startswith("wins ")]
     assert rates and all(part.endswith(", Role Queue") for part in rates)

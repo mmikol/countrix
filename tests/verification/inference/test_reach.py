@@ -18,7 +18,7 @@ from facts.model import Map, World
 from facts.records import DerivedEdge
 from inference import base, catalog, reach
 from inference.solver import Infeasible
-from tests.verification.inference import FIXTURE_PLAYBOOK, in_force, recorded
+from tests.verification.inference import FIXTURE_PLAYBOOK, in_force, recorded, seated
 from tests.verification.inference import record_reach as recorder
 
 # named, not waived - see the test
@@ -35,7 +35,7 @@ def test_every_hero_reach_finds_a_board_for_is_still_seated_and_none_is_newly_lo
     released = {h.name for h in world.heroes.values() if h.released}
     on_file = {b["hero"] for b in boards}
     assert all(b["seated"] and len(b["banned"]) <= reach.MAX_BANS for b in boards)
-    fell = [b["hero"] for b in boards if b["hero"] in released and not reach.seated(world, b)]
+    fell = [b["hero"] for b in boards if b["hero"] in released and not seated(world, b)]
     # a stale fixture fails here, before the costly search for what it lost
     stale = (
         "" if (fixture["playbook"], fixture["base"]) == in_force()
@@ -51,11 +51,7 @@ def test_every_hero_reach_finds_a_board_for_is_still_seated_and_none_is_newly_lo
     # with five of them banned; the playbook's rules are what can answer it. They are
     # not searched again on every run - three searches are a minute, more under
     # coverage - so one that comes to seat leaves UNSEATED when the recorder
-    # re-records. The healing floor seated Illari and Lifeweaver and unseated Cassidy;
-    # summed healing seated Kiriko and unseated Zarya; the written pairs' mean for an
-    # unwritten synergy pair and the exact search, recorded together, seated Cassidy,
-    # Domina, Hazard, Ramattra, Shion, Sierra and Venture and unseated Kiriko; every
-    # map searched, not the four best by rate, seated Zarya on Midtown with one ban.
+    # re-records.
     assert not UNSEATED - released, "not a released hero: %s" % ", ".join(UNSEATED - released)
     lost = [name for name in sorted((released - on_file - UNSEATED) | set(fell))
             if not reach.search(world, name)["seated"]]
@@ -120,30 +116,37 @@ def test_a_hero_no_board_fits_is_infeasible_not_a_crash(synthetic_world, monkeyp
     with pytest.raises(Infeasible, match="no board the search tries seats Anvil") as caught:
         reach.search(synthetic_world, "Anvil")
     assert isinstance(caught.value, Refusal)
+    anvil = synthetic_world.hero("Anvil")
+    boards = reach.maps(synthetic_world, anvil)
+    tried = len(reach.reds(synthetic_world, anvil)) * sum(
+        len(reach.SIDES) if reach.is_sided(m) else 1 for m in boards)
+    assert tried > 0
+    assert "(%d allow no six with it, 0 refuse past the search's budget)" % tried \
+        in str(caught.value)
     recorded_board = {"hero": "Anvil", "seated": True, "map": "Harbor Gate", "side": "",
                       "red": [], "banned": [], "six": ["Anvil"], "gap": 0.0}
-    assert reach.seated(synthetic_world, recorded_board) is False
+    assert seated(synthetic_world, recorded_board) is False
 
 
-def test_a_hero_its_best_map_favours_is_seated_there_with_no_ban(synthetic_world):
+def test_a_hero_its_best_map_favours_is_seated_there_with_no_ban(synthetic_world, monkeypatch):
     """Anvil's map rates lift it most on Harbor Gate: the search tries that map
     first, finds Anvil in the optimal six against red's likely six, and the
     board it records seats Anvil again when it is solved afresh."""
+    monkeypatch.setenv("COUNTRIX_STRATEGIES", FIXTURE_PLAYBOOK)
     anvil = synthetic_world.hero("Anvil")
     assert reach.maps(synthetic_world, anvil)[0].name == "Harbor Gate"
     assert reach.reds(synthetic_world, anvil)[0] == []
     board = reach.search(synthetic_world, "Anvil")
     assert (board["seated"], board["banned"], board["map"], board["red"], board["gap"]) == (
         True, [], "Harbor Gate", [], 0.0)
-    assert "Anvil" in board["six"] and reach.seated(synthetic_world, board)
+    assert "Anvil" in board["six"] and seated(synthetic_world, board)
 
 
 def test_the_search_tries_every_map_the_ones_its_rates_lift_it_most_on_first(synthetic_world):
     """Two maps with no rates join the three: the search tries all five,
     Harbor Gate first, where Anvil's rate is highest, and Salt Flats last;
     a map with no rate lifts it by nothing, level with Ember Ruins, and ties
-    go by name. It used to stop at four, and Zarya's seat on Midtown lay
-    past her four."""
+    go by name."""
     w = synthetic_world
     for mid, name in ((901, "Zinc Quay"), (902, "Amber Pier")):
         w.maps[mid] = Map(mid, name, "Control")
@@ -156,13 +159,12 @@ def test_the_reds_read_the_counter_graph_the_engine_scores(synthetic_world):
     scores, not the wiki's edges alone: Anvil's derived answers to Quarry
     and Flint rank after its wiki answer to Mortar and before the most
     picked heroes it does not answer, and Balm, with a derived answer to
-    Anvil, drops behind them. On the wiki's edges alone the red was
-    Mortar, Kite, Needle, Rook, Balm and Tansy."""
+    Anvil, drops behind them."""
     w = synthetic_world
     ids = {h.name: h.id for h in w.heroes.values()}
     for winner, loser in (("Anvil", "Quarry"), ("Anvil", "Flint"), ("Balm", "Anvil")):
         w.derived[(ids[loser], ids[winner])] = DerivedEdge(
-            winner=ids[winner], loser=ids[loser], score=0.8, net=0.5, fired=())
+            winner=ids[winner], loser=ids[loser], score=0.8, fired=())
     assert reach.reds(w, w.hero("Anvil")) == [
         [], ["Mortar", "Quarry", "Flint", "Needle", "Tansy", "Myrrh"]]
 
@@ -313,7 +315,7 @@ def test_the_recorder_checks_every_six_already_recorded_before_a_hero_is_unseate
     monkeypatch.setattr(recorder.psycopg, "connect", lambda dsn: _Connected())
     monkeypatch.setattr(recorder.tables, "load", lambda cx: synthetic_world)
     monkeypatch.setattr(recorder.reach, "search", search)
-    monkeypatch.setattr(recorder.reach, "six", six)
+    monkeypatch.setattr(recorder, "six", six)
     monkeypatch.setattr(recorder.catalog, "playbook_digest", lambda: "ab" * 32)
     monkeypatch.setattr(recorder, "OUT", str(out))
     assert recorder.main() == 0

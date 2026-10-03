@@ -1,91 +1,75 @@
 """Unit tests: the pure functions the pulls lean on - the measurement, name
-and map readers. No database, no network - every lesson here was paid for
-once already."""
+and map readers - and the doc writers, embed, table_prose and the prose a
+later migration's comment gives a table. No database, no network - every
+lesson here was paid for once already."""
 
 import pytest
 
+from db import embed
 from db.data.normalizer import hero_key, name_key, slug
 from db.data.wiki import WikiError
 from db.data.wiki.kits.measurements import parse_measurements
 from db.data.wiki.maps import parse_phases, parse_stages, parse_stretches, stages_of
+from db.psql import schema
+from db.psql.schema import table_prose
+from tests.verification.db import HYBRID_PAGE
 
 # --- measurements: value / numerator / denominator / window ------------
 
-def test_rate_splits_into_numerator_and_denominator():
-    [(value, num, den, window, _cond, _text)] = parse_measurements("125 m/s")
-    assert (value, num, den, window) == (125, "meters", "seconds", 1)
-
-
-def test_plain_quantity_has_no_denominator():
-    [(value, num, den, _window, *_)] = parse_measurements("14 seconds")
-    assert (value, num, den) == (14, "seconds", None)
-
-
-def test_window_that_is_not_one_second_is_kept():
-    # 75 over 0.59s is a published total, not 127/s; normalising it away
-    # would turn a total into a derived rate.
-    [(value, _num, den, window, *_)] = parse_measurements(
-        "75 over 0.59 seconds", default_unit="hp")
-    assert (value, den, window) == (75, "seconds", 0.59)
-
-
-def test_range_is_split_and_ordered_by_magnitude():
-    # damage falloff is written high -> low; position must not decide min/max
-    values = [m[0] for m in parse_measurements("30 - 10 meters")]
-    assert values == sorted(values)
-
-
-def test_perk_transition_keeps_both_sides():
-    # "5 -> 7" is the value before the perk AND with it - dropping either
-    # side stores the wrong claim (this bug shipped once).
-    conds = {m[4] for m in parse_measurements("5 -> 7 meters")}
-    assert conds == {"before perk", "with perk"}
-
-
-def test_booleans_become_one_and_zero():
-    assert parse_measurements("✓")[0][0] == 1
-    assert parse_measurements("✕")[0][0] == 0
-
-
-def test_a_bare_one_or_zero_is_a_number_in_the_stats_unit():
+# a stat's text, its unit, and every measurement read from it: (value,
+# numerator, denominator, window, condition, text)
+MEASUREMENTS = [
+    pytest.param("125 m/s", None, [(125, "meters", "seconds", 1, None, "125 m/s")],
+                 id="a-rate-splits-into-numerator-and-denominator"),
+    pytest.param("14 seconds", None, [(14, "seconds", None, None, None, "14 seconds")],
+                 id="a-plain-quantity-has-no-denominator"),
+    # 75 over 0.59s is a published total, not 127/s: normalised, it reads as a rate
+    pytest.param("75 over 0.59 seconds", "hp",
+                 [(75, "hp", "seconds", 0.59, None, "75 over 0.59 seconds")],
+                 id="a-window-that-is-not-one-second-is-kept"),
+    # falloff is written high -> low: magnitude, not position, decides min and max
+    pytest.param("30 - 10 meters", None,
+                 [(10, "meters", None, None, "min", "30 - 10 meters"),
+                  (30, "meters", None, None, "max", "30 - 10 meters")],
+                 id="a-range-is-ordered-by-magnitude"),
+    # the value before the perk and with it: dropping either stores the wrong claim
+    pytest.param("5 -> 7 meters", None,
+                 [(5, None, None, None, "before perk", "5"),
+                  (7, "meters", None, None, "with perk", "7 meters")],
+                 id="a-perk-transition-keeps-both-sides"),
+    pytest.param("✓", None, [(1, None, None, None, None, "✓")], id="a-tick-is-one"),
+    pytest.param("✕", None, [(0, None, None, None, None, "✕")], id="a-cross-is-zero"),
     # Venom Mine's health is 1: one hp, not a yes
-    [(value, num, *_)] = parse_measurements("1", default_unit="hp")
-    assert (value, num) == (1, "hp")
-    before, _with = parse_measurements("0 -> 50", default_unit="hp")
-    assert (before.value, before.numerator, before.condition) == (0, "hp", "before perk")
-    # a flag has no unit to take
-    assert parse_measurements("1")[0][:2] == (1, None)
+    pytest.param("1", "hp", [(1, "hp", None, None, None, "1")],
+                 id="a-bare-one-is-a-number-in-the-stats-unit"),
+    pytest.param("0 -> 50", "hp",
+                 [(0, "hp", None, None, "before perk", "0"),
+                  (50, "hp", None, None, "with perk", "50")],
+                 id="a-bare-zero-is-a-number-in-the-stats-unit"),
+    pytest.param("1", None, [(1, None, None, None, None, "1")], id="a-flag-takes-no-unit"),
+    pytest.param("Projectile", None, [(None, None, None, None, None, "Projectile")],
+                 id="text-keeps-its-row-with-no-value"),
+    pytest.param("Expression error: unexpected <", None,
+                 [(None, None, None, None, None, "Expression error: unexpected <")],
+                 id="a-broken-template-is-no-number"),
+    # no unit holds a slash
+    pytest.param("1.25 shots/s", None, [(1.25, "shots", "seconds", 1, None, "1.25 shots/s")],
+                 id="shots-a-second"),
+    pytest.param("3 rounds/s", None, [(3, "rounds", "seconds", 1, None, "3 rounds/s")],
+                 id="rounds-a-second"),
+    # Symmetra's turret slow, written with U+2212, stored a NULL once
+    pytest.param("\u221215% per turret", "percent",
+                 [(-15, "percent", None, None, None, "-15% per turret")],
+                 id="a-unicode-minus-reads-as-a-minus"),
+    # Death Blossom's "185/s" stored as a flat 185 hp once
+    pytest.param("185/s per enemy", "hp", [(185, "hp", "seconds", 1, None, "185/s per enemy")],
+                 id="a-bare-per-second-is-a-rate-of-the-stats-own-unit"),
+]
 
 
-def test_non_numeric_keeps_the_row_with_a_null_value():
-    [(value, *_, text)] = parse_measurements("Projectile")
-    assert value is None and text == "Projectile"
-
-
-def test_broken_template_is_not_read_as_a_number():
-    [(value, *_)] = parse_measurements("Expression error: unexpected <")
-    assert value is None
-
-
-def test_units_never_contain_a_slash():
-    for source in ("125 m/s", "1.25 shots/s", "3 rounds/s"):
-        for _, num, den, *_ in parse_measurements(source):
-            assert not (num and "/" in num) and not (den and "/" in den)
-
-
-
-def test_unicode_minus_reads_as_a_minus():
-    # Symmetra's turret slow is written with U+2212; it stored a NULL once.
-    [(value, num, den, _window, _cond, text)] = parse_measurements(
-        "\u221215% per turret", default_unit="percent")
-    assert (value, num, den, text) == (-15.0, "percent", None, "-15% per turret")
-
-
-def test_bare_per_second_is_a_rate_of_the_stats_own_unit():
-    # Death Blossom's "185/s" stored as a flat 185 hp once.
-    [(value, num, den, window, *_)] = parse_measurements(
-        "185/s per enemy", default_unit="hp")
-    assert (value, num, den, window) == (185.0, "hp", "seconds", 1)
+@pytest.mark.parametrize(("text", "unit", "expected"), MEASUREMENTS)
+def test_a_stats_text_reads_as_its_measurements(text, unit, expected):
+    assert [tuple(m) for m in parse_measurements(text, default_unit=unit)] == expected
 
 # --- name matching across sources ---------------------------------------
 
@@ -179,14 +163,6 @@ The payload starts at the docks, passes the market and ends in the [[hangar]].
 Take the high ground.
 """
 
-HYBRID_PAGE = """[[File:Hybrid.png|right|frameless]]
-'''Hybrid''' is one of the main [[game mode]]s. It is a combination of the
-[[Assault]] and [[Escort (game mode)|Escort]] modes.
-
-==Gameplay==
-In the first section, the attacking team must capture a point.
-"""
-
 
 def test_stretches_are_the_gameplay_subsections_the_opening_names():
     # a leading article aside; Ferry Rides is a subsection, not a stretch
@@ -221,3 +197,59 @@ def test_a_maps_stages_follow_its_mode():
     # a Push map stays whole
     assert stages_of("push", FIXTURE, phases) == []
     assert stages_of("push", ESCORT_NAMED, phases) == []
+
+
+# --- the doc writers: a table's prose, a generated section ----------------------
+
+def test_a_tables_prose_is_the_comment_block_directly_above_it():
+    text = "\n".join([
+        "-- THE FILE: a header that is no table's.",
+        "BEGIN;",
+        "",
+        "-- One row per hero.",
+        "--",
+        "-- The roster, from Blizzard.",
+        "CREATE TABLE heroes (",
+        "    hero_id serial PRIMARY KEY",
+        ");",
+        "",
+        "-- Not this one: a blank line follows it.",
+        "",
+        "CREATE TABLE maps (map_id serial PRIMARY KEY);",
+        "-- Nor this one:",
+        "    -- an indented line ends the block.",
+        "CREATE TABLE modes (mode_id serial PRIMARY KEY);",
+        "-- Two lines,",
+        "-- one sentence.",
+        "CREATE TABLE stages (stage_id serial PRIMARY KEY);",
+        "COMMIT;",
+    ])
+    assert table_prose(text) == {
+        "heroes": "One row per hero. The roster, from Blizzard.",   # the bare -- is dropped
+        "maps": "", "modes": "",
+        "stages": "Two lines, one sentence.",
+    }
+
+
+def test_a_later_comment_replaces_a_tables_prose_and_leaves_its_domain(monkeypatch):
+    """A COMMENT ON TABLE in a later migration replaces the prose the table's
+    own migration wrote above it, '' read as one quote; the data dictionary
+    still files the table under the migration that created it."""
+    monkeypatch.setattr(schema, "read_migrations", lambda: [
+        schema.Migration(path="001_a.sql", sql="-- The first words.\nCREATE TABLE things (\n"
+                                               "    thing_id serial PRIMARY KEY\n);\n"),
+        schema.Migration(path="002_b.sql", sql="COMMENT ON TABLE things IS\n"
+                                               "    'The wiki''s words.';\n")])
+    assert schema._migration_tables() == {
+        "things": schema.TableOrigin(migration="001_a.sql", prose="The wiki's words.")}
+
+
+def test_embed_replaces_only_the_marked_section(tmp_path):
+    path = tmp_path / "doc.md"
+    path.write_text("# T\n\nkeep\n\n<!-- generated:x -->\nold\n<!-- /generated:x -->"
+                    "\n\nalso keep\n")
+    embed(str(path), "x", "new\nlines")
+    assert path.read_text() == ("# T\n\nkeep\n\n<!-- generated:x -->\nnew\nlines\n"
+                                "<!-- /generated:x -->\n\nalso keep\n")
+    with pytest.raises(ValueError, match="no y markers"):
+        embed(str(path), "y", "z")

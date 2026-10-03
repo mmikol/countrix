@@ -10,6 +10,7 @@ import pytest
 import requests
 
 from db.data import cache, wiki
+from tests.verification.db import write_aged
 
 INSTANT = cache.RequestPolicy(backoff=0, delay=0)
 
@@ -46,13 +47,6 @@ class FakeSession:
         pass
 
 
-def write_aged(path, text, hours=48):
-    """Write a cached page whose modification time is `hours` old."""
-    path.write_text(text, encoding="utf-8")
-    stamp = time.time() - hours * 3600
-    os.utime(str(path), (stamp, stamp))
-
-
 def test_a_context_with_no_cutoff_keeps_a_page_forever(tmp_path):
     """A build from the caches: a page a year old is read, and nothing is
     asked for."""
@@ -84,6 +78,19 @@ def test_refresh_refetches_a_page_written_before_it_began_and_rewrites_the_cache
     assert cache.cached_get(newest, "u", "k", policy=INSTANT) == "newest page"
 
 
+def test_a_write_cut_short_leaves_the_cached_copy_whole(tmp_path):
+    """A page is written beside its cached copy and renamed over it once
+    whole: a write that fails raises and leaves the old copy as it was,
+    never a truncated page a later build reads as whole. A lone surrogate
+    stands in for a full disk: it fails the write after the file opens."""
+    write_aged(tmp_path / "k.html", "yesterday")
+    pull = cache.PullContext(str(tmp_path), session=FakeSession("half a page \ud800"),
+                             cutoff=time.time())
+    with pytest.raises(UnicodeEncodeError):
+        cache.cached_get(pull, "u", "k", policy=INSTANT)
+    assert (tmp_path / "k.html").read_text(encoding="utf-8") == "yesterday"
+
+
 def test_a_failed_refetch_keeps_the_cached_copy(tmp_path):
     """The stale copy is read, named in the pull's stale and warned of in its
     log; with nothing cached the failure surfaces and nothing is listed."""
@@ -101,6 +108,23 @@ def test_a_failed_refetch_keeps_the_cached_copy(tmp_path):
     with pytest.raises(cache.FetchError):         # nothing cached: the failure surfaces
         cache.cached_get(pull, "u", "other", policy=INSTANT)
     assert len(pull.stale) == 1
+
+
+def test_each_page_served_adds_its_write_time_to_the_pulls_captured(tmp_path):
+    """What a pull dates its pages by: a cached copy's write time, a fetched
+    page's as the cache wrote it - the time a later build from the cache
+    reads - and a stale copy's when its refetch fails."""
+    write_aged(tmp_path / "kept.html", "cached", hours=48)
+    write_aged(tmp_path / "stale.html", "yesterday", hours=24)
+    pull = cache.PullContext(str(tmp_path), session=FakeSession())
+    assert cache.cached_get(pull, "u", "kept", policy=INSTANT) == "cached"
+    assert cache.cached_get(pull, "u", "fetched", policy=INSTANT) == "new page"
+    down = cache.PullContext(str(tmp_path), session=FakeSession(fail=True), cutoff=time.time())
+    assert cache.cached_get(down, "u", "stale", policy=INSTANT) == "yesterday"
+    kept, fetched, stale = (os.path.getmtime(tmp_path / name)
+                            for name in ("kept.html", "fetched.html", "stale.html"))
+    assert pull.captured == [kept, fetched] and down.captured == [stale]
+    assert kept < stale < fetched
 
 
 def test_attempts_count_every_request_the_first_included(tmp_path):

@@ -1,7 +1,7 @@
 """The Draft from facts/draft.py refuses a board no lobby holds wherever it
 is built - by a door's parse_board, by the MCP tools' _draft, by the engine's
-dataclasses.replace - and board_stage, the stage a board is played on, as
-its map spells it. No database."""
+dataclasses.replace - and reads from the other seat flipped; board_stage,
+the stage a board is played on, as its map spells it. No database."""
 
 import dataclasses
 
@@ -45,6 +45,16 @@ def test_a_replaced_draft_is_checked_again():
         dataclasses.replace(Draft(), bans=SEVEN[:6])
     with pytest.raises(Refusal, match="more than 6 red picks"):
         dataclasses.replace(Draft("Harbor Gate"), red=SEVEN)
+
+
+def test_a_flipped_draft_is_the_board_from_the_other_seat():
+    """flipped() swaps red's picks and blue's and turns the side, and keeps
+    the map, the bans and the stage; flipped twice it is the draft again."""
+    draft = Draft("Harbor Gate", ("Ana",), ("Ashe", "Genji"), ("Tracer",), "attack", "Escort")
+    assert draft.flipped() == Draft("Harbor Gate", ("Ashe", "Genji"), ("Ana",), ("Tracer",),
+                                    "defense", "Escort")
+    assert draft.flipped().flipped() == draft
+    assert Draft("Salt Flats", ("Ana",)).flipped().side == ""
 
 
 def test_parse_board_drops_empty_values():

@@ -40,21 +40,17 @@ reason in `inference/strategies/tuning-log.md`. Nothing is edited by hand.
 ## The default engine's weights ("it trusts the win rates too much")
 
 Before any strategy scores, the default engine scores every six on three
-terms: each pick's win rate on the map, trusted by its pick rate; the
-wiki's synergy scores among the six, a cell no article writes at half the
-written pairs' mean; and the counter graph against the other side. Its
-weights live in `inference/strategies/meta.md`, and `strategies` lists
-them on its first line:
+terms - win rates, synergies and counters (docs/inference.md, The
+objective). Its weights live in `inference/strategies/meta.md`, and
+`strategies` lists them on its first line:
 
 - **meta** scales the whole engine: 0 is the playbook alone, 1 the
   engine as calibrated, 2 twice as loud against the playbook's rules.
 - **rate**, **synergy** and **counter** weigh the three terms under it:
   rate 1 puts its term in win-rate points, and synergy and counter are
   set so that each term spreads a typical board's sixes about half as far
-  as the rates do. The rule was measured again when a blank synergy cell
-  came to read the written cells' claim share, which narrowed that term's
-  range, and synergy went from 0.1 to 0.26 (docs/inference.md, Why the
-  weights are the playbook's); measure again before quoting the rule.
+  as the rates do (docs/inference.md, Why the weights are the
+  playbook's); measure again before quoting the rule.
 - **swap** is the swap cost, in share points of blue's span, 0..50: what
   a swap of one of blue's picks must gain before the board suggests it,
   and what a hero changed between two stages of the plan costs. It scores

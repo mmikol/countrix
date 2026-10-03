@@ -1,5 +1,6 @@
 """The board over HTTP: the same handlers the unit tests call, served."""
 
+import contextlib
 import http.client
 import json
 import re
@@ -110,8 +111,10 @@ def test_the_page_the_statics_the_math_and_the_strategies_need_no_database(
 def test_a_board_leaves_a_line_on_stderr_and_a_static_file_none(served, monkeypatch, capsys):
     """The solves are logged with their status and seconds, so the container's
     log says what the page asked and when; the page and its files are quiet
-    unless they fail."""
-    monkeypatch.setattr(board, "api_board", lambda query: ({}, 200))
+    unless they fail. The board's connection and its solve are stubbed."""
+    monkeypatch.setattr(board.psql, "default_dsn", lambda: NOWHERE)
+    monkeypatch.setattr(board.psycopg, "connect", lambda dsn: contextlib.nullcontext())
+    monkeypatch.setattr(board.serve, "handle_board", lambda cx, query: web.Reply({}, 200))
     capsys.readouterr()
     assert get(served + "/static/board.css")[0] == 200 and get(served + "/")[0] == 200
     assert capsys.readouterr().err == ""

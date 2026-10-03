@@ -94,7 +94,7 @@ def test_the_built_world_reads_the_6v6_kit(db):
 def test_a_tank_whose_article_writes_no_6v6_pool_keeps_its_5v5_one(db):
     """Twelve of the fifteen released tanks' articles write a 6v6 pool.
     Hazard's and D.Mon's write none and Sigma's leaves shield6v6 blank: the
-    wiki is what is missing, not the parser (db/data/README.md), so their
+    wiki is what is missing, not the parser, so their
     5v5 pools stand - Hazard's 275 health and 225 armor, 500 - and no pool
     change is named for them. A pool the wiki comes to write fails here."""
     world = tables.load(db)

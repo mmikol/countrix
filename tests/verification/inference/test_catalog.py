@@ -180,8 +180,7 @@ def test_the_reference_and_the_live_playbooks_are_valid_and_reference_real_metri
     assert forms == {"limit", "scored", "heuristic", "assumption"}
     assert {h.form for h in cat if h.kind == "heuristic"} == {"heuristic", "scored"}
     assert {h.form for h in cat if h.kind == "constraint"} == {"limit"}
-    assert all(
-        h.form == "assumption" and not h.solver_reads for h in cat if h.kind == "assumption")
+    assert all(h.form == "assumption" for h in cat if h.kind == "assumption")
     assert {h.id for h in cat if h.kind == "assumption"} >= {"optimal-play", "vintage", "objective"}
     registry = compute.registry()
     for h in cat:
@@ -196,10 +195,9 @@ def test_the_reference_and_the_live_playbooks_are_valid_and_reference_real_metri
 def test_the_shipped_healing_floor_is_a_scored_heuristic_at_weight_two():
     """inference/strategies/heal-rate.md, the shipped playbook's healing
     heuristic: weighted, so a heuristic, and scored - it charges its weight
-    times matchup.heal_shortfall on every board, unguarded, the one scored
-    rule on sustain and the one no gate closes. HEAL_RATE holds the same
-    fields, so the solver tests that stand it in for the file prove this
-    rule."""
+    times matchup.heal_shortfall on every board, unguarded, and it is the
+    one rule that reads the shortfall. HEAL_RATE holds the same fields, so
+    the solver tests that stand it in for the file prove this rule."""
     shipped = catalog.load(catalog.SHIPPED_DIR)
     heal = next(h for h in shipped if h.id == "heal-rate")
     assert (heal.kind, heal.form, heal.category, heal.weight) == (
@@ -207,15 +205,19 @@ def test_the_shipped_healing_floor_is_a_scored_heuristic_at_weight_two():
     assert heal.penalty is not None and heal.penalty.source == "matchup.heal_shortfall"
     assert heal.when is None and heal.bonus is None and heal.require is None
     assert {k: heal.to_dict()[k] for k in HEAL_RATE} == HEAL_RATE
-    scored = [h for h in shipped if h.form == "scored"]
-    assert [h.id for h in scored if h.category == "sustain" or h.when is None] == ["heal-rate"]
+    def reads(h):
+        sources = [e.source for e in (h.when, h.bonus, h.penalty, h.require) if e is not None]
+        return " ".join([*sources, h.metric or ""])
+    assert [h.id for h in shipped if "matchup.heal_shortfall" in reads(h)] == ["heal-rate"]
 
 
-def test_the_shipped_support_limit_is_a_shape_limit_at_three():
+def test_the_shipped_limits_hold_one_to_three_supports_and_a_tank():
     """inference/strategies/at-most-three-supports.md, the owner's limit: a
     require on the Support role's count with three as its dial, never
-    weighted, and the shipped playbook's one limit - a shape limit, so no
-    legal shape seats a fourth support and the roster refuses one."""
+    weighted - a shape limit, so no legal shape seats a fourth support and
+    the roster refuses one. Beside it the research's two floors,
+    six-fields-a-support and six-fields-a-tank, leave no legal shape
+    without a support or a tank."""
     shipped = catalog.load(catalog.SHIPPED_DIR)
     limit = next(s for s in shipped if s.id == "at-most-three-supports")
     assert (limit.kind, limit.form, limit.category, limit.weighs) == (
@@ -223,8 +225,12 @@ def test_the_shipped_support_limit_is_a_shape_limit_at_three():
     assert limit.require is not None
     assert limit.require.source == "team.supports <= params.MAX_SUPPORTS"
     assert limit.params == {"MAX_SUPPORTS": 3}
-    assert [s.id for s in shipped if s.form == "limit"] == ["at-most-three-supports"]
-    assert max(shape.supports for shape in legal_shapes(shipped)) == 3
+    assert sorted(s.id for s in shipped if s.form == "limit") == [
+        "at-most-three-supports", "six-fields-a-support", "six-fields-a-tank"]
+    shapes = legal_shapes(shipped)
+    assert max(shape.supports for shape in shapes) == 3
+    assert min(shape.supports for shape in shapes) == 1
+    assert min(shape.tanks for shape in shapes) == 1
 
 
 def test_catalog_rejects_a_goal_on_an_unknown_metric(tmp_path):
@@ -249,7 +255,7 @@ def test_a_constraint_is_a_limit_a_heuristic_weighs_and_an_assumption_is_prose(t
         (tmp_path / "x.md").write_text(text, encoding="utf-8")
         return catalog.load(str(tmp_path))[0]
     limit = load_one("---\nname: l\nkind: constraint\nrequire: team.tanks <= 2\n---\nx\n")
-    assert limit.form == "limit" and limit.solver_reads and not limit.weighs
+    assert limit.form == "limit" and not limit.weighs
     assert load_one("---\nname: s\nkind: heuristic\nbonus: team.tanks\n---\nx\n").form == "scored"
     charge = load_one("---\nname: c\nkind: heuristic\nwhen: not (team.tanks <= 1)\n"
                       "penalty: 2\n---\nx\n")
@@ -357,7 +363,8 @@ def test_meta_md_holds_the_engines_weights_and_is_no_strategy(catalog_copy):
     assert catalog.engine_weights(catalog_copy).rate == 2.0
     assert catalog.playbook_digest(catalog_copy) == digest
     assert catalog.meta_record(catalog.read_meta(catalog_copy))["rate"] == 2.0
-    assert catalog.meta_rendered(meta.weights) == "meta 1 x (rate 1, synergy 0.1, counter 0.05)"
+    assert catalog.meta_rendered(meta.weights, 10.0) == (
+        "meta 1 x (rate 1, synergy 0.1, counter 0.05); swap cost 10")
     assert catalog.read_meta(catalog.SHIPPED_DIR).weights.on
 
 

@@ -9,7 +9,7 @@ from collections.abc import Callable
 
 from door.mcp.registry import Context, tool
 from door.mcp.schema import Properties, ToolReply
-from facts.draft import Draft
+from facts.draft import SIDES, Draft, as_side
 
 BOARD: Properties = {
     "map": {"type": "string", "description": "map name (any spelling)"},
@@ -25,7 +25,7 @@ BOARD: Properties = {
                        " the lobby's), more refused; all optional; neither"
                        " team can pick them"},
     "side": {
-        "type": "string", "enum": ["attack", "defense", ""],
+        "type": "string", "enum": [*SIDES, ""],
         "description": "blue's side on an Escort or Hybrid map (red gets"
                        " the other); ignored on Control, Push, Flashpoint"},
     "stage": {
@@ -42,8 +42,9 @@ type BoardFn = Callable[..., ToolReply]
 
 
 def _names(value: object) -> tuple[str, ...]:
-    """An array of names the schema admitted, as the tuple a Draft holds."""
-    return tuple(str(v) for v in value) if isinstance(value, (list, tuple)) else ()
+    """An array of names the schema admitted, as the tuple a Draft holds,
+    its empty names dropped as facts.draft.parse_board drops them."""
+    return tuple(str(v) for v in value if v) if isinstance(value, (list, tuple)) else ()
 
 
 def _draft(arguments: dict[str, object]) -> Draft:
@@ -55,7 +56,7 @@ def _draft(arguments: dict[str, object]) -> Draft:
                  red=_names(arguments.pop("red", ())),
                  blue=_names(arguments.pop("blue", ())),
                  bans=_names(arguments.pop("bans", ())),
-                 side=str(arguments.pop("side", "")),
+                 side=as_side(str(arguments.pop("side", ""))),
                  stage=str(arguments.pop("stage", "")))
 
 

@@ -1,27 +1,26 @@
-"""The tools in-process: query, db_status, roster, the board tools, the
-compact infer, db_migrate and metrics against the built database; and,
-with no database, query's refusals, the playbook writes' mirror, the Draft
-a board tool hands its function, the readiness every door reports and how
-query turns a cell into JSON and pages its rows. The one registry's family
-order is test_mcp_registry's."""
+"""The tools in-process: query, db_status, roster, the board tools,
+db_migrate and metrics against the built database; and,
+with no database, query's refusals, db_status's remedy for a stale schema,
+the playbook writes' mirror, the Draft
+a board tool hands its function, and how query turns a cell into JSON, pages
+its rows and words an empty result. The one registry's family order is
+test_mcp_registry's; the readiness every door reports and a migration that
+fails are db.psql.schema's, in tests/verification/db/test_psql.py."""
 
-import contextlib
 import datetime
 import decimal
-import json
 import os
-import shutil
 
 import psycopg
 import pytest
 
 from db import Refusal, psql
 from db.psql import schema
-from door.mcp import boards, lifecycle, solver, tools
+from door.mcp import boards, lifecycle, tools
 from facts import board_facts, tables
 from facts.draft import Draft
-from inference import catalog
-from tests.verification.inference import FIXTURE_PLAYBOOK
+from inference import catalog, tune
+from tests.verification.door.mcp import Offline
 
 # --- the tools against the built database ----------------------------------
 
@@ -46,12 +45,14 @@ def test_query_is_read_only(ctx):
     # what Postgres rejects is the caller's to fix too, answered in its words
     with pytest.raises(Refusal, match='query: column "nosuch" does not exist'):
         ctx.call("query", sql="select nosuch from heroes")
+    # a write past the first word reaches the read-only transaction, which refuses it
+    with pytest.raises(Refusal, match="query: "):
+        ctx.call("query", sql="with d as (delete from heroes returning *) select * from d")
 
 
 @pytest.mark.invariant
 def test_db_status_and_roster(ctx):
     text, status = ctx.call("db_status")
-    # 33: map_strategy went with counterpick.gg (migration 019)
     assert status["table_count"] >= 33 and status["counts"]["heroes"] > 40
     assert status["state"] == "current" and "state: current" in text
     assert status["counts"]["counters"] >= 100
@@ -78,20 +79,6 @@ def test_facts_and_infer_through_the_tools(ctx):
 
 
 @pytest.mark.invariant
-def test_a_compact_infer_names_the_silent_heuristics_and_fits_a_reply(ctx):
-    board = {"map": "King's Row", "red": ["Zarya"], "blue": ["Ana"]}
-    _, full = ctx.call("infer", **board)
-    text, data = ctx.call("infer", compact=True, **board)
-    assert data["blue"] == full["blue"] and data["score"] == full["score"]
-    silent = sorted(c["id"] for c in full["contributions"] if c.get("spread") is False)
-    assert data["silent"] == silent
-    assert data["idle"] == sum(1 for c in full["contributions"] if not c["applies"])
-    assert data["terms"] == len(full["contributions"]) and "strategies" not in data
-    assert len(data["largest"]) <= solver.COMPACT_TERMS
-    assert len(text) + len(json.dumps(data)) < 10000
-
-
-@pytest.mark.invariant
 def test_db_migrate_is_idle_when_the_ledger_is_current(ctx):
     """A ledger behind the files is skipped, not migrated: a test run never
     applies a migration to the database the suite reads, which may be one
@@ -115,14 +102,54 @@ def test_query_runs_as_the_reader_role(ctx):
 
 def test_query_refuses_file_and_server_reaching_sql_before_connecting():
     nowhere = tools.Context(dsn="postgresql://nowhere")
+    # the three sleeps migration 012 revokes
     for sql in ("select pg_read_file('/etc/passwd')", "select * from pg_ls_dir('.')",
-                "COPY heroes TO PROGRAM 'id'", "select pg_sleep(10)"):
+                "COPY heroes TO PROGRAM 'id'", "select pg_sleep(10)",
+                "select pg_sleep_for('10 seconds')", "select pg_sleep_until(now() + '10s')"):
         with pytest.raises(Refusal, match=r"refuses|read-only"):
             nowhere.call("query", sql=sql)
     long = "select '%s'" % ("x" * (lifecycle.MAX_SQL_CHARS - 8))       # one character over
     assert len(long) == lifecycle.MAX_SQL_CHARS + 1
     with pytest.raises(Refusal, match="too long"):
         nowhere.call("query", sql=long)
+
+
+def test_what_the_read_only_transaction_refuses_is_the_callers_to_fix(monkeypatch):
+    """A statement past the first-word check can still write - a WITH that
+    deletes, FOR UPDATE - or use what Postgres does not support: Postgres
+    refuses it in the read-only transaction, and the caller hears a Refusal
+    in its words, never INTERNAL. The connection is stubbed."""
+    class Refusing:
+        def __init__(self, error):
+            self.error = error
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def execute(self, sql):
+            if not sql.startswith("SET "):
+                raise self.error
+    refused = (
+        psycopg.errors.ReadOnlySqlTransaction("cannot execute DELETE in a read-only transaction"),
+        psycopg.errors.FeatureNotSupported("FOR UPDATE is not allowed with aggregate functions"))
+    for error in refused:
+        monkeypatch.setattr(lifecycle.psycopg, "connect", lambda dsn, error=error: Refusing(error))
+        with pytest.raises(Refusal, match="query: %s" % error):
+            tools.Context(dsn="postgresql://nowhere").call("query", sql="select 1")
+
+
+def test_db_status_answers_pending_migrations_with_db_migrate(monkeypatch):
+    """A schema behind the files catches up through db_migrate, which keeps
+    the data; db_status names it, never a rebuild, which drops the rates
+    history."""
+    monkeypatch.setattr(lifecycle, "read_status", lambda ctx: lifecycle.DbStatus(
+        dsn="postgresql://nowhere", state="stale", table_count=1, counts={}, snapshots=[],
+        newest_capture=None, pending_migrations=["099_future.sql"]))
+    text, _ = tools.Context(dsn="postgresql://nowhere").call("db_status")
+    assert text.endswith("\nPENDING MIGRATIONS (db_migrate keeps the data): 099_future.sql")
 
 
 def test_only_db_rebuild_creates_the_cluster(tmp_path, monkeypatch):
@@ -163,22 +190,16 @@ def test_metrics_tool_serves_the_vocabulary():
     assert text.splitlines()[0].startswith("team.")
 
 
-def test_every_playbook_write_mirrors_the_catalog_once(tmp_path, monkeypatch):
+def test_every_playbook_write_mirrors_the_catalog_once(catalog_copy, monkeypatch):
     """tune, add_strategy and infer_strategy each reload the strategies table
     once, after the write."""
-    for name in catalog.strategy_files(FIXTURE_PLAYBOOK):
-        shutil.copy(os.path.join(FIXTURE_PLAYBOOK, name), tmp_path / name)
-    monkeypatch.setenv("COUNTRIX_STRATEGIES", str(tmp_path))
+    monkeypatch.setenv("COUNTRIX_STRATEGIES", catalog_copy)
     mirrored = []
     monkeypatch.setattr(catalog, "mirror", lambda cx, cat, directory=None: mirrored.append(
         (cx, len(cat))))
-
-    class Offline(tools.Context):
-        def connect(self):
-            return contextlib.nullcontext("cx")
     ctx = Offline(dsn="postgresql://nowhere")
     heuristic = next(h for h in catalog.load() if h.kind == "heuristic")
-    files = len(catalog.strategy_files(str(tmp_path)))
+    files = len(catalog.strategy_files(catalog_copy))
     ctx.call("tune", id=heuristic.id, field="weight", value=3, reason="a test")
     assert mirrored == [("cx", files)]
     ctx.call(
@@ -192,26 +213,51 @@ def test_every_playbook_write_mirrors_the_catalog_once(tmp_path, monkeypatch):
     assert not [h.id for h in catalog.load() if h.pending]
 
 
-def test_add_strategy_stores_a_charge_with_a_numeric_penalty(tmp_path, monkeypatch):
+def test_a_playbook_write_reaches_the_database_before_it_moves_a_file(
+        catalog_copy, tmp_path, monkeypatch):
+    """tune, add_strategy and infer_strategy open the database before they
+    write, as db_rebuild does before it drops: with the database out of
+    reach each call fails with no strategy file, doc or log line moved, so
+    the same call succeeds once the database is back."""
+    monkeypatch.setenv("COUNTRIX_STRATEGIES", catalog_copy)
+    monkeypatch.setattr(catalog, "mirror", lambda cx, cat, directory=None: None)
+    documented = []
+    monkeypatch.setattr(catalog, "write_docs", lambda cat, path=None: documented.append(len(cat)))
+    before = {path.name: path.read_bytes() for path in tmp_path.iterdir()}
+
+    class Unreachable(tools.Context):
+        def connect(self):
+            raise psql.NoDatabaseError("no database")
+    heuristic = next(h for h in catalog.load() if h.kind == "heuristic")
+    calls = (
+        ("tune", {"id": heuristic.id, "field": "weight", "value": 3, "reason": "a test"}),
+        ("add_strategy", {"id": "a-draft", "name": "A draft", "kind": "heuristic",
+                          "body": "Prose to infer from.", "reason": "a test"}),
+        ("infer_strategy", {"id": heuristic.id, "reason": "a test", "weight": 2}))
+    for name, arguments in calls:
+        with pytest.raises(psql.NoDatabaseError):
+            Unreachable(dsn="postgresql://nowhere").call(name, **arguments)
+    assert {path.name: path.read_bytes() for path in tmp_path.iterdir()} == before
+    assert documented == []
+    for name, arguments in calls:
+        Offline(dsn="postgresql://nowhere").call(name, **arguments)
+    assert len(documented) == 3 and len(tune.log_tail(5)) == 3
+
+
+def test_add_strategy_stores_a_charge_with_a_numeric_penalty(catalog_copy, monkeypatch):
     """The door declares its strategy fields from the rule that checks them,
     so the numeric penalty the skill and the prompt promise a charge for a
     rule broken passes the schema, a category sets the file's like any
     field, and who asked reaches the log line as it does through tune. soft
     is no field, and the door refuses it before anything is written."""
-    for name in catalog.strategy_files(FIXTURE_PLAYBOOK):
-        shutil.copy(os.path.join(FIXTURE_PLAYBOOK, name), tmp_path / name)
-    monkeypatch.setenv("COUNTRIX_STRATEGIES", str(tmp_path))
+    monkeypatch.setenv("COUNTRIX_STRATEGIES", catalog_copy)
     monkeypatch.setattr(catalog, "mirror", lambda cx, cat, directory=None: None)
-
-    class Offline(tools.Context):
-        def connect(self):
-            return contextlib.nullcontext("cx")
     ctx = Offline(dsn="postgresql://nowhere")
     with pytest.raises(Refusal):
         ctx.call("add_strategy", id="tank-cap", name="Tank cap", kind="constraint",
                  body="At most one tank.", reason="a test", require="team.tanks <= 1", soft=True,
                  penalty=2)
-    assert not os.path.exists(tmp_path / "tank-cap.md")
+    assert not os.path.exists(os.path.join(catalog_copy, "tank-cap.md"))
     _, added = ctx.call(
         "add_strategy", id="tank-cap", name="Tank cap", kind="heuristic",
         body="At most one tank.", reason="a test", when="not (team.tanks <= 1)",
@@ -221,10 +267,8 @@ def test_add_strategy_stores_a_charge_with_a_numeric_penalty(tmp_path, monkeypat
     assert stored.penalty.source == "2" and stored.category == "shape" and stored.weighs
 
 
-def test_the_tuning_log_tool_refuses_fewer_than_one_line(tmp_path, monkeypatch):
-    for name in catalog.strategy_files(FIXTURE_PLAYBOOK):
-        shutil.copy(os.path.join(FIXTURE_PLAYBOOK, name), tmp_path / name)
-    monkeypatch.setenv("COUNTRIX_STRATEGIES", str(tmp_path))
+def test_the_tuning_log_tool_refuses_fewer_than_one_line(catalog_copy, monkeypatch):
+    monkeypatch.setenv("COUNTRIX_STRATEGIES", catalog_copy)
     ctx = tools.Context(dsn="postgresql://nowhere")
     for lines in (0, -3):
         with pytest.raises(Refusal, match="lines is 1 or more"):
@@ -234,8 +278,9 @@ def test_the_tuning_log_tool_refuses_fewer_than_one_line(tmp_path, monkeypatch):
 
 def test_a_board_tool_hands_its_function_one_draft(tmp_path, monkeypatch):
     """The board tools share BOARD's six properties, first and in order, and
-    each function gets them as one Draft: tuples, with what the call left out
-    empty, and the stage as sent."""
+    each function gets them as one Draft: tuples, an empty name dropped as
+    the board's query string drops it, what the call left out empty, and
+    the stage as sent."""
     seen = []
 
     class Stub:
@@ -244,73 +289,16 @@ def test_a_board_tool_hands_its_function_one_draft(tmp_path, monkeypatch):
 
         def rendered(self):
             return ""
-
-    class Offline(tools.Context):
-        def connect(self):
-            return contextlib.nullcontext("cx")
     monkeypatch.setattr(tables, "load", lambda cx: None)
     monkeypatch.setattr(board_facts, "generate", lambda world, draft: seen.append(draft) or Stub())
     Offline(dsn="postgresql://nowhere").call(
-        "facts", map="Ilios", red=["Ana"], bans=["Mei"])
+        "facts", map="Ilios", red=["", "Ana"], bans=["Mei", ""])
     Offline(dsn="postgresql://nowhere").call("facts", map="Ilios", stage="Well")
     assert seen == [Draft("Ilios", ("Ana",), (), ("Mei",), ""), Draft("Ilios", stage="Well")]
     assert list(boards.BOARD) == ["map", "red", "blue", "bans", "side", "stage"]
     for name in ("facts", "infer", "board"):
         properties = list(tools.REGISTRY.get(name).schema["properties"])
         assert properties[:len(boards.BOARD)] == list(boards.BOARD)
-
-
-def test_readiness_is_the_first_unmet_condition(monkeypatch):
-    """One definition of ready for the entrypoint, compose, /health and the
-    orchestrator: no tables, then a pending migration, then no heroes."""
-
-    class Rows:
-        def __init__(self, n):
-            self.n = n
-
-        def fetchone(self):
-            return (self.n,)
-
-    class Connection:
-        def __init__(self, heroes):
-            self.heroes = heroes
-
-        def execute(self, sql, params=None):
-            assert "heroes" in sql
-            return Rows(self.heroes)
-
-    def board(tables, pending, heroes):
-        monkeypatch.setattr(schema, "table_count", lambda cx: tables)
-        monkeypatch.setattr(schema, "pending", lambda cx: pending)
-        return schema.state(Connection(heroes))
-
-    assert board(0, ["001_initial_schema.sql"], 0) == "empty"
-    assert board(35, ["099_future.sql"], 0) == "stale"
-    assert board(35, ["099_future.sql"], 54) == "stale"
-    assert board(35, [], 0) == "unfilled"
-    assert board(35, [], 54) == "current"
-
-
-def test_the_probe_exits_one_when_the_database_never_answers(monkeypatch, capsys):
-    monkeypatch.setenv("DATABASE_URL", "postgresql://nobody@127.0.0.1:9/nowhere")
-    monkeypatch.setattr(schema, "CONNECT_TRIES", 2)
-    monkeypatch.setattr(schema.time, "sleep", lambda seconds: None)
-    assert schema.main() == 1
-    captured = capsys.readouterr()
-    assert captured.out == "" and "never became reachable" in captured.err
-    assert "port 9" in captured.err                    # the last try's own error
-
-
-def test_the_probe_exits_one_when_there_is_no_database(monkeypatch, capsys):
-    """No DATABASE_URL and no cluster is no database to wait for: one line
-    on stderr and exit 1 at once, which ends the container under set -e."""
-    def nothing():
-        raise psql.NoDatabaseError("nothing to point at")
-    monkeypatch.delenv("DATABASE_URL", raising=False)
-    monkeypatch.setattr(schema.psql, "default_dsn", nothing)
-    assert schema.main() == 1
-    captured = capsys.readouterr()
-    assert captured.out == "" and "no database: nothing to point at" in captured.err
 
 
 def test_a_query_cell_arrives_as_json():
@@ -337,3 +325,15 @@ def test_a_query_page_says_truncated_exactly_when_a_row_is_left_out():
     rows, truncated = lifecycle._page([wide, wide, wide])
     assert len(rows) == 1 and truncated is True
     assert {len(cell) for cell in rows[0]} == {lifecycle.MAX_CELL + 1}
+
+
+def test_a_query_that_reads_no_row_says_so_under_its_header(monkeypatch):
+    """Every statement query admits names its columns, so the header always
+    leads, and a result with no row says so beneath it."""
+    nowhere = tools.Context(dsn="postgresql://nowhere")
+    monkeypatch.setattr(lifecycle, "_read_only", lambda dsn, body: (["name", "hero_id"], []))
+    text, data = nowhere.call("query", sql="select name, hero_id from heroes where false")
+    assert text == "name\thero_id\n(no rows)"
+    assert data == {"columns": ["name", "hero_id"], "rows": [], "truncated": False}
+    monkeypatch.setattr(lifecycle, "_read_only", lambda dsn, body: (["n"], [(1,), (2,)]))
+    assert nowhere.call("query", sql="select 1 union select 2")[0] == "n\n1\n2"

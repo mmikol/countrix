@@ -37,21 +37,24 @@ MIGRATIONS_DIR = os.path.join(ROOT, "db", "psql", "migrations")
 
 # Which domain the data dictionary files a table under, keyed by the migration
 # that last created it. A migration that creates no surviving table needs no
-# entry; a table with none falls to "foundation".
+# entry; a table with none falls to "foundation". RELATIONS is the wiki's word
+# on heroes together - counters, synergies and their cells, playstyles;
+# PLAYBOOK is the mirror of the strategy files.
 DOC_DOMAIN = {
     "001_initial_schema.sql": "foundation", "002_heroes.sql": "HEROES",
     "003_maps.sql": "MAPS", "004_meta.sql": "META",
-    "005_playbook.sql": "PLAYBOOK",
+    "005_playbook.sql": "RELATIONS",
     "008_schema_migrations.sql": "foundation",
-    "010_constraints_and_heuristics.sql": "INFERENCE",
+    "010_constraints_and_heuristics.sql": "PLAYBOOK",
     "020_map_terrain.sql": "MAPS", "021_stage_terrain.sql": "MAPS",
-    "025_kit_6v6.sql": "HEROES", "029_synergy_cells.sql": "PLAYBOOK"}
+    "025_kit_6v6.sql": "HEROES", "029_synergy_cells.sql": "RELATIONS"}
 # The domains in the order the dictionary lists them.
-DOMAINS = ("HEROES", "MAPS", "META", "PLAYBOOK", "INFERENCE")
+DOMAINS = ("HEROES", "MAPS", "META", "RELATIONS", "PLAYBOOK")
 
 
 class SchemaError(Exception):
-    """No migrations where the schema should be."""
+    """A migration that will not apply, named with Postgres's reason, or no
+    migrations where the schema should be."""
 
 
 @dataclass(frozen=True)
@@ -78,18 +81,27 @@ def read_migrations() -> list[Migration]:
 
 
 def apply(connection: psycopg.Connection, migrations: Sequence[Migration]) -> None:
-    """Run each migration and commit it, then record them all in the ledger
-    once the ledger exists."""
+    """Run each migration and commit it with its row in the ledger, once the
+    ledger exists; the files before the ledger's own are recorded with it.
+    A file that fails is rolled back and raised as a SchemaError naming it,
+    and every file before it stays applied and recorded, so a retry starts
+    at the file that broke."""
+    unrecorded: list[str] = []
     for migration in migrations:
-        with connection.cursor() as cursor:
-            cursor.execute(migration.sql)
-        connection.commit()
-    if psql.scalar(connection.execute("select to_regclass('schema_migrations')")):
-        for migration in migrations:
-            connection.execute(
-                "INSERT INTO schema_migrations (filename) VALUES (%s)"
-                " ON CONFLICT (filename) DO NOTHING", (migration.name,))
-        connection.commit()
+        unrecorded.append(migration.name)
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(migration.sql)
+            if psql.scalar(connection.execute("select to_regclass('schema_migrations')")):
+                for name in unrecorded:
+                    connection.execute(
+                        "INSERT INTO schema_migrations (filename) VALUES (%s)"
+                        " ON CONFLICT (filename) DO NOTHING", (name,))
+                unrecorded.clear()
+            connection.commit()
+        except psycopg.Error as error:
+            connection.rollback()
+            raise SchemaError("%s: %s" % (migration.name, error)) from error
 
 
 def applied(connection: psycopg.Connection) -> list[str]:
@@ -296,15 +308,14 @@ def _dictionary(
     return "\n".join(dd)
 
 
-def generate_docs(connection: psycopg.Connection, path: str | None = None) -> str:
-    """Write the data dictionary into docs/db.md (or `path`) from the live
+def generate_docs(connection: psycopg.Connection, path: str) -> str:
+    """Write the data dictionary into `path` (docs/db.md) from the live
     schema and the migrations' prose -> a summary line."""
     origins = _migration_tables()
     tables = table_names(connection)
     columns = {t: _columns(connection, t) for t in tables}
     fks = _foreign_keys(connection)
     domain = {t: DOC_DOMAIN.get(origins.get(t, NO_ORIGIN).migration, "foundation") for t in tables}
-    path = path or os.path.join(ROOT, "docs", "db.md")
     embed(path, "dictionary", _dictionary(tables, columns, fks, domain, origins))
     return "regenerated the data dictionary of docs/db.md: %d tables" % len(tables)
 

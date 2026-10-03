@@ -6,8 +6,10 @@ writes lives with what it writes - the pulls in db.data,
 inference.catalog.mirror, which reloads the strategies table, and
 inference.tune, which edits the playbook's files - and is called only from
 a door tool.
-Reads bypass the door: the facts and inference layers connect through
-db.psql.default_dsn(). The door imports db, facts and inference, and none
+Reads need no door tool: the board opens its own connection through
+db.psql.default_dsn(), and a door tool opens one through its Context;
+facts.tables.load reads over the connection it is handed, and inference/
+reads only the World. The door imports db, facts and inference, and none
 of them imports it.
 
     mcp/        the MCP server and its tools, the one door, for a session,

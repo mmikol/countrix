@@ -9,7 +9,7 @@ and logs one line on stderr for a request that failed or took a timed route.
 A request that raised is answered by failure(): a Refusal is the caller's
 error, 400 with its message; anything else is the server's fault, 500 with
 the error's type and message, and the traceback goes to stderr, never to the
-caller.
+caller. Each server's /health answers a HealthStatus, ok or degraded.
 
 read_json() is the one HTTP reader - the status and the decoded body of any
 answer - under orchestrator.py's calls to the stack's servers.
@@ -28,19 +28,22 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from email.message import Message
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 from urllib.parse import urlsplit
 
 from db import Refusal
 
 # the names a request may call a local server by: an allowlisted Host, not a bind
 LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "0.0.0.0"})  # nosec B104
+# what each server's /health says of itself: ok, or degraded with the error
+type HealthStatus = Literal["ok", "degraded"]
 
 
 class Reply(NamedTuple):
     """A JSON reply: its body, a JSON object, and its HTTP status - what every
-    JSON route of the board answers, and failure()."""
-    body: dict[str, object]
+    JSON route of the board answers, and failure(). The body is a Mapping,
+    so a route's typed record rides as it is, uncopied."""
+    body: Mapping[str, object]
     status: int
 
 
@@ -78,8 +81,7 @@ def request_allowed(headers: Message, allowed: frozenset[str]) -> bool:
 
 class LocalServer(ThreadingHTTPServer):
     """A threading HTTP server that answers to the local names and to any
-    `allowed_hosts` it is published under - the compose service name another
-    container calls it by, or a public host name."""
+    `allowed_hosts`: a public host name it is published under."""
 
     def __init__(
             self, address: tuple[str, int], handler: type[BaseHTTPRequestHandler],

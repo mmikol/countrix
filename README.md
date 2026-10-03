@@ -10,15 +10,16 @@ turns a draft into numbered facts, and finds the highest-scoring six under a
 playbook of markdown strategy files a person can read and tune. Every reason it
 gives cites a fact.
 
-![The board: King's Row, blue on attack, Widowmaker banned, both sides scored](docs/img/board.jpg)
+![The board: King's Row, blue on attack, Widowmaker banned](docs/img/board.jpg)
 
 *King's Row, blue on attack, two picks a side, Widowmaker banned. The solver
-fills blue's six around Ana and Reinhardt. Each badge is a side's six as a share
-of the best six it could field here: blue's fill is its best, 100; red's two
-picks reach 92. The fight odds split those two shares and are not a win
-probability. The screenshots run the reference playbook ([below](#quick-start))
-without its two rules that read Blizzard's published win rates, and the cards
-hide the rate figures: Blizzard licenses those for personal use only.*
+fills blue's six around Ana and Reinhardt; blue's badge is its six as a share
+of the best six it could field here, 100. The picture predates red's likely
+six: the fight-odds strip is gone, and red is no longer scored - its badge
+now reads the pull of that six.
+The screenshots run the reference playbook ([below](#quick-start)) without its
+two rules that read Blizzard's published win rates, and the cards hide the rate
+figures: Blizzard licenses those for personal use only.*
 
 ## What it does
 
@@ -32,10 +33,9 @@ hide the rate figures: Blizzard licenses those for personal use only.*
   ([how a six is chosen](docs/inference.md#how-a-six-is-chosen)). The
   space is every six of the released roster, each set of heroes once, at
   most two tanks, and the playbook's constraints prune it, weighing
-  nothing: about 17.2 million legal sixes today, fewer with bans or
+  nothing: about 13 million legal sixes today, fewer with bans or
   locks. A default engine, the meta, scores every six left on its win
-  rates on the map trusted by pick rate, the wiki's synergies (a cell no
-  article writes read at the written cells' claim share, not zero) and its
+  rates on the map trusted by pick rate, the wiki's synergies and its
   counters to the other side - the wiki's, and answers derived from the
   kits where the wiki says nothing - and one meta weight scales it. The
   heuristics add or subtract from the same facts, each times its weight.
@@ -89,9 +89,9 @@ the solver reads nothing else.
 
 ## Engineering
 
-- **895 tests.** CI runs ruff, mypy and the 775 that need no database on
-  every push to main and every pull request; they cover 93% of the lines,
-  held to 78%. With the database built, all of them run against a 75% floor.
+- **The tests.** CI runs ruff, mypy and every test that needs no database
+  on every push to main and every pull request, held to 78% line coverage.
+  With the database built, all of them run against a 75% floor.
   They sit in three folders: QA (the house rules), verification (the code
   against its spec) and validation (against recorded games, empty for now).
 - **The search is held to brute force.** A CI gate enumerates every legal six
@@ -113,10 +113,9 @@ the solver reads nothing else.
 - **Tested documentation.** Relative links resolve, every setting is documented,
   and the generated schema, tool and catalog references match a fresh render.
 
-About 19,000 lines of Python and 14,000 of tests. Python 3.12, PostgreSQL 16,
-psycopg, requests and beautifulsoup4 for the scrapers, the standard library's
-HTTP server with no web framework, plain JavaScript with no build step, Docker
-Compose.
+Python 3.12, PostgreSQL 16, psycopg, requests and beautifulsoup4 for the
+scrapers, the standard library's HTTP server with no web framework, plain
+JavaScript with no build step, Docker Compose.
 
 ## Quick start
 
@@ -135,11 +134,8 @@ database from the sources, about ten minutes at a polite pace; later starts
 reuse the database.
 
 The reference playbook is the one the tests prove the solver against. Leave out
-the `echo` line and the board runs the shipped playbook while its rules are
-rebuilt: eight assumptions in prose, thirteen heuristics - a healing floor
-set by the kit, and twelve that read the terrain of the map or the stage in
-play - and one limit, at most three supports, on top of the default engine,
-which scores the sixes on their win rates, synergies and counters.
+the `echo` line and the board runs the shipped playbook, its rules listed in
+[the catalog](docs/inference.md#the-catalog), on top of the default engine.
 
 | | |
 | --- | --- |

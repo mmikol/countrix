@@ -59,7 +59,7 @@ def test_an_announced_hero_is_flagged_with_its_release_day(synthetic_world):
     assert announced.text == (
         "CAUTION: Wisp is announced, not yet playable (releases 2026-12-01) - the kit is"
         " the wiki's preview and there are no rates")
-    assert announced.value == "2026-12-01"
+    assert announced.value == "2026-12-01" and announced.warn
     assert not fs.find("hero.rate") and not fs.find("hero.best_map")      # no rates
     wisp.release_date = None
     fs = FactSet(Draft(blue=("Wisp",)))
@@ -250,9 +250,11 @@ def test_against_the_opponents_and_beside_the_teammates(synthetic_world):
     blue = _facts(w, "Mortar", team="blue", red=("Anvil",))
     assert _texts(blue, "hero.vs_answered_by", "Mortar") == [
         "WARNING: blue Mortar is answered by red Anvil"]
+    assert blue.find("hero.vs_answered_by", "Mortar")[0].warn
     red = _facts(w, "Mortar", team="red", blue=("Anvil",))
     assert _texts(red, "hero.vs_answered_by", "Mortar") == [
         "NOTE: red Mortar is answered by blue Anvil"]
+    assert not red.find("hero.vs_answered_by", "Mortar")[0].warn
     anvil = _facts(w, "Anvil", team="blue", red=("Mortar",), blue=("Balm",))
     assert _texts(anvil, "hero.vs_answers", "Anvil") == ["blue Anvil answers red Mortar"]
     assert anvil.find("hero.vs_answers", "Anvil")[0].value == ["Mortar"]

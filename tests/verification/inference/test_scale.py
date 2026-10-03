@@ -13,7 +13,7 @@ from facts.draft import Draft
 from inference import catalog
 from inference.scoring import Objective
 from tests.verification.inference import ASSUMPTIONS_ONLY, DEFAULT, FIXTURE_PLAYBOOK
-from tests.verification.inference.test_solver import seated
+from tests.verification.inference.enumeration import seated
 
 RULES = {
     "points-reward-control": ("team.cc_count", "maximize", 1, "map.chokes >= 0.5"),
@@ -41,16 +41,16 @@ def playbook(directory):
 def test_the_lean_field_measures_what_the_whole_one_does(synthetic_world, tmp_path, monkeypatch,
                                                          draft):
     """The same board frozen twice - its field read lean, then prepared
-    whole - holds the same bounds and the same floor, bit for bit."""
+    whole - holds the same scale and the same floor, bit for bit."""
     rules = playbook(str(tmp_path))
     lean = seated(synthetic_world, draft, rules, DEFAULT)
     assert lean.lean_keys() == frozenset({"cc_count", "mobility_count", "range_min",
                                           "barrier_hp", "flyers"})
-    lean.freeze_bounds()
+    lean.freeze_scale()
     monkeypatch.setattr(Objective, "lean_keys", lambda self: None)
     whole = seated(synthetic_world, draft, rules, DEFAULT)
-    whole.freeze_bounds()
-    assert lean.bounds == whole.bounds and lean.floor == whole.floor
+    whole.freeze_scale()
+    assert lean.scale == whole.scale and lean.floor == whole.floor
 
 
 def test_a_playbook_that_needs_more_is_prepared_whole(synthetic_world):

@@ -33,10 +33,12 @@ from collections.abc import Callable, Sequence
 from typing import NamedTuple
 
 from db import Refusal
+from facts.draft import Side
 from facts.model import ROLES, Hero, Map, World
 from inference import scale
 from inference.base import BaseWeights
-from inference.bounds import Bound, Frame, Space, roster
+from inference.bounds import Bound, Frame, roster
+from inference.ranges import Open, Space
 from inference.scoring import Candidate, Objective, quantized, rank_key
 from inference.shapes import Shape, legal_shapes
 from inference.strategy import Strategy
@@ -85,10 +87,6 @@ class Evaluated(NamedTuple):
     rank: int | None
     outranked: bool
     solver: "Solver"
-
-
-# the roles still open at a node: (role, first candidate, picks left)
-type Open = tuple[tuple[int, int, int], ...]
 
 
 def _open(slots: Sequence[int], j: int, start: int) -> Open:
@@ -182,7 +180,7 @@ class Solver(Objective):
     it is normalised on, and the exact search around the locked picks."""
 
     def __init__(self, world: World, m: Map | None, *, red: Sequence[Hero],
-                 locked: Sequence[Hero], banned: Sequence[Hero] = (), side: str = "",
+                 locked: Sequence[Hero], banned: Sequence[Hero] = (), side: Side = "",
                  stage: str = "", catalog: list[Strategy], base: BaseWeights,
                  check: Callable[[], None] | None = None,
                  keep: frozenset[int] = frozenset(), swap: float = 0.0) -> None:
@@ -202,16 +200,17 @@ class Solver(Objective):
 
     # --- the scale ----------------------------------------------------------------
 
-    def freeze_bounds(self) -> None:
-        """Bounds per heuristic from the reference sample and the field, and
-        the sample's floor."""
+    def freeze_scale(self) -> None:
+        """The board's scale: each heuristic's low and high from the
+        reference sample and the field, and the sample's floor."""
         self.floor = scale.freeze(self)
         self._frozen, self._bound = True, None
 
     def adopt_scale(self, other: "Solver") -> None:
-        """The scale another solver on the same board froze - its bounds and
-        its floor: a fill takes its seat's, and draws no sample."""
-        self.adopt_bounds(other.bounds)
+        """The scale another solver on the same board froze - each
+        heuristic's low and high, and its floor: a fill takes its seat's, and
+        draws no sample."""
+        self.set_scale(other.scale)
         self.floor = other.floor
         self._frozen, self._bound = True, None
 
@@ -228,7 +227,7 @@ class Solver(Objective):
     def _walker(self) -> Bound:
         """The bound over this board's space, built once the scale is frozen."""
         if not self._frozen:
-            self.freeze_bounds()
+            self.freeze_scale()
         if self._bound is None:
             space = Space(self, self.locked, roster(self.world, self.locked, self.banned))
             self._bound = Bound(self, space)
@@ -247,17 +246,23 @@ class Solver(Objective):
     # --- the search -------------------------------------------------------------------
 
     def solve(self, top: int = 5) -> Solved:
-        """The `top` best legal sixes, exactly, in rank order, hydrated."""
+        """The `top` best legal sixes, exactly, in rank order, hydrated;
+        Infeasible where the search proves there is none."""
         goal = _Best(max(1, top))
         self._search(goal)
+        if not goal.items:
+            where = ("around the locked picks" if self.locked
+                     else "on this stage" if self.stage else "on this board")
+            raise Infeasible("no composition satisfies the limits %s - relax a constraint in"
+                             " the playbook" % where)
         return Solved(self, [self.hydrate(c) for _, c in goal.items], goal.k)
 
-    def outranking(self, target: Candidate, cap: int | None = None) -> int | None:
+    def outranking(self, target: Candidate) -> int | None:
         """How many legal sixes rank above `target` (scoring.rank_key), a six
         that ties its quantized score counted where the tie-break or the
         names put it first, as the alternatives are listed: exactly, or None
-        once `cap` do - RANK_CAP where none is named."""
-        goal = _Count(target, RANK_CAP if cap is None else cap)
+        once RANK_CAP do."""
+        goal = _Count(target, RANK_CAP)
         self._search(goal)
         return None if goal.done else goal.count
 
@@ -333,7 +338,7 @@ class Solver(Objective):
         if self.leaves > SCORE_BUDGET:
             raise Unbounded("the search scored %d sixes without proving its answer - a"
                             " playbook term the bound cannot narrow; tighten it in"
-                            " inference/strategies/" % SCORE_BUDGET)
+                            " the playbook" % SCORE_BUDGET)
         cand = self.prepare(Candidate(walk.space.heroes[i] for i in frame.picks))
         if cand.violations:
             return
@@ -347,7 +352,7 @@ class Solver(Objective):
         if self.nodes > NODE_BUDGET:
             raise Unbounded("the search walked %d branches without proving its answer - a"
                             " playbook term the bound cannot narrow; tighten it in"
-                            " inference/strategies/" % NODE_BUDGET)
+                            " the playbook" % NODE_BUDGET)
 
 
 def evaluate_comp(solved: Solved, heroes: Sequence[Hero]) -> Evaluated:
@@ -355,12 +360,8 @@ def evaluate_comp(solved: Solved, heroes: Sequence[Hero]) -> Evaluated:
     six in the order the search lists them (scoring.rank_key): from the
     search's own top K where the six reaches it, else by outranking(); a
     count past its budget leaves it unranked. A six that ties the optimal's
-    score but loses the tie-break is not first. A board with no feasible
-    six is Infeasible, as infer refuses it."""
+    score but loses the tie-break is not first."""
     solver = solved.solver
-    if not solved.ranked:
-        raise Infeasible("no composition satisfies the limits on this board - relax a"
-                         " constraint in inference/strategies/")
     target = solver.score(solver.prepare(Candidate(heroes)))
     key = rank_key(target)
     ranked = solved.ranked

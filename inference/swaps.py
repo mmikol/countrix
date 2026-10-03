@@ -16,11 +16,12 @@ dropped costing the swap cost.
                 exact branch and bound on blue's seat, on blue's optimal's
                 scale, ties broken by the board's draw. The winner is scored
                 again on blue's plain objective before anything reads it
-    paired      the swaps: each pick the target drops, in the order sent,
-                matched to an incoming hero of its role, then any left to
-                the incoming heroes left, in seat order; its place among the
-                picks as sent. A half-drafted seat's incoming heroes past
-                those fill its empty slots
+    paired      the swaps: each pick the target drops matched to an incoming
+                hero of its role, then any left to the incoming heroes left,
+                both sides in seat order, as the stage plan's swaps are
+                (moved); its place among the picks as sent. A half-drafted
+                seat's empty slots show the fill's heroes, as the rest of the
+                board does
     verdict     the swaps in words
     chain       the plan stage by stage (below)
 
@@ -34,22 +35,23 @@ rest the best answer from the new picks: for R' = R less the pick dropped
 plus the hero taken, net_R'(x) <= net_R(T) + c = net_R'(T). Blue's seat
 alone is searched; red's picks are the other side's facts.
 
-The stage plan walks the map's stages in play order from one origin, the
-six the board suggests - blue's picks with the swaps taken, the fill around
-fewer, the optimal without picks. The phases of a route (Hybrid, Escort)
-chain: each phase's six is the best reachable from the one before, each
-hero changed costing the swap cost, so a hero stays into the next stage
-unless swapping gains more than the cost - greedy, stage by stage, never
-trading a swap now against one later. The arenas (Control, Flashpoint) come
-up in no fixed order, so each is reached from the origin. The board's
-chosen stage is the origin itself, and the phases before it are played.
-Two stages that score every six alike from the same six are one search
-(scoring.Objective.ground_key); a stage past its budget is not solved, and
-the next phase goes on from the last six that was.
+The stage plan walks the map's stages in play order from one origin, the six
+the comps tab shows - blue's picks at six, the fill around fewer, the
+optimal without picks. The phases of a route (Hybrid, Escort) chain: each
+phase's six is the best reachable from the one before, each hero changed
+costing the swap cost, so a hero stays into the next stage unless swapping
+gains more than the cost - greedy, stage by stage, never trading a swap now
+against one later. The arenas (Control, Flashpoint) come up in no fixed
+order, so each is reached from the origin. The board's chosen stage is its
+own swap answer from the origin - the swaps suggested, else the origin
+itself - and the phases before it are played. Two stages that score every
+six alike from the same six are one search (scoring.Objective.ground_key); a
+stage past its budget is not solved, and the next phase goes on from the
+last six that was.
 """
 
 from collections.abc import Sequence
-from typing import Literal, NamedTuple
+from typing import NamedTuple
 
 from facts import compute
 from facts.board_facts import GroundValue
@@ -62,6 +64,7 @@ from inference.result import (
     Pick,
     Result,
     Span,
+    StageKind,
     StageRow,
     StageRules,
     StageSwap,
@@ -73,11 +76,13 @@ from inference.solver import Infeasible, Solver, Unbounded
 
 def raw_cost(cost: float, span: Span) -> float | None:
     """The swap cost in the objective's points: `cost` share points of the
-    seat's span, each a hundredth of its optimal's lead over its floor;
-    None where the seat is unscored - no lead to take a share of."""
-    if span.floor is None or span.best <= span.floor:
+    seat's span, each a hundredth of its optimal's lead over its floor - zero
+    where no reference six was legal, as Span reads it; None where the seat
+    is unscored - no lead to take a share of."""
+    floor = 0.0 if span.floor is None else span.floor
+    if span.best <= floor:
         return None
-    return cost * (span.best - span.floor) / 100.0
+    return cost * (span.best - floor) / 100.0
 
 
 class Target(NamedTuple):
@@ -92,14 +97,12 @@ def keeping(plain: Solver, picks: Sequence[Hero], cost: float,
             stage: str | None = None) -> Solver:
     """The swap search's Solver on `plain`'s board - blue's optimal's,
     nothing locked - with `cost` points, the raw cost, for each of `picks`
-    a six keeps, on `plain`'s scale: its bounds and its floor; on `stage`
-    where given, else on `plain`'s."""
-    solver = Solver(plain.world, plain.m, red=plain.red, locked=(),
-                    banned=[plain.world.heroes[i] for i in sorted(plain.banned)],
+    a six keeps, on `plain`'s scale: each heuristic's low and high, and its
+    floor; on `stage` where given, else on `plain`'s."""
+    solver = Solver(plain.world, plain.m, red=plain.red, locked=(), banned=plain.banned_heroes,
                     side=plain.side, stage=plain.stage if stage is None else stage,
-                    catalog=plain.catalog,
-                    base=plain.base.weights if plain.base is not None else OFF,
-                    check=plain.check, keep=frozenset(h.id for h in picks), swap=cost)
+                    catalog=plain.catalog, base=plain.base, check=plain.check,
+                    keep=frozenset(h.id for h in picks), swap=cost)
     solver.adopt_scale(plain)
     return solver
 
@@ -114,11 +117,7 @@ def search(
     search is exact over every legal six; Unbounded past its budget."""
     solver = keeping(plain, picks, cost)
     keep = solver.keep
-    solved = solver.solve(top=1)
-    if not solved.ranked:
-        raise Infeasible("no composition satisfies the limits on this board - relax a"
-                         " constraint in inference/strategies/")
-    best = solved.ranked[0]
+    best = solver.solve(top=1).ranked[0]
     gains = not keep <= set(best.key)
     if gains and keeper is not None:
         kept = solver.score(solver.prepare(Candidate(keeper)), detail=False)
@@ -126,29 +125,17 @@ def search(
     return Target(six=plain.score(plain.prepare(Candidate(best.heroes))), gains=gains)
 
 
-def paired(picks: Sequence[Hero], target: Result) -> tuple[list[SwapPair], list[OpenSlot]]:
-    """The swaps from `picks` (in the order sent) to `target`'s six, and
-    the heroes left for the empty slots: each dropped pick meets an
-    incoming hero of its role first, in seat order, then whichever are
-    left; its `at` is its place among the picks."""
-    names = {h.name for h in picks}
-    incoming = [p for p in target.picks if p["hero"] not in names]
-    kept = set(target.blue)
-    dropped = [(at, h) for at, h in enumerate(picks) if h.name not in kept]
-    matched = {}
-    for at, h in dropped:
-        same = next((p for p in incoming if p["role"] == h.role), None)
-        if same is not None:
-            incoming.remove(same)
-            matched[at] = same
-    for at, _ in dropped:
-        if at not in matched and incoming:
-            matched[at] = incoming.pop(0)
-    pairs = [
-        SwapPair({"out": h.name, "in": matched[at]["hero"], "at": at,
-                  "portrait": matched[at].get("portrait"), "why": matched[at]["why"]})
-        for at, h in dropped if at in matched]
-    return pairs, open_slots(incoming)
+def paired(picks: Sequence[Hero], six: Sequence[Hero], target: Result) -> list[SwapPair]:
+    """The swaps from `picks` to `six`, matched as the stage plan's are
+    (moved): both sides in seat order. Each carries the dropped pick's place
+    among the picks as sent (`at`), the order the pairs come in, and the
+    incoming hero's portrait and reason off `target`, the six scored."""
+    place = {h.name: at for at, h in enumerate(picks)}
+    told = {p["hero"]: p for p in target.picks}
+    return sorted((SwapPair({"out": s["out"], "in": s["in"], "at": place[s["out"]],
+                             "portrait": told[s["in"]].get("portrait"),
+                             "why": told[s["in"]]["why"]})
+                   for s in moved(picks, six)), key=lambda pair: pair["at"])
 
 
 def open_slots(picks: Sequence[Pick]) -> list[OpenSlot]:
@@ -157,28 +144,20 @@ def open_slots(picks: Sequence[Pick]) -> list[OpenSlot]:
             for p in picks]
 
 
-def verdict(pairs: Sequence[SwapPair], cost: float, before: int | None, after: int,
-            odds: tuple[int, int] | None, *, partial: bool) -> str:
-    """The suggestion in words: each swap, blue's share before and after -
-    the picks filled where the seat is half-drafted - and the fight odds
-    where both are read; or that the picks keep, and the cost that held
-    them."""
+def verdict(pairs: Sequence[SwapPair], cost: float, before: int | None, after: int, *,
+            partial: bool) -> str:
+    """The suggestion in words: each swap and blue's share before and after -
+    the picks filled where the seat is half-drafted; or that the picks keep,
+    and the cost that held them."""
     if not pairs:
-        return "keep the picks: no swap gains its cost of %s / 100" % _number(cost)
+        return "keep the picks: no swap gains its cost of %s / 100" % plan.cost_text(cost)
     if before is None:
         share = "back to an allowed six, %d / 100 of the optimal" % after
     else:
         share = "%d -> %d / 100 of the optimal%s" % (
             before, after, " (the picks filled)" if partial else "")
-    fight = ", fight odds %d -> %d" % odds if odds is not None else ""
-    return "swap %s: %s%s, at a cost of %s / 100 a swap" % (
-        _swaps(pairs), share, fight, _number(cost))
-
-
-def withheld(pairs: Sequence[SwapPair], odds: tuple[int, int]) -> str:
-    """Why a suggestion is withheld: its swaps would not raise the fight odds."""
-    return "keep the picks: the best swaps (%s) would not raise the fight odds %d -> %d" % (
-        _swaps(pairs), *odds)
+    return "swap %s: %s, at a cost of %s / 100 a swap" % (
+        _swaps(pairs), share, plan.cost_text(cost))
 
 
 def _swaps(pairs: Sequence[SwapPair]) -> str:
@@ -186,15 +165,7 @@ def _swaps(pairs: Sequence[SwapPair]) -> str:
     return ", ".join("%s for %s" % (p["out"], p["in"]) for p in pairs)
 
 
-def _number(value: float) -> str:
-    """A cost as the verdict writes it: whole where it is whole."""
-    return "%d" % value if value == int(value) else "%g" % value
-
-
 # --- the stage plan -----------------------------------------------------------
-
-type StageKind = Literal["phase", "arena"]
-
 
 class Leg(NamedTuple):
     """One stage's answer from a reference six: the six to play there and
@@ -227,10 +198,7 @@ def leg(solver: Solver, reference: Sequence[Hero], memo: Memo) -> Leg:
     if key in memo:
         return memo[key]
     ref = solver.score(solver.prepare(Candidate(reference)))
-    solved = solver.solve(top=1)
-    if not solved.ranked:
-        raise Infeasible("no composition satisfies the limits on this stage")
-    best = solved.ranked[0]
+    best = solver.solve(top=1).ranked[0]
     gains = not solver.keep <= set(best.key) and (
         bool(ref.violations) or quantized(best.score) > quantized(ref.score))
     six = solver.score(solver.prepare(Candidate(best.heroes))) if gains else ref
@@ -240,9 +208,9 @@ def leg(solver: Solver, reference: Sequence[Hero], memo: Memo) -> Leg:
 
 def moved(reference: Sequence[Hero], six: Sequence[Hero]) -> list[StageSwap]:
     """The swaps from `reference` to `six`: each hero that goes, in seat
-    order, met first by an incoming hero of its own role, and only then, the
-    same-role matches all made, by whichever are left - as paired() pairs
-    the board's swaps."""
+    order, met first by an incoming hero of its own role, in seat order, and
+    only then, the same-role matches all made, by whichever are left - the
+    one rule every swap is matched by, the board's (paired) among them."""
     kept = {h.id for h in six}
     going = [h for h in sorted(reference, key=seat_order) if h.id not in kept]
     held = {h.id for h in reference}
@@ -293,28 +261,35 @@ def ground(m: Map, stage: str) -> list[GroundValue]:
 def ruled(solver: Objective, whole: Objective) -> StageRules:
     """The weighted rules `solver`'s ground turns on that the map as a
     whole leaves off, and those it turns off, by name."""
-    weighted = [s for s in solver.catalog if s.form in ("heuristic", "scored")]
+    weighted = [s for s in solver.catalog if s.weighs]
     return StageRules(
         on=[s.name for s in weighted if solver.gates[s.id] is True and whole.gates[s.id] is False],
         off=[s.name for s in weighted if solver.gates[s.id] is False and whole.gates[s.id] is True])
 
 
+def gates_on(plain: Objective, stage: str = "") -> Objective:
+    """`plain`'s board on `stage` - the whole map where it names none - with
+    the default engine off: the objective a stage's rules are read off
+    (ruled), which reads only its gates."""
+    return Objective(plain.world, plain.m, red=plain.red, banned=plain.banned_heroes,
+                     side=plain.side, stage=stage, catalog=plain.catalog, base=OFF)
+
+
 class Taken(NamedTuple):
     """The board's swap answer on its chosen stage: the six it makes (the
-    origin where none is suggested) and its swaps."""
+    origin where the picks keep) and its swaps."""
     six: Sequence[Hero]
     swaps: Sequence[StageSwap]
 
 
-class Plan(NamedTuple):
+class ChainStart(NamedTuple):
     """What the stage plan is walked from: blue's optimal's Solver, whose
-    board and scale every stage shares; the whole map's objective, which a
-    stage's rules are read against; the board's chosen stage; the origin -
-    the six the comps tab shows; the raw cost and the cost in share points;
-    and the board's swap answer on the chosen stage, None where it searched
-    none."""
+    board and scale every stage shares; the board's chosen stage; the
+    origin - the six the comps tab shows; the raw cost and the cost in share
+    points; and the board's swap answer on the chosen stage - a swap
+    suggested, or the picks kept under the cost - None where it gave
+    neither: it searched none."""
     plain: Solver
-    whole: Objective
     chosen: str
     origin: Sequence[Hero]
     raw: float
@@ -322,7 +297,7 @@ class Plan(NamedTuple):
     taken: Taken | None = None
 
 
-def chain(p: Plan, memo: Memo | None = None) -> list[StageRow]:
+def chain(p: ChainStart, memo: Memo | None = None) -> list[StageRow]:
     """The plan stage by stage (the module's docstring): a row a stage of
     the map, in play order; none on a map without stages."""
     m = p.plain.m
@@ -330,6 +305,7 @@ def chain(p: Plan, memo: Memo | None = None) -> list[StageRow]:
         return []
     memo = {} if memo is None else memo
     titles = {s.id: s.name for s in p.plain.catalog} | base.TITLES
+    whole = gates_on(p.plain)
     walk = stages(m)
     phases = [name for name, kind in walk if kind == "phase"]
     rows: list[StageRow] = []
@@ -344,30 +320,27 @@ def chain(p: Plan, memo: Memo | None = None) -> list[StageRow]:
         reference = previous if kind == "phase" else p.origin
         index = (phases.index(name) + 1, len(phases)) if kind == "phase" else (0, 0)
         if current:
-            here = Objective(p.plain.world, m, red=p.plain.red, banned=[
-                p.plain.world.heroes[i] for i in sorted(p.plain.banned)],
-                side=p.plain.side, stage=name, catalog=p.plain.catalog, base=OFF)
-            rules = ruled(here, p.whole)
+            rules = ruled(gates_on(p.plain, name), whole)
             # the board's own swap answer on this stage, one answer with the
-            # swaps above the picks; where none was searched, the origin
+            # swaps above the picks; where it gave none, the origin
             played_six = sorted(p.taken.six if p.taken is not None else p.origin,
                                 key=seat_order)
             taken = list(p.taken.swaps) if p.taken is not None else []
             rows.append(_row(m, name, kind, current=True, six=[h.name for h in played_six],
                              swaps=taken, rules=rules, blurb=plan.stage_blurb(
                                  m, name, index, rules, taken, [], p.cost,
-                                 origin=p.taken is None)))
+                                 outcome="origin" if p.taken is None else "solved")))
             if kind == "phase":
                 previous = played_six
             continue
         solver = keeping(p.plain, reference, p.raw, stage=name)
-        rules = ruled(solver, p.whole)
+        rules = ruled(solver, whole)
         try:
             got = leg(solver, reference, memo)
         except (Unbounded, Infeasible) as error:
             rows.append(_row(m, name, kind, rules=rules, solved=False, blurb=plan.stage_blurb(
-                m, name, index, rules, [], [], p.cost, solved=False,
-                infeasible=isinstance(error, Infeasible))))
+                m, name, index, rules, [], [], p.cost,
+                outcome="infeasible" if isinstance(error, Infeasible) else "unsolved")))
             continue
         heroes = got.six.heroes
         swaps = moved(reference, heroes)

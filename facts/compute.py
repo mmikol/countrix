@@ -22,11 +22,12 @@ from collections import OrderedDict
 from collections.abc import Sequence
 from typing import Literal, NamedTuple, TypedDict
 
-from facts.draft import EXPECTED_SHAPE, is_sided
+from facts.draft import EXPECTED_SHAPE, TEAM_SIZE, Side, is_sided
 from facts.model import ROLES, TERRAIN_FEATURES, Hero, Map, World
 from facts.team import TEAM_METRICS, VERSUS_METRICS, MetricBag, number
 
 TREND_POINTS = 1.5
+CHEW_UNKNOWN = 999.0      # the seconds a chew time reads where a side's pool or damage is 0
 TERRAIN_STANDOUT = 0.75   # sd from the ordinary map at which a terrain feature is a fact
 STAGE_MENTIONS = 2        # mentions a stage's text must hold of a feature to stand out on it
 STAGE_FEATURES = 2        # standout features a stage fact names, largest first
@@ -37,7 +38,8 @@ MATCHUP_METRICS = OrderedDict([
     ("hps_diff", "blue healing floor minus red"),
     ("burst_vs_heal", "blue's biggest hit minus red's biggest single save"),
     ("heal_vs_burst", "blue's biggest single save minus red's biggest hit"),
-    ("chew_time_ours", "seconds of blue's floor damage to chew red's pool (999 if unknown)"),
+    ("chew_time_ours", "seconds of blue's floor damage to chew red's pool (%g if unknown)"
+                       % CHEW_UNKNOWN),
     ("chew_time_theirs", "seconds of red's floor damage to chew blue's pool"),
     ("tempo_diff", "red median cooldown minus blue's (positive: blue cycles faster)"),
     ("range_diff", "blue median reach minus red's; 0 where a side's picks publish none:"
@@ -57,7 +59,7 @@ MAP_METRICS = OrderedDict([
     ("style_top", "the playstyle the map rewards most: the rates' lift plus the terrain's lean"),
     ("style_margin", "top style score minus the runner-up, in sd"),
     ("mode", "the game mode"),
-    ("stages", "separate arenas, one played at a time: Control's 3, Flashpoint's 5; else 0"),
+    ("arenas", "separate arenas, one played at a time: Control's 3, Flashpoint's 5; else 0"),
     ("phases", "named parts of one route, played in order: Hybrid's 2, an Escort map's"
                 " named stretches; else 0"),
     ("bans", "bans already made in this match: a ban rate is a risk only before them"),
@@ -96,12 +98,13 @@ SYNERGY_PULL = 2.0        # pick-rate points a hero gains per synergy partner al
 
 class ExpectedPick(TypedDict):
     """One of the other side's likely six: the hero, its role, the pick rate
-    it rests on (None for a revealed pick or a hero with no rate), whether it
-    was revealed, and the reason in words."""
+    it rests on (None for a hero with no rate), whether it was revealed, its
+    pull and the reason in words."""
     hero: str
     role: str
     rate: float | None
     locked: bool
+    pull: float
     why: str
 
 
@@ -110,11 +113,13 @@ def expected_picks(world: World, m: Map | None, *, revealed: Sequence[Hero] = ()
     """What the other side is likely to field, from the data alone - no
     strategy read: any picks given as revealed first, then slot by slot the
     hero the map's pick rates (the overall meta with no map set) and the
-    wiki's synergies make likeliest - a hero's likelihood is its pick rate
-    plus SYNERGY_PULL per partner already on the six - into a two-two-two,
-    past the bans. Ties go to the alphabetically first name. Deterministic;
-    the board calls it with nothing revealed, so the six is static for the
-    board. Each entry says what it rests on."""
+    wiki's synergies rank first - a hero's pull is its pick rate plus
+    SYNERGY_PULL per partner already on the six - toward a two-two-two,
+    past the bans, six heroes in all. Ties go to the alphabetically first
+    name. Deterministic. Each entry carries its pull - a revealed pick's
+    counts the revealed picks before it - so the six's pulls sum to its pick
+    rates plus SYNERGY_PULL per documented pair on it, and says what it
+    rests on."""
     shape = dict(EXPECTED_SHAPE)
     chosen = list(revealed)
     for h in revealed:
@@ -125,26 +130,31 @@ def expected_picks(world: World, m: Map | None, *, revealed: Sequence[Hero] = ()
         r = h.map_pick(m.id) if m is not None else None
         return (r if r is not None else h.pick, r is not None)
 
-    def partners(h: Hero) -> list[Hero]:
-        return [c for c in chosen if world.synergy(c.id, h.id)]
+    def partners(h: Hero, among: Sequence[Hero]) -> list[Hero]:
+        return [c for c in among if world.synergy(c.id, h.id)]
+
+    def entry(h: Hero, among: Sequence[Hero], locked: bool) -> ExpectedPick:
+        value, on_map = rate(h)
+        mates = partners(h, among)
+        pull = (value or 0.0) + SYNERGY_PULL * len(mates)
+        why = _pick_reason(value, on_map, m, mates)
+        return {"hero": h.name, "role": h.role, "rate": value, "locked": locked,
+                "pull": round(pull, 2),
+                "why": "%spull %.1f: %s" % ("revealed; " if locked else "", pull, why)}
 
     picked: list[ExpectedPick] = []
-    while any(shape.values()):
+    while any(shape.values()) and len(chosen) < TEAM_SIZE:
         field = [h for h in world.heroes.values()
                  if h.released and h.id not in taken and shape.get(h.role, 0) > 0]
         if not field:
             break
         best = min(field, key=lambda h: (
-            -((rate(h)[0] or 0.0) + SYNERGY_PULL * len(partners(h))), h.name))
-        value, on_map = rate(best)
-        picked.append({"hero": best.name, "role": best.role, "rate": value, "locked": False,
-                       "why": _pick_reason(value, on_map, m, partners(best))})
+            -((rate(h)[0] or 0.0) + SYNERGY_PULL * len(partners(h, chosen))), h.name))
+        picked.append(entry(best, chosen, False))
         chosen.append(best)
         taken.add(best.id)
         shape[best.role] -= 1
-    out: list[ExpectedPick] = [
-        {"hero": h.name, "role": h.role, "rate": None, "locked": True, "why": "revealed"}
-        for h in revealed]
+    out = [entry(h, revealed[:i], True) for i, h in enumerate(revealed)]
     return out + sorted(picked, key=lambda p: (ROLES.index(p["role"]), p["hero"]))
 
 
@@ -221,7 +231,8 @@ def matchup_metrics(world: World, blue_t: MetricBag, red_t: MetricBag) -> Metric
     """MATCHUP_METRICS from blue's seat, given both teams' metrics and the
     World, whose role medians fill red's open slots for the healing floor.
 
-    Only what reading both sides produces. A number that is already a team
+    What reading both sides produces, and blue's answers to red's ultimates
+    (ult_answers) beside red's ultimate damage. A number that is already a team
     metric, blue's or red's, is not restated here under a second name: two
     strategies reading the same number through two keys weigh one signal
     twice, and the catalog cannot see that they do. Read team.* for blue's
@@ -238,8 +249,8 @@ def matchup_metrics(world: World, blue_t: MetricBag, red_t: MetricBag) -> Metric
     matchup["hps_diff"] = number(blue_t["hps_floor"]) - number(red_t["hps_floor"])
     matchup["burst_vs_heal"] = blue_burst - red_heal
     matchup["heal_vs_burst"] = blue_heal - red_burst
-    matchup["chew_time_ours"] = red_pool / blue_dps if blue_dps and red_pool else 999.0
-    matchup["chew_time_theirs"] = blue_pool / red_dps if red_dps and blue_pool else 999.0
+    matchup["chew_time_ours"] = red_pool / blue_dps if blue_dps and red_pool else CHEW_UNKNOWN
+    matchup["chew_time_theirs"] = blue_pool / red_dps if red_dps and blue_pool else CHEW_UNKNOWN
     matchup["tempo_diff"] = number(red_t["cooldown_median"]) - number(blue_t["cooldown_median"])
     # a side none of whose picks publishes a range has no median: unknown, not
     # 0 m, so there is no gap to read
@@ -281,12 +292,16 @@ def stage_standouts(m: Map, stage: str) -> list[Standout]:
     return sorted(found, key=lambda s: (-s.z, s.feature))[:STAGE_FEATURES]
 
 
+# whose text a feature on the ground in play was read off
+type GroundSource = Literal["stage", "map"]
+
+
 class Ground(NamedTuple):
     """A terrain feature on the ground in play: its z, and whose text it was
     read off - the stage's own, or the map's article."""
     feature: str
     z: float
-    source: Literal["stage", "map"]
+    source: GroundSource
 
 
 def ground(m: Map, stage: str, feature: str) -> Ground:
@@ -317,18 +332,18 @@ def objective(m: Map | None, stage: str = "") -> str:
     return OBJECTIVES.get(m.mode or "", "")
 
 
-def map_metrics(m: Map | None, side: str = "", *, ban_count: int, stage: str = "") -> MetricBag:
+def map_metrics(m: Map | None, side: Side = "", *, ban_count: int, stage: str = "") -> MetricBag:
     """MAP_METRICS on the ground in play: the map, or `stage`, one the map
     lists (facts.draft.board_stage), where a board names one."""
     if m is None:
         return {"known": 0, "sided": 0, "side": "", "style_top": "",
-                "style_margin": 0, "mode": "", "stages": 0, "phases": 0, "bans": ban_count,
+                "style_margin": 0, "mode": "", "arenas": 0, "phases": 0, "bans": ban_count,
                 "name": "", "stage": "", "objective": "",
                 **dict.fromkeys(TERRAIN_FEATURES, 0.0)}
     sided = 1 if is_sided(m) else 0
     return {"known": 1, "sided": sided, "side": side if sided else "",
             "style_top": m.style_top or "", "style_margin": m.style_margin,
-            "mode": m.mode or "", "stages": len(arenas(m)),
+            "mode": m.mode or "", "arenas": len(arenas(m)),
             "phases": len(phases(m)), "bans": ban_count,
             "name": m.name, "stage": stage, "objective": objective(m, stage),
             **{f: ground(m, stage, f).z for f in TERRAIN_FEATURES}}

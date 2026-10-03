@@ -14,9 +14,9 @@ weapons.
 
 import re
 from collections.abc import Iterable, Mapping
-from typing import Literal, NamedTuple, TypedDict
+from typing import NamedTuple, TypedDict
 
-from db import KIND_ABILITY, KIND_PASSIVE, KIND_ULTIMATE, KIND_WEAPON
+from db import KIND_ABILITY, KIND_PASSIVE, KIND_ULTIMATE, KIND_WEAPON, PerkTier
 from db.data.wiki import markup
 
 
@@ -32,7 +32,7 @@ class KitEntry(TypedDict):
 
 
 class PerkEntry(KitEntry):
-    tier: Literal["minor", "major"]
+    tier: PerkTier
 
 
 class AbilityEntry(KitEntry):

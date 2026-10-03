@@ -338,6 +338,8 @@ def run(connection: psycopg.Connection, pull: cache.PullContext) -> TerrainSumma
             " WHERE mm.map_id = s.map_id AND g.code = 'hybrid')"
             " FROM map_stages s ORDER BY s.map_id, s.position").fetchall():
         stages.setdefault(map_id, (hybrid, {}))[1][stage] = stage_id
+    # the read's transaction ends here, so none stays open across the fetches
+    connection.commit()
 
     articles = fetch_articles(pull, [name for _, name in maps])
     # every article is read before the first write: no row stays locked across a fetch

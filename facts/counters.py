@@ -51,11 +51,12 @@ Endothermic Blaster's 12). A movement tool's hit (Reinhardt's Charge, 300
 pinned to a wall) is not burst: the dash is control, which the cc
 mechanism reads, and counting it twice made the charge a one-shot.
 
-The graph. The wiki decides every pair it has an edge on, either way. On a
-pair it has none on, the loser's TOP_ANSWERS best derived answers - score
-at least THRESHOLD, net above 0, ranked by score, then net, then name -
-count at DERIVED_WEIGHT against a wiki edge's WIKI_WEIGHT, so every tally
-stays an integer.
+The graph. The wiki decides every pair it has an edge on, either way. Of
+each loser's TOP_ANSWERS best derived answers - score at least THRESHOLD,
+net above 0, ranked by score, then net, then name - those on a pair the
+wiki has no edge on count at DERIVED_WEIGHT against a wiki edge's
+WIKI_WEIGHT, so every tally stays an integer; the others are not
+replaced.
 """
 
 import math
@@ -65,7 +66,7 @@ from dataclasses import dataclass
 from typing import NamedTuple
 
 from db import KIND_ABILITY, KIND_PASSIVE, KIND_ULTIMATE
-from facts.kit import KitPiece
+from facts.kit import MIN_FALLOFF, KitPiece
 from facts.model import Hero, World
 from facts.records import DerivedEdge, Fired, Pairing
 from facts.scalars import (
@@ -120,7 +121,6 @@ DEFAULT_PSPEED = 40.0       # m/s: a projectile publishing no speed
 MAX_REACH = 60.0            # m: no weapon counts further; a hitscan with no limit reaches it
 MELEE_REACH = 4.0           # m: a melee weapon publishing no range
 BEAM_REACH = 15.0           # m: a beam publishing no range
-MIN_FALLOFF_START = 10.0    # m: a shotgun's falloff starting nearer is a splash, not a reach
 # --- anti-air and fliers ---------------------------------------------------------
 LIGHT_POOL = 300        # hp: a flier over this pool (D.Va) is no light flier
 AA_KIND = {"hitscan": 1.0, "fast projectile": 0.75, "projectile": 0.4, "beam": 0.2,
@@ -203,7 +203,7 @@ def _flag(piece: KitPiece, code: str) -> float:
     first = rows[0]
     if first.value is not None:
         return 0.0 if first.value >= 1 else 1.0
-    return PARTIAL if (first.text or "").strip().lower() == "partial" else 1.0
+    return PARTIAL if first.text.strip().lower() == "partial" else 1.0
 
 
 def _per_hit(piece: KitPiece) -> float | None:
@@ -211,7 +211,7 @@ def _per_hit(piece: KitPiece) -> float | None:
     bullet, a shot - not a sum, a damage over time or a row on the hero."""
     values = [s.value for s in piece.stats.get("damage", ())
                 if s.value is not None and s.unit_den is None and s.unit_num != "percent"
-                and not SUMMED_RE.search("%s %s" % (s.condition or "", s.text or ""))]
+                and not SUMMED_RE.search("%s %s" % (s.condition, s.text))]
     if not values:
         return None
     pellets = piece.max_stat("pellets") or 1
@@ -238,8 +238,8 @@ def _reach(piece: KitPiece) -> Reach:
         return Reach(piece.reach or MELEE_REACH, True)
     if "shotgun" in piece.weapon_kind and not piece.stats.get("range"):
         starts = [s.value for s in piece.stats.get("damage_falloff_range", ())
-                  if s.value is not None and s.value >= MIN_FALLOFF_START
-                  and "min" in (s.condition or "") and "simultaneous" not in (s.condition or "")]
+                  if s.value is not None and s.value >= MIN_FALLOFF
+                  and "min" in s.condition and "simultaneous" not in s.condition]
         if starts:
             return Reach(min(starts), True)
     if piece.reach:
@@ -265,7 +265,6 @@ def _fights(guns: Sequence[KitPiece]) -> list[tuple[KitPiece, float]]:
 class Features:
     """What the mechanisms read of one hero: its kit facts, each strength in
     [0, 1] unless a unit says otherwise, and the pieces that set them."""
-    id: int
     name: str
     role: str
     subrole: str
@@ -294,9 +293,9 @@ class Features:
     mobility_pieces: tuple[str, ...]
     diver: float
     escape: tuple[str, ...]
-    cc_int: float
+    cc_interrupt: float
     cc_deny: float
-    cc_int_pieces: tuple[str, ...]
+    cc_interrupt_pieces: tuple[str, ...]
     cc_deny_pieces: tuple[str, ...]
     channel: float
     channel_pieces: tuple[str, ...]
@@ -306,7 +305,7 @@ class Features:
     antiheal_piece: str
     self_sustain: float
     heal_out: float
-    heal_rel: float
+    heal_reliance: float
     barrier: float
     barrier_piece: str
     barrier_share: float
@@ -427,6 +426,19 @@ def _eater(h: Hero) -> tuple[float, str, str | None]:
     return best
 
 
+def _antiheal(h: Hero) -> tuple[float, str]:
+    """The hero's strongest anti-heal: its strength (the share of healing
+    received it takes away, an ultimate's times ULT) and its evidence."""
+    best, where = 0.0, ""
+    for a in h.abilities:
+        for s in a.stats.get("healing_mod", ()):
+            if s.value is not None and s.value < 0 and s.condition != "allies":
+                strength = -s.value / 100.0 * (ULT if a.kind == KIND_ULTIMATE else 1.0)
+                if strength > best:
+                    best, where = strength, "%s (%+g%% healing received)" % (a.name, s.value)
+    return best, where
+
+
 def features(h: Hero, support_hps: float) -> Features:
     """The facts every mechanism reads of one hero. support_hps is the
     roster's best support's sustained healing, which heal_out is a share of."""
@@ -440,7 +452,7 @@ def features(h: Hero, support_hps: float) -> Features:
     tools = mobility_tools(h.abilities)
     mobility = _clamp(sum(STRONG_MOVE if a.keywords & MOVE_STRONG else WEAK_MOVE for a in tools)
                       / MOBILITY_FULL)
-    cc_int, cc_deny, int_pieces, deny_pieces = _control(h)
+    cc_interrupt, cc_deny, interrupt_pieces, deny_pieces = _control(h)
     ult_channels = [a.name for a in h.abilities
                     if a.kind == KIND_ULTIMATE and "channel" in a.keywords]
     channels = [a.name for a in h.abilities if a.kind == KIND_ABILITY and "channel" in a.keywords
@@ -449,14 +461,7 @@ def features(h: Hero, support_hps: float) -> Features:
                 and a.keywords & (SAVE | CLEANSE)]
     save = _clamp(sum((CLEANSE_SAVE if a.keywords & CLEANSE else INVULN_SAVE)
                       * _cd_weight(a, SAVE_CD_FULL) for a in saves))
-    antiheal, antiheal_piece = 0.0, ""
-    for a in h.abilities:
-        for s in a.stats.get("healing_mod", ()):
-            if s.value is not None and s.value < 0 and (s.condition or "") != "allies":
-                strength = -s.value / 100.0 * (ULT if a.kind == KIND_ULTIMATE else 1.0)
-                if strength > antiheal:
-                    antiheal, antiheal_piece = strength, "%s (%+g%% healing received)" % (
-                        a.name, s.value)
+    antiheal, antiheal_piece = _antiheal(h)
     own = h.self_heal + SELF_HPS_SECONDS * h.self_hps + LIFESTEAL_SECONDS * h.lifesteal * h.dps
     self_sustain = _clamp(own / h.pool) if h.pool else 0.0
     heal_out = _clamp(h.hps / support_hps) if support_hps else 0.0
@@ -466,16 +471,24 @@ def features(h: Hero, support_hps: float) -> Features:
     barrier, barrier_piece = max(barriers, default=(0.0, ""))
     pierce, pierce_piece = _pierce(steady, h.abilities)
     eater, eater_piece, eater_family = _eater(h)
-    hit = (max(main.hits() or [0.0]) or _per_hit(main) or 0.0) if main else 0.0
-    instance = (_per_hit(main) or hit or 1.0) if main else 0.0
-    main_kind = _kind(main) if main else "none"
+    # the main weapon's hit, and what armor and each eater family take of it
+    if main is not None:
+        hit = max(main.hits() or [0.0]) or _per_hit(main) or 0.0
+        instance = _per_hit(main) or hit or 1.0
+        main_kind = _kind(main)
+        armor_loss = _armor_loss(main, main_kind, instance)
+        taken = _clamp(hit / EAT_FULL_HIT, EAT_SMALL_SHARE)
+        eaten = _flag(main, "ignores_matrix") * taken
+        deflected = _flag(main, "ignores_deflect") * taken
+    else:
+        hit = instance = armor_loss = eaten = deflected = 0.0
+        main_kind = "none"
     armor = h.armor + h.form_armor
     return Features(
-        id=h.id, name=h.name, role=h.role, subrole=h.subrole, pool=h.pool, armor=armor,
+        name=h.name, role=h.role, subrole=h.subrole, pool=h.pool, armor=armor,
         armor_share=armor / (h.pool + h.form_armor) if h.pool else 0.0, dps=h.dps,
         burst=burst, burst_piece=burst_piece, melee_only=h.melee_only, main=main,
-        main_kind=main_kind, main_hit=hit, instance=instance,
-        armor_loss=_armor_loss(main, main_kind, instance) if main else 0.0,
+        main_kind=main_kind, main_hit=hit, instance=instance, armor_loss=armor_loss,
         range=reach, range_weapon=range_weapon, aa=aa, aa_weapon=aa_weapon, aa_kind=aa_kind,
         aa_reach=aa_reach, flight=flight, flight_piece=flight_piece, mobility=mobility,
         mobile=_clamp((mobility - MOBILE_FROM) / (1.0 - MOBILE_FROM)),
@@ -483,20 +496,17 @@ def features(h: Hero, support_hps: float) -> Features:
         diver=1.0 if h.subrole in DIVERS else 0.0,
         escape=tuple(sorted(a.name for a in h.abilities if a.kind == KIND_ABILITY
                             and a.keywords & SAVE and not a.for_allies)),
-        cc_int=cc_int, cc_deny=cc_deny, cc_int_pieces=int_pieces, cc_deny_pieces=deny_pieces,
+        cc_interrupt=cc_interrupt, cc_deny=cc_deny, cc_interrupt_pieces=interrupt_pieces,
+        cc_deny_pieces=deny_pieces,
         channel=CHANNEL_ULT * bool(ult_channels) + CHANNEL_ABILITY * bool(channels),
         channel_pieces=tuple(ult_channels + channels), save=save,
         save_pieces=tuple(a.name for a in saves),
         antiheal=_clamp(antiheal), antiheal_piece=antiheal_piece, self_sustain=self_sustain,
-        heal_out=heal_out, heal_rel=max(self_sustain, heal_out), barrier=barrier,
+        heal_out=heal_out, heal_reliance=max(self_sustain, heal_out), barrier=barrier,
         barrier_piece=barrier_piece,
         barrier_share=barrier / (barrier + h.pool) if barrier else 0.0, pierce=pierce,
         pierce_piece=pierce_piece, eater=eater, eater_piece=eater_piece,
-        eater_family=eater_family,
-        eaten=_flag(main, "ignores_matrix") * _clamp(hit / EAT_FULL_HIT, EAT_SMALL_SHARE)
-        if main else 0.0,
-        deflected=_flag(main, "ignores_deflect") * _clamp(hit / EAT_FULL_HIT, EAT_SMALL_SHARE)
-        if main else 0.0,
+        eater_family=eater_family, eaten=eaten, deflected=deflected,
         projectile_main=main_kind == "projectile",
         percent_ult=next((u.name for u in h.ults if any(
             s.unit_num == "percent" for s in u.stats.get("damage", ()))), ""),
@@ -579,12 +589,12 @@ def m_antiheal(win: Features, lose: Features) -> Reading:
     what = ("self-sustain %.0f%% of its pool" % (100 * lose.self_sustain)
             if lose.self_sustain >= lose.heal_out else "healing %.0f%% of the best support's"
             % (100 * lose.heal_out))
-    return Reading(win.antiheal * lose.heal_rel, "anti-heal against its healing",
+    return Reading(win.antiheal * lose.heal_reliance, "anti-heal against its healing",
                    "%s; %s's %s" % (win.antiheal_piece, lose.name, what))
 
 
 def m_burst(win: Features, lose: Features) -> Reading:
-    if lose.role == "tank" or not win.burst:
+    if lose.role == "tank" or not win.burst or not lose.pool:
         return NONE
     strength = (_clamp((win.burst / lose.pool - BURST_FROM) / BURST_SPAN)
                 * (MELEE_BURST if win.melee_only else 1.0) * (1.0 - MOBILE_DODGE * lose.mobile)
@@ -595,11 +605,11 @@ def m_burst(win: Features, lose: Features) -> Reading:
 
 
 def m_cc(win: Features, lose: Features) -> Reading:
-    interrupt = win.cc_int * lose.channel * _reachable(win, lose)
+    interrupt = win.cc_interrupt * lose.channel * _reachable(win, lose)
     deny = win.cc_deny * lose.mobile * _reachable(win, lose)
     if interrupt >= deny:
         return Reading(interrupt, "control against its channel", "%s; %s channels %s" % (
-            ", ".join(win.cc_int_pieces), lose.name, ", ".join(lose.channel_pieces)))
+            ", ".join(win.cc_interrupt_pieces), lose.name, ", ".join(lose.channel_pieces)))
     return Reading(deny, "control against its mobility", "%s; %s moves with %s" % (
         ", ".join(win.cc_deny_pieces), lose.name, ", ".join(lose.mobility_pieces)))
 
@@ -645,6 +655,8 @@ def m_armor(win: Features, lose: Features) -> Reading:
 
 
 def m_dive(win: Features, lose: Features) -> Reading:
+    if not lose.pool:
+        return NONE
     kill = _clamp(((win.dps * KILL_WINDOW + win.burst) / lose.pool - KILL_FROM) / KILL_SPAN)
     exposed = lose.backline * (1.0 - lose.mobility) * (ESCAPE_KEEPS if lose.escape else 1.0)
     return Reading(win.diver * win.mobility * exposed * kill * _reachable(win, lose),
@@ -656,11 +668,11 @@ def m_dive(win: Features, lose: Features) -> Reading:
 
 
 def m_save(win: Features, lose: Features) -> Reading:
-    reliance = max(lose.antiheal, lose.cc_int, BURST_SAVE * lose.oneshot_risk)
+    reliance = max(lose.antiheal, lose.cc_interrupt, BURST_SAVE * lose.oneshot_risk)
     if reliance == lose.antiheal:
         phrase, what = "saves against its anti-heal", lose.antiheal_piece
-    elif reliance == lose.cc_int:
-        phrase, what = "saves against its control", ", ".join(lose.cc_int_pieces)
+    elif reliance == lose.cc_interrupt:
+        phrase, what = "saves against its control", ", ".join(lose.cc_interrupt_pieces)
     else:
         phrase, what = "saves against its burst", "a %.0f hit" % lose.burst
     return Reading(win.save * reliance, phrase, "%s; %s's %s" % (
@@ -707,9 +719,9 @@ def pairing(win: Features, lose: Features) -> Pairing:
 def derive(world: World) -> None:
     """The matrix over the released heroes (world.matrix, {(winner, loser):
     Pairing}) and the derived edges the graph fills with (world.derived,
-    {(loser, winner): DerivedEdge}): each loser's TOP_ANSWERS best answers
-    on the pairs the wiki has no edge on. Deterministic: heroes by id,
-    ties by name."""
+    {(loser, winner): DerivedEdge}): of each loser's TOP_ANSWERS best
+    answers, those on a pair the wiki has no edge on. Deterministic: heroes
+    by id, ties by name."""
     released = sorted((h for h in world.heroes.values() if h.released), key=lambda h: h.id)
     supports = [h.hps for h in released if h.role == "support"]
     feats = {h.id: features(h, max(supports, default=0.0)) for h in released}
@@ -721,13 +733,13 @@ def derive(world: World) -> None:
             ((pair.score, round(pair.score - world.matrix[(loser.id, w)].score, 3), w)
                 for (w, lose), pair in world.matrix.items() if lose == loser.id),
             key=lambda t: (-t[0], -t[1], world.heroes[t[2]].name))
-        top = [(score, net, w) for score, net, w in answers
+        top = [(score, w) for score, net, w in answers
                 if score >= THRESHOLD and net > 0][:TOP_ANSWERS]
-        for score, net, w in top:
+        for score, w in top:
             if (loser.id, w) in world.counters or (w, loser.id) in world.counters:
                 continue
             world.derived[(loser.id, w)] = DerivedEdge(
-                winner=w, loser=loser.id, score=score, net=net,
+                winner=w, loser=loser.id, score=score,
                 fired=world.matrix[(w, loser.id)].fired)
 
 

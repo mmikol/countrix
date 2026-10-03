@@ -10,16 +10,7 @@ every source.
     cache_key        a request as a file name in the cache
     session          a requests session that identifies this project
     PullContext      what a pull's run() takes beside its connection: the page
-                     cache, the session, the log (stderr unless the caller
-                     names another - over stdio, stdout is the MCP wire) and
-                     the cutoff. Without one a page is kept forever (a build
-                     from the caches); a refresh's cutoff, the moment it
-                     began, refetches every page written before it, so the
-                     pulls of one refresh fetch a shared article once. A
-                     page that fails to refetch keeps its cached copy and is
-                     listed in the context's stale, so a flaky source
-                     degrades to yesterday's numbers, never to an empty
-                     table, and the pull says so
+                     cache, the session, the log and the refresh's cutoff
 
 Each source package (blizzard, wiki) names its own endpoints
 and its own `sources` row, so provenance lives with the source. Fetching
@@ -35,7 +26,7 @@ from collections.abc import Callable, Mapping
 
 import requests
 
-from db import SECONDS_PER_HOUR, Log, to_stderr
+from db import SECONDS_PER_HOUR, Log, to_stderr, write_whole
 
 MAX_BACKOFF = 60.0
 
@@ -89,13 +80,17 @@ class PullContext:
     from the caches).
 
     stale holds 'name: error' for each page whose refetch failed and whose
-    cached copy was read instead. The context stays frozen: only the list's
+    cached copy was read instead. captured holds the write time of each
+    page served, a time.time() stamp: a cached copy's, or a fetched page's
+    as it was written, so a build from the caches dates a page as the
+    refresh that fetched it did. The context stays frozen: only the lists'
     contents change."""
     cache_dir: str
     session: requests.Session = dataclasses.field(default_factory=session)
     log: Log = to_stderr
     cutoff: float | None = None
     stale: list[str] = dataclasses.field(default_factory=list)
+    captured: list[float] = dataclasses.field(default_factory=list)
 
 
 def _age(path: str) -> float:
@@ -107,12 +102,6 @@ def _read_cache(path: str) -> str:
     """A cached page's text."""
     with open(path, encoding="utf-8") as handle:
         return handle.read()
-
-
-def _write_cache(path: str, text: str) -> None:
-    """A page's text into the cache, over any older copy."""
-    with open(path, "w", encoding="utf-8") as handle:
-        handle.write(text)
 
 
 def _keep_stale(pull: PullContext, path: str, error: Exception) -> str:
@@ -170,18 +159,21 @@ def cached(pull: PullContext, name: str, produce: Callable[[], str]) -> str:
     is read and nothing is asked for. Otherwise produce() runs and its text
     is written. When it fails with a FetchError, the stale copy is kept and
     named in the pull's stale, and the failure surfaces only when there is
-    none.
+    none. The write time of the copy served joins the pull's captured.
     """
     path = os.path.join(pull.cache_dir, name)
     if os.path.exists(path) and (pull.cutoff is None or os.path.getmtime(path) >= pull.cutoff):
-        return _read_cache(path)
-    try:
-        text = produce()
-    except FetchError as error:
-        if os.path.exists(path):
-            return _keep_stale(pull, path, error)
-        raise
-    _write_cache(path, text)
+        text = _read_cache(path)
+    else:
+        try:
+            text = produce()
+        except FetchError as error:
+            if not os.path.exists(path):
+                raise
+            text = _keep_stale(pull, path, error)
+        else:
+            write_whole(path, text)   # never half a page a later build reads as whole
+    pull.captured.append(os.path.getmtime(path))
     return text
 
 

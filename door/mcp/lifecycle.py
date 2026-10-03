@@ -18,12 +18,12 @@ import datetime
 import os
 import re
 from collections.abc import Mapping, Sequence
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 
 import psycopg
 from psycopg.sql import SQL
 
-from db import ROOT, Refusal, psql
+from db import ROOT, Refusal, psql, web
 from db.psql import schema
 from door.mcp.registry import REFRESH, Context, tool
 from door.mcp.schema import ToolReply
@@ -51,6 +51,21 @@ class DbStatus(TypedDict):
     snapshots: list[Snapshot]
     newest_capture: str | None
     pending_migrations: list[str]
+
+
+class DataHealth(TypedDict):
+    """What the data container's /health answers: ok with the database's
+    state and counts as read_status reads them, or degraded with the error
+    when the database is out of reach. compose.yaml's healthcheck reads the
+    state, and orchestrator.py the rest."""
+    status: web.HealthStatus
+    state: NotRequired[schema.State]
+    table_count: NotRequired[int]
+    pending_migrations: NotRequired[list[str]]
+    heroes: NotRequired[int]
+    announced: NotRequired[int]
+    newest_capture: NotRequired[str | None]
+    error: NotRequired[str]
 
 
 # the tables db_status counts, where they exist
@@ -88,7 +103,7 @@ def db_status(ctx: Context) -> ToolReply:
         status["dsn"], status["state"], status["table_count"],
         "\n".join("  %-16s %d" % kv for kv in status["counts"].items()),
         len(status["snapshots"]), ", newest capture %s" % newest if newest else "",
-        "\nPENDING MIGRATIONS (rebuild): %s" % ", ".join(missing)
+        "\nPENDING MIGRATIONS (db_migrate keeps the data): %s" % ", ".join(missing)
         if missing else "")
     return ToolReply(text, status)
 
@@ -146,18 +161,26 @@ def db_rebuild(ctx: Context, refresh: bool = False) -> ToolReply:
                      {"dropped": len(dropped), "sync": results})
 
 
+DICTIONARY_DOC = os.path.join(ROOT, "docs", "db.md")       # where db_docs writes the dictionary
+
+
 @tool(
     "db_docs", "Regenerate the generated sections of the docs: the data dictionary"
     " in docs/db.md from the live schema, the catalog and vocabulary in"
     " docs/inference.md from the strategies files, the tool reference in docs/mcp.md.")
 def db_docs(ctx: Context) -> ToolReply:
     with ctx.connect() as cx:
-        text = schema.generate_docs(cx)
+        text = schema.generate_docs(cx, DICTIONARY_DOC)
+        tables = schema.table_count(cx)
     paths = [p for p in (catalog.write_docs(catalog.load()), ctx.tools.write_docs()) if p]
+    text += "; wrote " + ", ".join(os.path.relpath(p, ROOT) for p in paths)
+    skipped: list[str] = []
     if catalog.strategies_dir() != catalog.SHIPPED_DIR:
-        ctx.log("db_docs: another playbook folder is in force (%s); the catalog section"
-                " of docs/inference.md was left as the shipped playbook" % catalog.strategies_dir())
-    return ToolReply(text + "; wrote " + ", ".join(os.path.relpath(p, ROOT) for p in paths), {})
+        skipped.append(os.path.relpath(catalog.DOCS_PATH, ROOT))
+        text += ("\nanother playbook folder is in force (%s): the catalog section of %s"
+                 " was left as the shipped playbook" % (catalog.strategies_dir(), skipped[0]))
+    written = [os.path.relpath(p, ROOT) for p in (DICTIONARY_DOC, *paths)]
+    return ToolReply(text, {"written": written, "skipped": skipped, "tables": tables})
 
 
 # --- read-only SQL ----------------------------------------------------------
@@ -166,11 +189,13 @@ READ_ONLY_STARTS = ("select", "with", "explain", "show", "table", "values")
 # The same starts as the description and the refusal name them.
 READ_ONLY_NAMES = "%s or %s" % (", ".join(s.upper() for s in READ_ONLY_STARTS[:-1]),
                                 READ_ONLY_STARTS[-1].upper())
-# Names that reach the file system or the network from inside SQL, refused
-# before the database sees them. The reader role below is the second guard.
+# Names that reach the file system or the network from inside SQL, run text
+# as SQL, change settings, sleep, or signal the server and its other
+# sessions, refused before the database sees them. pg_sleep\w* is the three
+# sleeps migration 012 revokes. The reader role below is the second guard.
 SQL_DENIED = re.compile(r"\b(pg_read_file|pg_read_binary_file|pg_ls_dir|pg_stat_file|"
                         r"lo_import|lo_export|lo_get|lo_put|pg_execute_server_program|"
-                        r"dblink|pg_sleep|pg_terminate_backend|pg_cancel_backend|"
+                        r"dblink|pg_sleep\w*|pg_terminate_backend|pg_cancel_backend|"
                         r"set_config|query_to_xml|query_to_xmlschema|query_to_xml_and_xmlschema|"
                         r"cursor_to_xml|cursor_to_xmlschema|pg_reload_conf)\b", re.I)
 READER_ROLE = "matrix_reader"          # a login of its own (migration 012): SELECT, nothing else
@@ -180,8 +205,10 @@ MAX_QUERY_BYTES = 1 << 20              # what one query may return
 MAX_CELL = 2000                        # characters per cell
 # What Postgres says of a statement the caller can fix: a syntax error, an
 # unknown table, column or function, a privilege the reader lacks, a bad cast,
-# the ten-second timeout.
+# a construct Postgres does not support, a write the read-only transaction
+# refuses, the ten-second timeout.
 QUERY_REFUSED = (psycopg.errors.ProgrammingError, psycopg.errors.DataError,
+                 psycopg.errors.NotSupportedError, psycopg.errors.ReadOnlySqlTransaction,
                  psycopg.errors.QueryCanceled)
 
 # A cell as JSON carries it.
@@ -205,8 +232,8 @@ def reader_dsn(dsn: str) -> str:
 def query(ctx: Context, sql: str) -> ToolReply:
     columns, rows = _read_only(ctx.dsn, _checked_sql(sql))
     kept, truncated = _page(rows)
-    text = "\t".join(columns) + "\n" + "\n".join(
-        "\t".join(str(v) for v in row) for row in kept) if columns else "(no rows)"
+    text = "\t".join(columns) + "\n" + ("\n".join(
+        "\t".join(str(v) for v in row) for row in kept) if rows else "(no rows)")
     if truncated:
         text += "\n(truncated: %d rows shown)" % len(kept)
     return ToolReply(text, {"columns": columns, "rows": kept, "truncated": truncated})

@@ -24,8 +24,8 @@ from facts.kit import KitPiece, dual_rate, on_self
 from facts.model import Hero
 
 # Keyword families the wiki tags abilities with, read verbatim from the
-# keywords column; the wiki's prose is read only in facts.kit, and the name
-# lists below (PILOT_GUNS to SAVE_TOOLS) are authored. The wiki writes a
+# keywords column; the name lists below (PILOT_GUNS to SAVE_TOOLS) are
+# authored. The wiki writes a
 # keyword as `family;;qualifier` ("area of effect;;spherical", "invulnerable;;
 # targets"): a KitPiece keeps the family in `keywords` and the whole atom in
 # `atoms`.
@@ -49,13 +49,8 @@ FORM_GATED = ("Configuration: Assault", "Pummel", "Tesla Cannon Alt Fire", *PILO
 SAVE_TOOLS = ("Immortality Field",)
 
 # --- sustained healing ------------------------------------------------------
-# hero.hps is hp/s landed on teammates, summed over every teammate a piece
-# reaches and over every piece that runs beside the others; the caster's own
-# healing is out (docs/inference.md, Sustained healing). The six stand spread
-# uniformly over a disk of radius FORMATION_RADIUS: a piece centred on the
-# caster reaches TEAMMATES x p(r) of them, a piece that lands on an aimed
-# teammate 1 + (TEAMMATES - 1) x p(r), p(r) the chance two points of the disk
-# lie within r (p_within).
+# hero.hps is hp/s landed on teammates (docs/inference.md, Sustained healing;
+# the math page's reach and hps).
 #
 # 15 m is a judgement. Its anchor is the shortest single-target heal range
 # among the supports: Caduceus Staff, Biotic Grasp and Healing Pylon (the
@@ -140,41 +135,43 @@ def mobility_tools(pieces: Iterable[KitPiece]) -> list[KitPiece]:
 
 
 def derive_scalars(hero: Hero) -> None:
-    """The hero's numbers, from the kit rows. Three kit sets:
+    """The hero's numbers, from the kit rows. Three kit sets, and two made of
+    them:
 
-        base    weapons, abilities and passives - what the hero brings every fight
-        ults    the ultimates - their numbers are their own (ult_*), and they
-                count toward the tools a team plans its big fights around
-                (crowd control, area damage, saves, overhealth, anti-heal)
-        perks   one of two choices a tier: never a baseline number
+        base        weapons, abilities and passives - what the hero brings every fight
+        ults        the ultimates - their numbers are their own (ult_*), and they
+                    count toward the tools a team plans its big fights around
+                    (crowd control, area damage, saves, overhealth, anti-heal)
+        perks       one of two choices a tier: never a baseline number
+        with_ults   base and ults together
+        in_fight    base less the pieces swapped to off the fight (OFF_FIGHT)
 
     The steps run in order: the body, dps, burst, healing (the one step
     that reads an earlier one's result, dps), reach, weapon kinds, area,
     barriers, amps, control, saves and the ultimate."""
     ults = hero.ults
     base = hero.weapons + [a for a in hero.abilities if a.kind != KIND_ULTIMATE]
-    fights = base + ults
-    fought = [k for k in base if k.name not in OFF_FIGHT]
+    with_ults = base + ults
+    in_fight = [k for k in base if k.name not in OFF_FIGHT]
     steady = [w for w in hero.weapons if w.name not in FORM_GATED]
     guns = [w for w in steady if w.damages]
     _body(hero, base)
     _dps(hero, steady, guns)
     _burst(hero, base)
-    _healing(hero, fought, hero.dps)
+    _healing(hero, in_fight, hero.dps)
     _reach(hero, guns)
     _weapon_kinds(hero, base, guns)
-    _area(hero, fights)
-    _barriers(hero, base, fought)
-    _amps(hero, fights, fought)
-    _control(hero, base, fights)
+    _area(hero, with_ults)
+    _barriers(hero, base, in_fight)
+    _amps(hero, with_ults, in_fight)
+    _control(hero, base, with_ults)
     _saves(hero, base, ults)
     _ult(hero, ults)
 
 
 def _body(hero: Hero, base: list[KitPiece]) -> None:
-    """pool, keywords and form_armor; cooldowns and median_cooldown."""
+    """pool and form_armor; cooldowns and median_cooldown."""
     hero.pool = hero.health + hero.shield + hero.armor
-    hero.keywords = set[str]().union(*(k.keywords for k in base))
     # armor an ability's form wears (Nemesis Form), by the form's uptime. Kept
     # apart from the base row: `armor` and `pool` stay what the hero spawns with
     hero.form_armor = 0.0
@@ -208,7 +205,7 @@ def _burst(hero: Hero, base: list[KitPiece]) -> None:
     hero.burst = max(hits, default=0.0)
 
 
-def _healing(hero: Hero, fought: list[KitPiece], dps: float) -> None:
+def _healing(hero: Hero, in_fight: list[KitPiece], dps: float) -> None:
     """hps and hps_pieces, sustained healing onto teammates (_team_pieces);
     peak_heal, the largest cast onto one; self_hps and self_heal, the hero's
     own. A rate (hp/s) and a cast (hp) are two quantities, and what lands on
@@ -216,7 +213,7 @@ def _healing(hero: Hero, fought: list[KitPiece], dps: float) -> None:
     team_cast: list[float] = []
     own_rate: list[float] = []
     own_cast: list[float] = []
-    for piece in fought:
+    for piece in in_fight:
         mine = not _lands_on_team(hero, piece)
         rate = piece.heal_rate()
         casts = [s.value for s in piece.flat("heal") if not on_self(s.condition)]
@@ -230,7 +227,7 @@ def _healing(hero: Hero, fought: list[KitPiece], dps: float) -> None:
         share = _share_cast(piece, mine, dps)
         if share is not None:
             own_cast.append(share)
-    hero.hps_pieces = _team_pieces(hero, fought)
+    hero.hps_pieces = _team_pieces(hero, in_fight)
     hero.hps = sum(hero.hps_pieces.values())
     hero.peak_heal = max(team_cast, default=0.0)
     hero.self_hps = max(own_rate, default=0.0)
@@ -262,10 +259,11 @@ class Energy(NamedTuple):
     delay: float
 
 
-def p_within(r: float, big: float = FORMATION_RADIUS) -> float:
-    """The chance two points spread uniformly over a disk of radius `big` lie
-    within `r` of each other: the disk's distance distribution, closed form."""
-    s = r / big
+def p_within(r: float) -> float:
+    """The chance two points spread uniformly over a disk of radius
+    FORMATION_RADIUS lie within `r` of each other: the disk's distance
+    distribution, closed form."""
+    s = r / FORMATION_RADIUS
     if s <= 0:
         return 0.0
     if s >= 2:
@@ -307,13 +305,13 @@ def _lands_on_team(hero: Hero, piece: KitPiece) -> bool:
     return hero.role == "support" or piece.for_allies or "deployable" in piece.keywords
 
 
-def _team_pieces(hero: Hero, fought: list[KitPiece]) -> dict[str, float]:
+def _team_pieces(hero: Hero, in_fight: list[KitPiece]) -> dict[str, float]:
     """hp/s onto teammates per counted piece: the best healing weapon, and
     every ability and passive that runs beside it. A lock-on channel holds the
     weapon for its share of the cycle; a refund of a beam's energy adds to the
     beam."""
     team = [
-        k for k in fought
+        k for k in in_fight
         if _lands_on_team(hero, k) and k.name not in NOT_BESIDE + OWN_HEALS]
     guns = [(k.name, _weapon_heal(k)) for k in team if k.kind == KIND_WEAPON]
     gun, rate = max(guns, key=lambda g: g[1], default=("", 0.0))
@@ -327,13 +325,13 @@ def _team_pieces(hero: Hero, fought: list[KitPiece]) -> dict[str, float]:
             value, share = locked
             held += share
         else:
-            value = _cast_heal(piece, fought)
+            value = _cast_heal(piece, in_fight)
         if value:
             pieces[piece.name] = value
     for piece in team:
         target, refund = ENERGY_REFUND.get(piece.name, ("", 0.0))
         if target in pieces:
-            pieces[target] += _refund(piece, refund, fought, target)
+            pieces[target] += _refund(piece, refund, in_fight, target)
     if rate:
         pieces = {gun: rate * (1 - held), **pieces}
     return pieces
@@ -345,13 +343,13 @@ def _beam_rows(piece: KitPiece) -> tuple[float, float, float]:
     before the hps field, as the tick does (Mercy: 55, where the field says
     60)."""
     rates = [
-        (s.condition or "", s.per_second) for s in piece.stats.get("heal", ())
+        (s.condition, s.per_second) for s in piece.stats.get("heal", ())
         if s.per_second and s.den_value in (None, 1.0) and not on_self(s.condition)]
     rate = next((v for c, v in rates if not LINGERING_RE.search(c)), 0.0)
     hot = next((v for c, v in rates if LINGERING_RE.search(c)), 0.0)
     hot_s = max((
         s.value for s in piece.stats.get("duration", ())
-        if s.value is not None and LINGERING_RE.search(s.condition or "")), default=0.0)
+        if s.value is not None and LINGERING_RE.search(s.condition)), default=0.0)
     return rate, hot, hot_s
 
 
@@ -359,14 +357,14 @@ def _energy(piece: KitPiece) -> Energy | None:
     """The piece's energy rows, or None when it spends none. Of several regen
     rates the fastest: Moira's secondary fire refills it."""
     rates = [
-        ((s.condition or "").lower(), s.per_second) for s in piece.stats.get("energy", ())
+        (s.condition.lower(), s.per_second) for s in piece.stats.get("energy", ())
         if s.per_second]
     cost = [v for c, v in rates if "cost" in c]
     regen = [v for c, v in rates if "regen" in c or "recharge" in c]
     delay = [
         s.value for s in piece.stats.get("duration", ())
-        if s.value is not None and "delay" in (s.condition or "")
-        and ("regen" in (s.condition or "") or "recharge" in (s.condition or ""))]
+        if s.value is not None and "delay" in s.condition
+        and ("regen" in s.condition or "recharge" in s.condition)]
     if not (cost and regen):
         return None
     return Energy(max(cost), max(regen), max(delay, default=0.0))
@@ -388,8 +386,8 @@ def _weapon_heal(piece: KitPiece) -> float:
         if rate:
             return rate
     rate = piece.rate("hps", "heal") or 0.0
-    direct = [f.value for f in piece.flat("heal") if "direct" in (f.condition or "")]
-    splash = [f.value for f in piece.flat("heal") if "splash" in (f.condition or "")]
+    direct = [f.value for f in piece.flat("heal") if "direct" in f.condition]
+    splash = [f.value for f in piece.flat("heal") if "splash" in f.condition]
     radius = piece.plain_stat("radius")
     if direct and splash and radius and piece.name in AIMED:
         shot = max(direct) + max(splash)
@@ -434,8 +432,8 @@ def _cast_total(piece: KitPiece) -> float:
     every cast lands - 120 at low health and 100 under half are conditional;
     a heal per pulse counts every pulse of the duration."""
     flats = [f for f in piece.flat("heal") if not on_self(f.condition)]
-    instant = [f.value for f in flats if not LINGERING_RE.search(f.condition or "")]
-    lingering = [f.value for f in flats if LINGERING_RE.search(f.condition or "")]
+    instant = [f.value for f in flats if not LINGERING_RE.search(f.condition)]
+    lingering = [f.value for f in flats if LINGERING_RE.search(f.condition)]
     totals = [
         s.value for s in piece.stats.get("heal", ())
         if s.value is not None and s.den_value not in (None, 1.0) and s.unit_den == "seconds"
@@ -443,27 +441,27 @@ def _cast_total(piece: KitPiece) -> float:
     cast = min(instant, default=0.0) + sum(lingering) + sum(totals)
     pulses = [
         s.value for s in piece.stats.get("duration", ())
-        if s.value and "pulse" in (s.condition or "")]
-    if pulses and any("pulse" in (f.condition or "") for f in flats):
+        if s.value and "pulse" in s.condition]
+    if pulses and any("pulse" in f.condition for f in flats):
         cast *= math.floor((piece.max_stat("duration") or 0.0) / min(pulses))
     return cast
 
 
-def _cast_heal(piece: KitPiece, fought: list[KitPiece]) -> float:
+def _cast_heal(piece: KitPiece, in_fight: list[KitPiece]) -> float:
     """An ability's or a passive's sustained hp/s onto teammates."""
     if piece.name in TICK_RATES:
         return _stream(piece)
     if piece.name in UPTIME:
         return _shots(piece) * UPTIME[piece.name]
     if piece.name in TRIGGERED:
-        return _triggered(piece, fought)
-    if any(BOUNCE_RE.search(f.condition or "") for f in piece.flat("heal")):
+        return _triggered(piece, in_fight)
+    if any(BOUNCE_RE.search(f.condition) for f in piece.flat("heal")):
         return _bounces(piece)
     cycle = _cycle(piece)
     rate = _per_second(piece)
     if rate:
         boosted = BOOSTS.get(piece.name)
-        rate -= max((_per_second(k) for k in fought if k.name == boosted), default=0.0)
+        rate -= max((_per_second(k) for k in in_fight if k.name == boosted), default=0.0)
         if not cycle:
             return rate * _reach_count(piece)
         total = rate * (piece.max_stat("duration") or 0.0)
@@ -477,7 +475,7 @@ def _cap(piece: KitPiece) -> float | None:
     second , up to 300"."""
     caps = [
         float(found.group(1)) for s in piece.stats.get("heal", ())
-        for found in [CAP_RE.search(s.text or "")] if found]
+        for found in [CAP_RE.search(s.text)] if found]
     return max(caps, default=None)
 
 
@@ -493,13 +491,13 @@ def _stream(piece: KitPiece) -> float:
     return free + energy_duty(energy.cost, energy.regen, energy.delay, drawn)
 
 
-def _refund(piece: KitPiece, refund: float, fought: list[KitPiece], target: str) -> float:
+def _refund(piece: KitPiece, refund: float, in_fight: list[KitPiece], target: str) -> float:
     """hp/s a cast of `piece` adds to `target` by refunding `refund`% of its
     energy: that much more of the drawn tick, once a cycle."""
     cycle = _cycle(piece)
     ticks = TICK_RATES.get(target, {})
     drawn = sum(v for c, v in ticks.items() if c != FREE_TICK)
-    for beam in fought:
+    for beam in in_fight:
         energy = _energy(beam)
         if beam.name == target and energy and cycle:
             return drawn * refund / energy.cost / cycle
@@ -515,14 +513,14 @@ def _shots(piece: KitPiece) -> float:
     return shot * (piece.max_stat("fire_rate") or 0.0)
 
 
-def _triggered(piece: KitPiece, fought: list[KitPiece]) -> float:
+def _triggered(piece: KitPiece, in_fight: list[KitPiece]) -> float:
     """A heal a weapon's hits trigger (TRIGGERED), held while they land: the
     trigger comes on the first swing past each lockout. The instant heal
     counts once a trigger, the per-second one over what its duration covers
     of the gap."""
     weapon, lockout = TRIGGERED[piece.name]
     swings = [
-        s.per_second for k in fought if k.name == weapon
+        s.per_second for k in in_fight if k.name == weapon
         for s in k.stats.get("fire_rate", ()) if s.per_second]
     if not swings:
         return 0.0
@@ -540,10 +538,10 @@ def _bounces(piece: KitPiece) -> float:
     of the last, while one stands there."""
     chain = sorted(
         (int(found.group(1)), f.value) for f in piece.flat("heal")
-        for found in [BOUNCE_RE.search(f.condition or "")] if found)
+        for found in [BOUNCE_RE.search(f.condition)] if found)
     hop = max((
         s.value for s in piece.stats.get("range", ())
-        if s.value is not None and "bounce" in (s.condition or "")), default=0.0)
+        if s.value is not None and "bounce" in s.condition), default=0.0)
     near = p_within(hop)
     landed, total = 1.0, 0.0
     for order, (_, value) in enumerate(chain):
@@ -561,7 +559,7 @@ def _lock_on(piece: KitPiece) -> tuple[float, float] | None:
     teammate FORMATION_RADIUS away."""
     locks = [
         s.value for s in piece.stats.get("duration", ())
-        if s.value is not None and "lock-on" in (s.condition or "")]
+        if s.value is not None and "lock-on" in s.condition]
     span = piece.plain_stat("range") or 0.0
     wait = piece.max_stat("cooldown") or 0.0
     if not (locks and span > LOCK_NEAR and wait):
@@ -624,13 +622,13 @@ def _weapon_kinds(hero: Hero, base: list[KitPiece], guns: list[KitPiece]) -> Non
     hero.melee_only = hero.melee and hero.weapon_kinds <= {"melee"}
 
 
-def _area(hero: Hero, fights: list[KitPiece]) -> None:
+def _area(hero: Hero, with_ults: list[KitPiece]) -> None:
     """aoe_count and aoe_damage_count: the pieces that hit an area, and those
     of them that deal damage. A weapon is in the abilities table too (kind
     'weapon', no config extra): each weapon counts once, whatever its
     configs."""
     area: dict[str, bool] = {}                  # piece -> does it damage
-    for k in fights:
+    for k in with_ults:
         # tagged, or a damaging piece typed Area of effect with no tag (Trailblazer)
         wide = k.keywords & set(AREA_KEYWORDS) or (k.damages and k.typed("area of effect"))
         if wide and not (k.kind == KIND_WEAPON and not k.extra and hero.weapons):
@@ -640,7 +638,7 @@ def _area(hero: Hero, fights: list[KitPiece]) -> None:
     hero.aoe_damage_count = sum(area.values())
 
 
-def _barriers(hero: Hero, base: list[KitPiece], fought: list[KitPiece]) -> None:
+def _barriers(hero: Hero, base: list[KitPiece], in_fight: list[KitPiece]) -> None:
     """barrier_hp and pierces_barrier."""
     barriers = [k.plain_stat("barrier_health") for k in base]
     barriers += [
@@ -653,38 +651,38 @@ def _barriers(hero: Hero, base: list[KitPiece], fought: list[KitPiece]) -> None:
         k.damages and (
             "barrier piercing" in k.keywords
             or ((k.max_stat("ignores_barrier") or 0) >= 1 and not k.for_allies))
-        for k in fought if k.kind != KIND_PASSIVE)
+        for k in in_fight if k.kind != KIND_PASSIVE)
 
 
-def _amps(hero: Hero, fights: list[KitPiece], fought: list[KitPiece]) -> None:
+def _amps(hero: Hero, with_ults: list[KitPiece], in_fight: list[KitPiece]) -> None:
     """overhealth, antiheal, heal_amp, dmg_amp and lifesteal."""
     hero.overhealth = max(
-        (s.overhealth for k in fights for s in k.stats.get("overhealth", ())
+        (s.overhealth for k in with_ults for s in k.stats.get("overhealth", ())
             if s.overhealth is not None),
         default=0.0)
     mods = [
-        s.value for k in fights for s in k.stats.get("healing_mod", ()) if s.value is not None]
+        s.value for k in with_ults for s in k.stats.get("healing_mod", ()) if s.value is not None]
     hero.antiheal = min((m for m in mods if m < 0), default=0.0)
     hero.heal_amp = max((m for m in mods if m > 0), default=0.0)
     # a passive's damage_amp is the hero's own bonus (Opportunist), not the team's
     amps = [
-        s.value for k in fights if k.kind != KIND_PASSIVE for s in k.stats.get("damage_amp", ())
+        s.value for k in with_ults if k.kind != KIND_PASSIVE for s in k.stats.get("damage_amp", ())
         if s.value is not None and s.value > 0 and not s.condition]
     hero.dmg_amp = max(amps, default=0.0)
     # a percent heal is a share of the damage the hero deals, not hit points
     hero.lifesteal = max(
-        (s.value / 100.0 for k in fought for s in k.stats.get("heal", ())
+        (s.value / 100.0 for k in in_fight for s in k.stats.get("heal", ())
             if s.value is not None and s.unit_num == "percent" and s.condition != "allies"),
         default=0.0)
 
 
-def _control(hero: Hero, base: list[KitPiece], fights: list[KitPiece]) -> None:
+def _control(hero: Hero, base: list[KitPiece], with_ults: list[KitPiece]) -> None:
     """cc_tools, mobility_tools and flyer."""
     # crowd control: tagged as such, an ability that slows, or an ABILITY
     # that knocks an enemy back at MIN_KNOCKBACK or more - a weapon's knockback
     # stat is recoil, and a movement tool's is the hero's own flight
     hero.cc_tools = sorted({
-        k.name for k in fights
+        k.name for k in with_ults
         if k.keywords & set(CC_KEYWORDS)
         or (k.kind in (KIND_ABILITY, KIND_ULTIMATE) and k.damages and k.shoves and not moves(k))
         or (k.kind in (KIND_ABILITY, KIND_ULTIMATE)

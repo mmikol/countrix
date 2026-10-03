@@ -7,41 +7,51 @@
 <a class='sub' href='#sustained-healing'>sustained healing</a>
 <a class='sub' href='#healing-floor'>the healing floor</a>
 <a class='sub' href='#what-100-means'>what 100 means</a>
-<a class='sub' href='#fight-odds'>fight odds</a>
+<a class='sub' href='#problem'>the problem's class</a>
 <a class='sub' href='#argmax'>the argmax</a>
 <a class='sub' href='#searched'>what is searched</a>
 <a class='sub' href='#against-red'>what it is optimal against</a>
 <a class='sub' href='#swaps'>swaps and stages</a>
 <a class='sub' href='#deterministic'>deterministic, not probabilistic</a>
 <a href='#board'>the board</a>
-<a class='sub' href='#likely-comp'>red's likely starting comp</a>
+<a class='sub' href='#likely-comp'>red's likely comp</a>
 <a class='sub' href='#counter'>blue's optimal counter</a>
 <a class='sub' href='#weights'>the weights</a>
 <a href='#pieces'>how the pieces fit</a>
 </nav>
 <h2 id='equation'>The Counter Utility Matrix</h2>
 <p><b>Countrix</b> is short for <b>Counter Utility Matrix</b>, the equation below. The
-counter is who answers whom. The utility is what a pick is worth once the facts are
-counted. The matrix is every selection crossed with every other: heroes against heroes,
-heroes against maps, both against the meta. A comp is the argmax over that matrix.</p>
+counter is who answers whom. The utility is what a six is worth once the facts are counted:
+one number for the whole six, not a sum of its picks' worths, since a pair can pay only
+together. The matrix is every row of the data crossed with every other: heroes against heroes,
+heroes against maps, both against the meta. A comp is the argmax, over the legal sixes, of the
+utility the matrix feeds.</p>
 <pre class='eq'>DATA           = HEROES &cup; MAPS &cup; META
 for each domain D in { HEROES, MAPS, META }:
-  INDEPENDENT(D) = &#8899; facts(s)      over each selection s in D
-  DEPENDENT(D)   = &#8899; facts(s &#8904; t)  over the other selections t
+  INDEPENDENT(D) = &#8899; facts(s)      over each row s of D
+  DEPENDENT(D)   = &#8899; facts(s &#8904; t)  over the rows t that s joins, in D or beyond
   FACTS(D)       = INDEPENDENT(D) &cup; DEPENDENT(D)
 FACTS          = FACTS(HEROES) &cup; FACTS(MAPS) &cup; FACTS(META)
-FACTS(D) &cap; FACTS(E) = the joins of D with E
+FACTS(D) &cap; FACTS(E) = the joins of D with E, read as facts, for D &ne; E
 STRATEGIES     = CONSTRAINTS &cup; HEURISTICS &cup; ASSUMPTIONS
 COMP           = ARGMAX[ STRATEGIES( FACTS ) ]
+               = the first six x of LEGAL by score(x)
+LEGAL          = the sixes of released, unbanned heroes that keep the locked picks,
+                 at most %(MAX_TANKS)d tanks, every CONSTRAINT true on FACTS(x)
+score(x)       = base(x) + each HEURISTIC's term on FACTS(x); an ASSUMPTION adds nothing
+FACTS(x)       = the board's FACTS, and the six's own, team and matchup, read on x
+first          = the highest score to %(SCORE_PLACES)d places, then the board's draw, then the names
 </pre>
 <p><b>DATA</b>: the tables as pulled. HEROES: kits, their published numbers, playstyles,
 counters, synergies. MAPS: mode, stages, sides, and the terrain the wiki's articles
 describe, counted as mentions per thousand words (chokes, interiors, high ground, flanks,
 sightlines, open ground, hazards, cover). META: win, pick and ban rates per hero and per
 map, dated.</p>
-<p><b>FACTS</b>: what the fact engine derives for one board. The <b>independent</b> facts of
-a domain come from one row: a hero's pool, range and rates; a map's mode, stages and
-terrain, each feature z-scored across the maps with text; the meta's vintage.</p>
+<p><b>FACTS</b>: what the fact engine derives for one board and a six on it: the board's facts
+hold still, and the six's own, <code>team</code> and <code>matchup</code>, are read afresh on
+every six the function scores. The <b>independent</b> facts of a domain come from one row: a
+hero's pool, range and rates; a map's mode, stages and terrain, each feature z-scored across the
+maps with text; the meta's vintage.</p>
 <p>The <b>dependent</b> facts are joins (&#8904;). A hero's rate on this map is
 heroes &#8904; map_meta &#8904; maps. The style a map rewards adds the rates' lift to the
 terrain's lean:
@@ -53,60 +63,83 @@ it pairs with, the six aggregated, the twelve compared, and a ban weighed agains
 teams' counters. Facts are numbered F1, F2, &hellip;; every claim on the board cites one.</p>
 <p><b>STRATEGIES</b>: the playbook, one markdown file each. Constraints cut the space, then
 heuristics weigh what is left. A <b>constraint</b> is a limit: it always holds and is never
-weighted. A <b>heuristic</b> is a metric, a direction and a weight, or a bonus or penalty under
-a condition, times its weight. An <b>assumption</b> is prose: shown, never scored.</p>
-<p><b>COMP</b>: of every legal six, the one the function scores highest on this board. The
-same board gives the same six.</p>
+weighted. A <b>heuristic</b> is a metric, a direction and a weight, or a bonus less a penalty
+times its weight; either may count only under a condition, its <code>when</code>. An
+<b>assumption</b> is prose: shown, never scored. Read as a function, STRATEGIES( FACTS ) is
+score(x) on the legal sixes: the constraints set its domain, the heuristics its terms, over the
+default engine's base(x), whose weights <code>meta.md</code> holds.</p>
+<p><b>COMP</b>: of every legal six, the first in the board's order: the highest score to
+%(SCORE_PLACES)d decimal places, then the board's tie-break draw, then the names, so it falls
+short of the highest score by less than a unit in the last of those places. The same board
+gives the same six.</p>
 <h2 id='chosen'>How a six is chosen</h2>
 <p>Inference on maxims and facts. The maxims are the playbook's rules, the facts the database's
 numbers about this board, and together they make one objective, weighted and constrained, which
-the search solves exactly. Five steps, in order:</p>
+the search solves exactly or refuses. Five steps, in order:</p>
 <pre class='eq'>1  the space       every six of released, unbanned heroes that keeps the locked picks,
-                   each set once, grouped tank, damage, support; at most two tanks
+                   each set once, grouped tank, damage, support; at most %(MAX_TANKS)d tanks
 2  the limits      each constraint removes the sixes that break it, and weighs nothing
 3  the meta        the default engine scores every six left, times the meta weight:
                    win-rate edge trusted by pick rate, synergies, counters
 4  the heuristics  each adds or subtracts, times its weight, from the same facts
 5  the argmax      the best legal six, proved, then the next best in order;
                    every reason cites a fact</pre>
-<p>An open board held about 17.2 million legal sixes under the shipped playbook at the
-roster of 2026-09-28 (<a href='#searched'>what is searched</a>), and a ban or a locked pick
-leaves fewer. A synergy cell no hero's article writes is unknown, not zero: it reads half the
-mean of the written pairs, so a pair neither article writes reads the mean. The weights are
-not learned: a rule's starting weight comes from its prose on the house scale, 0.25 a whisper,
-1 the default, 2.5 strong and 4 dominant, and each rule's weight and each of the engine's is
-yours to turn - the tune tool for the file, a slider for a session, the Meta slider for the
-whole engine. A score is not a probability: a badge reads it as a share of the seat's optimal, and
-the fight odds split the two seats' shares. The rates are Competitive Role Queue, 5v5, a proxy
-for Open Queue 6v6, so a value a hero has only beside a second tank, such as Zarya's in a
-two-tank front line, is missing from them.</p>
+<p>An open board held about 13.0 million legal sixes under the shipped playbook of 2026-10-03
+at the roster of 2026-09-28 (<a href='#searched'>what is searched</a>), and a ban or a locked pick
+leaves fewer. A synergy cell no hero's article writes is unknown, not zero: it reads the share
+of the written cells that claim their pair, so a pair neither article writes reads twice that,
+the written pairs' mean with their own blank cells read the same way. The weights are not
+learned: a rule's starting weight comes from its prose on the house scale, 0.25 a whisper, 1
+the default, 2.5 strong and 4 dominant, or from the owner's word, as <code>heal-rate</code>'s 2
+did, and each rule's weight and each of the engine's is yours to turn - the tune tool for the
+file, a slider for a session, the Meta slider for the whole engine. A score is not a
+probability: blue's badge places it on the seat's span, from its floor, 0, to its optimal, 100.
+Red is never optimized or scored: its badge is its likely six's pull. The rates are Competitive Role Queue,
+5v5, a proxy for Open Queue 6v6, so a value a hero has only beside a second tank, such as
+Zarya's in a two-tank front line, is missing from them.</p>
 <h2 id='function'>The function: STRATEGIES( FACTS )</h2>
-<p>One six in, one number out. The facts are its namespace: <code>team</code>,
-<code>enemy</code>, <code>matchup</code>, <code>map</code> and <code>world</code>, the facts
-tab's own numbers.</p>
+<p>One six in, one number out: score(x), the default engine's base(x) with the playbook's
+heuristics on top; the constraints decide which sixes it is read on, and the assumptions add
+nothing. The facts are its namespace: <code>team</code>, <code>enemy</code>,
+<code>matchup</code>, <code>map</code> and <code>world</code>, the facts tab's own numbers,
+<code>team</code> and <code>matchup</code> read on the six.</p>
 <p id='default-engine'><b>The default engine</b> scores every six before the playbook reads
 it, whatever the playbook holds: the six's win rates on this map, the wiki's synergy pairs
-among its picks, a cell no hero's article writes counted at half the mean of the pairs one
-does, and the counter graph between it and the other side. A pick's win rate is
+among its picks, a cell no hero's article writes counted at the share of the written cells
+that claim, and the counter graph between it and the other side. A pick's win rate is
 read as its edge over a coin flip, trusted by its pick rate, so a hero picked in few matches
 counts for less. The counter graph is the wiki's edges, its Match-Up tables' and its
 Strategy sections', and where the wiki has no edge either way, the answers the kit derives:
-thirteen mechanisms read off the two heroes' kits, from hitscan against a flier to anti-heal
-against self-healing, each loser's %(TOP_ANSWERS)d best at a score of %(THRESHOLD)g or more.
-A wiki edge counts %(WIKI_WEIGHT)d, a derived one %(DERIVED_WEIGHT)d, and the board names
-every derived edge it counts with the mechanism that fired. The other side is its locked
-picks, or its likely six on this map until it locks one; only this term reads the likely six
-or a derived edge - the playbook's counter metrics read the wiki's graph alone. A playbook of assumptions alone gets the six these three favour, scored and explained,
-and every other term sits on top of them.</p>
-<p>A limit that fails removes the six, and no limit scores. A heuristic on a metric
-normalises it to 0..1 against %(REFERENCE_SIZE)s random legal sixes for the board
-(seeded from map, side, enemies and bans), flips it when minimising, then multiplies by its
-weight. A heuristic guarded on the six's own state (<code>team.*</code> or
-<code>matchup.*</code>) is a <i>need</i>: met in full it costs nothing, unmet it
-costs its weight, so entering the guarded state never pays. A scored heuristic adds its
-weight times bonus minus penalty while its <code>when</code> holds; a rule that should cost
-rather than forbid is one, <code>when: not (the rule)</code> with its penalty. An assumption
-adds nothing.</p>
+%(MECHANISMS)d mechanisms read off the two heroes' kits, from hitscan against a flier to
+anti-heal against self-healing, score every ordered pair, and of each loser's %(TOP_ANSWERS)d
+best answers - a score of %(THRESHOLD)g or more, and above the reverse pair's - those on a pair
+the wiki leaves out count; the others are not replaced. A wiki edge counts %(WIKI_WEIGHT)d, a
+derived one %(DERIVED_WEIGHT)d, and the board names every derived edge it counts with the
+mechanism that fired. Only this term reads a derived edge - the playbook's counter metrics read
+the wiki's graph alone.</p>
+<p>The other side is its locked picks, or its likely six on this map until it locks one. Only
+this term reads the likely six: every other term - the healing floor, the <code>enemy.*</code>
+and <code>matchup.*</code> metrics, the counter metrics, the scale's field - reads the side's
+revealed picks, none before a reveal, on the board and in <code>infer</code> alike. A playbook of
+assumptions alone gets the six these three favour, scored and explained, and every other term
+sits on top of them.</p>
+<p>A limit that fails removes the six, and no limit scores. A heuristic on a metric normalises
+it to 0..1 against %(REFERENCE_SIZE)s random legal sixes for the board, the <i>reference
+sample</i>, and against the board's <i>field</i>, flips it when minimising, then multiplies by
+its weight. The sample is drawn a legal shape first, each shape as likely, then each role's
+heroes, from every released hero, by a string seed of the map and the side alone: red, the bans
+and the locks never move it. The field is every legal six of each role's %(SCALE_POOL)d released
+heroes the board ranks first by a prior - the win rate here, 3 points for each of the other
+side's picks the hero answers less 3 for each that answers it, a point for the map's style and
+one for a best map - which reads the other side, never the bans or the locks.
+Both are measured on the whole map, and a six a limit refuses is left out of both.</p>
+<p>A heuristic on a metric whose <code>when</code> the six decides - one that reads
+<code>team.*</code> or <code>matchup.*</code> - is a <i>need</i>: it counts only on a six in that
+state; met in full it costs nothing, unmet it costs s_n times its weight, its weight at most, so
+entering the guarded state never pays. A scored heuristic is never a need: it adds its weight
+times bonus minus penalty while its <code>when</code> holds, on the board or on the six, so a
+guard on the six's state can pay; a rule that should cost rather than forbid is one,
+<code>when: not (the rule)</code> with its penalty. An assumption adds nothing.</p>
 <pre class='eq'>for one six x, with every limit holding:
 
 score(x) = base(x)
@@ -114,35 +147,49 @@ score(x) = base(x)
          + &Sigma; needs n          s_n &middot; w_n &middot; ( norm_n( metric_n(x) ) &minus; 1 )
          + &Sigma; scored r         w_r &middot; ( bonus_r(x) &minus; penalty_r(x) )
 
+           h: a heuristic on a metric whose when, if it has one, the board settles - a reward
+           n: a heuristic on a metric whose when the six decides - a need
+           each sum runs over its terms whose when holds; a term whose when fails adds 0
+
 base(x)     = %(W_META)g &middot; ( %(W_RATE)g &middot; rates(x) + %(W_SYNERGY)g &middot; synergy(x) + %(W_COUNTER)g &middot; counters(x) )
-rates(x)    = mean over the picks p of  t_p &middot; ( win_p &minus; 50 )
+rates(x)    = mean over the picks p of  t_p &middot; ( win_p &minus; %(COIN_FLIP)g )
               t_p = pick_p / ( pick_p + %(RATE_PICK_HALF)g )
-              win_p, pick_p: p's rates on the map, all ranks; overall with no map or no row
+              win_p, pick_p: p's rates on the map in percent, all ranks; overall with no map
+              or no row, and the overall pick rate where the row has none; no rate adds 0
 synergy(x)  = &Sigma; over the pairs in x of their two cells, one in each hero's article:
-              1 a claim, 0 a write-off, and m / 2 where no article writes the cell,
-              m the mean score of the pairs an article writes
-counters(x) = &Sigma; over x's picks p and the other side's heroes e of  w(e, p) &minus; w(p, e)
-              w(l, a) = %(WIKI_WEIGHT)d where the wiki reads a answering l, 0 where it reads the
+              1 a claim, 0 a write-off, and c where no article writes the cell
+              c = claimed cells / written cells, the written cells' claim share, so a pair
+              neither article writes reads 2c, the written pairs' mean
+counters(x) = &Sigma; over x's picks p and the other side's heroes e of  v(e, p) &minus; v(p, e)
+              v(l, a) = %(WIKI_WEIGHT)d where the wiki reads a answering l, 0 where it reads the
               reverse, else %(DERIVED_WEIGHT)d for a derived answer, else 0
               the other side: its locked picks, else its likely six here
 
 norm_h(v) = clamp( (v &minus; min_ref) / (max_ref &minus; min_ref), 0, 1 )
             and 1 &minus; that when h minimises
-            min_ref, max_ref: over the reference sixes h's guard holds on
-            max_ref = min_ref: a reward reads 0.5, a need costs nothing
+            min_ref, max_ref: h's metric over the reference sample and the field - a need's
+            on the sixes its guard holds on, a reward's on all of them, its gate read as on
+            max_ref = min_ref, or no six to read: a reward reads 0.5, a need costs nothing
 s_n       = min( 1, max( %(NEED_BUDGET)g, the largest w on n's guard ) / &Sigma; w over the needs on n's guard )
-            one state costs %(NEED_BUDGET)g at most, or its largest need's weight where that is more</pre>
+            n's guard: its when and its params; one state costs %(NEED_BUDGET)g at most, or its
+            largest need's weight where that is more</pre>
 <p id='base-weights'><b>The base's weights.</b> They are the playbook's, not the code's:
 <code>meta.md</code> beside the strategy files holds them, and the tune tool changes them. The
 meta, %(W_META)g, scales the whole engine, and at 0 the playbook scores alone. Under it the rate
-term is in win-rate points and weighs %(W_RATE)g. The synergy and counter weights are set so
-that, on the median board, each term spreads the reference sixes about half as far as the rate
-term does; synergy was set again once a blank synergy cell came to read half the written pairs'
-mean. The calibration is in <code>inference/base.py</code>. The figures that follow are at meta 1 and the shipped weights.
-A heuristic moves a six by its weight at most, since its norm is 0..1, and a base term has no
-such bound. On the median board a heuristic at weight 1 moves a six less than any base term
-spreads the sixes, at 2 about as far as the synergy or the counter term, and at the slider's
-10 further than the three together.</p>
+term is in win-rate points and weighs %(W_RATE)g. The synergy and counter weights are set so that
+each term's spread - its highest less its lowest over a board's reference sample, the other side
+red's likely six - has a median over the maps about half the rate term's; synergy was set again
+once a blank synergy cell came to read the written cells' claim share. The calibration is in
+<code>inference/base.py</code>. The figures that follow are at meta 1 and the shipped playbook's
+weights, each spread its median over the maps; under another playbook the weights above are its
+<code>meta.md</code>'s, and the figures do not carry over. A heuristic on a metric moves a six by
+its weight at most, since its norm is 0..1 and s_n is 1 at most. A scored one moves it by its
+weight times its bonus less its penalty, which its own expressions bound: the shipped
+<code>two-of-each-role</code> by up to 3 times its weight within the shipped limits - a 1-4-1
+six, two damage picks past two and a tank short - <code>edges-reward-displacement</code> by up
+to 1.5 times, the other shipped scored rules by their weight at most. A base term has no such bound. A heuristic at weight 1 moves a six
+less than any base term spreads the sixes, at 2 about as far as the synergy or the counter term,
+and at the slider's %(WEIGHT_MAX)g further than the three together.</p>
 <p id='sustained-healing'><b>Sustained healing.</b> A hero's <code>hps</code> is what it lands
 on teammates a second, summed over every piece that runs beside its weapon and over every
 teammate each piece reaches; its own healing is out. A beam that spends energy counts what the
@@ -150,141 +197,223 @@ energy sustains: fire, wait out the regen delay, regenerate, at the cycle that h
 area heal counts the teammates it reaches. The six stand spread uniformly over a disk of radius
 R = %(FORMATION_RADIUS)g m, the shortest single-target heal range among the supports, and p(r)
 is the chance two of them stand within r:</p>
-<pre class='eq'>p(r)       = 1 + (2/&pi;)(s&sup2; &minus; 1) acos(s/2) &minus; (s/2&pi;)(1 + s&sup2;/2) &radic;(4 &minus; s&sup2;)      s = r / R &lt; 2, else 1
-reach      = %(TEAMMATES)d &middot; p(r)          around the caster
-           = 1 + %(TEAMMATES_BUT_ONE)d &middot; p(r)      on an aimed teammate
-hps        = &Sigma; over the counted pieces of heal &middot; reach / cycle
-cycle      the cooldown, and the duration too where the effect is held</pre>
+<pre class='eq'>p(r)       = 1 + (2/&pi;)(s&sup2; &minus; 1) acos(s/2) &minus; (s/(2&pi;))(1 + s&sup2;/2) &radic;(4 &minus; s&sup2;)      s = r / R &lt; 2, else 1
+reach      = %(TEAMMATES)d &middot; p(r)                 around the caster, r its radius
+           = 1 + %(TEAMMATES_BUT_ONE)d &middot; p(r)             on an aimed teammate
+           = 1 + %(TEAMMATES_BUT_ONE)d &middot; angle / 360      a wave, by its angle
+           = 1                        one teammate
+           the teammates a piece reaches, expected
+hps        = &Sigma; over the counted pieces of
+             heal &middot; reach / cycle         a cast; a heal a second counts its rate times
+                                          its duration, to its cap, as its heal
+             rate &middot; reach                 a heal with no cooldown: an aura, an orb held on
+             rate &middot; on / (on + off)       a beam on energy, e%% of the bar at a time: on =
+                                          e / cost, off = delay + e / regen, at the e that heals most
+             rate                         a weapon, its reload in; a splash on an aimed
+                                          teammate adds the others it reaches
+cycle      the cooldown, and the duration too where the effect is held
+           the pylon's uptime, the Flail's trigger, the torpedoes' lock and a bounce chain are
+           rules of their own (facts/scalars.py); a bounce lands on each next teammate at
+           1 &minus; (1 &minus; p(hop))^n, n those not yet healed, an upper bound on the
+           formation's chance: Healing Kasa reads 31.4 where the formation gives about 30.5</pre>
 <p id='healing-floor'><b>The healing floor.</b> The shipped playbook's healing heuristic,
 <code>heal-rate</code>, scored, charges a six that heals less than the other side's rate. It comes
 from a race. A six has a pool P (health, shield, armor), damage D and sustained healing onto
 teammates H, an area heal over the teammates it reaches and a beam at what its resource
-sustains; each side's damage lays the same anti-heal k on the other's healing, so each loses
-(D &minus; k H) / P of its pool a second, and the one that loses the smaller share outlasts the
-other. The margin splits into a damage half and a healing half, and the healing half breaks even
-when blue heals the same share of its own pool as red heals of its own, whatever k is. The need is
-that share of blue's pool, and never less than red's healing in full, since the race never rewards
-a smaller pool.</p>
+sustains. Each side's damage leaves the same share k of the other's healing landing, 0 &lt; k
+&le; 1, so x loses (D_r &minus; k H_x) / P_x of its pool a second and red (D_x &minus; k H_r) / P_r,
+and the one that loses the smaller share outlasts the other. The margin,
+(D_x / P_r &minus; D_r / P_x) + k (H_x / P_x &minus; H_r / P_r), splits into a damage half and a
+healing half, and the healing half breaks even when blue heals the same share of its own pool as
+red heals of its own, whatever k is. The need is that share of blue's pool, floored at red's
+healing in full. The floor is a choice, not the race's: parity asks less of a smaller pool, while
+the race rewards a larger one as long as a six loses health, so a six under red's pool cannot
+lower its bar by shedding pool; over red's pool the need still grows with the pool.</p>
 <pre class='eq'>need(x)      = max( H_r, H_r / P_r &middot; P_x )
 shortfall(x) = max( 0, need(x) &minus; H_x ) / need(x)      0 when need(x) is 0
 charge(x)    = w &middot; shortfall(x)      w the rule's weight in the playbook
 
 H_x, P_x     x's summed sustained healing onto teammates and its pool, a form's armor in
 H_r          red's healing  + f &middot; d_support &middot; hps_bench / 2
-P_r          red's pool     + f &middot; &Sigma;_r d_r &middot; median pool of role r
-d_r          max( 0, 2 &minus; red's picks in role r ): what the two-two-two still misses
-f            red's open slots / &Sigma;_r d_r, 0 when nothing is missing</pre>
-<p>With red empty it is a two-two-two of role-median heroes: it heals <code>world.hps_bench</code>,
-twice the median support, on twice the sum of the role-median pools
-in the kit in force. A six must then heal that share of its own pool a second, and never less
-than <code>world.hps_bench</code>. Everything in
-the threshold is kit data. The sources give no absolute bar - no fight length, no ultimate charge
-- so the rule asks for parity with the other side's healing and no more; past it the race is
-the damage half's. The bar inherits three limits. The bench is a step: Illari, Mizuki and
-Moira sit inside 0.7 hp/s of each other at the median, each on a judgement, and one of them past
-Kiriko lifts the bench to about 151. Overheal is out, so an untargeted area heal, which lands on
-full-health teammates too, reads above what it heals. Brigitte holds her Flail in contact
-throughout; at half contact she reads 61.7 in place of 98.4.</p>
-<p id='what-100-means'><b>What 100 means.</b> Each seat's best six on this board is its
-optimal, 100. Its 0 is the seat's floor: the lowest score among the reference sixes its scale
-draws. A score is signed - the rate term counts each pick's edge over a coin flip - so zero
-anchors nothing, and a six below it would read 0 against any six above it. The badge above a
-picker is that seat's picks on the span between the two, under the default engine and this
-playbook, not a win probability:</p>
-<pre class='eq'>share(x) = clamp( (score(x) &minus; floor) / (best &minus; floor), 0, 1 ) &middot; 100
-           best: the seat's optimal six; floor: its lowest reference six</pre>
+P_r          red's pool     + f &middot; &Sigma;_q d_q &middot; median pool of role q
+d_q          max( 0, 2 &minus; red's picks in role q ): what the two-two-two still misses
+f            red's open slots / &Sigma;_q d_q, 0 when nothing is missing</pre>
+<p>Red here is the other side's revealed picks, their open slots filled as above; the likely six
+is not read. With red empty - before red reveals a pick - it is a two-two-two of role-median
+heroes: it heals <code>world.hps_bench</code>, twice the median
+support, on twice the sum of the role-median pools in the kit in force. A six must then heal
+that share of its own pool a second, and never less than <code>world.hps_bench</code>, and
+everything in that threshold is kit data. The sources give no absolute bar - no fight length,
+no ultimate charge - so the rule asks for parity with the other side's healing and no more;
+past it the race is the damage half's. The bar inherits three limits, read on the 6v6 kit as of
+2026-09-26. The bench sits under a gap: Illari, Mizuki and Moira sit inside 0.7 hp/s of each
+other at the median, each on a judgement, the bench moves hp for hp with the two that hold the
+median, and one of them past Kiriko lifts it to about 151 hp/s. Overheal is out, so an
+untargeted area heal, which lands on full-health teammates too, reads above what it heals.
+Brigitte holds her Flail in contact throughout; at half contact she reads 61.7 hp/s in place of
+98.4.</p>
+<p id='what-100-means'><b>What 100 means.</b> Blue's best six on this board is its
+optimal, 100. Its 0 is the seat's floor: the lowest score among the sixes of its reference
+sample that keep the board's limits, scored on the board's stage. The sample is drawn from every
+released hero whatever the bans, so the floor six may hold a banned one; the field does not
+enter the floor, and 0 stands in where no six of the sample keeps the limits. A score is signed
+- the rate term counts each pick's edge over a coin flip - so zero anchors nothing, and a six
+below it would read 0 against any six above it. The badge above blue's picker places blue's six
+on the span between the two - its picks at six, the best six its picks reach while it drafts,
+the optimal's 100 before any pick - under the default engine and this playbook,
+not a win probability:</p>
+<pre class='eq'>share(x) = round( clamp( (score(x) &minus; floor) / (best &minus; floor), 0, 1 ) &middot; 100 )
+           best: the seat's optimal six; floor: the lowest score in its reference sample
+           round: to the nearest whole number, a half to the even one</pre>
 <p>An optimal no higher than the floor leaves no share to divide, so every other comp reads
 <i>unscored</i>, and the reason is on hover. A comp whose own picks break a limit - a full six
 that breaks one, or picks no six can complete within the limits - is <i>not allowed</i>: no
-score, no share and no odds, and the badge names the limit. Red's picks are the other side's,
-and never ruled out.</p>
-<p id='fight-odds'><b>Fight odds.</b> Blue's share over the sum of both shares; red's is the
-rest. A seat still drafting is read through its fill, the best six its picks can reach, on
-both sides alike: a sum over fewer picks reads low, so the seat with more picks would lead. With
-one seat unscored or not allowed the bars show the shares alone. This is not a fitted
-probability.</p>
-<p id='argmax'><b>The argmax.</b> The search is exact. Every legal shape is filled role by role
-from every released, unbanned hero of each role, each six built once. A branch of the search
-is dropped only where a bound proves that no six in it can reach the board's best: the
-default engine's terms are bounded together - each open pick's own rate and counter part, its
-synergy with the picks already made, and half its best synergies among the rest - and each of
-the playbook's terms apart, from the range each metric it reads can take over the branch. A
-limit that fails on every six of a branch drops the branch too. Sixes rank by their score to
-%(SCORE_PLACES)d decimal places, then by the board's tie-break draw, then by name. A full six's rank
-is its place in that order - one that ties the best six's score and loses the tie-break is
-not first - counted exactly up to %(RANK_CAP)d.</p>
-<p id='searched'><b>What is searched.</b> Every legal six: <b>17,217,564</b> on an open
-board under the shipped playbook at the roster of 2026-09-28, 53 released heroes, at most two
-tanks and three supports; a hero released or a limit changed moves the count. The search scores a few dozen of them in full and proves the rest cannot beat
-them, so the answer is the best of all of them, and the alternatives are the next best in
-order. The suite checks it on every run: on small boards of a twelve-hero test roster, with
-bans, locked picks and red revealed, under the reference playbook and a two-two-two role
-queue, the default engine on and off, the search returns exactly the sixes a full
-enumeration ranks first. On the built database, a brute force of every legal six on real
-boards agreed with it six for six, score for score.</p>
+score and no share, and the badge names the limits its picks break or, where they break none as
+they stand, says that no six keeping them meets the limits. Red's picks are the other side's,
+and never ruled out. Blue still drafting is read through its fill, the best six its picks can
+reach: a sum over fewer picks reads low. Where no fill is solved - a fill past the search's
+budget - the seat is read off its picks as they stand, and its badge says so.</p>
+<p id='problem'><b>The problem's class.</b> With V the heroes the board leaves open - released
+and unbanned - a six is x &isin; {0,1}^V, x_h = 1 where h is picked, and the search solves</p>
+<pre class='eq'>maximise    score(x)
+subject to  &Sigma;_h x_h = 6
+            x_h = 1                  for each locked pick h
+            &Sigma;_(h a tank) x_h &le; %(MAX_TANKS)d
+            each shape limit         linear in the role counts; the shipped one is
+                                     &Sigma;_(h a support) x_h &le; 3
+            each other limit         a predicate on x's facts; none is shipped</pre>
+<p>It is a nonlinear 0-1 program. base(x) is a quadratic pseudo-Boolean function: the rate and
+counter terms are linear in x - a six always holds six picks, and the other side is fixed for
+the board - and the synergy term is &Sigma;_(h&lt;k) S_hk x_h x_k with S symmetric and
+nonnegative, so base is supermodular: what a pick adds never falls as the picks beside it grow.
+The playbook's terms are not quadratic. They read counts and sums over the picks, the largest or
+smallest of a value among them (<code>range_max</code>, <code>range_min</code>), clamps, a ratio
+- the healing floor's shortfall, piecewise linear-fractional in H_x and P_x - and guards that
+switch a term on or off with x. So the objective is neither linear nor quadratic, and convexity
+does not apply: the set is discrete, and no continuous relaxation is solved. Exactness needs none
+of these: the set is finite, and the search drops only what a valid bound proves cannot
+place.</p>
+<p id='argmax'><b>The argmax.</b> The search is exact or refuses: past its budget of branches
+walked or sixes scored it answers nothing, never a six it has not proved, and a search that ends
+with no six proves that none is legal. Every legal shape is filled role by role from every
+released, unbanned hero of each role, each six built once. The search keeps the best few sixes -
+the optimal and the alternatives after it - and drops a branch only where a bound proves that no
+six in it can enter them: the bound, rounded as the scores are, falls below the last kept six's
+score, or meets it while the largest tie-break the branch can hold falls below that six's.</p>
+<pre class='eq'>bound(branch) = base over the picks made, exactly
+              + each open role's best n candidates by
+                  own(h) + pairs(h, the picks made) + half the sum of h's m &minus; 1 best pairs
+                  n the role's open slots, m all the open slots, a pair with any other candidate
+              + each playbook term at its best over an interval that holds every value its
+                metrics take over the branch, its range or wider:
+                  a heuristic at its norm's better end, a need at 0 where its guard may not hold,
+                  a scored term at w &middot; ( bonus's high end &minus; penalty's low end ),
+                  0 where its when may not hold
+own(h)        = h's rate and counter part, and in the swap search its keep bonus</pre>
+<p>A limit the intervals prove false on every six of a branch drops the branch too; one they
+cannot settle drops each six that breaks it as the walk reaches it. Sixes rank by their score to
+%(SCORE_PLACES)d decimal places, rounded, so two scores that round alike tie; then by their
+tie-break, the sum of their heroes' draws on this board, the larger first; then by their sorted
+names, alphabetically first. A full six's rank is its place in that order - one that ties the
+best six's score and loses the tie-break is not first - counted exactly up to %(RANK_CAP)d.</p>
+<p id='searched'><b>What is searched.</b> Every legal six: <b>13,030,920</b> on an open
+board under the shipped playbook of 2026-10-03 at the roster of 2026-09-28, 53 released heroes,
+one to %(MAX_TANKS)d tanks and one to three supports; a hero released or a limit changed moves
+the count. The
+search scores a few dozen of them in full and proves the rest cannot beat them, so the answer is
+the best of all of them, and the alternatives are the next best in order. The suite checks it on
+every run: on small boards of a twelve-hero test roster, with bans, locked picks, red revealed
+and a pair that pays only together, under the reference playbook with a two-two-two role queue
+and with the open queue's shapes, and on two boards of that roster widened to seven a role under
+the role queue, the default engine on and off and the swap search's keep term with it, the
+search returns exactly the sixes a full enumeration ranks first. On the built database, a brute
+force of every legal six on real boards agreed with it six for six, score for score.</p>
 <p id='against-red'><b>What it is optimal against.</b> A comp is optimal <i>against the red
 you can see</i>, not against every red they might pick. Before red reveals anything the board
-answers their most likely starting comp, drawn from the map's pick rates; each pick they show
+answers their likely starting comp, filled from the map's pick rates and the wiki's synergies,
+through the default engine's counter term; each pick they show
 re-solves against what is now known. It is a best reply to present information and changes as
-that information does. The hedge is the <i>if countered optimally</i> case the
-<code>board</code> tool reports: it scores your six against red's best reply to it, so a comp
-that wins only while red plays badly shows up there. The board page does not solve it.</p>
+that information does. Red is never solved, so nothing scores your six against red's best reply
+to it.</p>
 <p id='swaps'><b>Swaps and stages.</b> A six is not held for the map. Above blue's picks the
 board suggests the swaps that pay for their cost, as one answer: of every legal six, the one that
-scores most less the swap cost for each of blue's picks it drops. The suggested swaps never pull
-against each other, and taking one leaves the rest the best answer from the new picks. The cost
-is in share points of blue's span, %(SWAP)g by default (meta.md's swap, 0 to %(SWAP_MAX)g, a
-slider on the playbook tab), and stands in for the ultimate charge and the walk a swap costs. A
-swap that would lower the fight odds is not suggested, and red is never told to swap. The plan
-stage by stage walks the map's stages in play order: each phase of a route keeps its heroes into
-the next unless a swap gains more than the cost there, one stage at a time, and each arena of a
-Control or Flashpoint map is reached from the six the board suggests, since the game sets no
-order. A stage differs from its map only through its terrain - what the wiki's text on it
-stresses - and the playbook's rules that read it; the win rates are per map.</p>
+scores most less the swap cost for each of blue's picks it drops, a tie to the board's draw. The
+swaps are that one six, so none pulls against another: no hero comes in twice and no slot takes
+two. Taking one leaves that six the search's best from the new picks:</p>
+<pre class='eq'>net_R(x)  = score(x) &minus; c &middot; |R &minus; x|        R: blue's picks; c: the cost in the score's points
+R'        = R less the pick p dropped, plus the hero q taken
+net_R'(x) = net_R(x) + c &middot; ( [p &notin; x] &minus; [q &notin; x] )      [&middot;]: 1 where it holds, else 0
+          &le; net_R(target) + c = net_R'(target)</pre>
+<p>A six that reaches the bound tied the target from R and loses the same draw. The board reads
+the rest from the new picks as it reads any swap, so it can still keep the picks: on a tie with
+them. The cost is in share points of blue's
+span - c = swap &middot; (best &minus; floor) / 100 in the score's points - %(SWAP)g by default
+(meta.md's swap, 0 to %(SWAP_MAX)g, a slider on the playbook tab), and stands in for the ultimate
+charge and the walk a swap costs. The gain is read on the scores, so the whole, clamped shares
+the verdict shows can differ from it by a point, and by more where the picks score below the
+floor. Red is never told to swap.</p>
+<p>The plan stage by stage walks the map's stages in play order from the six the comps tab shows
+- blue's picks at six, the fill around fewer, the optimal before any pick; the board's chosen
+stage plays the swaps suggested above the picks, the phases before it read as played, and the
+phases after it go on from its six.
+Each phase of a route is the best six reachable from the phase before, net of the cost for each
+hero changed, one stage at a time: its heroes stay unless the swaps there gain more than their
+cost, or the six before breaks the stage's limits. Each arena of a Control or Flashpoint map is
+reached from the comps tab's six, since the game sets no order. An unscored seat walks its
+stages at no cost. A stage differs from its map through the ground in play - its terrain, what
+the wiki's text on it stresses, its name, and on a Hybrid its objective, the first phase a point
+and the rest payload - and the playbook's rules that read them; the win rates are per map.</p>
 <p id='reach'><b>Reach.</b> The weights are meant to make a hero common or rare, never
-impossible. What is established is narrower: at the reach fixture's recording of 2026-09-30,
-under the shipped playbook - the default engine, the healing floor and the terrain rules - 50
+impossible. What is established is narrower: at the reach fixture's recording of 2026-10-03,
+under the shipped playbook - the default engine and the rules researched that day - 50
 of the 53 released heroes had a board on which they are in the optimal six, within a match's
-five bans, and each such board is a proof: the six is the exact optimum. The search found none
-for three: Emre, Freja and Sojourn; a roster, a playbook or a weight that moves re-records it.
-That is not
-evidence that no such board exists, only that a search over every map but a few reds did not
-find one. No rule forbids any of them; the engine does not value what they do on the boards it
-tried, and the playbook's rules are what can answer that.</p>
+%(MAX_BANS)d bans, and each such board is a proof: the six is the exact optimum, on the board page
+and in <code>infer</code> alike. The search found none for three: Emre, Freja and Sojourn; a roster, a playbook or a weight that moves
+re-records it. That is not evidence that no such board exists, only that a search over every map
+but a few reds did not find one. No rule forbids any of them; the engine does not value what they
+do on the boards it tried, and the playbook's rules are what can answer that.</p>
 <p><b>When nothing scores</b> - the meta at 0 and no term of the playbook scoring - every legal
 six ties at zero, the board reads <i>unscored</i>, and the optimal is the draw's pick among
 them, marked as one of the sixes tied at the best score.</p>
 <p id='deterministic'><b>Deterministic, not probabilistic.</b> The engine computes; it does not
 sample. The same board, playbook and weights give the same six, the same score and the same
-alternatives in any process, and on any day the data holds still: nothing is drawn at random
-when a board is solved. The weights are inputs like the picks: move the Meta slider or a rule's
-and the objective moves, so the six may too; move it back and the same six returns. The scale's reference sixes and the tie-break's draws come from string
-seeds, the board's map and side. What reads like chance is a tie or a share. A tie is several
-sixes the function scores the same, none of them better; the board's draw - a hash of the map,
-the side and the hero, blind to the rates and the names - picks the one shown, and the board
-says how many tie. With the meta at 0 and every weight at 0, every legal six ties: each hero of
-a role has the same chance of being the one drawn across boards, and one board draws the same
-six every time. A share and the fight odds are ratios of scores, not probabilities of winning:
-nothing here is fitted to match results. The playbook holds both as assumptions, <i>Tied
-sixes are equally good</i> and <i>Deterministic, not probabilistic</i>.</p>
+alternatives in any process, and on any day the data holds still: nothing is left to chance when
+a board is solved - its one draw, the reference sample, is pseudo-random from a string seed and
+the same every time. The weights are inputs like the picks: move the Meta slider or a rule's and
+the objective moves, so the six may too; move it back and the same six returns. The reference
+sample and the tie-break's draws come from string seeds, the board's map and side; the scale's
+field reads the other side's picks besides. What reads like chance is a tie or a share. A tie is
+several sixes whose scores round to the same %(SCORE_PLACES)d decimal places, none of them
+better; the board's draws - each hero's a hash of the map, the side and the hero's id, blind to
+its rates and its name - pick the one shown, the six whose draws sum highest, and the board says
+how many tie. With the meta at 0 and every weight at 0, every legal six ties: each hero of a role
+has the same chance of being the one drawn across boards, and one board draws the same six every
+time. A share is a score's place on blue's span, not a probability of winning, and red's pull
+ranks heroes by their pick rates and documented synergies: nothing here is fitted to match
+results. The playbook holds both as assumptions, <i>Tied sixes are equally good</i> and <i>Deterministic, not probabilistic</i>.</p>
 <h2 id='board'>The board</h2>
-<p id='likely-comp'><b>Red's most likely starting comp</b>: a two-two-two, filled slot by slot
-with the likeliest hero from the map's pick rates and the synergy table, past the bans. No
-strategy is read, and it does not change when red reveals a pick.</p>
-<pre class='eq'>likelihood(h) = pick(h, map) + %(SYNERGY_PULL)g &times; partners(h, the six so far)
+<p id='likely-comp'><b>Red's likely comp</b>: red's revealed picks, then slot by slot toward a
+two-two-two, past the bans, six in all, the open-role hero of the highest pull below - a greedy
+fill by a score in pick-rate points, not the six a probability ranks first. Red is never
+optimized: no strategy is read and nothing scores it. The board suggests it in red's empty
+slots, red's badge is its pull, and blue's counter term reads it before red reveals a pick.</p>
+<pre class='eq'>pull(h)    = pick(h, map) + %(SYNERGY_PULL)g &times; partners(h, the six so far)
+pull(six)  = &Sigma; pull(h) = &Sigma; pick(h, map) + %(SYNERGY_PULL)g &times; the documented pairs on the six
 
-pick(h, map)   the hero's pick rate on this map (overall with no map set)
-partners(h, S) heroes already on the six the synergy table pairs h with</pre>
-<p id='counter'><b>Blue's optimal counter</b>: solved against red's revealed picks, or their
-likely comp until they reveal one, on this map, side and bans; never against blue's own
-picks. Once blue picks, its seat shows blue's six above the optimal: from one to five picks,
+pick(h, map)   the hero's pick rate on this map; overall with no map set or no rate here, 0 with none
+partners(h, S) how many heroes already on S the synergy table pairs h with; a revealed pick
+               counts the revealed picks before it
+               a tie goes to the name first in alphabetical order</pre>
+<p id='counter'><b>Blue's optimal counter</b>: solved against red's revealed picks - before they
+reveal one, the counter term reads their likely comp - on this map, side and bans; never against
+blue's own picks. Once blue picks, its seat shows blue's six above the optimal: from one to five picks,
 the picks with the rest filled by a second solve that keeps them - the six the suggestion
-tiles offer; at six, the six itself. The game plan describes that six. Red's
-optimal is solved as the scale for red's score and not shown.</p>
+tiles offer; at six, the six itself. The game plan describes that six. Blue's is the only seat
+the engine solves.</p>
 <p id='weights'><b>The weights.</b> A heuristic's weight is the slider under its card. It stays
 in your browser and rides with every request until reset; the file's weight is the default,
-and only the tune tool changes it. Every heuristic has a slider, 0 to 10, on a metric or
-scored; a constraint is never weighted. The Meta slider, on the meta's card at the head of
+and only the tune tool changes it. Every heuristic has a slider, 0 to %(WEIGHT_MAX)g, on a metric
+or scored; a constraint is never weighted. The Meta slider, on the meta's card at the head of
 the playbook tab, does the same for meta.md's meta: the whole default engine, scaled for your
 session.</p>
 <h2 id='pieces'>How the pieces fit</h2>
@@ -296,14 +425,16 @@ session.</p>
 FactSet - every table turned into numbered facts, each metric defined once for the board and the
 solver alike.</p>
 <p><b>The inference layer</b> (<code>inference/</code>): the playbook and the solver.
-Expressions are compiled once and whitelisted. The solver runs no model and opens no connection;
-serve.py reads the World per request. No code in the layer calls a language model.</p>
+Expressions are compiled once and whitelisted. The solver runs no model and opens no
+connection. No code in the layer calls a language model.</p>
 <p><b>The door</b> (<code>door/</code>): the MCP tools, the one way in for a write, and the
 clock that runs them daily.</p>
 <p><b>The board</b> (<code>ui/</code>): the facts layer's facts of one board and the inference
-layer's answer at each stage of a draft. It never calls a language model.</p>
+layer's answer at each stage of a draft; <code>serve.py</code> reads the World per request.
+It never calls a language model.</p>
 <p><b>Claude</b>: runs when you ask. It refreshes the sources, derives a strategy's mathematics
-from its prose, and tunes weights. <code>/comp</code> is the same solver in chat.</p>
+from its prose, and tunes weights. <code>/comp</code> is the same solver in chat: the same board
+gives the same six there.</p>
 <p class='legend'><code>docs/architecture.md</code>, <code>docs/db.md</code>,
 <code>docs/inference.md</code>.</p>
 </article>

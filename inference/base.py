@@ -23,8 +23,9 @@
 
 It is always on and needs no playbook: under a playbook of assumptions the
 board's sixes are the ones these three favour, and the strategies' terms
-sit on top of it (inference.scoring). A heuristic moves a six by its weight
-at most, since its norm is in [0, 1].
+sit on top of it (inference.scoring). A heuristic on a metric moves a six
+by its weight at most, since its norm is in [0, 1]; a scored one by its
+weight times its bonus less its penalty, which its expressions bound.
 
 Only this term reads the kit's derived edges. The team.* counter metrics -
 coverage, exposed_count, net_edges and their family - read the wiki's
@@ -55,24 +56,18 @@ a term counts inside is its definition and stays here, recorded in the
 stamp: RATE_PICK_HALF, and a derived counter edge at DERIVED_WEIGHT
 against a wiki edge's WIKI_WEIGHT, which keeps the tallies whole.
 
-The shipped values, and why. rate is 1: the rate term is in win-rate
-points. The other two are set so that each term's median range within one
-board is about half the rate term's, about 2.1 points, measured over the
-reference sample (inference.scale.sample, 1,200 legal sixes a board) on
-each of the 30 maps, each board's other side its likely six, the side the
-term reads until one is revealed. The counter graph's median range is 41 -
-the wiki's edges at 2 and the kit's fill at 1 - so counter 0.05 spreads a
-typical board's sixes about 2.1 points. The synergy score's was 21 while
-an unwritten pair read 0, which set synergy at 0.1; read cell by cell, a
-cell no article writes at the written cells' claim share, it is 8.1, and
-the same rule sets synergy at 0.26 (docs/inference.md, Why the weights
-are the playbook's). The rate term's own range reads Blizzard's rates,
-which are licensed for personal use, so its figures stay out of the repo.
-At meta 1 each term's weight is
-the file's exactly (1.0 x w is w in floating point), so moving the numbers
-out of code moved no score. OFF is meta 0 with every dial at 0, and a board
-scored under it is the playbook's alone, exactly as before the engine had a
-base.
+The calibration. rate is 1: the rate term is in win-rate points. The other
+two are set so that each term's median range within one board is about
+half the rate term's, measured over the reference sample
+(inference.scale.sample, 1,200 legal sixes a board) on each of the 30
+maps, each board's other side its likely six, the side the term reads
+until one is revealed. meta.md holds the values, tuning-log.md beside it
+their history, and docs/inference.md (Why the weights are the playbook's)
+the measurements behind them. The rate term's own range reads Blizzard's
+rates, which are licensed for personal use, so its figures stay out of
+the repo. At meta 1 each term's weight is the file's exactly (1.0 x w is w
+in floating point). OFF is meta 0 with every dial at 0, and a board scored
+under it is the playbook's alone.
 """
 
 import dataclasses
@@ -159,8 +154,7 @@ class BaseWeights:
         return bool(self.meta and (self.rate or self.synergy or self.counter))
 
     def scaled(self) -> TermWeights:
-        """Each term's weight times the meta. At meta 1 each is its dial
-        exactly, so the engine scores as it did with the dials in code."""
+        """Each term's weight times the meta."""
         return TermWeights(rate=self.meta * self.rate, synergy=self.meta * self.synergy,
                            counter=self.meta * self.counter)
 
@@ -247,13 +241,10 @@ def likely_six(world: World, m: Map | None, banned: Sequence[Hero]) -> tuple[Her
 def opponent(
         world: World, m: Map | None, red: Sequence[Hero], banned: Sequence[Hero]) -> Opponent:
     """The other side as the counter term reads it: its locked picks, else its
-    likely six. Handed exactly that likely six, as the board hands blue's
-    seat until red reveals a pick, it is the likely six still."""
-    likely = likely_six(world, m, banned)
+    likely six."""
     if not red:
-        return Opponent(heroes=likely, likely=True)
-    same = {h.id for h in red} == {h.id for h in likely}
-    return Opponent(heroes=tuple(red), likely=same)
+        return Opponent(heroes=likely_six(world, m, banned), likely=True)
+    return Opponent(heroes=tuple(red), likely=False)
 
 
 def rate_edge(h: Hero, m: Map | None) -> float:

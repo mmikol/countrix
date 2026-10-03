@@ -28,12 +28,12 @@ shows). Prefer whichever is connected; they expose the same tools.
    (players assumed to play optimally), each pick with its reasons and
    the fact ids (F#) that justify it, the score breakdown per engine term
    and per strategy, and alternatives. `board` with the same
-   arguments also returns the game plan in prose, red's best counter to
-   the user's picks, both current comps scored, the user's picks against
-   that counter, their locked picks with the empty slots filled, red's
-   likely starting comp and the fight odds - use it when the user asks
-   how the game is going, how their six rates, what the enemy should be
-   playing, or for the plan in a few lines. With blue picks it also
+   arguments also returns the game plan in prose, the user's current comp
+   scored, their locked picks with the empty slots filled, and red's likely
+   six around red's picks with its pull (red is never optimized or
+   scored). Use it when the user asks how the game is going, how their six
+   rates, what the enemy is likely to play, or for the plan in a few
+   lines. With blue picks it also
    carries `swaps`, the swaps of their picks that pay for the swap cost,
    one joint answer, and on a map with stages `stages`, the plan a stage
    at a time with a blurb each - use them when the user asks what to

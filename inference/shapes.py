@@ -1,8 +1,4 @@
-"""The legal shapes: the (tanks, damage, supports) triples the queue allows -
-at most MAX_TANKS tanks, whatever the playbook holds - and the playbook's
-shape-only limits allow (its own rule of form, 2-2-2 say), around whatever
-picks are locked.
-"""
+"""The legal shapes (legal_shapes) and the playbook's shape-only limits."""
 
 from collections.abc import Iterable, Sequence
 from typing import NamedTuple

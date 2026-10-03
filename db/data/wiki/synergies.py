@@ -14,7 +14,7 @@ the first sentence of the advice, cut to a clause under 120 characters, or
 NO_ADVICE where no claim writes any. synergy_cells keeps every written
 cell, a claim or not, so the facts layer can tell a pair an article wrote
 off from one neither article wrote (facts/tables.py reads the second at
-the written pairs' mean). Both tables are reloaded wholesale.
+the written cells' claim share). Both tables are reloaded wholesale.
 """
 
 import re
@@ -131,11 +131,6 @@ def claimed(cells: Sequence[Cell]) -> list[Row]:
     return [Row(hero=c.hero, cell=c.advice) for c in cells if c.claim]
 
 
-def parse_synergies(text: str) -> list[Row]:
-    """[Row(teammate name, advice)] - the claims one article's synergy cells make."""
-    return claimed(read_cells(text))
-
-
 # {(low id, high id): (score, note)}
 type Pairs = dict[tuple[int, int], tuple[int, str]]
 # {(article's hero id, teammate's id)}: the written cells, each way
@@ -143,23 +138,21 @@ type Written = set[tuple[int, int]]
 
 
 def pair_up(claims_by_hero: Mapping[str, Sequence[Row]],
-            hero_ids: Mapping[str, int]) -> tuple[Pairs, list[str]]:
-    """Claims per hero -> ({(low id, high id): (score, note)}, unresolved names).
+            hero_ids: Mapping[str, int]) -> Pairs:
+    """Claims per hero -> {(low id, high id): (score, note)}.
 
     claims_by_hero is {hero name: [Row(teammate name, advice)]}; hero_ids is
-    {name_key: hero_id}. The note comes from an article that writes advice,
-    one whose first sentence fits uncut when there is one, else the first by
-    hero name; NO_ADVICE where every claim is a rating alone.
+    {name_key: hero_id}. A teammate no released hero keys to is skipped:
+    written_cells names it. The note comes from an article that writes
+    advice, one whose first sentence fits uncut when there is one, else the
+    first by hero name; NO_ADVICE where every claim is a rating alone.
     """
     stated: dict[tuple[int, int], dict[int, str]] = {}
-    unmatched: list[str] = []
     for hero in sorted(claims_by_hero):
         hero_id = hero_ids[name_key(hero)]
         for teammate, advice in claims_by_hero[hero]:
             other_id = hero_ids.get(hero_key(teammate))
-            if other_id is None:
-                unmatched.append("%s: %s" % (hero, teammate))
-            elif other_id != hero_id:
+            if other_id is not None and other_id != hero_id:
                 pair = (min(hero_id, other_id), max(hero_id, other_id))
                 stated.setdefault(pair, {}).setdefault(hero_id, advice)
 
@@ -169,7 +162,7 @@ def pair_up(claims_by_hero: Mapping[str, Sequence[Row]],
         uncut = [n for n in notes if clause(n) == first_sentence(n)]
         note = clause((uncut or notes)[0]) if notes else NO_ADVICE
         pairs[pair] = (len(advice_by_hero), note)
-    return pairs, unmatched
+    return pairs
 
 
 def written_cells(cells_by_hero: Mapping[str, Sequence[Cell]],
@@ -215,7 +208,7 @@ def run(connection: psycopg.Connection, pull: cache.PullContext) -> SynergiesSum
     if not any(claims.values()):
         raise WikiError("no hero article has a synergy claim")
     ids = index(released)
-    pairs, _ = pair_up(claims, ids)
+    pairs = pair_up(claims, ids)
     # every written cell's names, the claims' among them
     written, unmatched = written_cells(cells, ids)
 

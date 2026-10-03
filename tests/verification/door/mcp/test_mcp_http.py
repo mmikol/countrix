@@ -1,7 +1,8 @@
 """The door over Streamable HTTP, the data-layer container's: the real
 server spawned on a free port, and an in-process HttpServer for the guards -
 the origin check, the bearer token, the JSON label, the body cap, the rate
-limit per client address, and /health's 500 for a status that raises."""
+limit per client address, and /health's 500 for a status that raises - and
+for the one message it handles at a time and the line each tool call logs."""
 
 import http.client
 import json
@@ -21,6 +22,17 @@ from db import ROOT
 from door.mcp import tools
 from door.mcp.http import HttpServer
 from door.mcp.server import Server
+
+
+@pytest.fixture(scope="module", autouse=True)
+def no_ambient_token():
+    """A door given no token reads COUNTRIX_MCP_TOKEN, which a shell may
+    export for .mcp.json: cleared for the module, so the spawned door and
+    every HttpServer(token=None) here ask for none. An autouse fixture is
+    set up before http_server, which shares its scope."""
+    with pytest.MonkeyPatch.context() as patch:
+        patch.delenv("COUNTRIX_MCP_TOKEN", raising=False)
+        yield
 
 
 @pytest.fixture(scope="module")
@@ -138,6 +150,20 @@ def test_the_door_requires_its_token_when_one_is_set():
     httpd.shutdown()
 
 
+def test_each_tool_call_leaves_a_line_naming_the_tool_and_the_client(capsys):
+    """A tool call over HTTP is logged on stderr before it runs - the
+    client's address, the time and the tool's name - so a rebuild through
+    the door leaves a record; a ping, no tool call, leaves none."""
+    httpd, url = _http_server()
+    assert _knock(url, {"jsonrpc": "2.0", "id": 1, "method": "ping"})[0] == 200
+    call = {"jsonrpc": "2.0", "id": 2, "method": "tools/call",
+            "params": {"name": "metrics", "arguments": {}}}
+    assert _knock(url, call)[0] == 200
+    httpd.shutdown()
+    [line] = capsys.readouterr().err.splitlines()
+    assert line.startswith("127.0.0.1 - - [") and line.endswith("] tools/call 'metrics'")
+
+
 def test_the_door_refuses_huge_bodies_and_rate_limits_a_client():
     httpd, url = _http_server(rate_limit=3)
     call = {"jsonrpc": "2.0", "id": 1, "method": "tools/call",
@@ -171,11 +197,35 @@ def test_a_missing_content_length_is_refused_as_required():
 
 
 def test_a_post_that_does_not_claim_json_is_refused():
-    """The board's rule on its writes holds at the door: a body not labelled
-    application/json is 415 before it is read."""
+    """A body not labelled application/json is 415 before it is read: the
+    door reads nothing but JSON-RPC."""
     httpd, url = _http_server()
     assert _knock(url, {"jsonrpc": "2.0", "id": 1, "method": "ping"},
                   {"Content-Type": "text/plain"}) == (415, {"error": "a JSON body is required"})
+    httpd.shutdown()
+
+
+def test_the_door_handles_one_message_at_a_time():
+    """Each request runs on a thread of its own, but the messages are handled
+    one after another, as over stdio: two playbook writes at once would lose
+    one edit."""
+    httpd, url = _http_server()
+    events = []
+    handle = httpd.mcp.handle
+
+    def slow(message):
+        events.append("in")
+        time.sleep(0.1)
+        events.append("out")
+        return handle(message)
+    httpd.mcp.handle = slow
+    message = {"jsonrpc": "2.0", "method": "ping"}
+    pings = [threading.Thread(target=_knock, args=(url, dict(message, id=n))) for n in range(3)]
+    for ping in pings:
+        ping.start()
+    for ping in pings:
+        ping.join()
+    assert events == ["in", "out"] * 3
     httpd.shutdown()
 
 

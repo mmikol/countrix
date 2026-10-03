@@ -9,8 +9,6 @@ evaluation's, and the cost in force. No database."""
 
 import dataclasses
 import json
-import os
-import shutil
 
 import pytest
 
@@ -18,10 +16,15 @@ from facts.draft import Draft
 from inference import catalog, engine, swaps
 from inference.base import OFF, SWAP, SWAP_RANGE
 from inference.result import Span
-from inference.scoring import Candidate, quantized, rank_key
-from tests.verification.inference import DEFAULT, FIXTURE_PLAYBOOK, evaluated
-from tests.verification.inference.test_engine import SUPPORTS, _support_limit
-from tests.verification.inference.test_solver import enumerated, legal_sixes, seated, verdicts
+from inference.scoring import Candidate, quantized
+from tests.verification.inference import (
+    DEFAULT,
+    FIXTURE_PLAYBOOK,
+    SUPPORTS,
+    evaluated,
+    support_limit,
+)
+from tests.verification.inference.enumeration import enumerated, netted, plain_seat, verdicts
 
 K = 6                       # the sixes the search's order is compared on
 COSTS = (0.0, 5.0, 10.0, 25.0, SWAP_RANGE[1])      # share points of blue's span
@@ -35,35 +38,10 @@ BOARDS = {
 
 
 @pytest.fixture()
-def limited(tmp_path):
+def limited(catalog_copy):
     """The reference playbook with a limit of three supports beside its own,
     so four supports are not allowed."""
-    for name in catalog.strategy_files(FIXTURE_PLAYBOOK):
-        shutil.copy(os.path.join(FIXTURE_PLAYBOOK, name), tmp_path / name)
-    return _support_limit(tmp_path)
-
-
-def plain_seat(world, draft, playbook, base):
-    """Blue's optimal's Solver on the board - blue's seat, nothing locked,
-    against red's picks - its scale frozen, and its span."""
-    solver = seated(world, dataclasses.replace(draft, blue=()), playbook, base)
-    best = solver.solve(top=1).ranked[0]
-    return solver, Span(best=best.score, floor=solver.floor)
-
-
-def netted(plain, picks, raw):
-    """Every legal six of the board scored by the plain objective less `raw`
-    for each pick it drops, best first: the answer, found without the keep
-    term or the search."""
-    keep = {h.id for h in picks}
-    banned = [plain.world.heroes[i] for i in plain.banned]
-    out = []
-    for six in legal_sixes(plain.world, plain.catalog, (), banned):
-        cand = plain.score(plain.prepare(Candidate(six)), detail=False)
-        if not cand.violations:
-            out.append((cand.score - raw * len(keep - set(cand.key)), cand))
-    return sorted(out, key=lambda pair: (-quantized(pair[0]), -pair[1].tiebreak,
-                                         sorted(pair[1].names)))
+    return support_limit(catalog_copy)
 
 
 @pytest.mark.parametrize("base", [OFF, DEFAULT], ids=["base-off", "base-on"])
@@ -101,10 +79,6 @@ def test_the_swap_search_is_the_enumerated_best_net(synthetic_world, limited, ba
             drops = quantized(got[0].score) > quantized(kept.score)
         if not drops:
             assert s["pairs"] == [] and s["verdict"].startswith("keep the picks"), (name, cost)
-            continue
-        if not s["pairs"]:              # the odds gate withheld it, and says so
-            assert s["status"] == "withheld", (name, cost)
-            assert s["verdict"].startswith("keep the picks: the best swaps"), (name, cost)
             continue
         assert s["status"] == "suggested" and sorted(s["six"]) == sorted(best.names), (name, cost)
         held = [p for p in draft.blue if p in s["six"]]
@@ -184,8 +158,7 @@ def test_the_keep_term_is_never_a_term_of_a_payload_and_the_share_is_the_evaluat
     six = evaluated(synthetic_world, dataclasses.replace(draft, blue=tuple(s["six"])),
                     catalog=playbook)
     assert six.share() == s["after"]
-    assert s["before"] == board.momentum["blue"] and s["odds"]["before"] == board.momentum["odds"]
-    assert s["odds"]["after"] is not None
+    assert s["before"] == board.momentum["blue"]
 
 
 def test_a_board_without_blue_picks_or_asked_for_none_has_no_swaps(synthetic_world):
@@ -196,7 +169,7 @@ def test_a_board_without_blue_picks_or_asked_for_none_has_no_swaps(synthetic_wor
                               catalog=playbook, brief=engine.Brief(base=DEFAULT, swap=5.0))
     assert open_board.swaps is None and open_board.to_dict()["swaps"] is None
     off = engine.board(synthetic_world, BOARDS["full"], catalog=playbook,
-                       brief=engine.Brief(base=DEFAULT, swap=5.0, swaps=False))
+                       brief=engine.Brief(base=DEFAULT, swap=5.0, search_swaps=False))
     assert off.swaps is None
 
 
@@ -209,52 +182,13 @@ def test_the_swap_cost_in_force_is_the_weights_then_the_brief_then_meta_md():
 
 
 def test_the_raw_cost_is_share_points_of_the_span():
-    """A share point is a hundredth of the optimal's lead over the floor; a
+    """A share point is a hundredth of the optimal's lead over the floor,
+    zero where no reference six was legal, as a Result reads the span; a
     seat with no lead is unscored and has no raw cost."""
     assert swaps.raw_cost(10.0, Span(best=3.0, floor=1.0)) == pytest.approx(0.2)
     assert swaps.raw_cost(10.0, Span(best=1.0, floor=1.0)) is None
-    assert swaps.raw_cost(10.0, Span(best=1.0, floor=None)) is None
-
-
-def test_the_search_ranks_a_kept_hero_first_with_the_engine_off(synthetic_world):
-    """With the default engine off the keep term is the bound's own part
-    alone: the search still reaches the enumeration's order, around locks,
-    and a cost past every other term keeps the picks."""
-    playbook = catalog.load(FIXTURE_PLAYBOOK)
-    draft = Draft("Harbor Gate", ("Mortar", "Gale"), ("Kite",), side="attack")
-    solver = seated(synthetic_world, draft, playbook, OFF)
-    solver.freeze_bounds()
-    picks = synthetic_world.resolve(None, (), ("Kite", "Rook", "Balm", "Myrrh")).blue
-    from inference.solver import Solver
-    m, red, locked, banned = synthetic_world.resolve(draft.map_name, draft.red, draft.blue, ())
-    kept = Solver(synthetic_world, m, red=red, locked=locked, banned=banned, side=draft.side,
-                  catalog=playbook, base=OFF, keep=frozenset(h.id for h in picks), swap=100.0)
-    kept.adopt_scale(solver)
-    got = kept.solve(top=K).ranked
-    assert verdicts(got) == verdicts(sorted(enumerated(kept), key=rank_key)[:K])
-    assert {h.id for h in picks} <= set(got[0].key)
-
-
-def test_a_swap_that_does_not_raise_the_fight_odds_is_withheld(synthetic_world, monkeypatch):
-    """The odds after are read off red solved again against the six the
-    swaps make; a swap is suggested only where they rise, as the owner asked,
-    and where they would not, the picks keep, the status says withheld and
-    the verdict names the swaps it held back and the odds they would read."""
-    playbook = catalog.load(FIXTURE_PLAYBOOK)
-    draft = BOARDS["full"]
-    brief = engine.Brief(base=DEFAULT, swap=5.0)
-    offered = engine.board(synthetic_world, draft, catalog=playbook, brief=brief).swaps
-    odds = offered["odds"]
-    assert offered["pairs"] and odds["after"]["blue"] > odds["before"]["blue"]
-    assert offered["status"] == "suggested"
-    worse = {"odds": {"blue": 0, "red": 100}}
-    monkeypatch.setattr(engine._Pass, "_against", lambda self, draft, six, blue: worse)
-    held = engine.board(synthetic_world, draft, catalog=playbook, brief=brief).swaps
-    assert held["pairs"] == [] and sorted(held["six"]) == sorted(draft.blue)
-    assert held["status"] == "withheld"
-    assert held["verdict"] == "keep the picks: the best swaps (%s) would not raise the fight odds" \
-        " %d -> 0" % (", ".join("%s for %s" % (p["out"], p["in"]) for p in offered["pairs"]),
-                      offered["odds"]["before"]["blue"])
+    assert swaps.raw_cost(10.0, Span(best=1.0, floor=None)) == pytest.approx(0.1)
+    assert swaps.raw_cost(10.0, Span(best=-1.0, floor=None)) is None
 
 
 def test_a_fill_out_of_budget_suggests_no_swap(synthetic_world, monkeypatch):
