@@ -174,7 +174,8 @@ norm_h(v) = clamp( (v &minus; min_ref) / (max_ref &minus; min_ref), 0, 1 )
             on the sixes its guard holds on, a reward's on all of them, its gate read as on
             max_ref = min_ref, or no six to read: a reward reads 0.5, a need costs nothing
 s_n       = min( 1, max( %(NEED_BUDGET)g, the largest w on n's guard ) / &Sigma; w over the needs on n's guard )
-            one state costs %(NEED_BUDGET)g at most, or its largest need's weight where that is more</pre>
+            n's guard: its when and its params; one state costs %(NEED_BUDGET)g at most, or its
+            largest need's weight where that is more</pre>
 <p id='base-weights'><b>The base's weights.</b> They are the playbook's, not the code's:
 <code>meta.md</code> beside the strategy files holds them, and the tune tool changes them. The
 meta, %(W_META)g, scales the whole engine, and at 0 the playbook scores alone. Under it the rate
@@ -284,7 +285,7 @@ probability:</p>
 <p>A seat still drafting is read through its fill, the best six its picks can reach, on both
 sides alike: a sum over fewer picks reads low, so the seat with more picks would lead. Where no
 fill is solved - red's revealed picks already past a limit, or a fill past the search's budget -
-the seat is read off its picks as they stand. There are no odds where a seat has no picks, is
+the seat is read off its picks as they stand, and its badge says so. There are no odds where a seat has no picks, is
 unscored or not allowed, or where both shares are 0: each bar shows its own seat's share, an
 unscored or not-allowed seat its badge's word.</p>
 <p id='problem'><b>The problem's class.</b> With V the heroes the board leaves open - released

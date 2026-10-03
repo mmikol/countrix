@@ -158,9 +158,11 @@ def _floor(v: float) -> float:
 
 def _floordiv(a: Abstract, b: Abstract) -> Abstract:
     """A floor division: the quotient's hull floored, its low end one lower
-    for a quotient that rounded up across a whole number."""
+    for a quotient that rounded up across a whole number - one that
+    underflowed to 0 among them. Exactly 0 only where the dividend or the
+    divisor is: the zero-safe division's 0."""
     q = divide(a, b)
-    if not isinstance(q, Iv) or q == FALSE:
+    if not isinstance(q, Iv) or a == FALSE or b == FALSE:
         return q
     return Iv(_floor(q.lo) - 1.0, _floor(q.hi))
 

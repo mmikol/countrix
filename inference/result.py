@@ -340,10 +340,12 @@ class Result:
     def scale_to(self, span: Span) -> None:
         """Set what 100 and 0 mean here - the seat's best score and its floor -
         and write each alternative's share of the span, None while the result
-        reads unscored. An unscored field ties, where no six ranks above
-        another, so the rank goes too: every six would read first."""
+        reads unscored or the board waits (waiting(): the optimal no higher
+        than the floor, which the optimal itself never reads as unscored).
+        An unscored field ties, where no six ranks above another, so the rank
+        goes too: every six would read first."""
         self.best, self.floor = span.best, span.floor
-        scoring = self.unscored() is None
+        scoring = self.unscored() is None and self.waiting() is None
         for alt in self.alternatives:
             alt["normalized"] = _pct(alt["score"], self.best, self._zero()) if scoring else None
         if not scoring:

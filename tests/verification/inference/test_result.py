@@ -11,9 +11,9 @@ from tests.verification.inference import BRIEF, FIXTURE_PLAYBOOK, evaluated
 
 def test_a_playbook_that_scores_nothing_reads_unscored(synthetic_world):
     """With the default engine off, limits and prose alone tie every
-    legal six at zero: the results carry no share of a best, say so, and the
-    verdict is the one line; red's likely six says it is a likelihood, as it
-    does with the engine on."""
+    legal six at zero: the results carry no share of a best, the optimal's
+    runners-up included, say so, and the verdict is the one line; red's
+    likely six says why it has none, as it does with the engine on."""
     from inference import engine
     from inference.result import LIKELIHOOD
     world = synthetic_world
@@ -27,6 +27,7 @@ def test_a_playbook_that_scores_nothing_reads_unscored(synthetic_world):
     d = b.to_dict()
     for key in ("blue", "red"):                     # the optimal is the reference: 100, always
         assert d[key]["scoring"] is True and d[key]["normalized"] == 100
+        assert all(a["normalized"] is None for a in d[key]["alternatives"])
     for key in ("current", "red_current", "fill", "countered"):
         assert d[key]["scoring"] is False and d[key]["normalized"] is None
         assert all(a["normalized"] is None for a in d[key]["alternatives"])
@@ -44,7 +45,7 @@ def test_a_playbook_that_scores_nothing_reads_unscored(synthetic_world):
 def test_the_default_engine_scores_a_playbook_that_scores_nothing(synthetic_world):
     """The same limits alone under the default engine: every seat scores and
     carries a share, no badge reads unscored, and only red's likely six, a
-    likelihood nothing scores, says why it has none."""
+    fill nothing scores, says why it has none."""
     from inference import engine
     from inference.result import LIKELIHOOD
     reference = catalog.load(FIXTURE_PLAYBOOK)

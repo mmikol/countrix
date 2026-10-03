@@ -98,8 +98,9 @@ def _badge(current: Result, fill: Result | None) -> Badge:
     reason, whenever the seat's current comp cannot be a share of anything -
     picks or not; before any pick the suggested six's 100, the seat's optimal
     by definition; else the picks' share of the seat's optimal, a
-    half-drafted seat read through the best six its picks reach, as the
-    verdict reads it. The tip says what the figure is a share of."""
+    half-drafted seat read through the best six its picks reach where that
+    fill was solved, as the verdict reads it. The tip says what the figure
+    is a share of, and whether a fill was read."""
     why = current.unscored()
     if why is not None:
         return Badge(label=NOT_ALLOWED if current.barred else "unscored", tip=why)
@@ -110,7 +111,9 @@ def _badge(current: Result, fill: Result | None) -> Badge:
     red = current.seat == "red"
     whose = "their" if red else "your"
     of = "their best counter to yours" if red else "the best six for this board"
-    reach = ("the best six from %s picks reaches" if current.partial else "%s picks reach") % whose
+    # a half-drafted seat whose fill was not solved is read off its picks: say so
+    filled = current.partial and fill is not None
+    reach = ("the best six from %s picks reaches" if filled else "%s picks reach") % whose
     return Badge(label="%d / 100" % share, tip="%s %d%% of %s" % (reach, share, of))
 
 
