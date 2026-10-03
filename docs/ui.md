@@ -125,6 +125,12 @@ with the fact it read, always shown - then the strategies in three tabs -
 filter, each bar's tooltip saying why it paid or did not, and last the
 alternatives. The bars share one scale.
 
+**The fight odds** strip above the teams splits 100 between blue's six
+and red's likely six, scored against each other on the default engine
+alone ([The share](inference.md#the-share)); its tooltip is the engine's
+words, and where there are no odds the engine's verdict says why. It
+reads *solving* while a board is searched.
+
 **The badges** above the pickers: blue's is its comp as a share of blue's
 optimal, read from the seat's floor, the lowest of its reference sixes,
 up to its optimal ([The share](inference.md#the-share)). Blue still

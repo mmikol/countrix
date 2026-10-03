@@ -20,7 +20,16 @@ from facts import board_facts, compute
 from facts.draft import Draft
 from facts.records import Patch
 from inference import base, catalog, engine, scale, scoring, solver
-from inference.result import Badge, Momentum, OpenSlot, Pick, StageRow, SwapPair, Swaps
+from inference.result import (
+    Badge,
+    Momentum,
+    Odds,
+    OpenSlot,
+    Pick,
+    StageRow,
+    SwapPair,
+    Swaps,
+)
 from inference.scoring import Contribution
 from inference.strategy import WEIGHT_RANGE, StrategyRecord
 from tests.verification.inference import BRIEF, FIXTURE_PLAYBOOK
@@ -81,7 +90,7 @@ def test_the_page_is_a_shell_over_static_files():
     assert "/static/board.css" in body and "/static/board.js" in body
     order = [body.index("/static/%s.js" % n) for n in ("comps", "playbook", "board")]
     assert order == sorted(order)      # board.js loads last: it calls the others
-    assert "id='plan'" in body and "id='momentum'" not in body     # red is never scored: no odds
+    assert "id='plan'" in body and "id='momentum'" in body         # the fight odds strip
     # scores live in the boxes
     assert "id='bluescore'" in body and "id='redscore'" in body
     assert "data-clear='red'" in body and "data-clear='blue'" in body
@@ -89,7 +98,7 @@ def test_the_page_is_a_shell_over_static_files():
     assert body.index("id='inf-blue'") < body.index("id='inf-red'")
     assert body.index("id='blueslots'") < body.index("id='redslots'")
     page = pages.view_math()
-    assert "id='fight-odds'" not in page and "Red is never optimized" in page
+    assert "id='fight-odds'" in page and "Red is never optimized" in page
     # a table of contents: every link resolves to an id on the page
     toc = page[page.index("<nav class='toc'>"):page.index("</nav>")]
     targets = re.findall(r"href='#([^']+)'", toc)
@@ -200,7 +209,8 @@ def test_the_scripts_read_payload_keys_the_server_writes(synthetic_world, monkey
     read(
         "id kind applies ok weighted form when bonus penalty norm spread need metric raw"
         " weight fact text", Contribution.__annotations__)
-    read("badges", Momentum.__annotations__)
+    read("badges odds verdict", Momentum.__annotations__)
+    read("blue red tip", Odds.__annotations__)
     read("label tip", Badge.__annotations__)
     read(
         "id name kind form weight direction metric need when require penalty bonus params body",

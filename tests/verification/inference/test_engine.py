@@ -69,8 +69,30 @@ def test_board_solves_blues_seat_and_reads_reds_likely_six(synthetic_world):
     # reports no share of its own. Red's badge is its likely six's pull
     assert mo["blue"] == fill.to_dict()["normalized"]
     assert cur.to_dict()["normalized"] is None
-    assert mo["verdict"] == "blue %d / 100 of its optimal (the best six from its picks)" % (
-        mo["blue"])
+    assert mo["verdict"].startswith(
+        "blue %d / 100 of its optimal (the best six from its picks); fight odds" % mo["blue"])
+    # the fight odds: blue's six - here its fill - and red's likely six scored
+    # against each other on the engine alone, red's six never searched, each
+    # side's part of 100 its score above the floor of the board's reference sixes
+    from inference import scale
+    from inference.plan import HeadToHead, fight_odds
+    from inference.scoring import Candidate, Objective
+    ours = world.resolve(None, (), tuple(fill.blue)).blue
+    theirs = world.resolve(None, (), tuple(likely.blue)).blue
+    m = world.resolve("Harbor Gate", (), (), ())[0]
+
+    def alone(side, against):
+        return Objective(world, m, red=against, banned=(), side=side, stage="", catalog=[],
+                         base=DEFAULT)
+
+    def score(objective, cand):
+        return objective.score(objective.prepare(cand), detail=False).score
+    for_blue = alone("attack", theirs)
+    floor = min(score(for_blue, c) for c in scale.sample(Objective(
+        world, m, red=theirs, banned=(), side="attack", stage="", catalog=fix, base=DEFAULT)))
+    head = HeadToHead(blue=score(for_blue, Candidate(ours)),
+                      red=score(alone("defense", ours), Candidate(theirs)), floor=floor)
+    assert mo["odds"] == fight_odds(head) and mo["odds"]["blue"] + mo["odds"]["red"] == 100
     pull = sum(p["pull"] for p in likely.picks)
     assert mo["badges"]["red"]["label"] == "%.0f pull" % pull
     # prose: the ground, what to play, them, the family

@@ -22,6 +22,7 @@ from inference.result import (
     Badge,
     Badges,
     Momentum,
+    Odds,
     Result,
     StageRules,
     StageSwap,
@@ -29,13 +30,24 @@ from inference.result import (
 )
 
 
+class HeadToHead(NamedTuple):
+    """Blue's six and red's likely six scored against each other on the
+    default engine alone, and the board's floor on the same terms: the
+    lowest such score among the board's reference sixes."""
+    blue: float
+    red: float
+    floor: float
+
+
 class Seats(NamedTuple):
     """What the verdict reads off a board: blue's current comp; its fill, the
     best six reachable from half-drafted picks, which the seat is read
-    through; and red's likely six, which nothing scores."""
+    through; red's likely six, which nothing optimizes; and the two sixes
+    head to head, where they were measured."""
     current: Result
     expected: Result
     fill: Result | None = None
+    head: HeadToHead | None = None
 
 
 def momentum(seats: Seats) -> Momentum:
@@ -54,8 +66,33 @@ def momentum(seats: Seats) -> Momentum:
     why = cur.unscored()
     share = _now(cur, fill).share() if cur.blue and why is None else None
     partial = bool(cur.blue and cur.partial)
+    odds = fight_odds(seats.head)
     verdict = _verdict_line(share, partial, fill is not None, why)
-    return Momentum(blue=share, partial=partial, verdict=verdict, badges=badges)
+    if odds is not None:
+        verdict += "; fight odds on the meta: blue %d%%, red %d%%" % (odds["blue"], odds["red"])
+    return Momentum(blue=share, partial=partial, odds=odds, verdict=verdict, badges=badges)
+
+
+def fight_odds(head: HeadToHead | None) -> Odds | None:
+    """The fight odds: each side's score above the board's floor as its part
+    of 100, a score below the floor counted as 0 - so the split holds still
+    when every score is scaled or shifted alike. None where the two sixes
+    were not measured, or where neither stands above the floor."""
+    if head is None:
+        return None
+    blue, red = max(head.blue - head.floor, 0.0), max(head.red - head.floor, 0.0)
+    if blue + red <= 0.0:
+        return None
+    share = round(100.0 * blue / (blue + red))
+    return Odds(blue=share, red=100 - share, tip=ODDS_TIP)
+
+
+# the strip's tooltip: what the odds compare, and what they are not
+ODDS_TIP = (
+    "blue's six and red's likely six head to head on the meta alone - win rates, synergy"
+    " and counters against each other, no playbook rule for either side; red's six is its"
+    " picks and likeliest heroes, never optimized. Each side's part of 100 is its score"
+    " above the board's floor. A comparison, not a chance of winning")
 
 
 def _now(current: Result, fill: Result | None) -> Result:

@@ -292,11 +292,16 @@ so a share read from zero put every six below zero at 0; the floor puts
 blue's comps on a real scale. A best no higher than the floor leaves
 nothing to divide, and every comp but the optimal reads *unscored*.
 
-Red is never optimized and never scored: the board's red is its likely
-six around its revealed picks (`compute.expected_picks`), each pick with
-its pull - its pick rate here plus `SYNERGY_PULL` for each partner
-already on the six - and red's badge is the six's total pull. No red
-share exists, so the board pits no red figure against blue's.
+Red is never optimized: the board's red is its likely six around its
+revealed picks (`compute.expected_picks`), each pick with its pull - its
+pick rate here plus `SYNERGY_PULL` for each partner already on the six -
+and red's badge is the six's total pull. Red has no share. The fight
+odds compare the two sides another way (`plan.fight_odds`): blue's six
+and red's likely six scored against each other on the default engine
+alone, no playbook rule for either side, each side's part of 100 its
+score above the floor of the board's reference sixes. They are a
+comparison of the two sixes, not a chance of winning (the math page,
+Fight odds).
 
 A comp the limits rule out is not allowed: blue's full six that breaks
 one, or picks that no six keeping them completes within the limits
@@ -950,7 +955,7 @@ Every six carries at least one save: an invulnerability, a death-prevention or a
 
 *assumption* - prose the solver takes as given and the session holds a comp to
 
-The same board, playbook and weights always give the same six, the same score and the same alternatives: nothing is sampled when a board is solved, and every seed is a string read off the board. A score and a share are the playbook's arithmetic over the facts, not probabilities of winning, because nothing is fitted to match results. A higher score means a better six under these rules and weights, never a greater chance to win.
+The same board, playbook and weights always give the same six, the same score and the same alternatives: nothing is sampled when a board is solved, and every seed is a string read off the board. A score, a share and the fight odds are the playbook's arithmetic over the facts, not probabilities of winning, because nothing is fitted to match results. A higher score means a better six under these rules and weights, and higher odds a stronger six than the other on the meta, never a greater chance to win.
 
 ##### This is Open Queue Ranked (`open-queue-ranked`, assumptions)
 

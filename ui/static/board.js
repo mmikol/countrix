@@ -226,6 +226,7 @@ function solving(on) {
     if (on) { if (node.textContent !== '…') node.dataset.was = node.textContent; node.textContent = '…'; }
     else if (node.textContent === '…' && node.dataset.was !== undefined) { node.textContent = node.dataset.was; }
   });
+  if (on) el('momentum').innerHTML = "<span class='lbl'>fight odds</span><span class='legend searching'>solving…</span>";
   ['plan', 'blueslots', 'redslots', 'blueswaps', 'stageplan'].forEach(function (id) {
     el(id).classList.toggle('waiting', !!on);
   });
@@ -248,6 +249,7 @@ function boardFailed() {
   el('inf-blue').innerHTML = "<div class='warnbox'>the board is not answering</div>";
   el('inf-red').innerHTML = ''; el('plan').innerHTML = '';
   el('stageplan').innerHTML = ''; el('blueswaps').innerHTML = '';
+  el('momentum').innerHTML = "<span class='lbl'>fight odds</span><span class='legend'>the board is not answering</span>";
   ['bluescore', 'redscore'].forEach(function (id) { el(id).textContent = ''; el(id).title = ''; });
 }
 

@@ -45,7 +45,8 @@ def test_the_verdict_reads_blues_standing():
     from inference import plan
     seated = plan.momentum(plan.Seats(comp(["a"] * 6, 8, 10), SIX))
     assert seated["verdict"] == "blue 80 / 100 of its optimal" and seated["blue"] == 80
-    assert set(seated) == {"blue", "partial", "verdict", "badges"}
+    assert set(seated) == {"blue", "partial", "odds", "verdict", "badges"}
+    assert seated["odds"] is None                # the two sixes were not measured
     half = plan.momentum(plan.Seats(comp(["a"], 2, 10, partial=True), SIX,
                                     fill=comp(["a"] * 6, 7, 10)))
     assert half["verdict"] == "blue 70 / 100 of its optimal (the best six from its picks)"
@@ -101,8 +102,30 @@ def test_blue_is_read_through_its_fill_while_half_drafted(synthetic_world, scrat
                      catalog=scratch_playbook, brief=BRIEF)
     assert b.current.partial
     assert b.momentum["blue"] == b.fill.to_dict()["normalized"]
-    assert b.momentum["verdict"] == (
-        "blue %d / 100 of its optimal (the best six from its picks)" % b.momentum["blue"])
+    assert b.momentum["verdict"].startswith(
+        "blue %d / 100 of its optimal (the best six from its picks); fight odds on the meta: "
+        % b.momentum["blue"])
+
+
+def test_the_fight_odds_split_100_by_each_score_above_the_floor():
+    """Each side's part of 100 is its score above the floor, a score below
+    it counted as 0; the split holds still when every score is scaled or
+    shifted alike, and there are none where neither side stands above the
+    floor or the sixes were not measured. The verdict quotes them."""
+    from inference import plan
+    head = plan.HeadToHead(blue=9.0, red=7.0, floor=3.0)
+    odds = plan.fight_odds(head)
+    assert (odds["blue"], odds["red"]) == (60, 40) and "not a chance of winning" in odds["tip"]
+    scaled = plan.HeadToHead(blue=2 * 9.0 + 5, red=2 * 7.0 + 5, floor=2 * 3.0 + 5)
+    assert plan.fight_odds(scaled) == odds
+    assert plan.fight_odds(plan.HeadToHead(blue=7.0, red=9.0, floor=3.0))["blue"] == 40
+    assert plan.fight_odds(plan.HeadToHead(blue=5.0, red=2.0, floor=3.0))["blue"] == 100
+    assert plan.fight_odds(plan.HeadToHead(blue=1.0, red=2.0, floor=3.0)) is None
+    assert plan.fight_odds(None) is None
+    mo = plan.momentum(plan.Seats(comp(["a"] * 6, 8, 10), SIX, head=head))
+    assert mo["odds"] == odds
+    assert mo["verdict"] == (
+        "blue 80 / 100 of its optimal; fight odds on the meta: blue 60%, red 40%")
 
 
 def test_the_plan_names_every_maps_derived_style(synthetic_world, harbor_gate_board):

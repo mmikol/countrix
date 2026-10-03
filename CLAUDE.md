@@ -160,9 +160,11 @@ db <- facts <- inference <- door <- ui.
 - **The solver is deterministic.** `engine.board()` returns a Board of up
   to four Results (blue, current, fill, expected); fill is None unless one
   to five blue picks are locked. Blue is the side the playbook optimizes,
-  and the only seat solved; red is never optimized or scored: `expected` is
-  red's likely six around its revealed picks, each pick with its pull
-  (`compute.expected_picks`), and red's badge is the six's total pull. A
+  and the only seat solved; red is never optimized: `expected` is red's
+  likely six around its revealed picks, each pick with its pull
+  (`compute.expected_picks`), red's badge is the six's total pull, and
+  the fight odds (`plan.fight_odds`) score that six against blue's on the
+  default engine alone. A
   Draft may name a stage the map lists (`stage`, resolved by
   `facts.draft.board_stage`); every seat plays it, and it moves the `map.*`
   metrics alone - the ground in play, `compute.ground`. Blue's seat has one

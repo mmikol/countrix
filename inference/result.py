@@ -146,13 +146,24 @@ class Badges(TypedDict):
     red: Badge
 
 
+class Odds(TypedDict):
+    """The fight odds: blue's six and red's likely six head to head on the
+    default engine alone, each side's score above the board's floor as its
+    part of 100, and the strip's tooltip. A comparison of the two sixes, not
+    a probability of winning."""
+    blue: int
+    red: int
+    tip: str
+
+
 class Momentum(TypedDict):
     """Where blue's picks stand: blue's share of its optimal, whether blue is
-    half-drafted, the verdict in words and the badge above each picker -
-    blue's share, red's likely six's pull. The share is None where it cannot
-    be read."""
+    half-drafted, the fight odds, the verdict in words and the badge above
+    each picker - blue's share, red's likely six. The share and the odds are
+    None where they cannot be read."""
     blue: int | None
     partial: bool
+    odds: Odds | None
     verdict: str
     badges: Badges
 
