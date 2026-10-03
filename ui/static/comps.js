@@ -176,7 +176,7 @@ function renderInf() {
      fill around one to five picks, the picks themselves at six - above the
      optimal, which blue's own picks never constrain; before any pick, the
      optimal alone. The picks' scores are the badges above the pickers */
-  renderResult(d.expected, el('inf-red'), 'red - most likely starting comp' + (d.map ? ' on ' + d.map : ''));
+  renderResult(d.expected, el('inf-red'), 'red - likely starting comp' + (d.map ? ' on ' + d.map : ''));
   var held = d.current && d.current.blue ? d.current.blue.length : 0;
   /* each result names its own six blue: red_current.blue is red's picks */
   var revealed = d.red_current && d.red_current.blue ? d.red_current.blue.length : 0;

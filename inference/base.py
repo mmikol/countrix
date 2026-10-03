@@ -18,13 +18,17 @@
                 answers them, a wiki edge WIKI_WEIGHT (2) and, on a pair the
                 wiki has no edge on either way, a derived one DERIVED_WEIGHT
                 (1). The other side is its locked picks; with none, its likely
-                six on this map (compute.expected_picks, past the bans),
-                which only this term reads
+                six on this map (compute.expected_picks, past the bans).
+                Where the other side gets no picks - red's seat before blue
+                picks, infer before red reveals - only this term reads it;
+                the board hands blue's seat that six as red's picks, so
+                there every term reads it
 
 It is always on and needs no playbook: under a playbook of assumptions the
 board's sixes are the ones these three favour, and the strategies' terms
-sit on top of it (inference.scoring). A heuristic moves a six by its weight
-at most, since its norm is in [0, 1].
+sit on top of it (inference.scoring). A heuristic on a metric moves a six
+by its weight at most, since its norm is in [0, 1]; a scored one by its
+weight times its bonus less its penalty, which its expressions bound.
 
 Only this term reads the kit's derived edges. The team.* counter metrics -
 coverage, exposed_count, net_edges and their family - read the wiki's

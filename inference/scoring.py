@@ -27,8 +27,8 @@ A six is scored in one seat order, whatever order it arrives in: tanks,
 then damage, then supports, each by hero id (Candidate). The score is then a
 function of the hero set, down to its last bit, which the exact search and
 its proofs need. Sixes rank by rank_key: the score to SCORE_PLACES decimal
-places, then the tie-break, then the names; two scores closer than that
-tie, and the tie-break decides. The tie-break is the sum of the six's
+places, then the tie-break, then the names; two scores that round to the
+same value tie, and the tie-break decides. The tie-break is the sum of the six's
 draws: each hero's draw is a whole number hashed from the board's seed
 (the map and the side) and the hero's id, so it favours no hero for its
 rates or its name, every hero of a role has the same chance of winning a

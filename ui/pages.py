@@ -16,8 +16,8 @@ import os
 from typing import NamedTuple
 
 from facts import compute, counters, scalars
-from facts.draft import MAX_BANS, TEAM_SIZE
-from inference import base, catalog, scale, scoring, solver
+from facts.draft import MAX_BANS, MAX_TANKS, TEAM_SIZE
+from inference import base, catalog, scale, scoring, solver, strategy
 
 GITHUB_MARK = (
     "<svg viewBox='0 0 16 16' width='15' height='15' aria-hidden='true'><path fill='currentColor' d='M8 0C3.58 0 0 3.58 0 8"  # noqa: E501
@@ -171,6 +171,12 @@ def view_math() -> str:
         "RATE_PICK_HALF": base.RATE_PICK_HALF,
         "SYNERGY_PULL": compute.SYNERGY_PULL,
         "REFERENCE_SIZE": format(scale.REFERENCE_SIZE, ","),
+        "SCALE_POOL": scale.SCALE_POOL,
+        "COIN_FLIP": base.COIN_FLIP,
+        "MECHANISMS": len(counters.MECHANISMS),
+        "MAX_TANKS": MAX_TANKS,
+        "MAX_BANS": MAX_BANS,
+        "WEIGHT_MAX": strategy.WEIGHT_RANGE[1],
         "NEED_BUDGET": scoring.NEED_BUDGET,
         "SCORE_PLACES": scoring.SCORE_PLACES,
         "RANK_CAP": solver.RANK_CAP,

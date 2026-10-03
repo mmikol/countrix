@@ -215,13 +215,16 @@ the sixes its three terms favour, scored and explained:
   answers from the kits at load: thirteen mechanisms (anti-air, a flier,
   barrier piercing, anti-heal, burst, control, a projectile eater and a
   weapon it cannot take, armor, dive, saves, reach, tank-busting) score
-  every ordered pair of released heroes, and each loser's six best
-  answers, scoring 0.5 or more and more than the reverse, weigh 1 each.
+  every ordered pair of released heroes, and of each loser's six best
+  answers, scoring 0.5 or more and more than the reverse, those on a
+  pair the wiki leaves out weigh 1 each; the others are not replaced.
   The other side is its locked picks, or, with none, its likely six on
   this map past the bans (`compute.expected_picks`, the six the board's
-  red panel shows); either seat reads the other the same way. Only this
-  term reads the likely six or a derived edge: the `team.*` and `enemy.*`
-  counter metrics read the wiki's graph against the picks. The board
+  red panel shows). The board hands blue's seat that six as red's picks,
+  so there every term reads it; where the other side gets no picks -
+  red's seat before blue picks, `infer` before red reveals - only this
+  term does. Only this term reads a derived edge: the `team.*` and
+  `enemy.*` counter metrics read the wiki's graph against the picks. The board
   names every derived edge it counts with the mechanism and the numbers
   that fired.
 
@@ -234,8 +237,9 @@ each term's median spread across a board's reference sample is about
 half the rate term's, about 2.1 points on a typical board; the module
 docstring holds the rule, and [Why the weights are the
 playbook's](#why-the-weights-are-the-playbooks) what it measured and why
-synergy moved from 0.1. A heuristic still moves a six by its weight at
-most; the math page says how that compares with the base's spread. Each
+synergy moved from 0.1. A heuristic on a metric still moves a six by its
+weight at most, a scored one by its weight times its bonus less its
+penalty; the math page says how that compares with the base's spread. Each
 term is a bar of the breakdown, with the fact it read and its weight
 with the meta applied: the counter bar's fact names the six it read.
 
@@ -495,9 +499,8 @@ keep some of the reference and with nothing locked, as a board runs it.
 ## The plan stage by stage
 
 The board carries a row a stage of the map, in play order (`Board.stages`,
-`swaps.chain`), from one origin: the six the board suggests - blue's
-picks with the swaps taken, the fill around fewer, the optimal before
-any pick.
+`swaps.chain`), from one origin: the six the comps tab shows - blue's
+picks at six, the fill around fewer, the optimal before any pick.
 
 - **The phases of a route** (Hybrid, Escort) chain: each phase's six is
   the best reachable from the phase before, each hero changed costing
@@ -508,8 +511,10 @@ any pick.
 - **The arenas** (Control rounds, Flashpoint points) come up in no fixed
   order, so each is reached from the origin, never from the arena listed
   before it.
-- **A chosen stage** is the origin itself, and the phases before it read
-  as played, with no six.
+- **A chosen stage** is the board's own swap answer from the origin - the
+  swaps suggested above the picks, else the origin itself - and the
+  phases before it read as played, with no six; the phases after it go
+  on from its six.
 
 Red on every stage is its revealed picks, else its likely six. Two stages
 that score every six alike from the same six - the same gates and the
@@ -523,8 +528,9 @@ text stresses, else that it reads as the map; the rules its ground turns
 on and off against the whole map; the swaps and the two terms the six
 gains most on, or the six kept under the cost; and how to play it where
 the six's lean turns (`plan.stage_blurb`). A stage differs from its map
-only through its terrain and the rules that read it, since the rates are
-per map: under the shipped playbook, 8 of the 64 stages score a six of
+only through the ground in play - its terrain, its name and, on a Hybrid,
+its objective - and the rules that read them, since the rates are per
+map: under the shipped playbook, 8 of the 64 stages score a six of
 their own, on either side and with none - Havana's three, Midtown's and
 Neon Junction's escort phases, two of Rialto's and Route 66's Western Town
 Complex. 36 of the 64 have no text of their own on the wiki; fuller stage
@@ -908,9 +914,12 @@ P_r = enemy.pool_total + f x sum over r of d_r x pool_medians[r]
 
 A red that has shown its two supports reads as two, not as two and a
 share of a third. A complete red that heals nothing needs nothing. The
-likely six is not read: it rests on pick rates.
+likely six is read only where a seat is handed it as red's picks: on the
+board, blue's seat before red reveals, where the bar is that six's
+healing on its pool.
 
-**The threshold.** With red empty, red is the 2-2-2 of role-median
+**The threshold.** With red empty - red's seat before blue picks, `infer`
+before red reveals - red is the 2-2-2 of role-median
 heroes: H_r = `world.hps_bench` = 139.87 hp/s and P_r = twice the sum of
 `World.pool_medians` = 2 x (525 + 250 + 237.5) = 2025, the 6v6 kit as of
 2026-09-26. A six must heal 6.91% of its own pool a second, and never less

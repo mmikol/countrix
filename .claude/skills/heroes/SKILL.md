@@ -30,7 +30,7 @@ Bring the roster and the kits up to date. Work through the
    `synergy_cells`: the summary's `cells` counts them, its
    `unwritten_pairs` the pairs neither article writes, and its `unwritten`
    line names heroes whose article writes no cell. The engine reads a cell
-   no article writes at half the written pairs' mean, not zero, so a new
+   no article writes at the written cells' claim share, not zero, so a new
    hero with a near-blank article is not charged for it - do not report
    it as having no synergy. The `unpaired` line names heroes the wiki
    pairs with no one yet. Nothing here is written by hand:

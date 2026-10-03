@@ -173,10 +173,11 @@ db <- facts <- inference <- door <- ui.
   page's boards do. A Draft may name a stage the map lists (`stage`,
   resolved by `facts.draft.board_stage`); every seat plays it, and it moves
   the `map.*` metrics alone - the ground in play, `compute.ground`. Each
-  seat has one scale: reference sixes drawn from a string seed, the map
-  and the side, bounded against the enemy and measured on the whole map
-  (`prepare(measure=True)`), so the stages of a map share it; the lowest
-  of their scores under the board's own gates is the seat's floor, a
+  seat has one scale: the reference sample, drawn from a string seed of
+  the map and the side, and the board's field, which reads the enemy, both
+  measured on the whole map (`prepare(measure=True)`), so the stages of a
+  map share it; the lowest of the sample's scores under the board's own
+  gates is the seat's floor, a
   share's 0, as its optimal is the 100. current shares blue's optimal's scale, red_current red's, so within
   a seat infer, the fill and current are comparable. The search is exact
   (`inference/solver.py`, its bounds in `inference/bounds.py` over
@@ -204,15 +205,15 @@ db <- facts <- inference <- door <- ui.
   search stays one exact branch and bound; the keep term is never a
   contribution, and the target is scored again on the plain objective.
   A swap needs its net to beat the six that keeps every pick; red is
-  re-solved against the target for the odds after, and a suggestion that
-  lowers them is withheld. Red is never searched for swaps. `BRIEF` in
+  re-solved against the target for the odds after, and a suggestion they
+  do not rise on is withheld. Red is never searched for swaps. `BRIEF` in
   tests/verification/inference/__init__.py turns them off
   (`Brief.search_swaps`); a test that reads them names its cost.
 - **The plan runs stage by stage.** On a map with stages, `Board.stages`
-  (`swaps.chain`) is a row a stage in play order from the six the board
-  suggests: each phase of a route the exact best reachable from the phase
+  (`swaps.chain`) is a row a stage in play order from the six the comps
+  tab shows: each phase of a route the exact best reachable from the phase
   before under the swap cost, greedy; each arena from that six; a chosen
-  stage the six itself, the phases before it played. Two stages with the
+  stage the board's swap answer, the phases before it played. Two stages with the
   same `Objective.ground_key` are one search. Each row's blurb is
   `plan.stage_blurb`, worded from the facts. `BRIEF` leaves it out too
   (`Brief.walk_stages`); test_stage_plan names its brief.

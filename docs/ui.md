@@ -33,7 +33,7 @@ and the health for it.
 | `/api/board?map=&side=&red=&blue=&bans=[&stage=&weights=&client=]` | the board solved at any step of the draft, every seat on the stage in play (the whole map without one), under the playbook tab's weights: the `board` tool's answer ([mcp.md](mcp.md#the-tools)) without the countered case, which the page never reads, from `serve.handle_board`. One board solves at a time; another waits, and answers 429 after a minute (`serve.Admission`); a newer board from the same `client` stops one still solving, which answers 400 (`serve.LATEST`, a lane per client) |
 | `/api/strategies` | the catalog: every constraint, heuristic and assumption with its kind, form, frontmatter and body, from `serve.handle_strategies` |
 | `/health` | the engine's health, from `serve.handle_health`: ok or degraded, the strategies, the drafts pending and the heroes, and the error naming what is out of reach. The ui container's healthcheck and `orchestrator.py` read it |
-| `/math` | `static/math.html` in the page shell, the numbers it quotes filled in by `pages.py` - the default engine's four weights and the swap cost from the playbook's `meta.md`, and from the code `SWAP_MAX`, the counter graph's four constants, `RATE_PICK_HALF`, `SYNERGY_PULL`, `REFERENCE_SIZE`, `NEED_BUDGET`, the search's `SCORE_PLACES` and `RANK_CAP`, and the healing formation's radius and teammates: the equation, how a six is chosen, the scoring function with the default engine under the playbook, the board and how the layers fit |
+| `/math` | `static/math.html` in the page shell, the numbers it quotes filled in by `pages.py` - the default engine's four weights and the swap cost from the playbook's `meta.md`, and from the code `SWAP_MAX`, the counter graph's four constants, `RATE_PICK_HALF`, `COIN_FLIP`, `SYNERGY_PULL`, `REFERENCE_SIZE`, `SCALE_POOL`, `NEED_BUDGET`, the search's `SCORE_PLACES` and `RANK_CAP`, the counter graph's mechanisms, `MAX_TANKS`, `MAX_BANS`, the weight slider's top, and the healing formation's radius and teammates: the equation, how a six is chosen, the scoring function with the default engine under the playbook, the board and how the layers fit |
 
 The board answers GET alone: any other method is a 501, after the host
 guard.
@@ -110,7 +110,7 @@ then two seats, neither with a score. Blue's (left) shows
 the six the plan describes - *your picks, the rest filled* from one to
 five picks, *your six* at six - over blue's *optimal vs red's picks* (*vs
 red's likely six* before red reveals one, alone before any pick), which
-blue's own picks never constrain. Red's (right) is their most likely
+blue's own picks never constrain. Red's (right) is their likely
 starting comp, a two-two-two filled slot by slot from the map's pick rates
 and the wiki's synergies, past the bans; it reads no strategy, and only a
 new map, side or ban sends it back to *searching*. Under a six's cards sit

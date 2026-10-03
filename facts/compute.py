@@ -112,8 +112,8 @@ def expected_picks(world: World, m: Map | None, *, revealed: Sequence[Hero] = ()
     """What the other side is likely to field, from the data alone - no
     strategy read: any picks given as revealed first, then slot by slot the
     hero the map's pick rates (the overall meta with no map set) and the
-    wiki's synergies make likeliest - a hero's likelihood is its pick rate
-    plus SYNERGY_PULL per partner already on the six - into a two-two-two,
+    wiki's synergies rank first - a hero's pull is its pick rate plus
+    SYNERGY_PULL per partner already on the six - into a two-two-two,
     past the bans. Ties go to the alphabetically first name. Deterministic;
     the board calls it with nothing revealed, so the six is static for the
     board. Each entry says what it rests on."""

@@ -35,18 +35,19 @@ rest the best answer from the new picks: for R' = R less the pick dropped
 plus the hero taken, net_R'(x) <= net_R(T) + c = net_R'(T). Blue's seat
 alone is searched; red's picks are the other side's facts.
 
-The stage plan walks the map's stages in play order from one origin, the
-six the board suggests - blue's picks with the swaps taken, the fill around
-fewer, the optimal without picks. The phases of a route (Hybrid, Escort)
-chain: each phase's six is the best reachable from the one before, each
-hero changed costing the swap cost, so a hero stays into the next stage
-unless swapping gains more than the cost - greedy, stage by stage, never
-trading a swap now against one later. The arenas (Control, Flashpoint) come
-up in no fixed order, so each is reached from the origin. The board's
-chosen stage is the origin itself, and the phases before it are played.
-Two stages that score every six alike from the same six are one search
-(scoring.Objective.ground_key); a stage past its budget is not solved, and
-the next phase goes on from the last six that was.
+The stage plan walks the map's stages in play order from one origin, the six
+the comps tab shows - blue's picks at six, the fill around fewer, the
+optimal without picks. The phases of a route (Hybrid, Escort) chain: each
+phase's six is the best reachable from the one before, each hero changed
+costing the swap cost, so a hero stays into the next stage unless swapping
+gains more than the cost - greedy, stage by stage, never trading a swap now
+against one later. The arenas (Control, Flashpoint) come up in no fixed
+order, so each is reached from the origin. The board's chosen stage is its
+own swap answer from the origin - the swaps suggested, else the origin
+itself - and the phases before it are played. Two stages that score every
+six alike from the same six are one search (scoring.Objective.ground_key); a
+stage past its budget is not solved, and the next phase goes on from the
+last six that was.
 """
 
 from collections.abc import Sequence
