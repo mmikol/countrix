@@ -111,7 +111,7 @@ def test_the_page_is_a_shell_over_static_files():
     assert links.count("<a ") == 2
     assert links.rstrip().endswith("GitHub</a></span>")
     # the page hands the scripts the counts they need
-    assert "var TEAM = 6, BANS = 5, SWAP_MAX = 50;" in body
+    assert "var TEAM = 6, BANS = 5, TANKS = 2, SWAP_MAX = 50;" in body
     data, ctype = pages.static_file("board.js")
     assert ctype.startswith("application/javascript") and b"function paint" in data
     data, ctype = pages.static_file("comps.js")
@@ -166,7 +166,7 @@ def test_the_scripts_write_the_ids_and_read_the_globals_the_shell_holds():
         assert attribute in script, attribute
     shell = re.search(r"<script>var (.*?);</script>", body).group(1)
     names = [part.split(" = ")[0] for part in shell.split(", ")]
-    assert names == ["TEAM", "BANS", "SWAP_MAX"]
+    assert names == ["TEAM", "BANS", "TANKS", "SWAP_MAX"]
     for name in names:
         assert re.search(r"\b%s\b" % name, script), name
     assert script.count("min='%g' max='%g' step='0.01'" % WEIGHT_RANGE) == 2
@@ -188,7 +188,7 @@ def test_the_scripts_read_payload_keys_the_server_writes(synthetic_world, monkey
     read(
         "plan momentum shapes current fill expected blue map side swaps stages",
         solved)
-    read("pairs open verdict status", Swaps.__annotations__)
+    read("pairs open verdict", Swaps.__annotations__)
     read("out in at portrait why", SwapPair.__annotations__)
     read("hero portrait why", OpenSlot.__annotations__)
     read("stage kind current played six swaps blurb solved", StageRow.__annotations__)
@@ -269,6 +269,9 @@ def test_the_swap_row_and_the_slots_it_fills_follow_the_picks_the_board_answered
     assert "'blueswaps', 'stageplan'" in function(script, "solving")
     take = function(script, "takeSwap")
     assert "st.bans.indexOf(into)" in take and "roleCap('blue'" in take
+    # the playbook's limits are blue's: red meets the queue's tank limit alone
+    assert "if (team === 'red') return role === 'tank' ? TANKS : null;" in function(
+        script, "roleCap")
 
 
 def test_a_reply_to_an_older_request_is_dropped_and_its_board_cancelled():

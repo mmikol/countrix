@@ -61,9 +61,12 @@ function buildTeam(team) {
 }
 function buildBanPicker() { el('banroster').innerHTML = rosterHTML('ban'); }
 
-/* how many of a role a team may hold, given what it holds of the others: the
-   most any legal shape seats. null when the board has not said what is legal */
+/* how many of a role a team may hold, given what it holds of the others. Blue's
+   is the most any legal shape seats, null when the board has not said what is
+   legal. Red's is the queue's tank limit alone: the playbook's limits are
+   blue's, and red's picks are never ruled out */
 function roleCap(team, role) {
+  if (team === 'red') return role === 'tank' ? TANKS : null;
   if (!SHAPES || !SHAPES.length) return null;
   var have = roleCounts(team), cap = -1;
   SHAPES.forEach(function (shape) {
@@ -211,7 +214,7 @@ function qs() {
 var pending = null, seq = 0, FACTS = null, INF = null;
 var STALE = false;         /* the last refresh failed: the next focus or reconnect retries it */
 var solve = null;          /* the board request in flight, aborted when a newer one is sent */
-var redKey = null;         /* the map, side, bans and red picks red's likely six was drawn for */
+var redKey = null;         /* the map, bans and red picks red's likely six was drawn for */
 /* this page's name on its board requests: the server stops a board this page
    has moved past, and serves every other page's in its own lane */
 var CLIENT = Math.random().toString(36).slice(2, 10);
@@ -265,10 +268,11 @@ function refresh() {
        lands: the two seats, the scores, the plan and the filled slots. Without
        this the board shows the last board's numbers while it thinks, which
        reads as an answer. Red's likely six changes only with the map, the
-       side, the bans and red's own picks, so a blue pick leaves it standing */
+       bans and red's own picks, so a blue pick, a side or a stage leaves it
+       standing */
     solving(true);
     el('inf-blue').innerHTML = "<p class='legend searching'>searching…</p>";
-    var key = [st.map, st.side, st.stage].concat(st.bans, ['red'], st.red).join('|');
+    var key = [st.map].concat(st.bans, ['red'], st.red).join('|');
     if (key !== redKey) el('inf-red').innerHTML = "<p class='legend searching'>searching…</p>";
     if (solve) solve.abort();           /* the older request; this one's arrival stops its board */
     solve = new AbortController();

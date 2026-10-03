@@ -1,8 +1,7 @@
 """The default engine: each of its three terms worked by hand, the pick
-rate's pull toward a coin flip, the other side it reads - the likely six
-until that side locks a pick, from either seat - a board the same under
-any hash seed, and the facts its terms cite. Every board is the synthetic
-World's: no database."""
+rate's pull toward a coin flip, the other side it reads - red's likely six
+until red locks a pick - a board the same under any hash seed, and the
+facts its terms cite. Every board is the synthetic World's: no database."""
 
 import copy
 import dataclasses
@@ -187,7 +186,8 @@ def test_blue_counters_reds_likely_six_and_red_is_never_solved(synthetic_world):
     assert c["likely"] and sorted(c["against"]) == sorted(likely)
 
 
-# red revealed and one blue pick locked on a sided map: every seat of the board solves
+# red revealed and one blue pick locked on a sided map: blue's optimal, current comp and
+# fill all solve, and red's likely six forms around its pick
 TRACED = Draft("Harbor Gate", ("Anvil",), ("Balm",), side="attack")
 
 # one board solved in a fresh process, its payload printed as JSON less the seconds

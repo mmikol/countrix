@@ -128,11 +128,11 @@ def view_board() -> str:
             "<span id='chips'></span><span id='factsn' class='count'></span></div>"
             "<table class='facts'><tbody id='factbody'></tbody></table></section>"
             "<section class='panel' id='tab-playbook'><div id='playbook'></div></section>"
-            "</main><script>var TEAM = %d, BANS = %d, SWAP_MAX = %g;</script>"
+            "</main><script>var TEAM = %d, BANS = %d, TANKS = %d, SWAP_MAX = %g;</script>"
             "<script src='/static/comps.js'></script>"
             "<script src='/static/playbook.js'></script>"
             "<script src='/static/board.js'></script>")
-    return shell % (REPO_URL, GITHUB_MARK, TEAM_SIZE, MAX_BANS, base.SWAP_RANGE[1])
+    return shell % (REPO_URL, GITHUB_MARK, TEAM_SIZE, MAX_BANS, MAX_TANKS, base.SWAP_RANGE[1])
 
 
 def page(title: str, body: str) -> str:

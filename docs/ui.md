@@ -72,11 +72,12 @@ else is drawn before it.
 **The rosters.** One tile renderer draws both rosters and the ban picker
 as the same hero select: portrait tiles in tank, damage and support
 columns, lit when picked, dotted when on the other team, crossed out when
-banned. A tile dims once the queue's two-tank limit or the playbook's
-shape limits - the `(tanks, damage, supports)` triples the board result
-carries - leave no legal six that seats one more of its role, and a click
-on it is refused with a note. The limits hold both teams: they are the
-game's form, not blue's alone. An **announced** hero, one the wiki knows
+banned. A tile dims once its team's limits leave no room for one more of
+its role, and a click on it is refused with a note. Blue's limits are the
+queue's two tanks and the playbook's shape limits - the
+`(tanks, damage, supports)` triples the board result carries; red's are
+the queue's two tanks alone, since the playbook's limits are blue's and
+red's picks are never ruled out. An **announced** hero, one the wiki knows
 ahead of release, sits in its role column as the same tile, dimmed and
 tagged "coming soon", with its portrait or a silhouette. It has no click
 handler, so it never enters the state, and the solver never fields it;
@@ -114,8 +115,8 @@ blue's own picks never constrain. Red's (right) is their likely six,
 *their picks, the rest likely* once red reveals one: red's picks, then a
 two-two-two filled slot by slot from the map's pick rates and the wiki's
 synergies, past the bans, with the six's pull in its title. Red is never
-optimized: it reads no strategy, and only a new map, side, ban or red pick
-sends it back to *searching*. Under a six's cards sit
+optimized: it reads no strategy, and only a new map, ban or red pick sends
+it back to *searching*. Under a six's cards sit
 the search's numbers (the candidates, every six of the legal shapes its
 answer covers; the seconds; the lean), the default engine's
 three terms - `base.rates`, `base.synergy`, `base.counters`, a bar each
@@ -135,7 +136,7 @@ share; where the optimal scores no higher than the floor, as every six
 does when a caller turns the engine off under a playbook that scores
 nothing, it reads *unscored*, the engine's reason in the tooltip. Red's
 badge is its likely six's pull - each hero's pick rate here plus 2 for
-each synergy partner on the six - since red is never scored. The engine
+each documented synergy pair on the six - since red is never scored. The engine
 words each badge (`momentum.badges`, a label and a tip); the page only
 shows it.
 

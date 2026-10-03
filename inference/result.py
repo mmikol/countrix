@@ -2,9 +2,9 @@
 
 A Result is one seat's six on one board: who is in it and why, each pick
 citing the board facts that justify it, the score and its breakdown per
-strategy, and the runners-up. A Board holds the seven Results board()
-solves, with the verdict, the seat badges, the plan and blue's swaps read
-off them. Both render as JSON-ready data (to_dict: a ResultRecord, a
+strategy, and the runners-up. A Board holds blue's Results board() solves
+and red's likely six, with the verdict, the seat badges, the plan and
+blue's swaps read off them. Both render as JSON-ready data (to_dict: a ResultRecord, a
 BoardRecord) and as text (rendered).
 """
 
@@ -439,8 +439,9 @@ class Result:
                 "red": self.red, "blue": self.blue, "locked": self.locked,
                 "bans": self.bans, "side": self.side, "stage": self.stage,
                 "partial": self.partial,
-                # a comp its own picks rule out carries no score at all
-                "score": None if self.barred else round(self.score, 3),
+                # a comp its own picks rule out carries no score at all, nor
+                # red's likely six, which nothing scores
+                "score": None if self.barred or self.kind == "expected" else round(self.score, 3),
                 "scoring": scoring, "unscored": unscored,
                 "weights": {s.id: s.weight for s in self.catalog if s.kind == "heuristic"},
                 # the default engine's weights it was scored under: the meta and its dials
@@ -461,9 +462,16 @@ class Result:
 
     def rendered(self) -> str:
         """The result as text: the heading, the six and its score, and a line
-        each for the picks, the breakdown and the alternatives."""
+        each for the picks, the breakdown and the alternatives. Red's likely
+        six has no score: its line gives the six's pull, and each pick's."""
         counts = catalog_module.counts(self.catalog)
         unscored = self.unscored()
+        picks = ["  %-8s %-14s %s" % (p["role"], p["hero"] + ("*" if p["locked"] else ""), p["why"])
+                 for p in self.picks]
+        if self.kind == "expected":
+            pull = sum(p.get("pull", 0.0) for p in self.picks)
+            return "\n".join([self._headline(), "  %s - %.1f pull %s" % (
+                ", ".join(self.blue), pull, self._share_label(unscored)), *picks])
         under = (" under the meta at %g, %d constraints, %d heuristics and %d assumptions"
                  % (self.base.meta, counts["constraint"], counts["heuristic"],
                     counts["assumption"]))
@@ -485,9 +493,7 @@ class Result:
                          % (len(self.blue), TEAM_SIZE))
         if self.violations:
             lines.append("  VIOLATES: " + ", ".join(self.violations))
-        lines += ["  %-8s %-14s %s" % (p["role"], p["hero"] + ("*" if p["locked"] else ""),
-                                       p["why"])
-                  for p in self.picks]
+        lines += picks
         lines.append(self._breakdown())
         lines += ["  alt %d: %s (%.2f)" % (i, ", ".join(alt["blue"]), alt["score"])
                   for i, alt in enumerate(self.alternatives, start=1)]

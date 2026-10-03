@@ -138,11 +138,10 @@ def evaluated(
         base: base.BaseWeights = DEFAULT) -> Result:
     """Blue's full six (`draft.blue`) scored and ranked against every legal
     six, as the board scores its current comp - through blue's optimal's
-    search - without the board's other seats."""
+    search - without the rest of the board."""
     optimal = engine._optimal(world, dataclasses.replace(draft, blue=()), catalog=catalog,
-                              base=base, top=engine.BOARD_TOP, seat="blue", kind="infer")
-    return engine._evaluated(world, draft, catalog=catalog, base=base, seat="blue",
-                             kind="evaluate", optimal=optimal)
+                              base=base, top=engine.BOARD_TOP, kind="infer")
+    return engine._evaluated(world, draft, catalog=catalog, base=base, optimal=optimal)
 
 
 def timeless(payload: dict[str, Any]) -> dict[str, Any]:

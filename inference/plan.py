@@ -54,8 +54,8 @@ def momentum(seats: Seats) -> Momentum:
     why = cur.unscored()
     share = _now(cur, fill).share() if cur.blue and why is None else None
     partial = bool(cur.blue and cur.partial)
-    return Momentum(blue=share, partial=partial, verdict=_verdict_line(share, partial, why),
-                    badges=badges)
+    verdict = _verdict_line(share, partial, fill is not None, why)
+    return Momentum(blue=share, partial=partial, verdict=verdict, badges=badges)
 
 
 def _now(current: Result, fill: Result | None) -> Result:
@@ -96,19 +96,20 @@ def _likely_badge(likely: Result) -> Badge:
     held = any(p["locked"] for p in likely.picks)
     six = "their picks and the likeliest heroes for the rest" if held else "their likely six"
     tip = (
-        "%s: %.1f pull - each hero's pick rate here, plus %g for each synergy partner"
-        " on the six" % (six, pull, compute.SYNERGY_PULL))
+        "%s: %.1f pull - each hero's pick rate here, plus %g for each documented synergy"
+        " pair on the six" % (six, pull, compute.SYNERGY_PULL))
     return Badge(label="%.0f pull" % pull, tip=tip)
 
 
-def _verdict_line(share: int | None, partial: bool, why: str | None) -> str:
-    """Blue's standing in words."""
+def _verdict_line(share: int | None, partial: bool, filled: bool, why: str | None) -> str:
+    """Blue's standing in words: a half-drafted seat says whether it was read
+    through its fill or, where none was solved, off its picks alone."""
     if why is not None:                  # picks not allowed, or a board that waits
         return "blue " + why if why.startswith(NOT_ALLOWED) else why
     if share is None:
         return "no blue picks yet: the suggested six is blue's optimal, 100 / 100"
-    return "blue %d / 100 of its optimal%s" % (
-        share, " (the best six from its picks)" if partial else "")
+    how = (" (the best six from its picks)" if filled else " (its picks alone)") if partial else ""
+    return "blue %d / 100 of its optimal%s" % (share, how)
 
 
 MODE_GROUND = {
