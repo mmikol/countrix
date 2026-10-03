@@ -87,8 +87,8 @@ change only what a check or the user points at, and leave a report.
    hardening).
 
 7. **The backlog is current.** `pm/backlog.md` is the list of what is
-   worth doing next, ordered by payoff over blast radius. A run moves an
-   item that landed to *Done* with its commit, adds what a check or a
+   worth doing next, ordered by payoff over blast radius. A run drops an
+   item that landed - git log keeps what landed - adds what a check or a
    lesson below suggests (a smell named in check 5, a cap that bit, a
    measurement that changed), rewrites an item whose cost or risk the
    code now shows differently, and drops what no longer applies. Never

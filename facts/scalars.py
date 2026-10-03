@@ -49,13 +49,8 @@ FORM_GATED = ("Configuration: Assault", "Pummel", "Tesla Cannon Alt Fire", *PILO
 SAVE_TOOLS = ("Immortality Field",)
 
 # --- sustained healing ------------------------------------------------------
-# hero.hps is hp/s landed on teammates, summed over every teammate a piece
-# reaches and over every piece that runs beside the others; the caster's own
-# healing is out (docs/inference.md, Sustained healing). The six stand spread
-# uniformly over a disk of radius FORMATION_RADIUS: a piece centred on the
-# caster reaches TEAMMATES x p(r) of them, a piece that lands on an aimed
-# teammate 1 + (TEAMMATES - 1) x p(r), p(r) the chance two points of the disk
-# lie within r (p_within).
+# hero.hps is hp/s landed on teammates (docs/inference.md, Sustained healing;
+# the math page's reach and hps).
 #
 # 15 m is a judgement. Its anchor is the shortest single-target heal range
 # among the supports: Caduceus Staff, Biotic Grasp and Healing Pylon (the

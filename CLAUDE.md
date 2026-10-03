@@ -119,12 +119,8 @@ db <- facts <- inference <- door <- ui.
   (`Strategy`, `CatalogError`); one bad file makes `catalog.load` raise
   everywhere. `meta.md` beside the strategy files is no strategy and no
   strategy may take its name: it holds the default engine's weights
-  (below). The shipped playbook is eight assumptions, thirteen
-  heuristics - `heal-rate`, scored (the healing floor,
-  `matchup.heal_shortfall`, docs/inference.md), and twelve on the terrain
-  of the ground in play (`map.<feature>`, `map.objective`) - and one
-  limit, `at-most-three-supports`, while
-  it is rebuilt rule by rule from the citation record in
+  (below). The shipped playbook, listed in docs/inference.md's generated
+  catalog, is rebuilt rule by rule from the citation record in
   `inference/README.md`. Solver behaviour is tested against the 19-file
   reference playbook in `tests/fixtures/playbook/` and its own `meta.md`
   (`DEFAULT` and `BRIEF` in tests/verification/inference/__init__.py), or
@@ -132,17 +128,11 @@ db <- facts <- inference <- door <- ui.
   playbook that scores nothing; no solver test reads
   `inference/strategies/`.
 - **The default engine scores first.** `inference/base.py` scores every six
-  on its win rates on the map (each pick's edge over 50, trusted by its pick
-  rate), the wiki's synergy scores - read cell by cell, one cell in each
-  hero's article: a claim 1, a write-off 0, and a cell no article writes
-  (no `synergy_cells` row) at the written cells' claim share
-  (`facts.tables.impute_synergy`), never 0 (docs/inference.md, Why an
-  unwritten synergy pair is not zero) - and the counter graph against the
-  other side - its locked picks, else its likely six: a wiki edge 2, and
-  on a pair the wiki leaves out a kit-derived one 1 (`facts/counters.py`,
-  which the team.* counter metrics never read) - and the playbook's terms
-  sit on top, so the shipped playbook's boards are scored, never
-  *unscored*. Its weights are the playbook's, in `meta.md`: `meta`, which
+  on its win rates on the map, the wiki's synergy scores and the counter
+  graph against the other side's locked picks, else its likely six, which
+  no other term reads (each term defined in docs/inference.md, The
+  objective, and on the math page); the playbook's terms sit on top, so
+  the shipped playbook's boards are scored, never *unscored*. Its weights are the playbook's, in `meta.md`: `meta`, which
   scales the whole engine, over the `rate`, `synergy` and `counter` dials
   (1, 1, 0.26, 0.05 shipped); `tune` with id `meta` changes them and the
   file's prose (`body`), and the playbook tab's Meta slider

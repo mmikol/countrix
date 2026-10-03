@@ -1,14 +1,12 @@
 # The playbook's sources
 
-**The playbook was emptied on purpose.** `strategies/` now holds eight
-assumptions, thirteen heuristics - `heal-rate` and twelve on the ground in
-play - and one limit, `at-most-three-supports`, beside `meta.md`, the
-default engine's weights, which is no strategy and cites nothing. This file
-is the record of the 245 entries it held and the six added since, with the
-citation behind
+**The playbook was emptied on purpose.** This file is the record of the 245
+entries `strategies/` held and the six added since, with the citation behind
 each, and it is the source the playbook is being rebuilt from by hand - so it
-describes more than the folder does, and is meant to. `docs/inference.md` is
-generated from the folder and says what is in force today.
+describes more than the folder does, and is meant to. The catalog in
+`docs/inference.md`, generated from the folder, says what is in force today;
+`meta.md` beside the strategy files holds the default engine's weights and
+cites nothing.
 
 One entry per strategy the playbook has held: the community's rules, the
 queue's limit and the user's assumptions. The rules come from

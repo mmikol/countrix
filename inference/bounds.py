@@ -17,13 +17,10 @@ range over a branch is inference.ranges.
                           then each heuristic and each scored term apart
     roster                each role's candidates for the open slots
 
-Floating point: a metric the bound sums in another order than the metric
-itself carries a slack, SLACK times the magnitude of its addends, outward on
-both ends; one whose values are whole numbers is exact and carries none, so
-a threshold on a count reads exactly. Every other step is a monotone float
-operation taken at the right end of an interval, and the terms add up in
-the score's own order, so a six's computed score never exceeds its branch's
-computed bound.
+Floating point: a metric's slack is inference.ranges'; every other step is
+a monotone float operation taken at the right end of an interval, and the
+terms add up in the score's own order, so a six's computed score never
+exceeds its branch's computed bound.
 """
 
 from collections.abc import Sequence

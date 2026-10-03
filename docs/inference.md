@@ -20,27 +20,20 @@ Two things infer:
   where arithmetic cannot. It runs when you ask it to, never on its own,
   on your subscription.
 
-One input is written by hand: the playbook, which the solver reads. A pull
-tool fills every other table. The shipped playbook is eight assumptions,
-thirteen heuristics - `heal-rate`, scored ([The healing
-floor](#the-healing-floor)), and twelve that read the terrain of the ground
-in play - and one limit, `at-most-three-supports`, while it is rebuilt from the
-citations in [inference/README.md](../inference/README.md); the default
-engine scores every board beneath it ([The objective](#the-objective)).
-The solver tests run on the reference playbook in
-[tests/fixtures/playbook/](../tests/fixtures/playbook/), which holds a
-file of every form but the draft. The package's map is the
+One input is written by hand: the playbook, which the solver reads; [The
+catalog](#the-catalog) lists the shipped rules, and the default engine
+scores every board beneath them ([The objective](#the-objective)). A
+pull tool fills every other table. The solver tests run on the reference
+playbook in [tests/fixtures/playbook/](../tests/fixtures/playbook/),
+which holds a file of every form but the draft. The package's map is the
 [inference/__init__.py](../inference/__init__.py) docstring, and each
 module's docstring holds its detail.
 
 ## How a six is chosen
 
-A six is chosen by inference on maxims and facts. The maxims are the
-playbook, rules in markdown a person reads and turns; the facts are the
-data, what the database holds about the board. Together they make one
-objective, weighted and constrained, and the solver solves it exactly:
-the six it returns is the best of every legal six under that objective,
-proved, and not the best a search happened to meet. Five steps, in order:
+A six is chosen by inference on maxims and facts: the playbook's rules
+and the database's numbers about the board make one objective, weighted
+and constrained, and the solver solves it exactly. Five steps, in order:
 
 ```
 space  = every six of released, unbanned heroes that keeps the locked picks,
@@ -51,68 +44,40 @@ score  = meta x (rate x rates + synergy x synergy + counter x counters)
 COMP   = the legal six of highest score, exactly; the next best after it, in order
 ```
 
-1. **The space.** A six is a set: the same heroes in another order are
-   one six, held grouped as tanks, damage and supports. It keeps the
-   locked picks, leaves out the banned and the unreleased, and fields at
-   most two tanks, the queue's own limit. Today's 53 released heroes -
-   15 tanks, 24 damage, 14 supports - make 22,957,480 sixes, and
-   18,040,386 of them field two tanks or fewer.
-2. **The limits prune.** A constraint is a limit: it removes every six
-   that breaks it and adds nothing to one that keeps it. The shipped
-   playbook's one, `at-most-three-supports`, removes 822,822 sixes and
-   leaves 17,217,564 legal on an open board, about 17.2 million. A ban
-   or a locked pick leaves fewer: four bans on Ilios leave 10,572,870,
-   two locked picks on King's Row 163,242. Blue's own comp that breaks
-   a limit is not allowed; red's revealed picks are facts, and never
+1. **The space.** A six is a set, held grouped as tanks, damage and
+   supports. It keeps the locked picks, leaves out the banned and the
+   unreleased, and fields at most two tanks, the queue's own limit.
+   Today's 53 released heroes - 15 tanks, 24 damage, 14 supports - make
+   22,957,480 sixes, and 18,040,386 of them field two tanks or fewer.
+2. **The limits prune.** A limit removes every six that breaks it and
+   adds nothing to one that keeps it. The shipped
+   `at-most-three-supports` leaves 17,217,564 legal sixes on an open
+   board, and a ban or a locked pick leaves fewer. Blue's own comp that
+   breaks a limit is not allowed; red's revealed picks are facts, never
    ruled out ([The share](#the-share)).
-3. **The meta scores.** The default engine reads three things off the
-   facts and scores every legal six: each pick's win-rate edge over 50
-   on the map, trusted by its pick rate, so a rarely picked hero's edge
-   counts for less; the wiki's synergy scores among the six, cell by
-   cell, a cell no article writes read at the written cells' claim
-   share, as unknown and not as zero; and the counter graph against the
-   other side's
-   locked picks, else its likely six - the wiki's edges and, where the
-   wiki has none, answers derived from the kits. `meta.md`'s `meta`
-   weight scales the three together: 1 is the engine as calibrated, and
-   0 leaves the playbook alone ([The objective](#the-objective)).
-4. **The heuristics adjust.** Each heuristic reads the same facts,
-   through the metric functions the board words as facts, and adds or
-   subtracts, times its weight: a metric normalised to 0..1 on the
-   board's scale, or a bonus less a penalty where its `when` holds
-   ([How a strategy file works](#how-a-strategy-file-works)). The
-   shipped playbook's `heal-rate` charges a six that heals less than the
-   other side's rate up to its weight, 2 ([The healing
-   floor](#the-healing-floor)), and twelve more read the terrain of the
-   ground in play - chokes reward crowd control, sightlines want hitscan,
-   high ground rewards fliers, a payload rewards the longest gun - each
-   gated where its feature stands out, 0.5 sd or more above the ordinary
-   map's (a `STANDOUT` dial), or on what the ground is won on (a payload,
-   a capture point), two of them also on a stage their source names.
+3. **The meta scores.** The default engine scores every legal six on its
+   win rates, synergies and counters, and `meta.md`'s `meta` scales it
+   ([The objective](#the-objective)).
+4. **The heuristics adjust.** Each heuristic adds or subtracts, times its
+   weight, from the same facts ([How a strategy file
+   works](#how-a-strategy-file-works)). The shipped playbook's are the
+   healing floor ([The healing floor](#the-healing-floor)) and twelve
+   rules on the terrain of the ground in play, each gated where its
+   feature stands out, 0.5 sd or more above the ordinary map's (a
+   `STANDOUT` dial), or on what the ground is won on.
 5. **The argmax.** The search returns the legal six of highest score,
    proved by branch and bound, and the next best in rank order as the
-   alternatives, five unless a caller asks for up to twenty. Ties break
-   by a draw per hero seeded by the map and the side, blind to rates and
-   names, so a board has one answer, and the board says how many sixes
-   tie. On an open board the search scores a few dozen sixes in full
-   and proves that none of the rest can beat them ([The
-   search](#the-search)). Every reason it gives cites a numbered fact
-   (F1, F2, ...): each pick's reasons, and each bar of the breakdown,
-   the engine's three terms among them.
+   alternatives ([The search](#the-search)). Every reason it gives cites
+   a numbered fact (F1, F2, ...).
 
-**The swaps.** Once blue has picks, the board asks one more question of
-the same objective: which of them to trade, and for whom. The answer is
-one six, the best reachable from the picks as they stand when each pick
-dropped costs the swap cost - `meta.md`'s `swap`, in share points of
-blue's span - searched exactly over every legal six, and the swaps are
-the picks it drops matched to the heroes it takes ([The
-swaps](#the-swaps)).
-
-**The plan stage by stage.** On a map with stages the board also lays
-out the map a stage at a time: each phase of a route keeps its heroes
-into the next unless a swap there beats the swap cost, and each arena is
-reached from the six the board suggests ([The plan stage by
-stage](#the-plan-stage-by-stage)).
+Once blue has picks, the board also answers which of them to trade ([The
+swaps](#the-swaps)) and lays the map out a stage at a time ([The plan
+stage by stage](#the-plan-stage-by-stage)). The weights are not learned
+([How the weights move](#how-the-weights-move)), and a score is not a
+probability ([The share](#the-share)). Each rule's reasons are in the Why
+sections: [the weights](#why-the-weights-are-the-playbooks), [the
+unwritten synergy pair](#why-an-unwritten-synergy-pair-is-not-zero) and
+[the exact search](#why-the-search-is-exact).
 
 **The ground in play.** A board is played on the whole map or on one of
 its stages - a Control or Flashpoint round, an Escort or Hybrid phase -
@@ -129,30 +94,6 @@ settles its gate, so every stage of a map shares one; the floor is the
 stage's own. With a stage named, the facts state the ground in play
 (`map.ground`), and a rule gated on the terrain cites it.
 
-**The weights are not learned.** No weight is fit to outcomes. A
-heuristic's starting weight is derived from its prose on the house
-scale, 0.25 a whisper, 1 the default, 2.5 strong and 4 dominant, when
-`/strategy` stores it. The engine's rate weight is 1, so its term reads
-in win-rate points, and its synergy and counter weights are set so that
-each term spreads a typical board's sixes about half as far as the rate
-term does ([The objective](#the-objective)). Every rule's weight and
-each of the engine's four can be changed: `/tune` changes a file's for
-good and logs why, a heuristic's slider on the playbook tab changes it
-for a session, and the Meta slider scales the whole engine ([How the
-weights move](#how-the-weights-move)). What a term counts inside is its
-definition and stays in code, recorded in a fixture's stamp: a derived
-counter edge at half a wiki edge (`WIKI_WEIGHT` 2, `DERIVED_WEIGHT` 1),
-the pick rate that halves a rate edge's trust (`RATE_PICK_HALF`), and
-the budget the needs on one guard share (`NEED_BUDGET`), which no single
-need's weight is ever cut below.
-
-**A score is not a probability.** A score is a sum of weighted terms in
-the objective's own units, and signed, since the rate term counts each
-pick's edge over 50. The board reads it as a share - a seat's six placed
-between the seat's floor, 0, and its optimal, 100 - and the fight odds
-split the two seats' shares. Neither is a fitted win probability ([The
-share](#the-share)).
-
 **The rates are a proxy.** Blizzard publishes rates for Competitive Role
 Queue, 5v5, one tank a side; no source publishes Open Queue 6v6, the
 mode the playbook assumes (`open-queue-ranked`). The rates stand in for
@@ -160,22 +101,6 @@ it, for direction and not for decimals, and a value a hero has only
 beside a second tank is missing from them: Zarya's, in a two-tank front
 line, is the plain case. The kit is read in 6v6
 ([architecture.md](architecture.md#the-scope)); the rates cannot be.
-
-**Why it is built this way.** Each step is one of the owner's rules, and
-each rule's reasons are below. Constraints prune and never weigh, so a
-rule either forbids a six or prices it, and a price is always a
-heuristic's ([How a strategy file works](#how-a-strategy-file-works)).
-Every term's weight is the playbook's and one meta scales the engine,
-so no term's weight hides in code ([Why the weights are the
-playbook's](#why-the-weights-are-the-playbooks)). An unwritten synergy
-cell is unknown, not zero, so a new hero is not charged for being new
-([Why an unwritten synergy pair is not
-zero](#why-an-unwritten-synergy-pair-is-not-zero)). The search is exact
-over every legal six, with no per-role shortlist deciding who can
-appear ([Why the search is exact](#why-the-search-is-exact)). Written as
-one pipeline, a board can be checked step by step: the space is
-counted, the limits are named, every term is a bar with the fact it
-read, and the argmax is proved.
 
 ## The objective
 
@@ -265,60 +190,40 @@ a playbook that scores nothing, every six ties at zero and a board reads
 ### Why the weights are the playbook's
 
 The owner's rule is that constraints prune and never weigh, and that the
-heuristics and the meta carry every weight, each one his to turn. The
-heuristics' weights already lived in their files; the engine's three
-were constants in `inference/base.py`, where only a commit could move
-them and no slider reached them. They moved into `meta.md` so that the
-`tune` tool changes them as it changes a strategy's weight - validated,
-documented and logged - and one meta weight was put over them so that
-the whole engine can be leaned on or silenced at once, from the file for
-good or from the Meta slider for a session. The shipped file holds the
-calibrated values under a meta of 1, and 1.0 x w is w in floating point,
-so no score moved: the pinned boards and the reach fixture's boards stand
-as they were. That first `meta.md` was written by hand, with the code
-that reads it, since no tool could yet write one; `tune` with id `meta`
-now seeds a playbook folder that has none from the shipped file, and its
-log line says so. What a term counts inside - a derived counter edge
-against a wiki edge, the pick rate that halves a rate edge's trust, the
-needs' shared budget - stays in code as the term's definition: the
-counter tallies stay whole numbers, which the search's exactness leans
-on, and making those dials is on the backlog, the owner's call.
+heuristics and the meta carry every weight, each one the owner's to turn.
+So the engine's weights live in `meta.md` beside the strategy files,
+where the `tune` tool changes them as it changes a strategy's weight -
+validated, documented and logged - and one meta weight over them leans
+on or silences the whole engine at once, from the file for good or from
+the Meta slider for a session. What a term counts inside - a derived
+counter edge against a wiki edge, the pick rate that halves a rate
+edge's trust, the needs' shared budget - stays in code as the term's
+definition: the counter tallies stay whole numbers, which the search's
+exactness leans on.
 
-The synergy weight moved from 0.1 to 0.26 on the owner's word, by the
-calibration's own rule. At 0.1 the synergy score's median range over a
-board's reference sample was 21 while an unwritten pair read 0, so the
-term spread a typical board about 2.1 points, as the counter term does
-at 0.05: the counter graph's median range is 41 - the wiki's edges at 2
-and the kit's fill at 1. Reading what no article writes as unknown moved
-that range: to 12.8 when an unwritten pair read the written pairs' mean,
-where the rule gave 0.16, and to 8.1 once each unwritten cell reads the
-written cells' claim share ([Why an unwritten synergy pair is not
-zero](#why-an-unwritten-synergy-pair-is-not-zero)). A blank cell now
-reads close to a claim, so sixes differ less in synergy, and at 0.1 the
-term would have spread them about 0.8 points - two fifths of what the
-calibration aimed at, and short of what a heuristic at weight 1 moves.
-The rule, measured on the 30 maps with red's likely six against the
-seat, gives 2.1 / 8.1, 0.26, and the tune tool set it (`tuning-log.md`,
-which also records the 0.18 the half-mean reading briefly gave). The
-weight restores the term's say, not the zero's verdicts: a hero no
-article writes about still reads as the written heroes do on average.
+The synergy and counter weights follow the calibration's rule: each
+term's median range over a board's reference sample, red's likely six
+against the seat, is about half the rate term's, about 2.1 points on a
+typical board. The counter graph's median range is 41 - the wiki's edges
+at 2 and the kit's fill at 1 - so counter weighs 0.05; the synergy
+score's is 8.1, each unwritten cell read at the written cells' claim
+share, so synergy weighs 0.26. `tuning-log.md` records each setting and
+its reason.
 
 ### Why an unwritten synergy pair is not zero
 
 The wiki's synergy data is the Team Synergy column of each hero's
 article: a cell per teammate, rated, written in prose, or left as a
-placeholder. `synergies` holds the pairs an article claims, and until
-2026-09-28 a pair it lacked read 0 wherever a six was scored, whether an
-article had written it off ("no notable synergy", rated POOR) or no
-article had written a word about it. The two are not the same, and the
-second is the common case: at that day's pull, 747 of the 1,378 pairs of
-released heroes had no cell in either article. The holes are not spread
-evenly. The newest heroes' articles are near blank - no article writes a
-pair for D.Mon or Shion, and Sierra, Venture, Emre, Freja and Hazard have
-two to five written pairs each of 52, where the median hero has 24 - so
-a six holding one of them read "these heroes do not work together" where
-the truth was "nobody has written it down yet". The synergy term charged
-the newest heroes for being new, and nothing on the board said so.
+placeholder. A pair an article writes off ("no notable synergy", rated
+POOR) and a pair no article writes about are not the same, and the
+second is the common case: at the pull of 2026-09-28, 747 of the 1,378
+pairs of released heroes had no cell in either article. The holes are
+not spread evenly. The newest heroes' articles are near blank - no
+article writes a pair for D.Mon or Shion, and Sierra, Venture, Emre,
+Freja and Hazard have two to five written pairs each of 52, where the
+median hero has 24 - so a blank read as 0 would say "these heroes do not
+work together" where the truth is "nobody has written it down yet", and
+the synergy term would charge the newest heroes for being new.
 
 A pair has two cells, one in each hero's article, and a cell no article
 writes is unknown. It reads the share of the written cells that claim
@@ -355,42 +260,14 @@ side's likely six, which adds `SYNERGY_PULL` for each documented partner.
 A fixture's stamp (`base.stamp`) names the reading, so one recorded
 under an earlier reading reads as another objective.
 
-**Why a cell and not a pair.** The first reading, of 2026-09-28, was by
-the pair: a pair neither article wrote read the written pairs' mean,
-1.06 (670 claims over 631 written pairs), and a written pair read its
-claims. But 483 of the 631 written pairs have one cell written and the
-other blank, and the pair reading counted the blank as 0. A pair an
-article claims then read below a pair nobody wrote about: Ana's article
-claims Cassidy and Ashe and theirs are silent, so each pair read 1,
-while Ana with Tracer, which neither article writes, read 1.06. 405
-pairs read that way, and 78 that one article writes off and the other
-leaves blank read 0, though half of each is unknown. The mean itself
-counted those blanks as 0. A review proposed reading each blank cell at
-half that mean, 0.53, which keeps 1.06 for a pair neither article
-writes; but the written pairs would then read 1.47 on average against
-that 1.06, and the heroes no article writes about would be charged
-again, less than a zero charged them. Read at the claim share, Ana with
-Cassidy or Ashe reads 1.86 and Ana with Tracer 1.72.
-
-What each reading moved, on the shipped playbook, blue's optimal six per
-map with red unrevealed. The pair reading, at synergy 0.1, changed all
-30 boards: D.Mon, whose every pair is unwritten, gained 5 x 1.06 x 0.1 =
-0.53 points on every six he was in, and was seated on 28 maps where he
-had been on 15; Juno, 35 of whose 52 pairs are unwritten, on 21 where she
-had been on 1; Vendetta on 10 where he had been on 2; Baptiste, 36 of
-whose pairs are written, on 6 where he had been on 22. Of the eleven
-heroes the reach fixture then named unseated, ten came closer to a seat
-on their two best maps, and 34 of the fixture's 42 boards then still
-seated their hero. The cell reading with synergy at 0.26 changed 19 of
-the 30 boards from the pair reading's: Juno is seated on 11 maps where she
-was on 21, Baptiste on 12 where he was on 6, Reinhardt on 16 where he
-was on 11, D.Va on 1 where she was on 6, and D.Mon on 27 where he was
-on 28. The reach fixture, recorded again, then seated 49 of
-the 53 released heroes, as before, and the same four stayed unseated;
-under the half-mean reading at 0.18 it would have seated 47, Kiriko in
-and Cassidy, Hazard and Shion out. The synergy term is honest about the
-documented pairs and neutral about the rest; the rates and the counter
-graph decide between heroes the wiki has not compared.
+**Why a cell and not a pair.** 483 of the 631 written pairs have one
+cell written and the other blank. Read by the pair - a pair neither
+article writes at the written pairs' mean, 1.06, and a written pair at
+its claims - a pair one article claims reads below a pair nobody wrote
+about: Ana with Cassidy 1, Ana with Tracer 1.06. Read by the cell they
+read 1.86 and 1.72. The synergy term is honest about the documented
+pairs and neutral about the rest; the rates and the counter graph decide
+between heroes the wiki has not compared.
 
 ## The share
 
@@ -643,33 +520,13 @@ every legal six of a real board, in slices, against the search.
 The owner's rule: the solver optimises exactly over the whole legal
 space - every six, duplicates removed, at most two tanks, the playbook's
 limits - and no per-role shortlist may restrict which heroes can appear.
-The search it replaces kept each role's six highest-standing heroes,
-swept the 13,101 sixes they allow, then climbed from the best of them by
-local search over the whole roster. It scored about 14,500 of 17 million
-sixes, and its answer was the best it met, not the best there is. On Samoa
-against D.Va, Roadhog, Sombra, Lúcio and Brigitte the investigation that
-led here found it returning a two-one-three where a two-two-two scored
-higher: the shape it needed was never searched from a good start, and no
-pool size could promise it would be.
-
-Replayed on that data, the old search still answers the two-one-three
-and the exact one the two-two-two, the same float a brute force of all
-17,217,564 legal sixes found. On the data of that day, where an unwritten
-synergy pair read the written pairs' mean, the old search happened to
-find the best six on each of 126 boards tried - every map against red's
-likely six, 90 seeded boards of random reds and bans, and six boards
-brute-forced in full - so its misses were rare, and nothing said when one
-happened. The exact search proves its answer, and costs less: 0.08 s a
-search against the old 2.3 s in one process, and a whole board
-0.19-0.33 s in one process against 1.1-3.7 s on twelve workers and
-3.8-11.2 s without them.
-
-Exactness retires what served the approximation: the process pool, its
-rounds and the two settings that sized it; the per-role pool and the
-`pool` knob of `infer`, `board` and `/api/board`; the field budget that
-held the swept fields in memory; and the check that tried the roster when
-the pools found no fill. `top` is the one knob left, and it buys the next
-best sixes in order.
+A search that sweeps a shortlist and climbs from its best can only return
+the best six it met: on Samoa against D.Va, Roadhog, Sombra, Lúcio and
+Brigitte one returned a two-one-three where a two-two-two scored higher,
+since the shape it needed was never searched from a good start, and no
+pool size could promise it would be. The exact search proves its answer
+and costs less, about 0.08 s a search and 0.2-0.3 s a board in one
+process. `top` is its one knob, and it buys the next best sixes in order.
 
 ## How a strategy file works
 

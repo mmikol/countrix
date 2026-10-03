@@ -4,55 +4,9 @@ registry.
 
     STRATEGIES = CONSTRAINTS ∪ HEURISTICS ∪ ASSUMPTIONS
 
-A strategy file, in the frontmatter dialect (inference.frontmatter):
-
-    ---
-    name: Answer every revealed enemy
-    kind: heuristic
-    category: matchup
-    direction: maximize
-    metric: team.coverage_share
-    weight: 3
-    when: enemy.size >= 1
-    ---
-    prose: what it means and why
-
-Constraints cut the space; heuristics weigh what is left. The kind is
-constraint, heuristic or assumption, and the form is read off the fields
-(`form`):
-
-    limit       a CONSTRAINT: `require: <expr>` must hold, always - a six
-                that fails is never a candidate. A constraint is never
-                weighted: it carries no when, bonus, penalty, metric,
-                direction or weight.
-    heuristic   a HEURISTIC on a metric: a numeric fact key (`metric`),
-                min-max normalised against the board's scale
-                (inference.scale: a seeded reference sample of legal sixes
-                and the board's field) and weighted; `direction`, maximize
-                or minimize, says which end is good. Guarded on the six's
-                own state it is a need: weight x (norm - 1).
-    scored      a HEURISTIC on an expression: `bonus: <expr>` and/or
-                `penalty: <expr>`, and the solver adds
-                `weight x (bonus - penalty)` while `when` holds.
-
-A heuristic takes an optional `when` guard, and weighs a metric or an
-expression, never both. A charge for breaking a rule is a heuristic:
-`when: not (<rule>)` with its `penalty`. `soft:` is refused: a limit
-always holds.
-
-An ASSUMPTION is prose: what the solver takes as given and the /comp
-session holds a comp to (players play optimally, say). It carries nothing
-to score and is never a draft.
-
-A constraint or heuristic with only a name, a kind and prose - no metric,
-no expression - is a DRAFT: it loads, it is shown and served, the solver
-ignores it, and the `/strategy` skill infers the rest (a constraint's
-limit; a heuristic's metric, direction and weight, or its when/bonus/
-penalty) from the prose and writes it through `infer_strategy` - or turns
-it into an assumption when nothing measurable captures it.
-
-`params:` (an indented block of NAME: number) are the dials an expression
-reads as params.NAME - tuning is editing the file.
+A strategy file - its frontmatter, its kind and the form read off its
+fields (limit, heuristic, scored), a need, a draft, its params - is
+docs/inference.md's "How a strategy file works".
 
 Each field keeps one rule, which FIELDS names and checked_value applies: a
 line of text or an expression is one line as the loader splits lines,

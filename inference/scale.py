@@ -133,11 +133,7 @@ def board_prior(objective: Objective, h: Hero) -> float:
 
 def _board_pool(objective: Objective, role: str) -> list[Hero]:
     """One role's top SCALE_POOL released heroes by the board's own prior."""
-    # not filtered by the bans, on purpose, exactly as sample() is not:
-    # this field is half the population that fixes the scale, and a ban
-    # that moved it would move the score of an unchanged six. Bans keep
-    # banned heroes out of the search's candidates; the measuring stick
-    # has to hold still
+    # not filtered by the bans, as sample() is not: the measuring stick holds still
     heroes = [h for h in objective.world.heroes.values() if h.role == role and h.released]
     heroes.sort(key=lambda h: (-board_prior(objective, h), h.name))
     return heroes[:SCALE_POOL]
@@ -165,11 +161,10 @@ def _board_field(objective: Objective) -> Iterator[list[Hero]]:
 def _field_sample(objective: Objective) -> list[Candidate]:
     """The board's field, measured (Objective.prepare) but unscored.
 
-    The sample alone is 1,200 random legal sixes, and the search picks from
-    comps far better than random, so a good six sat above the sample's high
-    on most metrics and every one of them normalised to the same 1.0: the
-    rule stopped telling them apart, and a weight raised past that bought
-    nothing. The field belongs in the population that sets the scale.
+    The field belongs in the population that sets the scale: the search
+    picks from comps far better than random, and against the sample alone a
+    good six sits above its high on most metrics, where every one
+    normalises to 1.0 and the rule cannot tell them apart.
 
     A six is read on the team keys its heuristics read alone where those
     are all it needs (Objective.lean_keys), the same values at a third of

@@ -181,9 +181,8 @@ def _variants(part: str, condition: str | None) -> list[tuple[str, str | None]]:
     """Split one part into the states it describes: [(text, condition)].
 
     Two shapes carry more than one measurement. "5 -> 7 meters" is a perk's
-    before and after; "10/20/30 per second" is a set of alternatives. Splitting
-    them keeps the values that would otherwise be dropped on the floor - only
-    the first number of each survived before.
+    before and after; "10/20/30 per second" is a set of alternatives. Each
+    number of each becomes a measurement of its own.
     """
     sides = ARROW_RE.split(part)
     if len(sides) == 2:

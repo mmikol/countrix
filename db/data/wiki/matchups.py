@@ -20,12 +20,8 @@ the hero, 0 neither.
 A tank's article rates each damage and support hero on the PRIORITY TARGET
 and RISK scales and never on the MATCHUP one: whom to kill first and how
 dangerous it is to try, not who wins. So the label is no answer, and the
-prose decides. Doomfist's article rates Sierra HIGH PRIORITY TARGET | LOW
-RISK, as it rates Mercy, whose prose calls her a very difficult target to
-pin down; the LOW RISK is half a cue, and the prose says she is vulnerable
-only once he closes the gap, which weighs no cue - no edge. Of the thirteen
-cells rated HIGH or EXTREMELY HIGH PRIORITY with LOW RISK, the prose makes
-five answers, seven none and one the other way.
+prose decides (test_wiki_matchups holds Doomfist's article on Sierra:
+HIGH PRIORITY TARGET | LOW RISK, and no edge).
 
 A pair both articles speak about keeps its edge when they agree or one
 says neither; when they contradict there is no edge. The same articles'

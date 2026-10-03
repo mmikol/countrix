@@ -325,15 +325,10 @@ def _read_terrain(cx: Connection, w: World) -> None:
 def impute_synergy(w: World) -> None:
     """World.synergy_cell: the share of the written Team Synergy cells that
     claim their pair - what team.synergy_score reads a cell no article
-    writes at, since its score is unknown, not zero. A pair's score is its
-    claimed cells, one in each hero's article, so a pair neither article
-    writes reads twice this, which is the mean of the written pairs as they
-    read, a written pair's blank cell read at this too: the one value at
-    which a blank reads as the written read. Over every cell, or with a
-    blank cell counted 0, it would be deflated by the blanks it stands in
-    for. It is 0 while no cell is on record, as in a database migrated and
-    not yet pulled again, where no cell is known to be unwritten
-    (World.unwritten_cells)."""
+    writes at, since its score is unknown, not zero (docs/inference.md, Why
+    an unwritten synergy pair is not zero). It is 0 while no cell is on
+    record, as in a database migrated and not yet pulled again, where no
+    cell is known to be unwritten (World.unwritten_cells)."""
     pairs = {frozenset(cell) for cell in w.synergy_written} | set(w.synergies)
     written = sum(2 - w.unwritten_cells(*sorted(pair)) for pair in pairs)
     w.synergy_cell = (sum(s.score or 0 for s in w.synergies.values()) / written

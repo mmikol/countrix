@@ -12,13 +12,9 @@ The default engine, which the playbook and the search both read:
 The playbook, which imports nothing from the search:
 
     strategies/   the playbook - STRATEGIES = CONSTRAINTS ∪ HEURISTICS ∪ ASSUMPTIONS:
-                  one markdown file per strategy, meta.md, the default
-                  engine's weights, and tuning-log.md, a line per change. A
-                  constraint is a limit (require: always holds, never
-                  weighted); a heuristic weighs what is left, a metric
-                  maximised or minimised or a bonus/penalty while a
-                  condition holds; an assumption is prose the agent holds a
-                  comp to
+                  one markdown file per strategy (inference.strategy),
+                  meta.md, the default engine's weights, and tuning-log.md,
+                  a line per change
     README.md     the citation record the playbook is rebuilt from: a line
                   per strategy id, shipped or removed, with the threads a
                   rule was drawn from or the user's word for an assumption

@@ -23,10 +23,9 @@ The argmax runs over every legal six - each set of heroes once, at most
 two tanks - less the sixes the playbook's limits rule out, which weigh
 nothing. The function it takes is two layers. The default engine
 (`inference/base.py`) scores a six on its win rates on the map, the
-wiki's synergy pairs among its picks - a cell no article writes at the
-written cells' claim share - and the counter graph against the other
-side, the wiki's edges and answers derived from the kits where the wiki
-has none, so a playbook of assumptions alone still gets scored sixes.
+wiki's synergy pairs among its picks and the counter graph against the
+other side ([inference.md](inference.md#the-objective)), so a playbook
+of assumptions alone still gets scored sixes.
 Its weights are the playbook's - `meta.md` beside the strategy files,
 one meta weight over the three terms' - and at meta 0 it is off.
 The playbook's heuristics sit on top and adjust that answer, and the
@@ -56,7 +55,7 @@ subscription, and the board never calls a model.
 | `inference/` | **INFERENCE LAYER** - the playbook of constraints, heuristics and assumptions in markdown, the solver, the tuning loop | [inference.md](inference.md) |
 | `door/` | **THE DOOR** over all three layers - `mcp/`, the MCP server and its tools, under which every write runs; `refresh.py`, the clock that runs the tools daily and weekly | [mcp.md](mcp.md) |
 | `ui/` | **THE BOARD** - the page (map, sides, bans, red and blue rosters) over the facts layer's facts and the inference layer's answer: `board.py`, `serve.py`, `pages.py` and `static/` - the only presentation code | [ui.md](ui.md) |
-| `tests/` | three folders by what a test holds the code to: `qa/`, the repository's text against the house rules (the docs, the layers, the style, the stylesheet); `verification/`, the code against its spec, a folder per layer beside the orchestrator's tests; and `validation/`, the engine against the owner's recorded maps, empty until they exist. Beside them, `synthetic.py`, a World of twelve released heroes, one announced hero and three maps built by hand, so a test works out its expected values with no database; `tests/fixtures/playbook/`, the reference playbook of every kind and form of strategy that the solver tests run on in place of `inference/strategies/`; `tests/verification/inference/record_reach.py`, the recorder that writes `tests/fixtures/reach.json`, a board per released hero, run from the repo root as `.venv/bin/python -m tests.verification.inference.record_reach`; and `tests/verification/inference/prove_exact.py`, a brute force of every legal six on a board of the built database against the exact search, in slices run by hand | |
+| `tests/` | three folders by what a test holds the code to - `qa/`, the house rules; `verification/`, the code against its spec; `validation/`, the engine against recorded maps, empty until they exist - with the synthetic World, the reference playbook, the reach recorder and the hand-run brute force beside them; `tests/__init__.py` maps it | |
 | `.claude/skills/` | the skills a Claude Code session runs here, one `SKILL.md` each | [The skills](#the-skills) |
 | `pm/` | `backlog.md`: what is worth doing next, why and at what cost, in payoff order; the maintainer skill keeps it current | |
 | `.github/workflows/` | `ci.yml`: lint, the types (mypy) and the tests that need no built database, held to 78% coverage, on pushes to `main` and on pull requests | |
@@ -163,14 +162,9 @@ minutes for the dump it asks for through `backups/`. Readiness has one
 definition, `db.psql.schema.state`: empty, stale (a migration the ledger
 lacks), unfilled (no heroes) or current. The entrypoint asks it through
 `python -m db.psql.schema`; `ui` and `refresh` wait for current, up to the
-data healthcheck's 900 s, then exit. The data container's `/health`
-carries the state: compose's healthcheck holds `data` unhealthy until it
-is current, and `depends_on` starts `ui` and `refresher` only then. The
-board's `/health` is the engine's - the playbook and the database - and
-its healthcheck gates nothing. The board solves one board at a time
-(`serve.Admission` in `ui/serve.py`): a search is exact, holds its best sixes and not a
-field, and runs in the board's process, so memory sets no limit and a
-second board would only share the interpreter. `orchestrator.py` waits only for a first reply and
+data healthcheck's 900 s, then exit ([db.md](db.md) has the rest of
+readiness). The board solves one board at a time in its own process
+([ui.md](ui.md)). `orchestrator.py` waits only for a first reply and
 reports the state in its verdict. [security.md](security.md) has
 the rest of the measures.
 
