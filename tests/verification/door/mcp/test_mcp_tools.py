@@ -1,5 +1,5 @@
-"""The tools in-process: query, db_status, roster, the board tools, the
-compact infer, db_migrate and metrics against the built database; and,
+"""The tools in-process: query, db_status, roster, the board tools,
+db_migrate and metrics against the built database; and,
 with no database, query's refusals, db_status's remedy for a stale schema,
 the playbook writes' mirror, the Draft
 a board tool hands its function, the readiness every door reports, a
@@ -10,7 +10,6 @@ test_mcp_registry's."""
 import contextlib
 import datetime
 import decimal
-import json
 import os
 import shutil
 
@@ -19,7 +18,7 @@ import pytest
 
 from db import Refusal, psql
 from db.psql import schema
-from door.mcp import boards, lifecycle, solver, tools
+from door.mcp import boards, lifecycle, tools
 from facts import board_facts, tables
 from facts.draft import Draft
 from inference import catalog, tune
@@ -80,20 +79,6 @@ def test_facts_and_infer_through_the_tools(ctx):
     text, data = ctx.call("infer", map="King's Row", red=["Zarya"], blue=["Ana"])
     assert len(data["blue"]) == 6 and "Ana" in data["blue"]
     assert "optimal comp" in text
-
-
-@pytest.mark.invariant
-def test_a_compact_infer_names_the_silent_heuristics_and_fits_a_reply(ctx):
-    board = {"map": "King's Row", "red": ["Zarya"], "blue": ["Ana"]}
-    _, full = ctx.call("infer", **board)
-    text, data = ctx.call("infer", compact=True, **board)
-    assert data["blue"] == full["blue"] and data["score"] == full["score"]
-    silent = sorted(c["id"] for c in full["contributions"] if c.get("spread") is False)
-    assert data["silent"] == silent
-    assert data["idle"] == sum(1 for c in full["contributions"] if not c["applies"])
-    assert data["terms"] == len(full["contributions"]) and "strategies" not in data
-    assert len(data["largest"]) <= solver.COMPACT_TERMS
-    assert len(text) + len(json.dumps(data)) < 10000
 
 
 @pytest.mark.invariant

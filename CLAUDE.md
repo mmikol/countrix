@@ -225,7 +225,8 @@ db <- facts <- inference <- door <- ui.
   board answers GET alone and writes nothing: a slider's weight rides
   with the session's requests. Both HTTP servers, the board and the
   MCP door, stand on `db/web.py`: a request whose Host or Origin is not a
-  local name or one given with `--allow-host` is refused with 403.
+  local name or one given to the board with `--allow-host` is refused
+  with 403.
 - **Docker** runs one image as three roles, plus postgres and `backup`, the
   nightly `pg_dump` into `backups/` on postgres's image (`compose.yaml`,
   `docker-entrypoint.sh`). Migrations ship in the image, not a mount: once

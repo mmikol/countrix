@@ -81,7 +81,7 @@ class _TeamWriter:
             source="derived:team." + key, team=self.team, also=also)
 
     def listed(self, key: str, unit: str | None = None) -> None:
-        """A metric worded by its registry line, once compute carries it."""
+        """A metric worded by its registry line, where it reads nonzero."""
         if self.metrics.get(key):
             self.fact(key, "%s %s: %g" % (
                 self.label, TEAM_METRICS[key], number(self.metrics[key])), unit)
@@ -97,7 +97,7 @@ def _write_side(
     figures = numbers(metrics)
     _shape_facts(w, figures, heroes, m)
     _durability_facts(w, figures)
-    _damage_facts(w, figures, heroes)
+    _damage_facts(w, figures)
     _sustain_facts(w, figures, world)
     _tool_facts(w, figures, heroes)
     _cohesion_facts(w, figures, world)
@@ -161,7 +161,7 @@ def _durability_facts(w: _TeamWriter, figures: dict[str, float]) -> None:
             % (label, figures["overhealth_total"]), "hp")
 
 
-def _damage_facts(w: _TeamWriter, figures: dict[str, float], heroes: Sequence[Hero]) -> None:
+def _damage_facts(w: _TeamWriter, figures: dict[str, float]) -> None:
     label, metrics = w.label, w.metrics
     w.fact("dps_floor", "%s sustained damage: %g per second, held weapons summed, %d of %d"
         " picks with a figure" % (label, figures["dps_floor"], figures["dps_count"],

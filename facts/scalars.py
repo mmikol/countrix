@@ -24,8 +24,8 @@ from facts.kit import KitPiece, dual_rate, on_self
 from facts.model import Hero
 
 # Keyword families the wiki tags abilities with, read verbatim from the
-# keywords column; the wiki's prose is read only in facts.kit, and the name
-# lists below (PILOT_GUNS to SAVE_TOOLS) are authored. The wiki writes a
+# keywords column; the name lists below (PILOT_GUNS to SAVE_TOOLS) are
+# authored. The wiki writes a
 # keyword as `family;;qualifier` ("area of effect;;spherical", "invulnerable;;
 # targets"): a KitPiece keeps the family in `keywords` and the whole atom in
 # `atoms`.
@@ -175,9 +175,8 @@ def derive_scalars(hero: Hero) -> None:
 
 
 def _body(hero: Hero, base: list[KitPiece]) -> None:
-    """pool, keywords and form_armor; cooldowns and median_cooldown."""
+    """pool and form_armor; cooldowns and median_cooldown."""
     hero.pool = hero.health + hero.shield + hero.armor
-    hero.keywords = set[str]().union(*(k.keywords for k in base))
     # armor an ability's form wears (Nemesis Form), by the form's uptime. Kept
     # apart from the base row: `armor` and `pool` stay what the hero spawns with
     hero.form_armor = 0.0
@@ -265,10 +264,11 @@ class Energy(NamedTuple):
     delay: float
 
 
-def p_within(r: float, big: float = FORMATION_RADIUS) -> float:
-    """The chance two points spread uniformly over a disk of radius `big` lie
-    within `r` of each other: the disk's distance distribution, closed form."""
-    s = r / big
+def p_within(r: float) -> float:
+    """The chance two points spread uniformly over a disk of radius
+    FORMATION_RADIUS lie within `r` of each other: the disk's distance
+    distribution, closed form."""
+    s = r / FORMATION_RADIUS
     if s <= 0:
         return 0.0
     if s >= 2:

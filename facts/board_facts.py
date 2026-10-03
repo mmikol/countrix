@@ -69,10 +69,6 @@ class GroundFact(TypedDict):
     features: list[GroundValue]
 
 
-def _g(value: float) -> str:
-    return "%g" % value if isinstance(value, float) else str(value)
-
-
 # --- the board -------------------------------------------------------------
 
 def generate(world: World, draft: Draft) -> FactSet:
@@ -245,8 +241,8 @@ def _map_styles(fs: FactSet, m: Map) -> None:
             source="derived:map.style")
     top = m.style_top                   # None exactly when the map has no styles
     if top is not None:
-        fs.add("map", m.name, "map.style_top", "%s rewards %s: %s (%s sd over the runner-up)"
-            % (m.name, top, _halves(m, top), _g(m.style_margin)),
+        fs.add("map", m.name, "map.style_top", "%s rewards %s: %s (%g sd over the runner-up)"
+            % (m.name, top, _halves(m, top), m.style_margin),
             value=top, source="derived:map.style_top")
 
 

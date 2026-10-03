@@ -286,9 +286,9 @@ def test_a_derived_edge_counts_half_a_wiki_edge_and_the_fact_names_it(synthetic_
     kite, mortar, anvil = w.hero("Kite"), w.hero("Mortar"), w.hero("Anvil")
     fired = (Fired("antiair", 1.0, "hitscan against a flier", "Longshot, hitscan, 60 m"),)
     w.derived[(kite.id, mortar.id)] = DerivedEdge(
-        winner=mortar.id, loser=kite.id, score=1.0, net=1.0, fired=fired)
+        winner=mortar.id, loser=kite.id, score=1.0, fired=fired)
     w.derived[(anvil.id, mortar.id)] = DerivedEdge(      # the wiki reads Anvil over Mortar
-        winner=mortar.id, loser=anvil.id, score=1.0, net=1.0, fired=fired)
+        winner=mortar.id, loser=anvil.id, score=1.0, fired=fired)
     six = ("Anvil", "Kite", "Needle", "Sorrel", "Balm", "Tansy")
     _, cand = prepared(w, "Harbor Gate", ("Mortar",), six)
     assert (cand.terms.answers, cand.terms.exposures) == (

@@ -291,7 +291,7 @@ def store(
         source_id: int, six: Mapping[str, SixKit] = MappingProxyType({})) -> Stored:
     """Reload the kit tables from `by_hero` and `six` and set each profiled
     hero's pools, its 5v5 ones and the 6v6 ones its article gives (NULL
-    where it gives none). hero_ids is {name_key: hero_id}, as names.index
+    where it gives none). hero_ids is {name_key: hero_id}, as normalizer.index
     builds it; a hero it lacks is skipped and named in the result."""
     for table in RELOADED:
         cursor.execute(SQL("DELETE FROM {}").format(psql.identifier(table)))

@@ -68,7 +68,6 @@ class Hero:
     # rows never filled reads zero rather than raising, and a reader sees
     # the fields in one place.
     pool: int = 0
-    keywords: set[str] = field(default_factory=set)
     form_armor: float = 0.0
     dps: float = 0.0
     burst: float = 0.0

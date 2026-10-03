@@ -118,7 +118,7 @@ def test_the_page_is_a_shell_over_static_files():
     data, ctype = pages.static_file("board.js")
     assert ctype.startswith("application/javascript") and b"function paint" in data
     data, ctype = pages.static_file("comps.js")
-    assert ctype.startswith("application/javascript") and b"function renderResult" in data
+    assert ctype.startswith("application/javascript") and b"function resultHTML" in data
     data, ctype = pages.static_file("playbook.js")
     assert ctype.startswith("application/javascript") and b"function renderPlaybook" in data
     assert pages.static_file("math.html") is None          # the article is not served on its own

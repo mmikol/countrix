@@ -14,7 +14,6 @@ from ui import serve
 def test_the_strategies_handler_lists_the_playbook_in_force():
     data, code = serve.handle_strategies()
     assert code == 200 and len(data["strategies"]) == len(catalog.load())
-    assert data["playbook"] == catalog.playbook_name()
 
 
 @pytest.mark.invariant

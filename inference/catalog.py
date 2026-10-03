@@ -298,9 +298,10 @@ def counts(catalog: Iterable[Strategy]) -> KindCounts:
                       assumption=kinds.count("assumption"))
 
 
-def playbook_name(directory: str | None = None) -> str:
-    """How the database names a playbook: its folder, relative to the repo."""
-    return os.path.relpath(directory or strategies_dir(), ROOT).replace(os.sep, "/")
+def playbook_name() -> str:
+    """How the database names the playbook in force: its folder, relative to
+    the repo."""
+    return os.path.relpath(strategies_dir(), ROOT).replace(os.sep, "/")
 
 
 def playbook_digest(directory: str | None = None) -> str:

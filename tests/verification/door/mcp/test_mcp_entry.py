@@ -26,17 +26,17 @@ def test_the_entry_point_lists_tools_and_refuses_nonsense(capsys):
 
 
 def test_the_http_mode_takes_the_flags_the_board_takes(monkeypatch, capsys):
-    """--host, --port and a repeated --allow-host, as the board spells
-    them; the old HOST:PORT positional is a usage error like a port that is
-    not a number."""
+    """--host and --port, as the board spells them, and no --allow-host:
+    the door is never published. The old HOST:PORT positional is a usage
+    error like a port that is not a number."""
     served = []
-    monkeypatch.setattr(http, "serve", lambda server, host, port, status, allowed_hosts=(): (
-        served.append((host, port, list(allowed_hosts)))))
+    monkeypatch.setattr(http, "serve", lambda server, host, port, status: (
+        served.append((host, port))))
     assert main(["--http"]) == 0
-    assert main(["--http", "--host", "0.0.0.0", "--port", "9",
-                 "--allow-host", "x", "--allow-host", "y"]) == 0
-    assert served == [("127.0.0.1", 8020, []), ("0.0.0.0", 9, ["x", "y"])]
-    for argv in (["--http", "--port", "x"], ["--http", "127.0.0.1:8020"]):
+    assert main(["--http", "--host", "0.0.0.0", "--port", "9"]) == 0
+    assert served == [("127.0.0.1", 8020), ("0.0.0.0", 9)]
+    for argv in (["--http", "--port", "x"], ["--http", "127.0.0.1:8020"],
+                 ["--http", "--allow-host", "x"]):
         with pytest.raises(SystemExit) as usage:
             main(argv)
         assert usage.value.code == 2

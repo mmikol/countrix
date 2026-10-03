@@ -9,7 +9,7 @@ imports only db.
     scalars         a hero's numbers, derived from its kit one section at a
                     time
     kit             a kit piece's stat rows and the combat numbers read off
-                    them; the one reader of the wiki's prose
+                    them
     kit_format      the kit in the format in force: the wiki's 6v6 figures
                     laid over the 5v5 rows, and what moved
     counters        the mechanical counter matrix, derived at load from the

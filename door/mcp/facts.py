@@ -3,8 +3,6 @@ board tools accept - and a board's facts. Each call loads a World from the
 database the context points at, and neither tool writes.
 """
 
-import json
-
 from door.mcp.boards import board_tool
 from door.mcp.registry import Context, tool
 from door.mcp.schema import ToolReply
@@ -51,13 +49,9 @@ def _described(m: RosterMap) -> str:
     " independent facts per named hero and for the map, joint facts per"
     " team once it has picks (shape, effective HP, damage and healing"
     " floors, range, tempo, cohesion, coverage...), and matchup facts"
-    " once both teams have picks. Numbered F1.. for citation.",
-    {"format": {"type": "string", "enum": ["lines", "json"],
-                "description": "lines (default) or json"}})
-def facts(ctx: Context, draft: Draft, format: str = "lines") -> ToolReply:
+    " once both teams have picks. Numbered F1.. for citation.")
+def facts(ctx: Context, draft: Draft) -> ToolReply:
     with ctx.connect() as cx:
         world = tables.load(cx)
     fs = board_facts.generate(world, draft)
-    payload = fs.to_dict()
-    text = fs.rendered() if format == "lines" else json.dumps(payload)
-    return ToolReply(text, payload)
+    return ToolReply(fs.rendered(), fs.to_dict())

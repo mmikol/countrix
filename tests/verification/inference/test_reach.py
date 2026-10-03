@@ -18,7 +18,7 @@ from facts.model import Map, World
 from facts.records import DerivedEdge
 from inference import base, catalog, reach
 from inference.solver import Infeasible
-from tests.verification.inference import FIXTURE_PLAYBOOK, in_force, recorded
+from tests.verification.inference import FIXTURE_PLAYBOOK, in_force, recorded, seated
 from tests.verification.inference import record_reach as recorder
 
 # named, not waived - see the test
@@ -35,7 +35,7 @@ def test_every_hero_reach_finds_a_board_for_is_still_seated_and_none_is_newly_lo
     released = {h.name for h in world.heroes.values() if h.released}
     on_file = {b["hero"] for b in boards}
     assert all(b["seated"] and len(b["banned"]) <= reach.MAX_BANS for b in boards)
-    fell = [b["hero"] for b in boards if b["hero"] in released and not reach.seated(world, b)]
+    fell = [b["hero"] for b in boards if b["hero"] in released and not seated(world, b)]
     # a stale fixture fails here, before the costly search for what it lost
     stale = (
         "" if (fixture["playbook"], fixture["base"]) == in_force()
@@ -129,7 +129,7 @@ def test_a_hero_no_board_fits_is_infeasible_not_a_crash(synthetic_world, monkeyp
         in str(caught.value)
     recorded_board = {"hero": "Anvil", "seated": True, "map": "Harbor Gate", "side": "",
                       "red": [], "banned": [], "six": ["Anvil"], "gap": 0.0}
-    assert reach.seated(synthetic_world, recorded_board) is False
+    assert seated(synthetic_world, recorded_board) is False
 
 
 def test_a_hero_its_best_map_favours_is_seated_there_with_no_ban(synthetic_world, monkeypatch):
@@ -143,7 +143,7 @@ def test_a_hero_its_best_map_favours_is_seated_there_with_no_ban(synthetic_world
     board = reach.search(synthetic_world, "Anvil")
     assert (board["seated"], board["banned"], board["map"], board["red"], board["gap"]) == (
         True, [], "Harbor Gate", [], 0.0)
-    assert "Anvil" in board["six"] and reach.seated(synthetic_world, board)
+    assert "Anvil" in board["six"] and seated(synthetic_world, board)
 
 
 def test_the_search_tries_every_map_the_ones_its_rates_lift_it_most_on_first(synthetic_world):
@@ -170,7 +170,7 @@ def test_the_reds_read_the_counter_graph_the_engine_scores(synthetic_world):
     ids = {h.name: h.id for h in w.heroes.values()}
     for winner, loser in (("Anvil", "Quarry"), ("Anvil", "Flint"), ("Balm", "Anvil")):
         w.derived[(ids[loser], ids[winner])] = DerivedEdge(
-            winner=ids[winner], loser=ids[loser], score=0.8, net=0.5, fired=())
+            winner=ids[winner], loser=ids[loser], score=0.8, fired=())
     assert reach.reds(w, w.hero("Anvil")) == [
         [], ["Mortar", "Quarry", "Flint", "Needle", "Tansy", "Myrrh"]]
 
@@ -321,7 +321,7 @@ def test_the_recorder_checks_every_six_already_recorded_before_a_hero_is_unseate
     monkeypatch.setattr(recorder.psycopg, "connect", lambda dsn: _Connected())
     monkeypatch.setattr(recorder.tables, "load", lambda cx: synthetic_world)
     monkeypatch.setattr(recorder.reach, "search", search)
-    monkeypatch.setattr(recorder.reach, "six", six)
+    monkeypatch.setattr(recorder, "six", six)
     monkeypatch.setattr(recorder.catalog, "playbook_digest", lambda: "ab" * 32)
     monkeypatch.setattr(recorder, "OUT", str(out))
     assert recorder.main() == 0

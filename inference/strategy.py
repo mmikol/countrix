@@ -392,11 +392,6 @@ class Strategy:
         return self.form in WEIGHED
 
     @property
-    def solver_reads(self) -> bool:
-        """Whether the solver reads this strategy at all (assumptions and drafts it does not)."""
-        return self.form == "limit" or self.weighs
-
-    @property
     def pending(self) -> bool:
         """A draft: the /strategy skill has not inferred its frontmatter yet."""
         return self.form == "draft"

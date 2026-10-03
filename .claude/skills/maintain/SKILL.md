@@ -160,8 +160,9 @@ is a lesson the next run relearns.
   the solver's ties, in the order a set of names iterated, which the
   process hash seed sets: the parallel board and the sequential one
   disagreed on a fact's text, and PYTHONHASHSEED changed the six. Now:
-  every tie, in a fact's wording and in the scoring path, breaks by name;
-  a solver test flips the iteration order, and
+  a tie in a fact's wording breaks by name, and sixes rank by score, then
+  the board's draw, then the names; a solver test flips the iteration
+  order, and
   `test_a_board_is_the_same_under_any_hash_seed` solves boards under two
   hash seeds and holds the payloads byte for byte.
 - **The look and the rules described as they were.** The UI document

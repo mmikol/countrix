@@ -172,7 +172,7 @@ function paint() {
 }
 
 document.addEventListener('click', function (e) {
-  var near = function (sel) { return e.target.closest ? e.target.closest(sel) : null; };
+  var near = function (sel) { return e.target.closest(sel); };
   var sideBtn = near('[data-side]');
   if (sideBtn) { var sd = sideBtn.getAttribute('data-side'); st.side = st.side === sd ? '' : sd; save(); paint(); refresh(); return; }
   var clear = near('[data-clear]');                   /* a team's clear button: that team's picks only */
@@ -220,25 +220,13 @@ function solving(on) {
   document.body.classList.toggle('solving', !!on);
   ['bluescore', 'redscore'].forEach(function (id) {
     var node = el(id);
-    if (!node) return;
     if (on) { if (node.textContent !== '…') node.dataset.was = node.textContent; node.textContent = '…'; }
     else if (node.textContent === '…' && node.dataset.was !== undefined) { node.textContent = node.dataset.was; }
   });
-  if (on) {
-    var mo = el('momentum');
-    if (mo) mo.innerHTML = "<span class='lbl'>fight odds</span><span class='legend searching'>solving…</span>";
-    var pl = el('plan');
-    if (pl && !pl.dataset.held) { pl.dataset.held = '1'; pl.classList.add('waiting'); }
-    ['blueslots', 'redslots', 'blueswaps', 'stageplan'].forEach(function (id) {
-      var s = el(id); if (s) s.classList.add('waiting');
-    });
-  } else {
-    var pl2 = el('plan');
-    if (pl2) { delete pl2.dataset.held; pl2.classList.remove('waiting'); }
-    ['blueslots', 'redslots', 'blueswaps', 'stageplan'].forEach(function (id) {
-      var s = el(id); if (s) s.classList.remove('waiting');
-    });
-  }
+  if (on) el('momentum').innerHTML = "<span class='lbl'>fight odds</span><span class='legend searching'>solving…</span>";
+  ['plan', 'blueslots', 'redslots', 'blueswaps', 'stageplan'].forEach(function (id) {
+    el(id).classList.toggle('waiting', !!on);
+  });
 }
 
 /* the facts tab when its request fails: the reason in place of the rows, so
@@ -285,8 +273,8 @@ function refresh() {
     var key = [st.map, st.side, st.stage].concat(st.bans).join('|');
     if (key !== redKey) el('inf-red').innerHTML = "<p class='legend searching'>searching…</p>";
     if (solve) solve.abort();           /* the older request; this one's arrival stops its board */
-    solve = window.AbortController ? new AbortController() : null;
-    fetch('/api/board?' + q + (q ? '&' : '') + 'client=' + CLIENT, solve ? { signal: solve.signal } : {})
+    solve = new AbortController();
+    fetch('/api/board?' + q + (q ? '&' : '') + 'client=' + CLIENT, { signal: solve.signal })
       .then(function (r) { return r.json(); }).then(function (d) {
         if (mine !== seq) return;
         solving(false);

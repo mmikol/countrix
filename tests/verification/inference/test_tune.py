@@ -108,7 +108,7 @@ def test_a_bare_file_is_a_draft_the_solver_ignores(catalog_copy):
                      "# Shut off a heavy heal line\n\nOne anti-heal pick is worth more.\n")
     cat = catalog.load(catalog_copy)
     draft = next(h for h in cat if h.id == "heal-line")
-    assert draft.form == "draft" and draft.pending and not draft.solver_reads
+    assert draft.form == "draft" and draft.pending and not draft.weighs
     assert all(
         h.form == "assumption" and not h.pending for h in cat
         if h.id in ("vintage", "objective", "locked-picks"))
@@ -150,7 +150,7 @@ def test_add_stores_a_validated_strategy_and_complete_finishes_a_draft(catalog_c
                          directory=catalog_copy)
     assert done["form"] == "heuristic" and done["set"]["weight"] == "2"
     cat = catalog.load(catalog_copy)
-    assert next(h for h in cat if h.id == "sustain-first").solver_reads
+    assert next(h for h in cat if h.id == "sustain-first").weighs
     # refusals leave nothing behind
     with pytest.raises(tune.TuneError, match="reason"):
         tune.add("no-reason", "No reason", "assumption", "x", None, "  ", directory=catalog_copy)

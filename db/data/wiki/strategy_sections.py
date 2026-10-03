@@ -72,7 +72,7 @@ from typing import NamedTuple
 
 from db.data.normalizer import name_key
 from db.data.wiki import markup
-from db.data.wiki.matchup_tables import SENTENCE_END_RE
+from db.data.wiki.matchup_tables import split_sentences
 
 STRATEGY_RE = re.compile(r"^==\s*Strategy\s*==[ \t]*$", re.M)
 # wiki furniture left in a line once its markup is text: a heading, a bullet
@@ -219,14 +219,10 @@ def sentences(text: str) -> list[Said]:
         if allied_at is not None and depth <= allied_at:
             allied_at = None
         allied = allied_at is not None
-        start = 0
-        for end in SENTENCE_END_RE.finditer(line):
-            out.append(Said(line[start:end.end()].strip(), allied))
-            start = end.end()
-        out.append(Said(line[start:].strip(), allied))
+        out.extend(Said(part, allied) for part in split_sentences(line))
         if ALLY_RE.search(line) and line.endswith(":") and allied_at is None:
             allied_at = depth
-    return [s for s in out if s.text]
+    return out
 
 
 def _alternation(names: Sequence[str]) -> str:

@@ -22,8 +22,8 @@ file by, before any file is touched. Each of the three takes a reason and
 writes in one order (_commit): the edited (or new) file is loaded through
 the catalog before it is written, so a metric that does not exist or an
 expression that does not parse is refused and nothing changes. Every
-accepted change is one line in inference/strategies/tuning-log.md. The log
-lives beside the files: the compose stack bind-mounts that directory, so a
+accepted change is one line in tuning-log.md, beside the playbook's files
+in force: the compose stack bind-mounts that directory, so a
 change made through a container lands on the host and in git with the file
 it changed.
 
@@ -52,7 +52,7 @@ from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
 from typing import TypedDict
 
-from db import Refusal
+from db import Refusal, write_whole
 from inference import catalog as catalog_module
 from inference.base import FIELDS, META
 from inference.frontmatter import FrontmatterError, parse_frontmatter
@@ -315,17 +315,6 @@ def _strategy_path(directory: str, sid: str) -> str:
     return path
 
 
-def _write_whole(path: str, text: str) -> None:
-    """A playbook file's new text, written into a .part file beside it and
-    renamed over it once whole: a write cut short raises and leaves the old
-    file as it was. The .part name is no strategy file's, so the catalog
-    never reads it."""
-    part = path + ".part"
-    with open(part, "w", encoding="utf-8") as handle:
-        handle.write(text)
-    os.replace(part, path)
-
-
 def _commit(directory: str, sid: str, text: str,
             what: Callable[[Strategy], str], reason: str,
             by: str) -> tuple[Strategy, str]:
@@ -340,7 +329,7 @@ def _commit(directory: str, sid: str, text: str,
     strategy = next((s for s in loaded if s.id == sid), None)
     if strategy is None:
         raise TuneError("%s.md lives beside the playbook and is not a strategy" % sid)
-    _write_whole(os.path.join(directory, sid + ".md"), text)
+    write_whole(os.path.join(directory, sid + ".md"), text)   # .part is no strategy file
     _document(directory, loaded)
     return strategy, _append_log_line(directory, sid, what(strategy), reason, by)
 
@@ -471,7 +460,7 @@ def _tune_meta(directory: str, field: str, value: object, reason: str, by: str) 
         loaded = catalog_module.load(directory)
     except CatalogError as error:
         raise TuneError(str(error)) from error
-    _write_whole(path, text)
+    write_whole(path, text)
     _document(directory, loaded)
     line = _append_log_line(directory, META, seeded + what, reason, by)
     return {"id": META, "field": field, "old": old, "new": new, "line": line}

@@ -308,15 +308,14 @@ def _dictionary(
     return "\n".join(dd)
 
 
-def generate_docs(connection: psycopg.Connection, path: str | None = None) -> str:
-    """Write the data dictionary into docs/db.md (or `path`) from the live
+def generate_docs(connection: psycopg.Connection, path: str) -> str:
+    """Write the data dictionary into `path` (docs/db.md) from the live
     schema and the migrations' prose -> a summary line."""
     origins = _migration_tables()
     tables = table_names(connection)
     columns = {t: _columns(connection, t) for t in tables}
     fks = _foreign_keys(connection)
     domain = {t: DOC_DOMAIN.get(origins.get(t, NO_ORIGIN).migration, "foundation") for t in tables}
-    path = path or os.path.join(ROOT, "docs", "db.md")
     embed(path, "dictionary", _dictionary(tables, columns, fks, domain, origins))
     return "regenerated the data dictionary of docs/db.md: %d tables" % len(tables)
 

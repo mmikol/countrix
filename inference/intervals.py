@@ -23,7 +23,7 @@ import operator
 from collections.abc import Callable, Mapping, Sequence
 from typing import NamedTuple
 
-from inference.expr import Expr
+from inference.expr import FUNCTIONS, Expr
 
 INF = math.inf
 
@@ -358,7 +358,7 @@ def _call(name: str, args: Sequence[Abstract]) -> Abstract:
     argument is exact, else by its own rule."""
     if args and all(isinstance(a, Exact) for a in args):
         try:
-            return lift(_HELPERS[name](*(a.value for a in args if isinstance(a, Exact))))
+            return lift(FUNCTIONS[name](*(a.value for a in args if isinstance(a, Exact))))
         except Exception:  # noqa: BLE001  # the score raises the same on the six itself
             return ANY
     if name in ("min", "max"):
@@ -388,11 +388,6 @@ def _length(a: Abstract) -> Abstract:
     if isinstance(a, Top):
         return Iv(0.0, a.size)
     return ANY
-
-
-_HELPERS: dict[str, Callable[..., object]] = {
-    "min": min, "max": max, "abs": abs, "round": round, "len": len, "int": int,
-    "float": float, "bool": bool}
 
 
 # --- an expression, compiled over abstract values -------------------------------

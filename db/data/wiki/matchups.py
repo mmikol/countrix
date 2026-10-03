@@ -79,7 +79,7 @@ RISK_WEIGHTS = {"extreme": -1.0, "extremely high": -1.0, "extermely high": -1.0,
 RISK_RATING_RE = re.compile(r"^(.*?)\s*RISK$", re.I)
 
 # Names the wiki's prose uses for a hero besides the article title, its
-# name unpunctuated and a former name (names.RENAMED).
+# name unpunctuated and a former name (normalizer.RENAMED).
 NICKNAMES = {
     "soldier76": ("Soldier",), "wreckingball": ("Hammond", "Ball"),
     "junkerqueen": ("Queen",), "reinhardt": ("Rein",), "torbjorn": ("Torb",),
@@ -345,16 +345,6 @@ def normalise(text: str, hero: str, other: str, pronouns: Pronouns = (None, None
     return token.sub(replace, text)
 
 
-def sentences(text: str) -> list[str]:
-    parts: list[str] = []
-    start = 0
-    for end in matchup_tables.SENTENCE_END_RE.finditer(text):
-        parts.append(text[start: end.end()])
-        start = end.end()
-    parts.append(text[start:])
-    return [part.strip() for part in parts if part.strip()]
-
-
 def score_sentence(sentence: str) -> tuple[float, float]:
     """(advantage, threat) a normalised sentence's cues add, before its place.
     Where cues overlap one counts: a plain one before a negated one, then the
@@ -391,7 +381,7 @@ def read_cell(cell: str, hero: str, other: str, pronouns: Pronouns = (None, None
         return Reading((steps > 0) - (steps < 0), "rating")
 
     advantage, threat = max(risk, 0.0), max(-risk, 0.0)
-    said = sentences(text)
+    said = matchup_tables.split_sentences(text)
     read = normalise("\n".join(said), hero, other, pronouns).split("\n") if said else []
     for place, normalised in enumerate(read):
         gained, lost = score_sentence(normalised)

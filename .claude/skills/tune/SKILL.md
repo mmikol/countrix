@@ -41,8 +41,8 @@ reason in `inference/strategies/tuning-log.md`. Nothing is edited by hand.
 
 Before any strategy scores, the default engine scores every six on three
 terms: each pick's win rate on the map, trusted by its pick rate; the
-wiki's synergy scores among the six, a cell no article writes at half the
-written pairs' mean; and the counter graph against the other side. Its
+wiki's synergy scores among the six, a cell no article writes at the
+written cells' claim share; and the counter graph against the other side. Its
 weights live in `inference/strategies/meta.md`, and `strategies` lists
 them on its first line:
 

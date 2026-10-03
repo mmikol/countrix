@@ -184,19 +184,3 @@ def _banning(world: World, hero: Hero, map_name: str, red: list[str], side: Side
         banned = [*banned, rivals[0]]
     return None
 
-
-def six(world: World, board: Reach) -> list[str]:
-    """The optimal six of a board a search recorded, solved afresh; none on a
-    board the playbook's limits no longer fit."""
-    try:
-        top = engine.infer(world, Draft(map_name=board["map"], red=tuple(board["red"]),
-                                        bans=tuple(board["banned"]), side=board["side"]), top=1)
-    except (Infeasible, Unbounded):
-        return []
-    return top.blue
-
-
-def seated(world: World, board: Reach) -> bool:
-    """Is the hero still in the optimal six of the board a search recorded for
-    it? A board the playbook's limits no longer fit has fallen: it seats no one."""
-    return board["hero"] in six(world, board)
