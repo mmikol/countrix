@@ -44,7 +44,8 @@ def test_the_badge_is_worded_on_the_server():
     reason, whenever the seat's comp cannot be a share of anything - picks
     or not, never 100 / 100; before any pick the suggested six's 100; else
     the picks' share of the seat's optimal, a half-drafted seat's through
-    the best six its picks reach, and the tip says what it is a share of."""
+    the best six its picks reach where that fill was solved and off the
+    picks themselves where it was not, and the tip says which."""
     from inference import plan
     waiting = plan.momentum(plan.Seats(comp(["a"], 0, 0), comp([], 0, 0, seat="red")))
     for badge in waiting["badges"].values():                # picks or not
@@ -64,8 +65,9 @@ def test_the_badge_is_worded_on_the_server():
         "label": "80 / 100",
         "tip": "the best six from your picks reaches 80% of the best six for this board"}
     assert half["badges"]["blue"]["label"] == "%d / 100" % half["blue"]   # as the strip reads it
-    assert half["badges"]["red"]["tip"] == (
-        "the best six from their picks reaches 30% of their best counter to yours")
+    # red's fill was not solved (its revealed picks past a limit, a search past its
+    # budget): the share is its picks' own, and the tip says so
+    assert half["badges"]["red"]["tip"] == "their picks reach 30% of their best counter to yours"
     full = plan.momentum(plan.Seats(comp(["a"] * 6, 9, 10), comp([], 0, 10, seat="red")))
     assert full["badges"]["blue"]["tip"] == "your picks reach 90% of the best six for this board"
     assert full["badges"]["red"]["label"] == "100 / 100"

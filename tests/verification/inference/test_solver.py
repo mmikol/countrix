@@ -413,7 +413,8 @@ def test_a_need_alone_on_its_guard_weighs_its_own_weight(synthetic_world, tmp_pa
     """The budget the needs on one guard share is NEED_BUDGET or their
     largest weight, whichever is more, so no slider is capped: a need alone
     on its guard weighs what its file or its slider says, past the budget
-    too, and two needs on one guard cost the larger weight together."""
+    too, and two needs on one guard cost the larger weight together. A guard
+    is its when and its params, as the gates read it."""
     from inference import scoring
     world = synthetic_world
     rule = ("---\nname: %s\nkind: heuristic\ndirection: maximize\nmetric: %s\nweight: %s\n"
@@ -432,6 +433,15 @@ def test_a_need_alone_on_its_guard_weighs_its_own_weight(synthetic_world, tmp_pa
     both = catalog.weighted(catalog.load(str(tmp_path)), {"solo": 3.0})
     assert weights(both) == {"solo": 2.25, "solo-cc": 0.75}
     assert weights(catalog.weighted(both, {"solo": 0.5})) == {"solo": 0.5, "solo-cc": 1.0}
+    # one when's text over two params guards two states: each need has a budget of its own
+    guarded = (
+        "---\nname: %s\nkind: heuristic\ndirection: maximize\nmetric: %s\nweight: 2\n"
+        "when: team.supports <= params.N\nparams:\n  N: %d\n---\nx\n")
+    apart = tmp_path / "apart"
+    apart.mkdir()
+    (apart / "at-one.md").write_text(guarded % ("At one", "team.mobility_count", 1), "utf-8")
+    (apart / "at-three.md").write_text(guarded % ("At three", "team.cc_count", 3), "utf-8")
+    assert weights(catalog.load(str(apart))) == {"at-one": 2.0, "at-three": 2.0}
 
 
 def test_partners_that_only_pay_together_are_brought_in_together(synthetic_world, tmp_path):

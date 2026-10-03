@@ -242,7 +242,8 @@ def test_every_bound_holds_every_completion_of_random_branches(
 def test_an_expression_reads_three_ways_where_a_branch_leaves_it_open():
     """A comparison a branch cannot settle reads either; `and`, `or` and an
     if join the outcomes they can take; a division by a range that holds 0
-    reads anything; a name the board settles is its value."""
+    reads anything, and a floor division's quotient that underflows to 0
+    still floors below it; a name the board settles is its value."""
     static = {"enemy.flyers": intervals.Iv(1.0, 1.0), "map.side": intervals.Exact("attack")}
 
     def read(source, **env):
@@ -258,6 +259,9 @@ def test_an_expression_reads_three_ways_where_a_branch_leaves_it_open():
     assert read("7 if enemy.flyers else team.tanks", tanks=maybe) == intervals.Iv(7.0, 7.0)
     assert read("1 / team.tanks", tanks=intervals.Iv(0.0, 2.0)) == intervals.WHOLE
     assert read("1 / team.tanks", tanks=intervals.Iv(0.0, 0.0)) == intervals.FALSE
+    tiny = read("team.tanks // 1e10", tanks=intervals.Iv(-1e-320, -1e-320))
+    assert tiny.lo <= -1e-320 // 1e10 == -1.0 <= tiny.hi
+    assert read("team.tanks // 2", tanks=intervals.Iv(0.0, 0.0)) == intervals.FALSE
     assert read("team.tanks ** 2", tanks=intervals.Iv(-1.0, 3.0)) == intervals.Iv(0.0, 9.0)
     assert read("len(team.subroles)", subroles=intervals.Top(6)) == intervals.Iv(0.0, 6.0)
     assert read("'x' in team.subroles", subroles=intervals.Top(6)) == intervals.MAYBE

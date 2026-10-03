@@ -326,14 +326,15 @@ class Objective:
         self._heuristics = [(g, gates[g.id], slots.get(g.id, 0), *_split_key(g.metric))
                             for g in self.heuristics]
         # a heuristic guarded on the six's own state is a need: see score().
-        # Needs that share a guard share a budget - NEED_BUDGET, or the
-        # largest of their weights where one is more - so the state costs
-        # that much at most however many rules the playbook writes about it,
-        # and no need weighs less than its own weight on a guard of its own
-        guards = {g.id: g.when.source for g in self.heuristics
-                  if g.need and g.when is not None}
-        written: dict[str, float] = {}
-        largest: dict[str, float] = {}
+        # Needs that share a guard - its when and its params, as the gates key
+        # a slot - share a budget: NEED_BUDGET, or the largest of their
+        # weights where one is more, so the state costs that much at most
+        # however many rules the playbook writes about it, and no need weighs
+        # less than its own weight on a guard of its own
+        guards = {g.id: (g.when.source, tuple(sorted(g.params.items())))
+                  for g in self.heuristics if g.need and g.when is not None}
+        written: dict[tuple[str, tuple[tuple[str, float], ...]], float] = {}
+        largest: dict[tuple[str, tuple[tuple[str, float], ...]], float] = {}
         for g in self.heuristics:
             if g.id in guards:
                 source = guards[g.id]
