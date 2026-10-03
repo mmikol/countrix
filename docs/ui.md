@@ -206,6 +206,7 @@ sequenceDiagram
 Sides exist on Escort and Hybrid maps only, and the facts say which side
 each team holds. The rates do not split by side, so a strategy brings the
 side in through a `when` that reads `map.side`. The shipped playbook holds
-none, so today the side reaches no score; the two in the [fixture
+one, `defenders-stack-barriers`, which pays stacked barrier health on
+defense at a hard choke; the two in the [fixture
 playbook](../tests/fixtures/playbook/) show the form - engage tools and
 anti-heal on attack, deployables, barriers and reach on defense.

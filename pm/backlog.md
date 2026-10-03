@@ -37,14 +37,26 @@ keeps it current.
   melee weapon. Cost: a day.
 - **Fuller stage texts.** 36 of the 64 stages have no text of their own
   on the wiki as the pull reads it, and most of the rest a few sentences,
-  so the terrain rules score a six of their own on 8 stages of 5 maps.
+  so under the rules of 2026-10-03 only Nepal's Sanctum scores a six of
+  its own (the terrain rules they replaced made 8 stages of 5 maps do).
   Reading each article's stage sections more fully, or a second
   paragraph per stage, is the lever that makes the plan stage by stage
   say more. Cost: the map pull and its cache; no engine change.
+- **The keys the research could not use.** The 2026-10-03 research
+  dropped sourced rules for want of a metric: peel tools near the
+  backline (`team.support_peel`), team speed sources such as Speed Boost
+  (`team.speed_sources`), walls and placed defences (`team.walls`,
+  `team.placed_defences`), setup ultimates for combos, the supports' own
+  damage (`team.dps_supports`) and a count of flankers (`team.flankers`).
+  Three kit reads undercount: `team.team_saves` misses Lúcio's Sound
+  Barrier, `team.barrier_hp` reads Domina's array as one segment, and
+  Winston's bubble counts in full as a main tank's barrier. Each key is a
+  metric and a range rule (CLAUDE.md, a new metric), then a rule through
+  `add_strategy`. Cost: half a day a key.
 - **A source for the cover rule.** "Cover closes the distance" (cover
   rewards mobility, `team.mobility_count` where `map.cover` stands out)
-  was drafted with the terrain rules and held back on 2026-09-30: the
-  citation record has no source for it. Mine one, or file it as the
+  was held back on 2026-09-30 for want of a source, and the 2026-10-03
+  research found the cover claims contested. Mine one, or file it as the
   owner's own rule, then add it through `add_strategy`.
 - **Tunings by map.** The user's request: each map carries its own tuning
   set - a weight per heuristic (and a params dial where a rule has one)
