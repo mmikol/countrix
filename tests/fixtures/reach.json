@@ -1,5 +1,5 @@
 {
- "playbook": "0bb4ba22583c4927d7c9ed3bbc4c1d8eb659e5de759b238018d2e46811fbddc6",
+ "playbook": "ceeb8e0ae9ca6ed5450d72828d586102dc73fcef0b85f0121e3d491c187a451a",
  "base": {
   "meta": 1.0,
   "rate": 1.0,
@@ -66,11 +66,11 @@
    "red": [],
    "banned": [],
    "six": [
+    "D.Mon",
+    "Reinhardt",
     "Ashe",
-    "Genji",
-    "Hanzo",
     "Widowmaker",
-    "Ana",
+    "Juno",
     "Zenyatta"
    ],
    "gap": 0.0
@@ -280,14 +280,21 @@
    "seated": true,
    "map": "Havana",
    "side": "attack",
-   "red": [],
+   "red": [
+    "Orisa",
+    "Roadhog",
+    "Ashe",
+    "Cassidy",
+    "Moira",
+    "Mercy"
+   ],
    "banned": [],
    "six": [
+    "D.Mon",
     "Ashe",
-    "Genji",
     "Hanzo",
     "Widowmaker",
-    "Ana",
+    "Juno",
     "Zenyatta"
    ],
    "gap": 0.0
@@ -434,9 +441,10 @@
     "Moira"
    ],
    "banned": [
-    "Baptiste",
     "Juno",
+    "Baptiste",
     "Ana",
+    "Mizuki",
     "Mercy"
    ],
    "six": [
@@ -952,11 +960,11 @@
    "red": [],
    "banned": [],
    "six": [
+    "D.Mon",
+    "Reinhardt",
     "Ashe",
-    "Genji",
-    "Hanzo",
     "Widowmaker",
-    "Ana",
+    "Juno",
     "Zenyatta"
    ],
    "gap": 0.0

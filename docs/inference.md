@@ -874,7 +874,7 @@ On a map built around high ground a melee pick has no way to touch an enemy stan
 
 ##### Open ground punishes short reach (`open-ground-punishes-short-reach`, map)
 
-`maximize team.range_min` - the shortest longest-range. weight 1; when `map.open_ground >= params.STANDOUT`
+`maximize team.range_min` - the shortest longest-range. weight 0.5; when `map.open_ground >= params.STANDOUT`
 params: STANDOUT=0.5
 
 On open ground the pick with the shortest reach is the one who spends the fight unable to shoot back. Beams and shotguns that own a corridor are helpless across a canyon, so a comp is judged there by its shortest longest-range. The smallest of the picks' longest published ranges is the measure, read on the ground whose open ground stands 0.5 sd or more above the ordinary map's.
