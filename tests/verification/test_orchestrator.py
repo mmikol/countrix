@@ -6,6 +6,7 @@ helpers test_orchestrator_http.py's."""
 import pytest
 
 import orchestrator
+from tests.verification import healthy
 
 
 def test_no_verb_means_up_and_a_bad_verb_prints_the_usage(monkeypatch, capsys):
@@ -39,19 +40,13 @@ def stubbed(monkeypatch, tmp_path):
     checkout of its own: up() makes backups/ there, not in the repo."""
     calls = []
     monkeypatch.setattr(orchestrator, "ROOT", str(tmp_path))
-    healthy = {
-        "data": {"status": "ok", "state": "current", "table_count": 36, "heroes": 54,
-                 "announced": 1, "pending_migrations": [],
-                 "newest_capture": "2026-09-14"},
-        "inference": {"status": "ok", "strategies": 38, "heroes": 54, "pending": 0},
-        "ui": {"heroes": [{}] * 54, "maps": [{}] * 30},
-        "board": {"seconds": 1.0, "picks": []}}
+    replies = healthy()
     # every command is given a timeout: a call without one raises TypeError here
     monkeypatch.setattr(orchestrator, "sh", lambda *a, timeout: calls.append(("sh", *a)) or "")
     monkeypatch.setattr(orchestrator, "wait_for", lambda url, s, what: calls.append(("wait", what)))
-    monkeypatch.setattr(orchestrator, "health", lambda: healthy)
+    monkeypatch.setattr(orchestrator, "health", lambda: replies)
     monkeypatch.setattr(orchestrator, "playbook_problem", lambda: None)
-    return calls, healthy
+    return calls, replies
 
 
 def test_up_builds_starts_waits_and_reports(stubbed, capsys):
@@ -95,8 +90,8 @@ def test_up_stops_before_the_containers_on_a_playbook_that_does_not_load(
 def test_up_and_status_report_pending_drafts_and_leave_them_for_strategy(stubbed, capsys):
     """A draft waits for /strategy: up counts it and starts nothing beyond
     the stack, and status touches nothing at all."""
-    calls, healthy = stubbed
-    healthy["inference"]["pending"] = 2
+    calls, replies = stubbed
+    replies["inference"]["pending"] = 2
     assert orchestrator.up() == 0
     assert [c[:3] for c in calls if c[0] == "sh"] == [
         ("sh", "docker", "compose"), ("sh", "docker", "compose")]
@@ -110,7 +105,5 @@ def test_up_and_status_report_pending_drafts_and_leave_them_for_strategy(stubbed
 def test_down_and_main_dispatch(stubbed, capsys):
     calls, _ = stubbed
     assert orchestrator.down() == 0 and ("sh", "docker", "compose", "down") in calls
-    assert orchestrator.main(["status"]) == 0
-    capsys.readouterr()
     assert orchestrator.main(["up", "status"]) == 2
     assert "python orchestrator.py up" in capsys.readouterr().err

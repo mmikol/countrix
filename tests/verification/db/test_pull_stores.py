@@ -20,10 +20,8 @@ from db.data import cache
 from db.data.blizzard import meta
 from db.data.cache import cache_key
 from db.data.wiki import maps, patches, playstyles, terrain
+from tests.verification.db import COMPOSITION, HYBRID_PAGE, write_aged
 from tests.verification.db.recording import RecordingConnection
-from tests.verification.db.test_cache import write_aged
-from tests.verification.db.test_transforms import HYBRID_PAGE
-from tests.verification.db.wiki.test_wiki_playstyles_and_patches import COMPOSITION
 
 CAO = datetime.datetime(2026, 9, 24, 5, 0, tzinfo=datetime.UTC)
 

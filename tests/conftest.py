@@ -14,6 +14,7 @@ with no cluster ends with none.
 """
 
 import os
+import shutil
 
 import pytest
 
@@ -88,6 +89,18 @@ def synthetic_world():
     """A fresh synthetic World for each test, which may change it: twelve
     released heroes, an announced one and three maps, and no database."""
     return synthetic.world()
+
+
+@pytest.fixture()
+def catalog_copy(tmp_path):
+    """A private copy of the reference playbook - its strategy files and its
+    meta.md - in tmp_path, to write to without touching the repo."""
+    from inference import catalog
+    from tests.verification.inference import FIXTURE_PLAYBOOK
+
+    for name in [*catalog.strategy_files(FIXTURE_PLAYBOOK), catalog.META_FILE]:
+        shutil.copy(os.path.join(FIXTURE_PLAYBOOK, name), tmp_path / name)
+    return str(tmp_path)
 
 
 @pytest.fixture(scope="session")

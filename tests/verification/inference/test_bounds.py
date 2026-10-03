@@ -19,7 +19,6 @@ import itertools
 import math
 import os
 import random
-import shutil
 
 import pytest
 
@@ -31,7 +30,7 @@ from inference.base import OFF
 from inference.expr import scope
 from inference.scoring import Candidate
 from inference.solver import Solver, _open
-from tests.verification.inference import ASSUMPTIONS_ONLY, DEFAULT, FIXTURE_PLAYBOOK
+from tests.verification.inference import ASSUMPTIONS_ONLY, DEFAULT
 
 SCRATCH = {
     "solo-mobility": (
@@ -67,17 +66,14 @@ LIMITS = {
 }
 
 
-def playbook(tmp_path):
-    """The reference playbook with the scratch strategies beside it."""
-    for name in os.listdir(FIXTURE_PLAYBOOK):
-        shutil.copy(os.path.join(FIXTURE_PLAYBOOK, name), tmp_path)
-    for sid, body in SCRATCH.items():
-        (tmp_path / ("%s.md" % sid)).write_text(
-            "---\nname: %s\nkind: heuristic\n%s\n---\nx\n" % (sid, body), "utf-8")
-    for sid, body in LIMITS.items():
-        (tmp_path / ("%s.md" % sid)).write_text(
-            "---\nname: %s\nkind: constraint\n%s\n---\nx\n" % (sid, body), "utf-8")
-    return catalog.load(str(tmp_path))
+def playbook(directory):
+    """The reference playbook, copied to `directory` (catalog_copy), with the
+    scratch strategies beside it."""
+    for kind, rules in (("heuristic", SCRATCH), ("constraint", LIMITS)):
+        for sid, body in rules.items():
+            with open(os.path.join(directory, "%s.md" % sid), "w", encoding="utf-8") as handle:
+                handle.write("---\nname: %s\nkind: %s\n%s\n---\nx\n" % (sid, kind, body))
+    return catalog.load(directory)
 
 
 def test_every_metric_and_every_expression_rule_has_a_bound():
@@ -186,7 +182,7 @@ CASES = {
 @pytest.mark.parametrize(("rules", "base", "imputed", "keeps"), list(CASES.values()),
                          ids=list(CASES))
 def test_every_bound_holds_every_completion_of_random_branches(
-        synthetic_world, tmp_path, rules, base, imputed, keeps):
+        synthetic_world, catalog_copy, rules, base, imputed, keeps):
     """On random branches of each board, for every six the branch can still
     become: each team and matchup metric lies in its rule's range, each
     strategy's expressions lie in their abstract values, the tie-break lies
@@ -195,7 +191,7 @@ def test_every_bound_holds_every_completion_of_random_branches(
     the bound is the default engine's and the keep term's, nothing else's
     slack beside it, and on some branch it is within a hair of a
     completion's score."""
-    rules = playbook(tmp_path) if rules == "scratch" else ASSUMPTIONS_ONLY
+    rules = playbook(catalog_copy) if rules == "scratch" else ASSUMPTIONS_ONLY
     world = imputing(synthetic_world) if imputed else synthetic_world
     keep = frozenset(world.hero(name).id for name in KEEP) if keeps else frozenset()
     rng = random.Random("bounds|%s|%s|%s%s" % (len(rules), base, imputed,

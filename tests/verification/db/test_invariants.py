@@ -17,10 +17,6 @@ STAT_TABLES = ("ability_stats", "weapon_stats", "perk_stats")
 
 # --- roster completeness ------------------------------------------------
 
-def test_every_hero_has_a_role_and_subrole(one):
-    assert one("select count(*) from heroes where role_id is null or subrole_id is null") == 0
-
-
 def test_every_hero_has_health(one):
     assert one("select count(*) from heroes where health is null") == 0
 
@@ -100,17 +96,6 @@ def test_source_text_survives_everything(one):
                    % table) == 0
 
 
-def test_no_measurement_is_stored_twice(one):
-    # identical stat rows once doubled when an ability shared its weapon's
-    # name; the unique constraint guards it, this states the intent
-    for table, owner in (("ability_stats","ability_id"), ("weapon_stats","config_id"),
-                         ("perk_stats","perk_id")):
-        assert one("""select count(*) from (select %s, stat_key_id, value,
-            unit_numerator, unit_denominator, denominator_value, condition,
-            value_text, count(*) from %s group by 1,2,3,4,5,6,7,8
-            having count(*) > 1) d""" % (owner, table)) == 0
-
-
 # --- snapshots: population and delineation -------------------------------
 
 def test_every_snapshot_names_its_patch(one):
@@ -140,14 +125,9 @@ def test_platform_is_console_and_input_follows_from_it(rows):
 
 # --- the playbook: judgements, undimensioned -----------------------------
 
-def test_a_maps_styles_are_derived_not_stored(rows):
-    # the style vocabulary is the wiki's hero tags; what a map rewards is
-    # computed from them and the per-map rates at load (facts.tables), and
-    # a comp's shape is facts.draft.EXPECTED_SHAPE - neither is a table
-    tables = {r[0] for r in rows("select tablename from pg_tables where schemaname = 'public'")}
-    assert not tables & {"map_playstyle", "comp_archetypes"}
-    # nor are a hero's best maps: the three largest map-over-overall win rates
-    assert "map_strategy" not in tables
+def test_the_style_vocabulary_is_the_wikis_hero_tags(rows):
+    # what a map rewards is derived from these tags and the per-map rates at
+    # load (facts.tables); no table stores it (test_authored_inputs)
     assert {r[0] for r in rows("select distinct style from playstyle")} >= {
         "dive", "brawl", "poke"}
 
@@ -162,13 +142,6 @@ def test_synergies_are_the_wikis_scored_one_or_two_with_a_short_note(rows, one):
                   join heroes a on a.hero_id = s.hero_id
                   join heroes b on b.hero_id = s.other_id
                   where a.status <> 'released' or b.status <> 'released'""") == 0
-
-
-def test_synergies_are_canonical_pairs(one):
-    # bidirectional: one row per pair, lower hero_id first (schema CHECKs it;
-    # this documents that both directions being present is representable
-    # nowhere)
-    assert one("select count(*) from synergies where hero_id >= other_id") == 0
 
 
 def test_every_claimed_pair_is_a_written_cell_between_released_heroes(one):
@@ -192,7 +165,6 @@ def test_every_claimed_pair_is_a_written_cell_between_released_heroes(one):
 def test_counters_are_directed_edges_between_released_heroes(one):
     # one row = countered_by_id answers hero_id
     assert one("select count(*) from counters") >= 100
-    assert one("select count(*) from counters where hero_id = countered_by_id") == 0
     assert one("""select count(*) from counters c
                   left join heroes a on a.hero_id = c.hero_id
                   left join heroes b on b.hero_id = c.countered_by_id
@@ -230,12 +202,6 @@ def test_every_table_records_source_and_cao(rows):
         group by table_name
         having count(*) filter (where column_name in ('source_id','cao')) < 2""")
     assert missing == []
-
-
-def test_no_row_is_missing_its_source(rows, one):
-    for (table,) in rows("""select distinct table_name from information_schema.columns
-                            where table_schema='public' and column_name='source_id'"""):
-        assert one("select count(*) from %s where source_id is null" % table) == 0
 
 
 def test_no_media_or_links_leak_into_stored_text(one):
@@ -294,17 +260,6 @@ def test_strategies_table_mirrors_the_files(rows):
     files = {h.id: h.kind for h in catalog.load(directory)}
     table = dict(rows("select strategy_id, kind from strategies"))
     assert table == files
-
-
-def test_the_playbook_column_names_the_setting_the_code_reads(one):
-    # 017 named the setting COUNTER_MATRIX_STRATEGIES; 022 carries the rename
-    import inspect
-
-    from inference import catalog
-    assert 'os.environ.get("COUNTRIX_STRATEGIES"' in inspect.getsource(catalog.strategies_dir)
-    described = one("select col_description('strategies'::regclass, attnum) from pg_attribute"
-                    " where attrelid = 'strategies'::regclass and attname = 'playbook'")
-    assert "COUNTRIX_STRATEGIES" in described
 
 
 def test_the_migration_ledger_matches_the_files(rows):

@@ -6,33 +6,9 @@ import pytest
 from db.data.wiki import WikiError
 from db.data.wiki.patches import dated_patches
 from db.data.wiki.playstyles import parse_playstyles
+from tests.verification.db import COMPOSITION
 
 # --- playstyles: one heroes section per style ----------------------------
-
-COMPOSITION = """
-= Popular compositions =
-Most teams settle on one style, such as [[Dive]].
-
-== Dive ==
-Dive wins on mobility, with heroes like [[Genji]].
-
-=== Dive heroes ===
-'''Tank:''' [[Winston]], [[D.Va|DVa]]
-* note
-
-== Brawl ==
-Brawl fights close, behind [[Reinhardt]].
-
-=== Brawl heroes ===
-* '''Tank:''' [[Reinhardt]], [[Winston]]
-
-=== Poke heroes ===
-No list yet.
-
-= References =
-[[Tracer]]
-"""
-
 
 def test_a_playstyle_reads_only_its_own_heroes_section():
     # a heading of any level ends a section, so the prose above a heroes

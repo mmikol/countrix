@@ -10,7 +10,8 @@
     validation/    the engine against outcomes, the owner's recorded maps;
                    empty until they exist
     conftest.py    the fixtures every folder shares: the database, its rows,
-                   the World and the synthetic one
+                   the World and the synthetic one, and a private copy of
+                   the reference playbook
     synthetic.py   a World built by hand, so a test works out its expected
                    values with no database
     fixtures/      the reference playbook and the reach record

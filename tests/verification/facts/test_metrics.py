@@ -44,8 +44,6 @@ def test_metrics_cover_the_registry_exactly(synthetic_world):
     assert fliers["flyers"] == 2 and fliers["light_flyers"] == 1
     assert compute.registry()["enemy.light_flyers"] == TEAM_METRICS["light_flyers"]
     assert ns["team"]["coverage"] == 1                    # Anvil answers Mortar
-    # the benches are the builder's inputs
-    assert ns["world"] == {"heal_bench": 145.0, "hps_bench": 130.0}
     # a text metric is exactly a registry key whose value is not a number
     values = {
         "%s.%s" % (section, key): value

@@ -10,6 +10,7 @@ import pytest
 import requests
 
 from db.data import cache, wiki
+from tests.verification.db import write_aged
 
 INSTANT = cache.RequestPolicy(backoff=0, delay=0)
 
@@ -44,13 +45,6 @@ class FakeSession:
 
     def close(self):
         pass
-
-
-def write_aged(path, text, hours=48):
-    """Write a cached page whose modification time is `hours` old."""
-    path.write_text(text, encoding="utf-8")
-    stamp = time.time() - hours * 3600
-    os.utime(str(path), (stamp, stamp))
 
 
 def test_a_context_with_no_cutoff_keeps_a_page_forever(tmp_path):

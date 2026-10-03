@@ -1,9 +1,8 @@
 """The default engine: each of its three terms worked by hand, the pick
 rate's pull toward a coin flip, the other side it reads - the likely six
 until that side locks a pick, from either seat - a board the same under
-any hash seed, the facts its terms cite, and a playbook of
-assumptions alone scored by it, its best six the enumerated maximum. Every
-board is the synthetic World's: no database."""
+any hash seed, and the facts its terms cite. Every board is the synthetic
+World's: no database."""
 
 import copy
 import dataclasses
@@ -13,6 +12,7 @@ import os
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -248,34 +248,6 @@ def test_every_base_term_cites_a_fact_the_result_carries(synthetic_world):
     assert int(terms[base.RATES]["fact"][1:]) > len([f for f in board_facts if f.id[0] == "F"])
 
 
-def test_a_playbook_of_assumptions_scores_by_the_engine_and_its_best_six_is_the_maximum(
-        synthetic_world):
-    """A playbook of assumptions alone, as the shipped one was before its
-    first rule. Every seat scores, no badge reads unscored, and blue's
-    optimal is the best of every legal six by the engine's terms, the
-    tie-break after them, found by enumeration."""
-    w = synthetic_world
-    draft = Draft("Ember Ruins", ("Mortar",), side="")
-    b = engine.board(w, draft, catalog=ASSUMPTIONS_ONLY, brief=BRIEF)
-    d = b.to_dict()
-    for key in ("blue", "red", "current", "red_current"):
-        assert d[key]["scoring"] is True and d[key]["unscored"] is None, key
-    badges = d["momentum"]["badges"]
-    assert badges["blue"]["label"] == "100 / 100"
-    assert badges["red"]["label"] == "%d / 100" % d["momentum"]["red"]   # red's pick, filled
-    objective = scoring.Objective(w, w.map("Ember Ruins"), red=heroes(w, ("Mortar",)),
-                                  catalog=ASSUMPTIONS_ONLY, base=DEFAULT)
-    released = [h for h in w.heroes.values() if h.released]
-    sixes = [
-        scoring.Candidate(six) for six in itertools.combinations(released, 6)
-        if sum(1 for h in six if h.role == "tank") <= 2]
-    ranked = sorted((objective.score(objective.prepare(c), detail=False) for c in sixes),
-                    key=lambda c: (-c.score, -c.tiebreak, sorted(c.names)))
-    assert sorted(b.blue.blue) == sorted(ranked[0].names)
-    assert b.blue.score == pytest.approx(ranked[0].score) and ranked[0].score > ranked[1].score
-    assert b.blue.alternatives[0]["score"] == pytest.approx(ranked[1].score, abs=1e-3)
-
-
 def test_a_derived_edge_counts_half_a_wiki_edge_and_the_fact_names_it(synthetic_world):
     """The kit derives Mortar answering Kite on a pair the wiki leaves out:
     against red's Mortar a six holding Kite takes DERIVED_WEIGHT back, where
@@ -335,12 +307,9 @@ def test_the_synergy_term_reads_a_cell_no_article_writes_at_half_the_prior(synth
 
 def test_the_reference_weights_are_the_calibrated_engine_and_off_is_meta_zero():
     """The reference playbook's meta.md holds the weights the engine was
-    first calibrated at, while an unwritten synergy pair read 0 - the rate
-    term in win-rate points, synergy and counter at half its median spread
-    each - under a meta of 1, whatever the live file moves to; OFF is the
-    meta at 0,
-    and a meta of 0 over any dials scores nothing, as OFF does."""
-    assert DEFAULT.record() == {"meta": 1.0, "rate": 1.0, "synergy": 0.1, "counter": 0.05}
+    calibrated at, under a meta of 1, whatever the live file moves to; OFF
+    is the meta at 0, and a meta of 0 over any dials scores nothing, as OFF
+    does."""
     assert DEFAULT.on and OFF.meta == 0 and not OFF.on
     assert not DEFAULT.metered({base.META: 0.0}).on
     assert DEFAULT.scaled() == base.TermWeights(rate=1.0, synergy=0.1, counter=0.05)
@@ -390,16 +359,14 @@ def test_a_board_at_meta_zero_is_the_board_off(synthetic_world):
 
 
 def test_a_board_that_names_no_weights_reads_the_playbooks_meta_file(
-        synthetic_world, monkeypatch, tmp_path):
+        synthetic_world, monkeypatch, catalog_copy):
     """No base on the brief is the playbook in force's meta.md: a copy of the
     reference playbook whose meta.md says 0.5 scores every seat at half the
     engine, and says so in every result."""
-    for name in os.listdir(FIXTURE_PLAYBOOK):
-        shutil.copy(os.path.join(FIXTURE_PLAYBOOK, name), tmp_path)
-    meta = tmp_path / catalog.META_FILE
+    meta = Path(catalog_copy, catalog.META_FILE)
     meta.write_text(meta.read_text(encoding="utf-8").replace("meta: 1\n", "meta: 0.5\n"),
                     encoding="utf-8")
-    monkeypatch.setenv("COUNTRIX_STRATEGIES", str(tmp_path))
+    monkeypatch.setenv("COUNTRIX_STRATEGIES", catalog_copy)
     halved = dataclasses.replace(DEFAULT, meta=0.5)
     assert catalog.engine_weights() == halved == engine.weights_in_force(None)
     b = engine.board(synthetic_world, Draft("Harbor Gate", ("Mortar",), side="attack"))

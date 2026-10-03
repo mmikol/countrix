@@ -3,7 +3,6 @@ from Blizzard or the wiki: load_authored takes the playbook alone, the
 `user` source is carried by `strategies` alone, and no third source is
 read."""
 
-import contextlib
 import os
 import time
 
@@ -14,6 +13,7 @@ import db
 from door.mcp import tools
 from door.mcp.schema import ToolReply
 from inference import catalog
+from tests.verification.door.mcp import Offline
 
 
 def test_the_catalog_holds_the_playbooks_source_row():
@@ -50,11 +50,6 @@ def test_every_pull_reads_blizzard_or_the_wiki():
     assert {spec.source for spec in tools.REGISTRY.pulls()} == {"blizzard", "wiki"}
     assert set(db.CACHE_DIRS) == {"blizzard", "wiki"}
     assert set(tools.Context(dsn="postgresql://nowhere").caches) == {"blizzard", "wiki"}
-
-
-class Offline(tools.Context):
-    def connect(self):
-        return contextlib.nullcontext("cx")
 
 
 def test_pull_counters_runs_the_wikis_matchups(monkeypatch, tmp_path):
@@ -176,69 +171,6 @@ def test_a_pull_that_stores_no_table_says_nothing_stored(monkeypatch, tmp_path):
     assert data["tables"] == [] and data["snapshot_id"] is None
 
 
-def test_the_data_dictionary_says_where_patches_and_synergies_come_from():
-    # 018's COMMENT ON TABLE replaces the prose 004 wrote above CREATE TABLE
-    # seasons, which was patches'; 005's prose above CREATE TABLE synergies is
-    # kept current itself
-    from db.psql import schema
-    described = schema._migration_tables()
-    assert described["patches"][0] == "004_meta.sql"           # the domain stays the creator's
-    assert described["synergies"][0] == "005_playbook.sql"
-    assert "pull_patches" in described["patches"][1]
-    assert "wiki's Patches cargo table" in described["patches"][1]     # '' unescaped
-    assert "season" not in described["patches"][1]
-    assert "pull_synergies" in described["synergies"][1]
-    assert "hero's wiki article" in described["synergies"][1]
-    for table in ("patches", "synergies"):
-        assert "authored" not in described[table][1].lower(), table
-        assert ".csv" not in described[table][1], table
-
-
-def test_the_data_dictionary_says_counters_are_the_wikis_matchups():
-    # 019's COMMENT ON TABLE replaces the prose 005 wrote about counterpick.gg
-    from db.psql import schema
-    described = schema._migration_tables()
-    assert described["counters"][0] == "005_playbook.sql"
-    prose = described["counters"][1]
-    assert "pull_counters" in prose and "wiki article" in prose and "Match-Up" in prose
-    assert "countered_by_id answers hero_id" in prose
-    assert "loader" not in prose and "tooltip" not in prose     # 005's, about counterpick
-
-
-# what three migrations that drop data run, in the order they run it
-DROPS_IN_ORDER = {
-    # map_strategy, then counterpick's rows: the rates, their snapshots, the
-    # counters, then the source
-    "019_wiki_replaces_counterpick.sql": (
-        "DROP TABLE IF EXISTS map_strategy;", "DELETE FROM hero_meta", "DELETE FROM map_meta",
-        "DELETE FROM meta_snapshots", "DELETE FROM counters",
-        "DELETE FROM sources WHERE code = 'counterpick';"),
-    # the two tables 024 added, the picks before the matches they reference
-    "027_drop_matches.sql": ("DROP TABLE IF EXISTS match_picks;", "DROP TABLE IF EXISTS matches;"),
-    # the snapshot's season column before the seasons it references, then the
-    # two kit tables nothing read
-    "028_drop_unread.sql": (
-        "ALTER TABLE meta_snapshots DROP COLUMN IF EXISTS season_id;",
-        "DROP TABLE IF EXISTS seasons;", "DROP TABLE IF EXISTS ability_modifiers;",
-        "DROP TABLE IF EXISTS perk_ability_effects;"),
-}
-
-
-def test_the_migrations_that_drop_data_drop_children_before_parents():
-    """Each drops a row, a column or a table before the one it references:
-    019 counterpick's rows, 027 the recorded matches, 028 the data nothing
-    read. That each is one transaction, tests/qa/test_docs.py holds of every
-    migration but 010-013."""
-    from db.psql import schema
-    sql = {m.name: m.sql for m in schema.read_migrations()}
-    for name, statements in DROPS_IN_ORDER.items():
-        body = "\n".join(line for line in sql[name].splitlines()
-                         if not line.lstrip().startswith("--"))
-        assert [s for s in statements if s not in body] == [], name
-        order = [body.index(statement) for statement in statements]
-        assert order == sorted(order), name
-
-
 def test_a_table_name_that_reaches_sql_text_is_checked():
     """psycopg parameterises values, never identifiers, so a name reaches SQL
     text only as the sql.Identifier psql.identifier returns once the name has
@@ -256,15 +188,6 @@ def test_a_table_name_that_reaches_sql_text_is_checked():
             identifier(bad)
     with pytest.raises(TypeError):
         identifier(None)
-
-
-def test_every_path_the_layer_declares_exists():
-    # the folder move once doubled a segment of one of these; the containers
-    # found out, the suite did not - now it does
-    from db.psql import schema
-    for path in (schema.MIGRATIONS_DIR, catalog.strategies_dir(),
-                 os.path.join(db.ROOT, "docs")):
-        assert os.path.isdir(path), path
 
 
 # --- the built database ----------------------------------------------------

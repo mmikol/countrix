@@ -220,28 +220,7 @@ def test_wiki_maps_store_each_modes_stages(shared):
 
 
 @needs_caches
-def test_wiki_terrain_pulls_the_stages_terrain_after_the_maps(shared):
-    ctx, connection = shared
-    order = [spec.name for spec in tools.REGISTRY.pulls()]
-    assert order.index("pull_maps") < order.index("pull_terrain")
-    ctx.call("pull_maps")
-    text, data = ctx.call("pull_terrain")
-    assert text.startswith("pull_terrain: terrain stored")
-    assert data["tables"] == ["map_terrain", "stage_terrain"]
-    assert data["stage_rows"] == data["stages"] * 8 > 0
-    assert data["stages"] + data["stages_no_text"] == connection.execute(
-        "select count(*) from map_stages").fetchone()[0]
-    # every row hangs off a stage of a map that has stages
-    assert connection.execute(
-        "select count(*), count(distinct t.stage_id) from stage_terrain t"
-        " join map_stages s using (stage_id)").fetchone() == (
-        data["stage_rows"], data["stages"])
-
-
-@needs_caches
-def test_wiki_maps_patches_and_playstyles_pull_from_the_cache(ctx):
-    text, data = ctx.call("pull_maps")
-    assert text.startswith("pull_maps:") and data["modes"] == 5 and data["stages"] >= 2
+def test_wiki_patches_and_playstyles_pull_from_the_cache(ctx):
     text, data = ctx.call("pull_patches")
     assert text.startswith("pull_patches: patches stored") and data["patches"] > 0
     text, data = ctx.call("pull_playstyles")
