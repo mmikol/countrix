@@ -84,8 +84,8 @@ the search solves exactly or refuses. Five steps, in order:</p>
 4  the heuristics  each adds or subtracts, times its weight, from the same facts
 5  the argmax      the best legal six, proved, then the next best in order;
                    every reason cites a fact</pre>
-<p>An open board held about 17.2 million legal sixes under the shipped playbook at the
-roster of 2026-09-28 (<a href='#searched'>what is searched</a>), and a ban or a locked pick
+<p>An open board held about 13.0 million legal sixes under the shipped playbook of 2026-10-03
+at the roster of 2026-09-28 (<a href='#searched'>what is searched</a>), and a ban or a locked pick
 leaves fewer. A synergy cell no hero's article writes is unknown, not zero: it reads the share
 of the written cells that claim their pair, so a pair neither article writes reads twice that,
 the written pairs' mean with their own blank cells read the same way. The weights are not
@@ -185,8 +185,9 @@ weights, each spread its median over the maps; under another playbook the weight
 <code>meta.md</code>'s, and the figures do not carry over. A heuristic on a metric moves a six by
 its weight at most, since its norm is 0..1 and s_n is 1 at most. A scored one moves it by its
 weight times its bonus less its penalty, which its own expressions bound: the shipped
-<code>control-points-have-edges</code> by up to 1.5 times its weight, the other shipped scored
-rules by their weight at most. A base term has no such bound. A heuristic at weight 1 moves a six
+<code>two-of-each-role</code> by up to 3 times its weight within the shipped limits - a 1-4-1
+six, two damage picks past two and a tank short - <code>edges-reward-displacement</code> by up
+to 1.5 times, the other shipped scored rules by their weight at most. A base term has no such bound. A heuristic at weight 1 moves a six
 less than any base term spreads the sixes, at 2 about as far as the synergy or the counter term,
 and at the slider's %(WEIGHT_MAX)g further than the three together.</p>
 <p id='sustained-healing'><b>Sustained healing.</b> A hero's <code>hps</code> is what it lands
@@ -315,9 +316,10 @@ cannot settle drops each six that breaks it as the walk reaches it. Sixes rank b
 tie-break, the sum of their heroes' draws on this board, the larger first; then by their sorted
 names, alphabetically first. A full six's rank is its place in that order - one that ties the
 best six's score and loses the tie-break is not first - counted exactly up to %(RANK_CAP)d.</p>
-<p id='searched'><b>What is searched.</b> Every legal six: <b>17,217,564</b> on an open
-board under the shipped playbook at the roster of 2026-09-28, 53 released heroes, at most
-%(MAX_TANKS)d tanks and three supports; a hero released or a limit changed moves the count. The
+<p id='searched'><b>What is searched.</b> Every legal six: <b>13,030,920</b> on an open
+board under the shipped playbook of 2026-10-03 at the roster of 2026-09-28, 53 released heroes,
+one to %(MAX_TANKS)d tanks and one to three supports; a hero released or a limit changed moves
+the count. The
 search scores a few dozen of them in full and proves the rest cannot beat them, so the answer is
 the best of all of them, and the alternatives are the next best in order. The suite checks it on
 every run: on small boards of a twelve-hero test roster, with bans, locked picks, red revealed
@@ -363,7 +365,7 @@ the wiki's text on it stresses, its name, and on a Hybrid its objective, the fir
 and the rest payload - and the playbook's rules that read them; the win rates are per map.</p>
 <p id='reach'><b>Reach.</b> The weights are meant to make a hero common or rare, never
 impossible. What is established is narrower: at the reach fixture's recording of 2026-10-03,
-under the shipped playbook - the default engine, the healing floor and the terrain rules - 50
+under the shipped playbook - the default engine and the rules researched that day - 50
 of the 53 released heroes had a board on which they are in the optimal six, within a match's
 %(MAX_BANS)d bans, and each such board is a proof: the six is the exact optimum, on the board page
 and in <code>infer</code> alike. The search found none for three: Emre, Freja and Sojourn; a roster, a playbook or a weight that moves

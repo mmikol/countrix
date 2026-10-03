@@ -33,7 +33,7 @@ figures: Blizzard licenses those for personal use only.*
   ([how a six is chosen](docs/inference.md#how-a-six-is-chosen)). The
   space is every six of the released roster, each set of heroes once, at
   most two tanks, and the playbook's constraints prune it, weighing
-  nothing: about 17.2 million legal sixes today, fewer with bans or
+  nothing: about 13 million legal sixes today, fewer with bans or
   locks. A default engine, the meta, scores every six left on its win
   rates on the map trusted by pick rate, the wiki's synergies and its
   counters to the other side - the wiki's, and answers derived from the

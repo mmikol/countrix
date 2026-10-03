@@ -1,21 +1,28 @@
 # The playbook's sources
 
-**The playbook was emptied on purpose.** This file is the record of the 245
-entries `strategies/` held and the six added since, with the citation behind
-each, and it is the source the playbook is being rebuilt from by hand - so it
-describes more than the folder does, and is meant to. The catalog in
+**The playbook was emptied on purpose, and rebuilt from research.** This file
+is the record of the 245 entries `strategies/` held, the six added after it
+was emptied and the fifteen the owner's reset of 2026-10-03 added, with the
+citation behind each, and it is the source the playbook is rebuilt from - so
+it describes more than the folder does, and is meant to. The catalog in
 `docs/inference.md`, generated from the folder, says what is in force today;
 `meta.md` beside the strategy files holds the default engine's weights and
 cites nothing.
 
 One entry per strategy the playbook has held: the community's rules, the
-queue's limit and the user's assumptions. The rules come from
-r/OverwatchUniversity, r/Competitiveoverwatch and r/Overwatch; every citation
-links to reddit itself, and new mining reads reddit's own feeds only. Each rule
-is standardized into the playbook's form, given one metric, stored through the
-tune module's validated add and logged in `strategies/tuning-log.md`.
-"applies" and "spreads" are the six-board check made before a rule was chosen;
-the catalog is `docs/inference.md`.
+queue's limit and the user's assumptions. The first 245 rules come from
+r/OverwatchUniversity, r/Competitiveoverwatch and r/Overwatch, each citation a
+link to reddit itself. The fifteen of 2026-10-03 come from Blizzard's site and
+forums, the wiki - read from the project's page cache, as the live wiki
+refuses automated readers - and this record's own Reddit links, cited as
+recorded: Reddit is never crawled, and new Reddit reading waits for its API.
+Each rule is standardized into the playbook's form, stored through the tune
+module's validated add and logged in `strategies/tuning-log.md`. "applies"
+and "spreads" are the six-board check made before a rule was chosen; the
+entries of 2026-10-03 carry that day's check over 122 boards - every map and
+side, red's dive, brawl and poke sixes and two-pick reveals, and the three
+most-picked heroes banned - the boards a rule applies on and the boards where
+taking it out changes the six. The catalog is `docs/inference.md`.
 
 - `amplified-healing` - Amplified healing saves more (heuristic). applies on 6/6 boards, spreads on 6.
   - https://www.reddit.com/r/OverwatchUniversity/comments/bwi0sl/widowmaker_is_the_reason_goats_is_meta_in_owl/
@@ -139,6 +146,14 @@ the catalog is `docs/inference.md`.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1vwg6wr/how_to_deal_with_ana_as_a_tank/
 - `brawl-has-no-backline` - Brawl has no backline (heuristic). applies on 4/6 boards, spreads on 4.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1rb9vcn/if_rein_is_brawl_why_does_he_feel_useless_against/
+- `brawl-heals-the-scrum` - A brawl six heals the scrum (heuristic). Researched 2026-10-03: applies on 33/122 boards, moves the six on 42.
+  - https://overwatch.fandom.com/wiki/Team_Composition
+  - https://overwatch.fandom.com/wiki/Illari
+  - https://overwatch.fandom.com/wiki/Brigitte
+  - https://overwatch.fandom.com/wiki/Moira
+  - https://us.forums.blizzard.com/en/overwatch/t/a-tanks-perspective-on-support-synergy/640781
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1rb9vcn/if_rein_is_brawl_why_does_he_feel_useless_against/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/glid48/we_need_more_guides_on_how_to_play_with_a/
 - `brawl-locks-flankers` - Brawl locks down flankers (heuristic). applies on 4/6 boards, spreads on 4.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1rb9vcn/if_rein_is_brawl_why_does_he_feel_useless_against/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w00w6m/can_someone_explain_team_comps_to_me_like_im_in/
@@ -201,6 +216,21 @@ the catalog is `docs/inference.md`.
 - `burst-through-heals` - Burst through their biggest save (heuristic). applies on 4/6 boards, spreads on 4.
   - https://www.reddit.com/r/OverwatchUniversity/comments/bwi0sl/widowmaker_is_the_reason_goats_is_meta_in_owl/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w9epk0/has_2_tanks_4_supports_ever_been_a_viable_6v6_comp/
+- `carry-a-damage-amplifier` - Carry a damage amplifier (heuristic). Researched 2026-10-03: applies on 122/122 boards, moves the six on 6.
+  - https://overwatch.fandom.com/wiki/Zenyatta
+  - https://overwatch.fandom.com/wiki/Mercy
+  - https://overwatch.fandom.com/wiki/Ana
+  - https://us.forums.blizzard.com/en/overwatch/t/regarding-zen-discord-and-mercy-damage-boost/844137
+  - https://us.forums.blizzard.com/en/overwatch/t/what-makes-a-good-divepokebrawl-support/636004
+  - https://us.forums.blizzard.com/en/overwatch/t/what-does-it-mean-to-go-dive-and-anti-dive/483702
+  - https://us.forums.blizzard.com/en/overwatch/t/best-cooldowns-in-the-game/657027
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1jge0s5/a_detailed_guide_on_how_to_think_through_which/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1rb9vcn/if_rein_is_brawl_why_does_he_feel_useless_against/
+  - https://www.reddit.com/r/Competitiveoverwatch/comments/b8l41z/satire_i_just_want_goats_to_die_says_owl_viewer/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1v2khtv/why_does_zen_have_such_a_high_win_rate/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1ulsogp/i_havent_won_a_match_in_3_days/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1uweo7e/mauga_counter/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1wdivt5/how_to_counter_bastion_torbjorn_mauga_in_low_elo/
 - `cc-halts-close-fighters` - Crowd control halts close fighters (constraint). applies on 4/6 boards, spreads on 0.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1r40x7r/noobs_guide_to_ranking_up/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1uweo7e/mauga_counter/
@@ -241,6 +271,20 @@ the catalog is `docs/inference.md`.
 - `coin-flip-lineup` - A coin-flip lineup is no plan (constraint). applies on 0/6 boards, spreads on 0.
   - https://www.reddit.com/r/Competitiveoverwatch/comments/b8l41z/satire_i_just_want_goats_to_die_says_owl_viewer/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1whed0u/as_a_tank_what_should_i_do_vs_mauga_swap_when_my/
+- `commit-to-one-playstyle` - Commit to one playstyle (heuristic). Researched 2026-10-03: no chosen six of the 122 boards lacks a lean, and taking it out changes the six on 64.
+  - https://overwatch.fandom.com/wiki/Team_Composition
+  - https://overwatch.fandom.com/wiki/Reinhardt
+  - https://overwatch.fandom.com/wiki/Vendetta
+  - https://overwatch.fandom.com/wiki/Illari
+  - https://overwatch.fandom.com/wiki/Symmetra
+  - https://us.forums.blizzard.com/en/overwatch/t/the-overwatch-triangle/529551
+  - https://us.forums.blizzard.com/en/overwatch/t/what-does-a-healthy-poke-comp-look-like/679291
+  - https://us.forums.blizzard.com/en/overwatch/t/dps-follow-your-tanks/551303
+  - https://us.forums.blizzard.com/en/overwatch/t/what-makes-a-good-divepokebrawl-support/636004
+  - https://us.forums.blizzard.com/en/overwatch/t/i-dont-get-6v6-with-2-tanks/930442
+  - https://us.forums.blizzard.com/en/overwatch/t/how-do-you-pick-which-tank-to-play/911787
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1rb9vcn/if_rein_is_brawl_why_does_he_feel_useless_against/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1u9mxr2/ive_identified_10_recurring_situations_in_my_low/
 - `commit-to-one-style` - Half a comp each way fails (constraint). applies on 0/6 boards, spreads on 0.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1rb9vcn/if_rein_is_brawl_why_does_he_feel_useless_against/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1u9mxr2/ive_identified_10_recurring_situations_in_my_low/
@@ -281,6 +325,25 @@ the catalog is `docs/inference.md`.
 - `cycle-ults-faster` - Cycle ultimates faster than red (heuristic). applies on 2/6 boards, spreads on 2.
   - https://www.reddit.com/r/Competitiveoverwatch/comments/b8l41z/satire_i_just_want_goats_to_die_says_owl_viewer/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w6ihev/what_causes_steamrolls/
+- `damage-breaks-two-tanks` - Bring damage that breaks two tanks (heuristic). Researched 2026-10-03: applies on 122/122 boards, moves the six on 55.
+  - https://overwatch.blizzard.com/en-us/news/24104605/director-s-take-opening-up-the-conversation-on-5v5-and-6v6/
+  - https://overwatch.fandom.com/wiki/Reaper
+  - https://overwatch.fandom.com/wiki/Doomfist
+  - https://overwatch.fandom.com/wiki/Bastion
+  - https://us.forums.blizzard.com/en/overwatch/t/6v62-tanks-had-more-issues-than-just-double-shield/889959
+  - https://us.forums.blizzard.com/en/overwatch/t/4-supports-in-6v6/959745
+  - https://us.forums.blizzard.com/en/overwatch/t/nerf-3-healers-in-6v6/983896
+  - https://us.forums.blizzard.com/en/overwatch/t/solo-tanking-in-6v6-is-depressing/995076
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1u9mxr2/ive_identified_10_recurring_situations_in_my_low/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1jge0s5/a_detailed_guide_on_how_to_think_through_which/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1v8u51x/when_i_offangle_on_support_my_teammates_just_die/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/cutjkt/psa_death_blossom_does_more_damage_to_barriers/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1wg0tx5/i_dont_understand_how_im_supposed_to_carry_on_dps/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1w9epk0/has_2_tanks_4_supports_ever_been_a_viable_6v6_comp/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1w9vje7/how_do_you_counter_bastion_and_torb_in_super/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1w90zka/working_on_a_tank_guide_what_are_some_general/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/yc8i2n/supports_are_you_struggling_to_stay_alive_in_ow2/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1vrjua5/how_do_you_actually_kill_the_supports/
 - `damage-seals-kills` - Damage seals the kills (heuristic). applies on 6/6 boards, spreads on 6.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1u9mxr2/ive_identified_10_recurring_situations_in_my_low/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1jge0s5/a_detailed_guide_on_how_to_think_through_which/
@@ -292,6 +355,17 @@ the catalog is `docs/inference.md`.
 - `defenders-set-deployables` - Defenders set deployables (heuristic). applies on 1/6 boards, spreads on 1.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w9vje7/how_do_you_counter_bastion_and_torb_in_super/
   - https://www.reddit.com/r/OverwatchUniversity/comments/9oo9zv/3_dps_exists_because_dps_are_largely_easy_to/
+- `defenders-stack-barriers` - Defenders stack barriers at a choke (heuristic). Researched 2026-10-03: applies on 6/122 boards, moves the six on 4.
+  - https://overwatch.blizzard.com/en-us/news/24104605/director-s-take-opening-up-the-conversation-on-5v5-and-6v6/
+  - https://overwatch.fandom.com/wiki/Winston
+  - https://overwatch.fandom.com/wiki/Symmetra
+  - https://overwatch.fandom.com/wiki/Escort
+  - https://us.forums.blizzard.com/en/overwatch/t/double-barrier-is-definitely-too-optimal-in-6v6/945071
+  - https://us.forums.blizzard.com/en/overwatch/t/what-do-we-think-of-6v6-open-queue-right-now/958901
+  - https://us.forums.blizzard.com/en/overwatch/t/attack-is-way-harder-than-defend-on-2cppayload/470457
+  - https://www.reddit.com/r/Competitiveoverwatch/comments/naye5a/how_to_play_winston/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/9oo9zv/3_dps_exists_because_dps_are_largely_easy_to/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1w9epk0/has_2_tanks_4_supports_ever_been_a_viable_6v6_comp/
 - `deployables-stop-flankers` - Deployables stop the flankers (heuristic). applies on 4/6 boards, spreads on 4.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w9epk0/has_2_tanks_4_supports_ever_been_a_viable_6v6_comp/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1vxqniw/genuinely_how_do_you_fight_anran/
@@ -327,6 +401,14 @@ the catalog is `docs/inference.md`.
 - `dive-maps-need-peel` - Dive maps need peel (constraint). applies on 2/6 boards, spreads on 0.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1jge0s5/a_detailed_guide_on_how_to_think_through_which/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w45p4i/is_it_true_that_supports_shouldnt_need_or_expect/
+- `dive-moves-together` - A dive six moves together (heuristic). Researched 2026-10-03: applies on 60/122 boards, moves the six on 25.
+  - https://overwatch.fandom.com/wiki/Team_Composition
+  - https://overwatch.fandom.com/wiki/Winston
+  - https://overwatch.fandom.com/wiki/Watchpoint:_Gibraltar
+  - https://us.forums.blizzard.com/en/overwatch/t/pls-can-someone-explain-me-dive-comp/385292
+  - https://us.forums.blizzard.com/en/overwatch/t/dive-how-it-works-and-why-the-hell-people-cant-do-this/627714
+  - https://us.forums.blizzard.com/en/overwatch/t/what-does-it-mean-to-go-dive-and-anti-dive/483702
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1w00w6m/can_someone_explain_team_comps_to_me_like_im_in/
 - `dive-needs-mobility` - A dive comp moves as one (heuristic). applies on 1/6 boards, spreads on 1.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w00w6m/can_someone_explain_team_comps_to_me_like_im_in/
 - `dive-still-needs-heals` - Dive still needs forward healing (heuristic). applies on 1/6 boards, spreads on 1.
@@ -348,6 +430,18 @@ the catalog is `docs/inference.md`.
   - https://www.reddit.com/r/Overwatch/comments/1r28wns/how_it_feels_to_play_comp_rn/
 - `dps-check-on-barriers` - Barriers are a DPS check (heuristic). applies on 3/6 boards, spreads on 3.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w888wc/is_it_a_bad_idea_to_shoot_the_tank_the_entire_game/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/7xaq6l/dear_moira_youre_great_superbly_designed_and_well/
+- `edges-reward-displacement` - Edges reward displacement (heuristic). Researched 2026-10-03: applies on 6/122 boards, moves the six on 6.
+  - https://overwatch.fandom.com/wiki/Ilios
+  - https://overwatch.fandom.com/wiki/Lijiang_Tower
+  - https://overwatch.fandom.com/wiki/Nepal
+  - https://overwatch.fandom.com/wiki/Samoa
+  - https://overwatch.fandom.com/wiki/Pharah
+  - https://overwatch.fandom.com/wiki/Route_66
+  - https://us.forums.blizzard.com/en/overwatch/t/several-control-maps-are-badly-designed/737260
+  - https://us.forums.blizzard.com/en/overwatch/t/in-depth-map-strategies/55768
+  - https://www.reddit.com/r/OverwatchUniversity/comments/9oo9zv/3_dps_exists_because_dps_are_largely_easy_to/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1tmv9w3/korean_tank_players_creating_a_literal_tank_union/
   - https://www.reddit.com/r/OverwatchUniversity/comments/7xaq6l/dear_moira_youre_great_superbly_designed_and_well/
 - `escape-beats-one-shot` - An escape beats the one-shot (heuristic). applies on 4/6 boards, spreads on 4.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1u5r05c/walls_have_unlimited_health_the_1_rule_of/
@@ -392,7 +486,24 @@ the catalog is `docs/inference.md`.
   - https://www.reddit.com/r/Competitiveoverwatch/comments/naye5a/how_to_play_winston/
   - https://www.reddit.com/r/OverwatchUniversity/comments/9oo9zv/3_dps_exists_because_dps_are_largely_easy_to/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w9epk0/has_2_tanks_4_supports_ever_been_a_viable_6v6_comp/
-- `heal-rate` - Heal at the other side's rate (heuristic). The owner's request of 2026-09-25 for a healing threshold in the six's total health, read from the healer data; the model and the threshold are docs/inference.md's The healing floor.
+- `heal-rate` - Heal at the other side's rate (heuristic). The owner's request of 2026-09-25 for a healing threshold in the six's total health, read from the healer data; the model and the threshold are docs/inference.md's The healing floor. Kept by the research of 2026-10-03: applies on 122/122 boards, moves the six on 32.
+  - https://overwatch.fandom.com/wiki/Zenyatta
+  - https://overwatch.fandom.com/wiki/Brigitte
+  - https://overwatch.fandom.com/wiki/Mercy
+  - https://overwatch.fandom.com/wiki/L%C3%BAcio
+  - https://overwatch.fandom.com/wiki/Ana
+  - https://overwatch.fandom.com/wiki/Lifeweaver
+  - https://overwatch.blizzard.com/en-us/news/24104605/director-s-take-opening-up-the-conversation-on-5v5-and-6v6/
+  - https://us.forums.blizzard.com/en/overwatch/t/6v6-if-only-1-healer-you-lose/958299
+  - https://us.forums.blizzard.com/en/overwatch/t/best-support-combinations/671745
+  - https://us.forums.blizzard.com/en/overwatch/t/supports-that-should-not-be-played-together/767024
+  - https://us.forums.blizzard.com/en/overwatch/t/6v6-mode-tanks-reinhardt/945348
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1w00w6m/can_someone_explain_team_comps_to_me_like_im_in/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/9oo9zv/3_dps_exists_because_dps_are_largely_easy_to/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/bwi0sl/widowmaker_is_the_reason_goats_is_meta_in_owl/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/12nh0zj/the_complete_overwatch_hero_guide_75000_words/
+  - https://www.reddit.com/r/Overwatch/comments/1t4f5on/korean_server_tank_players_dont_even_bother/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1whed0u/as_a_tank_what_should_i_do_vs_mauga_swap_when_my/
 - `at-most-three-supports` - Never more than three supports (constraint). The owner's rule of 2026-09-27, never more than three healers and always applied: a limit on the Support role's count, which binds the six the playbook builds and not the other side's revealed picks.
 - `healing-beyond-supports` - Healing beyond the supports (heuristic). applies on 6/6 boards, spreads on 6.
   - https://www.reddit.com/r/Competitiveoverwatch/comments/10pwudc/guide_to_competitive_ctf/
@@ -470,6 +581,29 @@ the catalog is `docs/inference.md`.
 - `meta-drifts-to-range` - The meta drifts toward range (heuristic). applies on 6/6 boards, spreads on 6.
   - https://www.reddit.com/r/Competitiveoverwatch/comments/v1r3si/understanding_owl_metagames_analysis/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1rb9vcn/if_rein_is_brawl_why_does_he_feel_useless_against/
+- `mobility-wins-races` - Mobility wins races and high ground (heuristic). Researched 2026-10-03: applies on 44/122 boards, moves the six on 15.
+  - https://overwatch.fandom.com/wiki/Flashpoint
+  - https://overwatch.fandom.com/wiki/Doomfist
+  - https://overwatch.fandom.com/wiki/Aatlis
+  - https://overwatch.fandom.com/wiki/Dorado
+  - https://overwatch.fandom.com/wiki/Route_66
+  - https://overwatch.fandom.com/wiki/Numbani
+  - https://overwatch.fandom.com/wiki/Watchpoint:_Gibraltar
+  - https://overwatch.fandom.com/wiki/Blizzard_World
+  - https://overwatch.blizzard.com/en-us/news/24122265/director-s-take-competitive-updates-for-season-12/
+  - https://overwatch.blizzard.com/en-us/news/24215719/weekly-recall-flashpoint-map-reworks/
+  - https://overwatch.blizzard.com/en-us/news/patch-notes/live/2024/10/
+  - https://us.forums.blizzard.com/en/overwatch/t/what-charactercomps-feel-good-on-flashpoint/848123
+  - https://us.forums.blizzard.com/en/overwatch/t/flashpoint-and-hero-selection/840380
+  - https://us.forums.blizzard.com/en/overwatch/t/when-people-refuse-to-play-dive-on-gibraltar/924457
+  - https://us.forums.blizzard.com/en/overwatch/t/in-depth-map-strategies/55768
+  - https://www.reddit.com/r/Competitiveoverwatch/comments/v1r3si/understanding_owl_metagames_analysis/
+  - https://www.reddit.com/r/Competitiveoverwatch/comments/1wdhogb/calculating_the_map_synergy_of_every_overwatch/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1tj5z04/one_tricking_is_the_fastest_way_to_get_better_in/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1rtseib/to_my_fellow_flanker_dps_heres_something_i/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1w5v9nd/what_3_dps_and_3_tanks_would_you_choose_and_why/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/9oo9zv/3_dps_exists_because_dps_are_largely_easy_to/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1mwkecz/a_grandmasters_overly_detailed_echo_guide/
 - `more-buttons-than-red` - More buttons than red (heuristic). applies on 4/6 boards, spreads on 4.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1wgyiqp/as_a_tank_what_should_you_do_if_you_are_about_to/
   - https://www.reddit.com/r/OverwatchUniversity/comments/glid48/we_need_more_guides_on_how_to_play_with_a/
@@ -566,6 +700,14 @@ the catalog is `docs/inference.md`.
 - `poke-needs-reach` - Poke needs reach (heuristic). applies on 1/6 boards, spreads on 1.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w00w6m/can_someone_explain_team_comps_to_me_like_im_in/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1rb9vcn/if_rein_is_brawl_why_does_he_feel_useless_against/
+- `poke-needs-reach` - A poke six needs reach (heuristic). Researched 2026-10-03: applies on 29/122 boards, moves the six on 33.
+  - https://overwatch.fandom.com/wiki/Team_Composition
+  - https://overwatch.fandom.com/wiki/Sub-Roles
+  - https://overwatch.fandom.com/wiki/Sigma
+  - https://us.forums.blizzard.com/en/overwatch/t/what-does-a-healthy-poke-comp-look-like/679291
+  - https://us.forums.blizzard.com/en/overwatch/t/idk-how-many-times-it-needs-to-be-said-double-shield-is-because-of-range/564575
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1w00w6m/can_someone_explain_team_comps_to_me_like_im_in/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1rb9vcn/if_rein_is_brawl_why_does_he_feel_useless_against/
 - `poke-no-short-pick` - Poke carries no short pick (heuristic). applies on 1/6 boards, spreads on 1.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w00w6m/can_someone_explain_team_comps_to_me_like_im_in/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1rb9vcn/if_rein_is_brawl_why_does_he_feel_useless_against/
@@ -628,6 +770,58 @@ the catalog is `docs/inference.md`.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w4j78i/when_is_it_best_to_use_hitscan_or_dive_in_game/
   - https://www.reddit.com/r/Competitiveoverwatch/comments/1wdhogb/calculating_the_map_synergy_of_every_overwatch/
   - https://www.reddit.com/r/Competitiveoverwatch/comments/b8l41z/satire_i_just_want_goats_to_die_says_owl_viewer/
+- `sightlines-want-long-hitscan` - Long sightlines want long hitscan (heuristic). Researched 2026-10-03: applies on 20/122 boards, moves the six on 16.
+  - https://overwatch.fandom.com/wiki/Widowmaker
+  - https://overwatch.fandom.com/wiki/Circuit_Royal
+  - https://overwatch.fandom.com/wiki/Havana
+  - https://overwatch.fandom.com/wiki/Rialto
+  - https://overwatch.fandom.com/wiki/Pharah
+  - https://overwatch.blizzard.com/en-us/news/24293050/weekly-recall-neon-junction-ama-recap/
+  - https://overwatch.blizzard.com/en-us/news/patch-notes/live/2024/10/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1w4j78i/when_is_it_best_to_use_hitscan_or_dive_in_game/
+  - https://www.reddit.com/r/Competitiveoverwatch/comments/1wdhogb/calculating_the_map_synergy_of_every_overwatch/
+  - https://www.reddit.com/r/Competitiveoverwatch/comments/b8l41z/satire_i_just_want_goats_to_die_says_owl_viewer/
+- `six-carries-a-save` - Every six carries a save (heuristic). Researched 2026-10-03: applies on 122/122 boards, moves the six on 72.
+  - https://overwatch.fandom.com/wiki/Kiriko
+  - https://overwatch.fandom.com/wiki/Sigma
+  - https://overwatch.fandom.com/wiki/Zarya
+  - https://overwatch.fandom.com/wiki/Reaper
+  - https://overwatch.fandom.com/wiki/Baptiste
+  - https://overwatch.fandom.com/wiki/Lifeweaver
+  - https://overwatch.blizzard.com/en-us/news/24104605/director-s-take-opening-up-the-conversation-on-5v5-and-6v6/
+  - https://us.forums.blizzard.com/en/overwatch/t/best-support-combinations/671745
+  - https://us.forums.blizzard.com/en/overwatch/t/6v6-ranked-will-be-limited-open-q/950900
+  - https://us.forums.blizzard.com/en/overwatch/t/baptiste-is-a-nerf-to-zaryas-graviton-surge/309394
+  - https://us.forums.blizzard.com/en/overwatch/t/lets-talk-about-support-stacking-6v6/957751
+  - https://www.reddit.com/r/Competitiveoverwatch/comments/1wck8j1/who_are_the_heroes_in_each_role_that_are_the_most/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/glid48/we_need_more_guides_on_how_to_play_with_a/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1utl22o/ranked_is_giving_me_cognitive_dissidence/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1weutpi/so_with_vendetta_apparently_coming_back_into_the/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1jbk577/is_dva_actually_not_a_dive_tank/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1w00w6m/can_someone_explain_team_comps_to_me_like_im_in/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1w90zka/working_on_a_tank_guide_what_are_some_general/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1noeger/i_have_reached_legend_in_every_role_in_stadium_so/
+  - https://www.reddit.com/r/Competitiveoverwatch/comments/1noef1t/i_have_reached_legend_in_every_role_in_stadium_so/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1uw5jxr/i_got_spawned_camped_by_two_enemy_players_who_did/
+  - https://www.reddit.com/r/Competitiveoverwatch/comments/b8l41z/satire_i_just_want_goats_to_die_says_owl_viewer/
+  - https://www.reddit.com/r/Competitiveoverwatch/comments/vcjrk7/where_did_the_dallas_fuel_go_wrong_analysis/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/9oo9zv/3_dps_exists_because_dps_are_largely_easy_to/
+- `six-fields-a-support` - A six always fields a support (constraint). Researched 2026-10-03: a limit, held on every board.
+  - https://overwatch.fandom.com/wiki/Roles
+  - https://overwatch.fandom.com/wiki/Junkrat
+  - https://overwatch.fandom.com/wiki/Moira
+  - https://overwatch.fandom.com/wiki/Widowmaker
+  - https://overwatch.fandom.com/wiki/Global_Passive_Abilities
+  - https://overwatch.blizzard.com/en-us/news/24151413/director-s-take-continuing-the-6v6-discussion/
+  - https://us.forums.blizzard.com/en/overwatch/t/4-supports-in-6v6/959745
+  - https://us.forums.blizzard.com/en/overwatch/t/6v6-if-only-1-healer-you-lose/958299
+- `six-fields-a-tank` - A six always fields a tank (constraint). Researched 2026-10-03: a limit, held on every board.
+  - https://overwatch.fandom.com/wiki/Roles
+  - https://overwatch.fandom.com/wiki/Sub-Roles
+  - https://overwatch.blizzard.com/en-us/news/24151413/director-s-take-continuing-the-6v6-discussion/
+  - https://overwatch.blizzard.com/en-us/news/24289101/director-s-take-future-formats/
+  - https://us.forums.blizzard.com/en/overwatch/t/minimum-tank-requirement-for-6v6/989022
+  - https://us.forums.blizzard.com/en/overwatch/t/6v6-needs-to-have-two-tanks/957309
 - `sniper-must-be-answered` - A sniper must be answered (heuristic). applies on 3/6 boards, spreads on 3.
   - https://www.reddit.com/r/OverwatchUniversity/comments/bwi0sl/widowmaker_is_the_reason_goats_is_meta_in_owl/
   - https://www.reddit.com/r/OverwatchUniversity/comments/cvgyni/double_shield_is_not_the_problem_but_rather_a/
@@ -699,6 +893,30 @@ the catalog is `docs/inference.md`.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1rtseib/to_my_fellow_flanker_dps_heres_something_i/
 - `synergy-that-answers` - Synergy that also answers (constraint). applies on 6/6 boards, spreads on 0.
   - https://www.reddit.com/r/Competitiveoverwatch/comments/1vcs69k/thoughts_on_the_absence_of_the_prevalent/
+- `tank-line-barrier` - The tank line carries a barrier (heuristic). Researched 2026-10-03: applies on 122/122 boards, moves the six on 37.
+  - https://overwatch.fandom.com/wiki/Zarya
+  - https://overwatch.fandom.com/wiki/Winston
+  - https://overwatch.fandom.com/wiki/Roadhog
+  - https://overwatch.fandom.com/wiki/D.Va
+  - https://overwatch.fandom.com/wiki/Wrecking_Ball
+  - https://overwatch.fandom.com/wiki/Mauga
+  - https://overwatch.fandom.com/wiki/Reinhardt
+  - https://overwatch.fandom.com/wiki/Sub-Roles
+  - https://overwatch.blizzard.com/en-us/news/24104605/director-s-take-opening-up-the-conversation-on-5v5-and-6v6/
+  - https://overwatch.blizzard.com/en-us/news/23785339/uniting-gameplay-and-style-behind-overwatch-2-s-complex-map-design/
+  - https://overwatch.blizzard.com/en-us/news/23865965/overwatch-2-developer-blog-post-launch-updates-on-gameplay-maps-and-competitive/
+  - https://us.forums.blizzard.com/en/overwatch/t/way-too-much-healing-in-6v6/944505
+  - https://us.forums.blizzard.com/en/overwatch/t/real-talk-about-6v6-tank-duos/861111
+  - https://us.forums.blizzard.com/en/overwatch/t/bring-back-6v6-with-main-tank-and-off-tank/745434
+  - https://us.forums.blizzard.com/en/overwatch/t/the-best-6v6-tank-combos/919362
+  - https://us.forums.blizzard.com/en/overwatch/t/i-dont-mind-solo-tanking-in-6v6/1031993
+  - https://us.forums.blizzard.com/en/overwatch/t/2-different-tank-roles-for-6v6/920655
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1rb9vcn/if_rein_is_brawl_why_does_he_feel_useless_against/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/glid48/we_need_more_guides_on_how_to_play_with_a/
+  - https://www.reddit.com/r/Competitiveoverwatch/comments/b8l41z/satire_i_just_want_goats_to_die_says_owl_viewer/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/9oo9zv/3_dps_exists_because_dps_are_largely_easy_to/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/d4poqw/i_have_way_more_sympathy_for_dps_players_with/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1w4gaz2/what_to_do_against_guaranteed_death_ults_during/
 - `teamwork-answers-uncounterable` - Teamwork answers the uncounterable (heuristic). applies on 3/6 boards, spreads on 3.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w4iezj/does_hazard_have_a_hard_counter/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1wdivt5/how_to_counter_bastion_torbjorn_mauga_in_low_elo/
@@ -740,6 +958,28 @@ the catalog is `docs/inference.md`.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w9epk0/has_2_tanks_4_supports_ever_been_a_viable_6v6_comp/
 - `two-light-healers-lose` - Two light healers lose fights (constraint). applies on 6/6 boards, spreads on 0.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w00w6m/can_someone_explain_team_comps_to_me_like_im_in/
+- `two-of-each-role` - Two of each role (heuristic). Researched 2026-10-03: applies on 122/122 boards, moves the six on 89.
+  - https://overwatch.blizzard.com/en-us/news/24187726/director-s-take-season-16-on-the-horizon/
+  - https://overwatch.blizzard.com/en-us/news/24104605/director-s-take-opening-up-the-conversation-on-5v5-and-6v6/
+  - https://overwatch.blizzard.com/en-us/news/24151413/director-s-take-continuing-the-6v6-discussion/
+  - https://overwatch.blizzard.com/en-us/heroes/
+  - https://overwatch.fandom.com/wiki/Zarya
+  - https://overwatch.fandom.com/wiki/Team_Composition
+  - https://us.forums.blizzard.com/en/overwatch/t/6v6-open-queue-max-2-tanks/959799
+  - https://us.forums.blizzard.com/en/overwatch/t/i-dont-mind-solo-tanking-in-6v6/1031993
+  - https://us.forums.blizzard.com/en/overwatch/t/solo-tanking-in-6v6-is-depressing/995076
+  - https://us.forums.blizzard.com/en/overwatch/t/6v6-open-queue-needs-to-become-2-2-2-or-max-2-dps/976218
+  - https://us.forums.blizzard.com/en/overwatch/t/what-do-we-think-of-6v6-open-queue-right-now/958901
+  - https://us.forums.blizzard.com/en/overwatch/t/6v6-open-queue-2-tanks-do-you-force-your-role/998373
+  - https://www.reddit.com/r/OverwatchUniversity/comments/glid48/we_need_more_guides_on_how_to_play_with_a/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1rb9vcn/if_rein_is_brawl_why_does_he_feel_useless_against/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/9oo9zv/3_dps_exists_because_dps_are_largely_easy_to/
+  - https://www.reddit.com/r/Competitiveoverwatch/comments/1t4f5on/korean_server_tank_players_dont_even_bother/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1w4j78i/when_is_it_best_to_use_hitscan_or_dive_in_game/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/1w9epk0/has_2_tanks_4_supports_ever_been_a_viable_6v6_comp/
+  - https://www.reddit.com/r/OverwatchUniversity/comments/d4poqw/i_have_way_more_sympathy_for_dps_players_with/
+  - https://www.reddit.com/r/Competitiveoverwatch/comments/b8l41z/satire_i_just_want_goats_to_die_says_owl_viewer/
+  - https://www.reddit.com/r/Competitiveoverwatch/comments/10pwudc/guide_to_competitive_ctf/
 - `two-off-map-picks` - Two off-map picks, wrong comp (constraint). applies on 0/6 boards, spreads on 0.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1tj5z04/one_tricking_is_the_fastest_way_to_get_better_in/
   - https://www.reddit.com/r/Competitiveoverwatch/comments/1wdhogb/calculating_the_map_synergy_of_every_overwatch/

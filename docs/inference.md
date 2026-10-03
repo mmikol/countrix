@@ -50,8 +50,10 @@ COMP   = the legal six of highest score, exactly; the next best after it, in ord
    Today's 53 released heroes - 15 tanks, 24 damage, 14 supports - make
    22,957,480 sixes, and 18,040,386 of them field two tanks or fewer.
 2. **The limits prune.** A limit removes every six that breaks it and
-   adds nothing to one that keeps it. The shipped
-   `at-most-three-supports` leaves 17,217,564 legal sixes on an open
+   adds nothing to one that keeps it. The shipped limits - at most three
+   supports, at least one tank and at least one support
+   (`at-most-three-supports`, `six-fields-a-tank`,
+   `six-fields-a-support`) - leave 13,030,920 legal sixes on an open
    board, and a ban or a locked pick leaves fewer. Blue's own comp that
    breaks a limit is not allowed; red's revealed picks are facts, never
    ruled out ([The share](#the-share)).
@@ -60,11 +62,16 @@ COMP   = the legal six of highest score, exactly; the next best after it, in ord
    ([The objective](#the-objective)).
 4. **The heuristics adjust.** Each heuristic adds or subtracts, times its
    weight, from the same facts ([How a strategy file
-   works](#how-a-strategy-file-works)). The shipped playbook's are the
-   healing floor ([The healing floor](#the-healing-floor)) and twelve
-   rules on the terrain of the ground in play, each gated where its
-   feature stands out, 0.5 sd or more above the ordinary map's (a
-   `STANDOUT` dial), or on what the ground is won on.
+   works](#how-a-strategy-file-works)). The shipped playbook's fourteen
+   were researched on 2026-10-03 from Blizzard's site and forums, the
+   wiki and the Reddit record (`inference/README.md`): the healing floor
+   ([The healing floor](#the-healing-floor)); the 6v6 shape, two of each
+   role; a save and a barrier on every six; one playstyle, with a need
+   for each of dive, brawl and poke; the damage to break two tanks and a
+   damage amplifier; and four rules on the ground in play - long
+   sightlines, hazard edges, Flashpoint and high ground, a defended choke
+   - each gated where its feature stands out, 0.5 sd or more above the
+   ordinary map's (a `STANDOUT` dial), or on the mode and the side.
 5. **The argmax.** The search returns the legal six of highest score,
    proved by branch and bound, and the next best in rank order as the
    alternatives ([The search](#the-search)). Every reason it gives cites
@@ -404,21 +411,20 @@ gains most on, or the six kept under the cost; and how to play it where
 the six's lean turns (`plan.stage_blurb`). A stage differs from its map
 only through the ground in play - its terrain, its name and, on a Hybrid,
 its objective - and the rules that read them, since the rates are per
-map: under the shipped playbook, 8 of the 64 stages score a six of
-their own, on either side and with none - Havana's three, Midtown's and
-Neon Junction's escort phases, two of Rialto's and Route 66's Western Town
-Complex. 36 of the 64 have no text of their own on the wiki; fuller stage
+map: under the shipped playbook of 2026-10-03, 1 of the 64 stages scores
+a six of its own, on either side and with none - Nepal's Sanctum, which
+`edges-reward-displacement` names; under the terrain rules it replaced, 8
+did. 36 of the 64 have no text of their own on the wiki; fuller stage
 texts are the lever (pm/backlog.md). At the shipped swap cost of 10 the
 plan keeps the board's six through every stage of an open board: the
 stages that score apart gain less than a swap costs, and a lower cost on
 the Swap cost slider shows them.
 
 **Rules that pull opposite ways.** Both rules of an opposing pair count,
-at the owner's word. Where a hard choke and high ground both stand out
-(Rialto's bridge, Route 66's Western Town Complex), the barrier pair
-partly offsets: the first 1000 of barrier health nets half a weight, and
-past 2000 nothing; the melee pair nets three quarters of a weight across
-the scale's range of melee picks.
+at the owner's word. Under the shipped playbook of 2026-10-03 the healing
+floor and the 6v6 shape pull apart: a third support raises a six's
+healing, and `two-of-each-role` charges it, so a six takes one only where
+the healing it adds outweighs that charge.
 
 `tests/verification/inference/test_stage_plan.py` holds each phase and each
 arena to an enumeration on the synthetic World.
@@ -427,7 +433,7 @@ arena to an enumeration on the synthetic World.
 
 `inference/solver.py` returns the best sixes of the whole legal space:
 every six of released, unbanned heroes that holds the locked picks, each
-once, at most two tanks and every limit kept - 17,217,564 on an open board
+once, at most two tanks and every limit kept - 13,030,920 on an open board
 under the shipped playbook. It walks that space by branch and bound. Each
 legal shape is filled role by role, a role's picks at rising places of its
 walk order, and a branch - the picks so far and the candidates each open
@@ -813,7 +819,7 @@ with three 7%.
 ## The catalog
 
 <!-- generated:catalog -->
-22 strategy files in `inference/strategies/`: 1 constraint (a limit), 13 heuristics (9 on a metric, 4 scored) and 8 assumptions. Regenerated by `.venv/bin/python -m door.mcp call db_docs`.
+25 strategy files in `inference/strategies/`: 3 constraints (limits), 14 heuristics (6 on a metric, 8 scored) and 8 assumptions. Regenerated by `.venv/bin/python -m door.mcp call db_docs`.
 
 #### The meta
 
@@ -830,95 +836,113 @@ params: MAX_SUPPORTS=3
 
 A six fields at most three supports, on every board. Open Queue sets no cap on supports, so this rule sets one: a six with a fourth support is never chosen. Measured as the six's support count.
 
+##### A six always fields a support (`six-fields-a-support`, shape, limit)
+
+`require team.supports >= params.MIN_SUPPORTS` - always holds
+params: MIN_SUPPORTS=1
+
+A six always fields at least one support, on every board. Supports are the team's backbone: most heroes heal only after several seconds out of combat, so a six with no support cannot sustain through a fight, and killing the supports is how the other side's heroes are told to win one. The six's support count is held at one or more, beside the cap of three.
+
+##### A six always fields a tank (`six-fields-a-tank`, shape, limit)
+
+`require team.tanks >= params.MIN_TANKS` - always holds
+params: MIN_TANKS=1
+
+A six always fields at least one tank, on every board. The tank leads the charge - it draws the other side's fire, holds space and breaks fortified positions and chokes - and a six with none leaves its supports with no one in front of them and nothing to walk behind against two tanks. The six's tank count is held at one or more, beside the queue's own cap of two.
+
 #### Heuristics
 
-##### Choke maps reward melee (`choke-maps-reward-melee`, map)
+##### Bring damage that breaks two tanks (`damage-breaks-two-tanks`, damage)
 
-`maximize team.melee` - picks with a melee weapon. weight 1; when `map.chokes >= params.STANDOUT or map.interiors >= params.STANDOUT`
+`maximize team.dps_floor` - summed published per-second damage figures (a floor: misses and healing ignored). weight 0.5
+
+A six brings enough sustained damage to burn through two tanks' worth of health. In 6v6 the second tank adds a pool, mitigation and often a second barrier to chew through before a kill, healing holds space but never takes it, and support-heavy lines are said to struggle to finish anyone. The summed published damage per second of the six's picks is the measure, a floor that ignores misses.
+
+##### Mobility wins races and high ground (`mobility-wins-races`, map)
+
+`maximize team.mobility_count` - picks with a movement or evasive ability. weight 1; when `map.mode == 'Flashpoint' or map.high_ground >= params.STANDOUT`
 params: STANDOUT=0.5
 
-A map of tight chokes and rooms puts the fight in someone's face, where a melee weapon does its full damage and a long gun does not. Reinhardt is the community's brawl tank because he swings his hammer at close quarters. Picks with a melee weapon are counted, read on the ground whose chokes or interiors stand 0.5 sd or more above the ordinary map's.
+On Flashpoint and on high ground, the picks that move win the ground. Flashpoint's next point opens across the largest maps in the game, so a slow six arrives one player at a time, and high ground goes to whoever can get up and back without the long way round the defenders are watching. Picks with a movement or evasive ability are counted on Flashpoint and on the ground whose high ground stands 0.5 sd or more above the ordinary map's.
 
-##### Chokes reward crowd control (`chokes-reward-crowd-control`, map)
+##### Long sightlines want long hitscan (`sightlines-want-long-hitscan`, map)
 
-`maximize team.cc_count` - picks with crowd control (stun, sleep, immobilize, hinder, knockback). weight 1; when `map.chokes >= params.STANDOUT or map.interiors >= params.STANDOUT`
+`maximize team.hitscan_reach` - hitscan picks whose weapon publishes a reach of 30 m or more. weight 1; when `map.sightlines >= params.STANDOUT`
 params: STANDOUT=0.5
 
-Where a map funnels both teams into a choke, crowd control decides who gets through it. A stun, a wall or a knockback at a doorway takes a pick out of the fight at the one moment the whole team is committed, and enclosed space leaves nowhere to dodge it. Picks with a crowd-control tool are counted, read on the ground whose chokes or interiors stand 0.5 sd or more above the ordinary map's.
+Long sightlines belong to long-reach hitscan. A hitscan shot lands the instant it is fired at any range the map offers, so on open lanes the fight opens where a Widowmaker, Ashe or Soldier: 76 already hits and projectiles and short guns do not, and Blizzard's designers add corner cover and run a train across Neon Junction to keep snipers from locking it down. Hitscan picks whose weapons reach 30 m or more are counted on the ground whose sightlines stand 0.5 sd or more above the ordinary map's.
 
-##### Capture points reward area effects (`control-area-healing`, map)
+##### A brawl six heals the scrum (`brawl-heals-the-scrum`, shape)
 
-`maximize team.aoe_count` - kit pieces tagged area of effect or shockwave. weight 0.25; when `map.objective == 'point'`
+`maximize team.hps_floor` - summed sustained healing onto teammates, hp per second over every teammate reached, reloads in. weight 0.5, a need; when `team.style_lean == 'brawl'`
 
-A capture-point fight happens on one point with the whole six stacked on it, so healing and damage that touch an area touch everyone. Lúcio's aura and Junkrat's splash both reach the whole point, and a Lúcio and Brigitte pairing was called too strong on king of the hill. Kit pieces tagged area of effect are counted, read wherever the ground is won on a point: Control, Flashpoint and a Hybrid's first phase.
+A brawl six outlasts the other side at close range by healing through the fight. Brawl moves as one tight group and trades damage face to face, so its supports need consistent healing, from an area or a high primary output, that keeps the tanks up through the trade, and area healing is called strongest when the team is grouped. Summed sustained healing onto teammates, an area heal counted once per teammate it reaches, is read while brawl is the six's majority playstyle, and a shortfall costs up to the weight.
 
-##### Escort lanes reward the longest gun (`escort-longest-gun`, map)
+##### A dive six moves together (`dive-moves-together`, shape)
 
-`maximize team.range_max` - the longest range on the team. weight 0.25; when `map.objective == 'payload'`
+`maximize team.mobility_count` - picks with a movement or evasive ability. weight 0.5, a need; when `team.style_lean == 'dive'`
 
-A payload runs down long lanes, and the pick with the longest reach on the six owns the lane before the fight closes. Every payload route opens onto a long sightline somewhere along the path, which is why the community names Escort as the mode that favours poke and Ashe as a Junkertown pick. The longest published range on the team is the measure, read wherever the ground is won on a payload: an Escort map and a Hybrid's later phase.
+A dive six moves as one: every pick reaches the target with the tanks and gets out when the cooldowns are spent. Dive takes several angles and rejoins at once, so a pick with no movement tool is the straggler the other side turns on, and a dive tank who lands without teammates dies fast. Picks with a movement or evasive ability are counted while dive is the six's majority playstyle, and a shortfall costs up to the weight.
 
-##### Flank routes want deployables (`flank-routes-want-deployables`, map)
+##### A poke six needs reach (`poke-needs-reach`, shape)
 
-`maximize team.deployables` - picks with deployables. weight 1; when `map.flanks >= params.STANDOUT`
-params: STANDOUT=0.5
+`maximize team.range_median` - median of each pick's longest published range. weight 0.5, a need; when `team.style_lean == 'poke'`
 
-A placed object fights a flanker while the team looks elsewhere: turrets counter flank pressure, a wall cuts the diver off, and a tree or a barrier gives the backline something to stand behind. Symmetra is rated one of the better damage picks in coordinated play for her turrets against flanks, and Torbjörn is the answer offered to a flanking Anran. Picks with deployables are counted, read on the ground whose flank routes stand 0.5 sd or more above the ordinary map's.
+A poke six wins the chip war before the fight closes, and it chips only what it reaches. Poke trades damage from range and from several angles, its tanks playing from the sides rather than the front, so a short-range pick idles through the poke or walks in alone. The median of the picks' longest published ranges is read while poke is the six's majority playstyle, and a shortfall costs up to the weight.
 
-##### High ground strands melee (`high-ground-strands-melee`, map)
+##### Carry a damage amplifier (`carry-a-damage-amplifier`, damage, scored)
 
-`minimize team.melee` - picks with a melee weapon. weight 0.25; when `map.high_ground >= params.STANDOUT`
-params: STANDOUT=0.5
+weight 0.5; bonus `min(team.dmg_amp, params.AMPS) / params.AMPS`
+params: AMPS=1
 
-On a map built around high ground a melee pick has no way to touch an enemy standing above and no quick way up. Reinhardt is named as the tank who suffers most where high ground matters, with nothing to throw at it but a Fire Strike, and brawl's movement tools are said to have no vertical component at all. Picks with a melee weapon are counted, minimised on the ground whose high ground stands 0.5 sd or more above the ordinary map's.
+A six carries a pick that amplifies its teammates' damage. A Discord Orb, a damage boost or a Nano Boost adds a kill threat without adding a gun: it makes a tank's large pool killable and turns a target that was surviving into one that is not, which counts most against two tanks. The rule pays its weight when at least one pick amplifies damage.
 
-##### Open ground punishes short reach (`open-ground-punishes-short-reach`, map)
+##### The tank line carries a barrier (`tank-line-barrier`, durability, scored)
 
-`maximize team.range_min` - the shortest longest-range. weight 0.5; when `map.open_ground >= params.STANDOUT`
-params: STANDOUT=0.5
+weight 1; penalty `max(0, 1 - team.barrier_hp / params.FRONT_BARRIER)`
+params: FRONT_BARRIER=600
 
-On open ground the pick with the shortest reach is the one who spends the fight unable to shoot back. Beams and shotguns that own a corridor are helpless across a canyon, so a comp is judged there by its shortest longest-range. The smallest of the picks' longest published ranges is the measure, read on the ground whose open ground stands 0.5 sd or more above the ordinary map's.
+The tank line carries a barrier that shields the team. In 6v6 the two tanks split the work, one holding ground behind a barrier while the other dives or peels; two tanks with no barrier between them are called no better than one, with nothing to stop a hit before it lands, and Blizzard added cover to its maps when the format lost a tank and its shields. Barrier health on the six is read against 600, a main tank's barrier: at 600 or more it costs nothing, and each part short of it costs that share of the weight.
 
-##### Sightlines want hitscan (`sightlines-want-hitscan`, map)
-
-`maximize team.hitscan` - picks with a hitscan weapon or ability. weight 1; when `map.sightlines >= params.STANDOUT`
-params: STANDOUT=0.5
-
-Long sightlines belong to hitscan weapons, which land at any distance the map offers while projectiles arc and slow. On such a map the fight opens at the range where a Soldier: 76, Ashe or Widowmaker is already hitting and a projectile kit is not. Picks with a hitscan weapon or ability are counted, read on the ground whose sightlines stand 0.5 sd or more above the ordinary map's.
-
-##### Vertical maps reward fliers (`vertical-maps-reward-fliers`, map)
-
-`maximize team.flyers` - picks that fly or hover. weight 0.25; when `map.high_ground >= params.STANDOUT`
-params: STANDOUT=0.5
-
-A map with high ground everywhere rewards the picks that travel between its levels without a staircase. Echo is named as the fill pick for maps with verticality, and the maps with the most high ground are called best for heroes that move easily between low and high ground. Picks that fly or hover are counted, read on the ground whose high ground stands 0.5 sd or more above the ordinary map's.
-
-##### Control points have edges (`control-points-have-edges`, map, scored)
+##### Edges reward displacement (`edges-reward-displacement`, map, scored)
 
 weight 1; when `map.hazards >= params.STANDOUT or (map.name == 'Nepal' and map.stage == 'Sanctum')`; bonus `min(max(team.cc_count - params.BOOP_FLOOR, 0), params.BOOP_CAP) * 0.5`
 params: BOOP_CAP=3, BOOP_FLOOR=2, STANDOUT=0.5
 
-Control stages are built around drops - the well on Ilios, the sanctum pit on Nepal, the edges of Lijiang Tower - and a knockback or a pull turns a full-health enemy into a kill. Roadhog hooking into the well and Lúcio booping on Lighthouse are the community's Control examples, and Orisa is named as good on maps with environmental hazards. Each pick with crowd control beyond the second earns half the rule's weight, up to three, read on the ground whose hazards stand 0.5 sd or more above the ordinary map's and on Nepal's sanctum, which the examples name.
+Where the ground has drops, displacement kills. A knockback, hook or pull over a pit, a ledge or a lava moat removes a full-health enemy outright, and the wiki's pages for Ilios, Lijiang Tower, Nepal and Samoa each name the abilities that do it on or beside the objective. Each pick with crowd control beyond the second earns half the weight, up to three, on the ground whose hazards stand 0.5 sd or more above the ordinary map's and on Nepal's Sanctum, which the wiki names.
 
-##### A hard choke needs a barrier (`hard-choke-needs-barrier`, map, scored)
+##### Commit to one playstyle (`commit-to-one-playstyle`, shape, scored)
 
-weight 1; when `map.chokes >= params.STANDOUT or (map.name == 'Havana' and map.stage in ['City Streets', 'Sea Fort'])`; bonus `min(team.barrier_hp / params.CHOKE_BARRIER, 1)`
-params: CHOKE_BARRIER=1000, STANDOUT=0.5
+weight 0.5; when `team.style_lean == ''`; penalty `1`
 
-A hard choke is crossed behind a barrier or not at all, and a map whose fights are chokes is a map where one barrier is worth a pick. The community's list of the places a shield is needed is a list of hard chokes - King's Row first point, Eichenwalde third, Havana first and third - and the maps left off it have long sightlines instead. Barrier health earns the rule's weight in full at 1000 and nothing past it, read on the ground whose chokes stand 0.5 sd or more above the ordinary map's and on Havana's first and third stages, which the list names.
+A six commits to one plan, dive, brawl or poke, carried by a strict majority of its picks. Each archetype wins one way - brawl walks in as one unit, dive collapses on one target from several angles, poke holds range from several angles - and a six split between them fights as two half-teams: a brawl tank in front of a poke backline can neither peel a dive nor swing at what stands far away. A six whose picks share no playstyle by a strict majority pays the weight.
 
-##### High ground looks over a barrier (`high-ground-over-barrier`, map, scored)
+##### Two of each role (`two-of-each-role`, shape, scored)
 
-weight 1; when `map.high_ground >= params.STANDOUT`; penalty `min(team.barrier_hp / params.BARRIER_HP, params.BARRIER_CAP) * 0.5`
-params: BARRIER_CAP=2, BARRIER_HP=1000, STANDOUT=0.5
+weight 1.5; penalty `team.shape_excess + max(0, params.TANKS - team.tanks)`
+params: TANKS=2
 
-A barrier faces one way and the enemy on the high ground above it shoots past it, so on a map built around high ground a barrier tank is a slow pick paying for a tool that does not work. Reinhardt is named as ineffective on Numbani's first two points for the high ground around them. Each 1000 of barrier health costs half the rule's weight, up to 2000, on the ground whose high ground stands 0.5 sd or more above the ordinary map's.
+A six plays two tanks, two damage and two supports. In 6v6 the second tank holds the off-angle and doubles the front's mitigation, so one tank facing two loses the trade for space, two damage picks make the pressure that lets the tanks take it, and each pick past two in a role gives one of those jobs up; a third support behind both tanks is the one off-shape six called strong. Each pick over two in a role costs the weight, and a six one tank short pays it once more.
+
+##### Defenders stack barriers at a choke (`defenders-stack-barriers`, side, scored)
+
+weight 1; when `map.side == 'defense' and map.chokes >= params.STANDOUT`; bonus `min(team.barrier_hp / params.STACKED, 1)`
+params: STACKED=2400, STANDOUT=0.5
+
+Defending a hard choke, a six stacks barrier health across the one lane the attackers must use. In 6v6 two tanks' barriers laid over a small choke held so well that matches made no progress until ultimates broke them - the double-shield hold - and the defenders pick that ground in their setup time. Barrier health pays the rule in proportion up to 2400, two barrier tanks' worth, on defense on the ground whose chokes stand 0.5 sd or more above the ordinary map's.
 
 ##### Heal at the other side's rate (`heal-rate`, sustain, scored)
 
 weight 2; penalty `matchup.heal_shortfall`
 
-A six heals at least the share of its total health that the other side heals of its own each second, and never less than the other side's healing in full; an unrevealed slot on that side is the 2-2-2 shape's missing role at the role's median pool and healing. With damage anti-heal on both sides, the healing half of the race between the two sixes breaks even at that share, and nothing in the kit sets a higher bar. The charge is the weight times the share of the need left unhealed.
+A six heals at least the share of its own pool that the other side heals of its own each second, and never less than the other side's healing in full; an unrevealed slot on that side reads as the 2-2-2's missing role at its median. In 6v6 the second tank on each side brings bigger pools and more incoming damage, so supports heal almost all fight, two light healers fall behind and a lone support is focused first, and with anti-heal on both sides the healing half of the race breaks even at that share. The charge is the weight times the share of that need the six leaves unhealed.
+
+##### Every six carries a save (`six-carries-a-save`, sustain, scored)
+
+weight 0.75; penalty `max(0, params.SAVES - team.team_saves)`
+params: SAVES=1
+
+Every six carries at least one save: an invulnerability, a death-prevention or a cleanse that lands on a teammate. 6v6 fights turn on ultimate combos and burst windows that land faster than any heal, and a Protection Suzu, Immortality Field, Life Grip, Transcendence or Projected Barrier makes the combo miss or breaks the stun chain before the kill. The picks carrying such a save are counted, Mercy's Resurrect among them, and a six short of one pays the weight.
 
 #### Assumptions
 
