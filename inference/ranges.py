@@ -863,7 +863,10 @@ TEAM_RULES: dict[str, Spec] = {
                           "world.heal_bench"),
     "hps_supports": _sum(lambda h, s: h.hps if h.role == "support" else 0.0),
     "hps_ratio": _scaled("team.hps_supports", lambda s: s.world.hps_bench, "world.hps_bench"),
-    "hps_per_support": _mean(lambda h, s: h.hps if h.role == "support" else None),
+    # a support's hps is always known and another role's reads as unknown, so
+    # the mean is over the six's supports
+    "hps_per_support": _mean(lambda h, s: h.hps if h.role == "support" else None)._replace(
+        aggregate="a mean over the six's supports; 0 where it fields none"),
     "heal_amp": _count(lambda h, s: h.heal_amp),
     "antiheal": _count(lambda h, s: h.antiheal < 0),
     "cleanse": _count(lambda h, s: h.cleanse_tools),

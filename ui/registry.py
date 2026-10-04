@@ -20,7 +20,9 @@ import os
 import re
 import textwrap
 import tokenize
+from collections import Counter
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from typing import Literal, NamedTuple
 from urllib.parse import unquote
 
@@ -81,7 +83,17 @@ FORM_LINKS: dict[Shown, str] = {
     "scored": "<a href='/math#function'>the function</a>, its scored terms",
     "assumption": "<a href='/math#equation'>the equation</a>, where an ASSUMPTION adds nothing",
     "draft": "<a href='/math#equation'>the equation</a>, which a draft is not yet in"}
-BOUND_LINK = "<a href='/math#base-weights'>the engine's weights</a>"
+# where the math page gives the most each form moves a six and sets it beside
+# the default engine's terms: its paragraph on the engine's weights
+BOUND_LINK = (
+    "the most each form moves a six, beside the default engine's terms:"
+    " <a href='/math#base-weights'>the engine's weights</a>")
+# what the registry and the math page's engine's weights both say of the shipped
+# playbook's scored rules; test_registry holds it on every six the shipped limits
+# allow, by brute force on the synthetic World and by the range rules on the built roster
+SHIPPED_SCORED_BOUND = (
+    "Every shipped scored rule keeps its bonus and its penalty within 0 to 1 inside the"
+    " shipped limits, so it too moves a six by its weight at most.")
 # a formula block's columns: the label, then what it is, wrapped to fit the card
 LABEL_WIDTH, FORMULA_WIDTH = 12, 88
 
@@ -97,8 +109,9 @@ class Citation(NamedTuple):
 
 def citations(path: str = RECORD_PATH) -> dict[str, list[Citation]]:
     """The citation record by strategy id: each ``- `id` - note`` line and
-    the sources indented under it, in the record's order; an id the
-    playbook has held twice has two entries."""
+    the sources indented under it, in the record's order. An id two rules
+    have held in turn has an entry for each, the earlier first, as the
+    record's preamble says: the last is the rule the id names now."""
     with open(path, encoding="utf-8") as handle:
         lines = handle.read().splitlines()
     out: dict[str, list[Citation]] = {}
@@ -194,10 +207,15 @@ def _and(items: Sequence[str]) -> str:
         ", ".join(items[:-1]), items[-1])
 
 
-def _sections(expr: Expr) -> str:
-    """The sections an expression reads, in words, its params aside."""
+def _gate_reads(expr: Expr) -> str:
+    """What a gate reads, in words: the sections it names, its params aside,
+    "only" those where the board settles it; where it names no section, only
+    its params, or no metric and no param at all."""
     read = {name.split(".", 1)[0] for name in expr.names}
-    return _and([words for section, words in SECTIONS.items() if section in read])
+    named = [words for section, words in SECTIONS.items() if section in read]
+    if not named:
+        return "only its params" if "params" in read else "no metric and no param"
+    return ("only %s" if settled_by_board(expr.names) else "%s") % _and(named)
 
 
 def _code(expr: Expr, params: Mapping[str, float]) -> str:
@@ -222,9 +240,10 @@ def _constant(expr: Expr | None) -> float | None:
 
 # --- one entry ---------------------------------------------------------------------
 
-class Needs(NamedTuple):
-    """The needs that share a guard, in catalog order, and each need's scale
-    (scoring.need_scales)."""
+@dataclass(frozen=True)
+class Needs:
+    """Each need's guard-mates - the needs that share its guard, in catalog
+    order - and its scale (scoring.need_scales), by id."""
     groups: dict[str, list[Strategy]]
     scales: dict[str, float]
 
@@ -246,10 +265,10 @@ def _gate_words(s: Strategy) -> str:
         return "It has no gate: it counts on every board."
     if settler(s) == "board":
         return ("It counts only on a board where its gate holds, %s. The board settles that"
-                " once, as the gate reads only %s, so no six can change it."
-                % (_code(s.when, s.params), _sections(s.when)))
+                " once, as the gate reads %s, so no six can change it."
+                % (_code(s.when, s.params), _gate_reads(s.when)))
     return ("It counts only on a six that meets its gate, %s, which the six decides, as the"
-            " gate reads %s." % (_code(s.when, s.params), _sections(s.when)))
+            " gate reads %s." % (_code(s.when, s.params), _gate_reads(s.when)))
 
 
 def _metric_words(s: Strategy) -> str:
@@ -259,10 +278,10 @@ def _metric_words(s: Strategy) -> str:
 
 
 def _budget_words(s: Strategy, book: Needs) -> str:
-    """How the needs' shared budget scales this need."""
+    """How the needs' shared budget scales this need: s, its share of it."""
     mates = book.groups.get(s.id, [s])
     if len(mates) == 1:
-        return "its weight: it is the only need on its guard"
+        return "its weight, as s is 1: it is the only need on its guard"
     scale, names = _num(book.scales.get(s.id, 1.0)), _and([esc(m.id) for m in mates])
     return ("its weight times s = %s: the needs on one guard - here %s - cost %s at most"
             " together, or their largest weight where that is more"
@@ -299,9 +318,10 @@ def _words(s: Strategy, book: Needs) -> str:
         text = ("A limit: every six must keep it. A six that breaks it is removed before any"
                 " score is read - it is never chosen, and blue's picks that break it read not"
                 " allowed - so it weighs nothing and adds nothing to a score. It reaches the"
-                " scores only through the scale: the reference sixes each heuristic on a metric"
-                " is read against, and whose lowest score is the share's 0, are sixes the limits"
-                " allow.")
+                " scores only through the scale, which reads only sixes the limits allow: each"
+                " heuristic on a metric is read against the board's reference sample and"
+                " top-hero sixes, and the share's 0 is the lowest score among the reference"
+                " sample's sixes alone - the top-hero sixes set the scale, not the floor.")
         if is_shape_limit(s):
             text += (" It reads only the six's shape, so the search drops the shapes that break"
                      " it before it seats a hero.")
@@ -309,18 +329,23 @@ def _words(s: Strategy, book: Needs) -> str:
     if form == "reward":
         return ("<p>A reward: a heuristic on a metric, %s. It adds its weight times the six's"
                 " norm on that metric - the metric placed on 0 to 1 between the lowest and the"
-                " highest values the board's reference sixes take, %s being better - so it adds"
-                " 0 to %s, at most its weight. %s</p>"
+                " highest values the board's reference sample and top-hero sixes take, %s being"
+                " better - so it adds 0 to %s, at most its weight. %s</p>"
                 % (_metric_words(s), better, w, _gate_words(s)))
-    if form == "need":
-        gate = _code(s.when, s.params) if s.when is not None else ""
+    if form == "need" and s.when is not None:
+        most = book.scales.get(s.id, 1.0) * s.weight
+        cost = ("It costs 0 to %s, %s." % (_num(most), _budget_words(s, book)) if most
+                else "At weight 0 it costs nothing.")
         return ("<p>A need: a heuristic on a metric, %s. Its gate, %s, reads %s, so it counts"
                 " only on a six that meets the gate, and there it charges what the six misses:"
-                " its weight times (norm &minus; 1), nothing at norm 1 and all of it at norm 0,"
-                " the norm placed as a reward's is, %s being better. A six that misses the gate"
-                " pays nothing, so meeting the gate never pays. It costs 0 to %s, %s.</p>"
-                % (_metric_words(s), gate, _sections(s.when) if s.when is not None else "",
-                   better, _num(book.scales.get(s.id, 1.0) * s.weight), _budget_words(s, book)))
+                " s times its weight times (1 &minus; norm), s its share of its guard's budget"
+                " - nothing at norm 1 and all of s times its weight at norm 0. The norm places"
+                " the metric on 0 to 1 between the lowest and the highest values the board's"
+                " reference sample and top-hero sixes take where they meet the gate, %s being"
+                " better; where those sixes hold one value, or none of them meets the gate, the"
+                " norm is 1 and the need costs nothing. A six that misses the gate pays nothing,"
+                " so meeting the gate never pays. %s</p>"
+                % (_metric_words(s), _code(s.when, s.params), _gate_reads(s.when), better, cost))
     if form == "scored":
         six = ""
         if settler(s) == "six":
@@ -356,9 +381,9 @@ def _gate_lines(s: Strategy) -> list[str]:
     if s.when is None:
         return []
     if settler(s) == "board":
-        who = "the board settles it once: it reads only %s" % _sections(s.when)
+        who = "the board settles it once: it reads %s" % _gate_reads(s.when)
     else:
-        who = "the six decides it: it reads %s" % _sections(s.when)
+        who = "the six decides it: it reads %s" % _gate_reads(s.when)
     return [_line("gate", esc(filled(s.when, s.params))), *_note(who)]
 
 
@@ -382,6 +407,22 @@ def _norm_lines(s: Strategy, need: bool) -> list[str]:
                    "max_ref")]
 
 
+def _scale_lines(s: Strategy, book: Needs) -> list[str]:
+    """A need's s, its share of its guard's budget, as scoring.need_scales
+    reads it: 1 where the weights on the guard sum to 0, which it does not
+    divide by."""
+    weights = [m.weight for m in book.groups.get(s.id, [s])]
+    if not sum(weights):
+        return [_line("s", "= 1"), *_note("the weights on this guard sum to 0, so s scales"
+                                          " nothing")]
+    budget, largest, total = (_num(scoring.NEED_BUDGET), _num(max(weights)),
+                              _num(sum(weights)))
+    return [_line("s", "= min( 1, max( %s, %s ) / %s ) = %s"
+                  % (budget, largest, total, _num(book.scales.get(s.id, 1.0)))),
+            *_note("%s: the needs' budget; %s: the largest weight on this guard; %s: the"
+                   " weights on it summed" % (budget, largest, total))]
+
+
 def _formula(s: Strategy, book: Needs) -> str:
     """The rule in the math page's notation, its own numbers and params
     filled in: the lines of its formula block, empty for an assumption or a
@@ -397,17 +438,10 @@ def _formula(s: Strategy, book: Needs) -> str:
         lines += [_line("term(x)", "= %s &middot; norm( %s(x) )" % (w, esc(s.metric or ""))),
                   *where, *_gate_lines(s), *_norm_lines(s, need=False)]
     elif form == "need":
-        weights = [m.weight for m in book.groups.get(s.id, [s])]
-        budget, largest, total = (_num(scoring.NEED_BUDGET), _num(max(weights)),
-                                  _num(sum(weights)))
         lines += [_line("term(x)", "= s &middot; %s &middot; ( norm( %s(x) ) &minus; 1 )"
                         % (w, esc(s.metric or ""))),
                   *_note("on a six that meets the gate; else 0"), *_gate_lines(s),
-                  _line("s", "= min( 1, max( %s, %s ) / %s ) = %s"
-                        % (budget, largest, total, _num(book.scales.get(s.id, 1.0)))),
-                  *_note("%s: the needs' budget; %s: the largest weight on this guard; %s: the"
-                         " weights on it summed" % (budget, largest, total)),
-                  *_norm_lines(s, need=True)]
+                  *_scale_lines(s, book), *_norm_lines(s, need=True)]
     elif form == "scored":
         lines += [_line("term(x)", "= %s &middot; ( bonus(x) &minus; penalty(x) )" % w), *where,
                   *_gate_lines(s)]
@@ -435,8 +469,11 @@ def _reads_table(s: Strategy) -> str:
                                           esc(over_the_six(key))))
     if not rows:
         return ""
-    return ("<div class='lbl'>what it reads</div><table class='reads'><tr><th>metric</th>"
-            "<th>what it is</th><th>over the six</th></tr>%s</table>" % "".join(rows))
+    # in a box that scrolls sideways: a metric's key keeps one line, and a card
+    # narrower than the table scrolls it rather than cutting it off
+    return ("<div class='lbl'>what it reads</div><div class='wide'><table class='reads'><tr>"
+            "<th>metric</th><th>what it is</th><th>over the six</th></tr>%s</table></div>"
+            % "".join(rows))
 
 
 def _prose(s: Strategy) -> str:
@@ -458,20 +495,31 @@ def _link(source: str) -> str:
     return esc(source)
 
 
+def _listed(entry: Citation) -> str:
+    """An entry's sources as a list, each a link where it is a web address."""
+    return "<ul class='sources'>%s</ul>" % "".join(
+        "<li>%s</li>" % _link(source) for source in entry.sources)
+
+
 def _sources(s: Strategy, record: Mapping[str, Sequence[Citation]]) -> str:
-    """The rule's entries in the citation record, each line with its sources
-    folded under it."""
+    """The rule's entry in the citation record, its line with its sources
+    folded under it. An id two rules have held in turn has an entry for
+    each, the earlier first (citations): the last is this rule's, and each
+    before it is folded away under a label that names it the earlier rule
+    of this id."""
     entries = record.get(s.id, ())
     if not entries:
         return ("<div class='lbl'>sources</div><p>The citation record,"
                 " <code>inference/README.md</code>, holds no entry for it.</p>")
-    out = ["<div class='lbl'>sources</div>"]
-    for entry in entries:
-        out.append("<p>%s</p>" % _marked(entry.note))
-        if entry.sources:
-            out.append("<details><summary>%s</summary><ul class='sources'>%s</ul></details>" % (
-                counted(len(entry.sources), "source"),
-                "".join("<li>%s</li>" % _link(source) for source in entry.sources)))
+    *earlier, current = entries
+    out = ["<div class='lbl'>sources</div><p>%s</p>" % _marked(current.note)]
+    if current.sources:
+        out.append("<details><summary>%s</summary>%s</details>" % (
+            counted(len(current.sources), "source"), _listed(current)))
+    for entry in earlier:
+        out.append("<details class='earlier'><summary>the earlier rule of this id, which the"
+                   " playbook no longer holds</summary><p>%s</p>%s</details>"
+                   % (_marked(entry.note), _listed(entry) if entry.sources else ""))
     return "".join(out)
 
 
@@ -486,7 +534,7 @@ def entry(s: Strategy, book: Needs, record: Mapping[str, Sequence[Citation]]) ->
     formula = _formula(s, book)
     if formula:
         formula = "<div class='lbl'>the formula</div><pre class='eq'>%s</pre>" % formula
-    bound = "; the bound: %s" % BOUND_LINK if s.weighs else ""
+    bound = "; %s" % BOUND_LINK if s.weighs else ""
     parts = (
         s.kind, esc(s.id), s.kind, s.kind, esc(s.name), " &middot; ".join(head),
         _words(s, book), formula, _reads_table(s), FORM_LINKS[form], bound, _prose(s),
@@ -506,7 +554,8 @@ def _moves(s: Strategy, book: Needs) -> str:
     if form == "reward":
         return "0 to %s" % w
     if form == "need":
-        return "&minus;%s to 0" % _num(book.scales.get(s.id, 1.0) * s.weight)
+        most = book.scales.get(s.id, 1.0) * s.weight
+        return "&minus;%s to 0" % _num(most) if most else "0"
     if form == "scored":
         return "%s &middot; (bonus &minus; penalty)" % w
     return "nothing"
@@ -522,31 +571,30 @@ def _glance(strategies: Sequence[Strategy], book: Needs) -> str:
                     "<td>%s</td></tr>" % (esc(s.id), esc(s.name), shown_form(s),
                                           _num(s.weight) if s.weighs else "-", _moves(s, book),
                                           gate if s.kind == "heuristic" else "-"))
-    return ("<table class='glance'><tr><th>rule</th><th>form</th><th>weight</th>"
-            "<th>moves a six by</th><th>gate settled by</th></tr>%s</table>" % "".join(rows))
+    return ("<div class='wide'><table class='glance'><tr><th>rule</th><th>form</th>"
+            "<th>weight</th><th>moves a six by</th><th>gate settled by</th></tr>%s</table></div>"
+            % "".join(rows))
 
 
 def _tally(strategies: Sequence[Strategy]) -> str:
-    """What the playbook holds, by kind and form, in a sentence."""
-    shown = [shown_form(s) for s in strategies]
-    kinds = catalog.counts(strategies)
+    """What the playbook holds, by form, in a sentence: a draft of any kind
+    counts as a draft alone, never as a limit or a heuristic."""
+    forms = Counter(shown_form(s) for s in strategies)
     heuristics = "%s - %s, %s and %d scored" % (
-        counted(kinds["heuristic"], "heuristic"), counted(shown.count("reward"), "reward"),
-        counted(shown.count("need"), "need"), shown.count("scored"))
-    drafts = shown.count("draft")
+        counted(forms["reward"] + forms["need"] + forms["scored"], "heuristic"),
+        counted(forms["reward"], "reward"), counted(forms["need"], "need"), forms["scored"])
     return "%d %s: %s; %s; and %s%s" % (
         len(strategies), "strategy" if len(strategies) == 1 else "strategies",
-        counted(kinds["constraint"], "limit"), heuristics,
-        counted(kinds["assumption"], "assumption"),
-        "; %s awaiting /strategy" % counted(drafts, "draft") if drafts else "")
+        counted(forms["limit"], "limit"), heuristics, counted(forms["assumption"], "assumption"),
+        "; %s awaiting /strategy" % counted(forms["draft"], "draft") if forms["draft"] else "")
 
 
 def article(strategies: Sequence[Strategy], record: Mapping[str, Sequence[Citation]],
             weights: BaseWeights, *, playbook: str, shipped: bool) -> str:
     """The registry's article: what it is, the default engine under the
     rules, every rule at a glance, then an entry per rule grouped by kind.
-    `shipped` says the playbook is the shipped one, whose scored rules the
-    math page bounds."""
+    `shipped` says the playbook is the shipped one, of whose scored rules
+    the page says SHIPPED_SCORED_BOUND, as the math page does."""
     book = needs(strategies)
     base = ("base(x) = %s &middot; ( %s &middot; rates(x) + %s &middot; synergy(x) + %s &middot;"
             " counters(x) )" % tuple(_num(getattr(weights, f)) for f in
@@ -585,10 +633,7 @@ def article(strategies: Sequence[Strategy], record: Mapping[str, Sequence[Citati
                      " on a metric moves a six by its weight at most; a scored one by its weight"
                      " times its bonus less its penalty (%s). Each weight here is its file's;"
                      " a slider on the playbook tab sets another for a session.%s" % (
-                         BOUND_LINK,
-                         " Every shipped scored rule keeps its bonus and its penalty within 0 to"
-                         " 1 inside the shipped limits, so it too moves a six by its weight at"
-                         " most." if shipped else ""),
+                         BOUND_LINK, " " + SHIPPED_SCORED_BOUND if shipped else ""),
         "assumption": "An assumption is prose the solver takes as given; it adds nothing to a"
                       " score (<a href='/math#equation'>the equation</a>)."}
     for kind in KINDS:
