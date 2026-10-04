@@ -19,7 +19,7 @@ import pytest
 from facts import board_facts, compute
 from facts.draft import Draft
 from facts.records import Patch
-from inference import base, catalog, engine, scale, scoring, solver
+from inference import base, bounds, catalog, engine, scale, scoring, solver
 from inference.result import (
     Badge,
     Momentum,
@@ -341,6 +341,8 @@ def test_the_math_page_quotes_each_weight_from_the_playbooks_meta_file(
     (scoring, "NEED_BUDGET", "the needs on one guard cost %s at most together"),
     (scoring, "SCORE_PLACES", "by their score to %s decimal places"),
     (solver, "RANK_CAP", "exactly up to %s"),
+    (bounds, "FOLD_COUNTS", "each where it and those taken before it read %s counts at most"),
+    (bounds, "FOLD_COUNTS", "so it reads %s counts at most"),
 ])
 def test_the_math_page_quotes_each_constant_from_the_code(monkeypatch, module, name, phrase):
     """math.html quotes the code's numbers as placeholders ui/pages.py fills in,

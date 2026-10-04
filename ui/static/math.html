@@ -384,17 +384,35 @@ or meets it while the largest tie-break the branch can hold falls below that six
 budget of branches walked or sixes scored, it returns no answer rather than a six it has not
 proved, and a search that ends with no six proves that none is legal.</p>
 <pre class='eq'>bound(branch) = base over the picks made, exactly
-              + each open role's best n candidates by
-                  own(h) + pairs(h, the picks made) + half the sum of h's m &minus; 1 best pairs
-                  n the role's open slots, m all the open slots, a pair with any other candidate
+              + each open role's best n candidates by worth(h)
               + each playbook term at its best over an interval that holds every value its
                 metrics take over the branch, its range or wider:
                   a heuristic at its norm's better end, a need at 0 where its guard may not hold,
                   a scored term at w &middot; ( bonus's high end &minus; penalty's low end ),
                   the larger of that and 0 where its condition may not hold
+worth(h)      = own(h) + pairs(h, the picks made) + half the sum of h's m &minus; 1 best pairs
+                  n the role's open slots, m all the open slots, a pair with any other candidate
 own(h)        = h's rate and counter part; in the swap search, plus c where h is one of
-                blue's picks - the keep term (swaps and stages)</pre>
-<p>A limit the intervals prove false on every six of a branch drops the branch too; one they
+                blue's picks - the keep term (swaps and stages)
+root(branch)  = bound(branch)'s base part + each playbook term at its best over every six of
+                the branch's shape around the locked picks, read once a shape
+fold(branch)  = base over the picks made
+              + the most, over each way v the open picks can add to the counts, of
+                  the most worth(h) the open picks sum to among those that add v
+                  + each count term at the picks' counts plus v
+              + each other playbook term as bound(branch) reads it
+                  a count term reads only counts of picks, each pick adding 0 or 1 to each;
+                  of such terms the largest weight is taken first, ties in the score's order,
+                  each where it and those taken before it read %(FOLD_COUNTS)d counts at most</pre>
+<p>The walk asks root(branch) first, then bound(branch), then fold(branch), each only while the
+ones before leave the branch in: root reads no metric off the branch, and fold seats the same
+picks for the base and the count terms, where bound may seat the base's best candidates and each
+count term's best apart. A count term at the counts a six holds is at least its value on that
+six, so fold, like the other two, never falls below a six of its branch. The ways v multiply
+with each count, and past a few the fold costs the walk more than it saves, so it reads
+%(FOLD_COUNTS)d counts at most; a term on counts alone that it does not take is read as
+bound(branch) reads it, which holds every six of the branch too.
+A limit the intervals prove false on every six of a branch drops the branch too; one they
 cannot settle drops each six that breaks it as the walk reaches it. Sixes rank by their score to
 %(SCORE_PLACES)d decimal places, rounded, so two scores that round alike tie; then by their
 <i>tie-break</i>, the sum of their heroes' tie-break numbers, the larger first, where each hero's
