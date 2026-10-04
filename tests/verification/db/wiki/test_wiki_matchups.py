@@ -168,6 +168,12 @@ def test_an_article_without_the_section_reads_nothing():
         "</small>", 1),
     # advice with no cue
     ("<small>Destroy his Shadow Step marker when you see it.</small>", 0),
+    # an edge given, a foe kited, a kill made easy: Emre's cells on Doomfist and Junker Queen
+    ("<small>Your Tesla Cannon gives you all the edge you need against him.</small>", 1),
+    ("<small>His slow wraith lets you easily kite him.</small>", 1),
+    (
+        "<small>Reaper lacks any mobility, making it very easy for you to pump shots into"
+        " him.</small>", 1),
 ])
 def test_prose_is_read_from_the_article_heros_seat(cell, verdict):
     assert read_cell(cell, "Winston", "Reaper").verdict == verdict

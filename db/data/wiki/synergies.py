@@ -56,7 +56,7 @@ NOT_A_SYNERGY = {"situational", "ok", "weak", "very weak", "poor", "very poor",
 UNRATED = {"", "tba", "tbd"}
 # An unrated cell is a claim unless its first sentence says there is none.
 NO_SYNERGY_RE = re.compile(
-    r"\b(?:no|not|n't|poor|little|few)\b[^.]{0,40}\bsynerg"
+    r"\b(?:no|not|\w+n['’]t|poor|little|few)\b[^.]{0,40}\bsynerg"
     r"|\bstruggles?\b|\bsynergi[sz]ing\b[^.]*\bdifficult"
     r"|\bnot (?:the best|a good) (?:pair|match)|\bdon't really mix"
     r"|\bdo not share\b|\brarely interact|\b(?:low|weak\w*) (?:synerg|pairing)", re.I)
