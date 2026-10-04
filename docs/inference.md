@@ -91,15 +91,26 @@ its stages - a Control or Flashpoint round, an Escort or Hybrid phase -
 named by `stage` (`/api/board`, the board tools; the roster lists each
 map's). The stage moves the `map.*` metrics and nothing else, and every
 seat of the board plays it. A terrain feature reads the map's article,
-raised to the stage's own where the stage's text names it
-`STAGE_MENTIONS` (2) times or more: a stage's text can add a feature,
-never drop one, since a paragraph that leaves a feature out has not said
-it is absent. `map.stage` and `map.objective` (a point, a payload or a
-push) say where the fight is, and `map.name` which map. The scale is
-measured on the whole map, each heuristic read wherever the board
-settles its gate, so every stage of a map shares one; the floor is the
-stage's own. With a stage named, the facts state the ground in play
-(`map.ground`), and a rule gated on the terrain cites it.
+raised to the stage's own where the stage's text - the article's
+sections and sentences about it, and the heroes' map-strategy notes on
+it - names the feature `STAGE_MENTIONS` (2) times or more, and more
+often than the map's (`facts.compute.ground`, over
+`facts.tables.derive_stage_terrain`): the stage's mentions per thousand
+words, pulled toward its map's rate by `STAGE_PRIOR_WORDS` (100) words of
+it, so a 20-word text counts a sixth and a 200-word one two thirds, then
+read in standard deviations from the maps' mean, as the map's own rate
+is. The pull weighs the text by its length, not by the value it yields:
+on the maps of 2026-10-04 one mention in 20 words still reads 1 to 2.7
+sd above the mean on six of the eight features, enough to open a terrain
+rule's gate, and one word can be a misreading - Havana's Distillery has
+"Vats blocking sightlines" - so one mention raises nothing. A stage's
+text can add a feature, never drop one, since a text that leaves a
+feature out has not said it is absent. `map.stage` and `map.objective`
+(a point, a payload or a push) say where the fight is, and `map.name`
+which map. The scale is measured on the whole map, each heuristic read
+wherever the board settles its gate, so every stage of a map shares one;
+the floor is the stage's own. With a stage named, the facts state the
+ground in play (`map.ground`), and a rule gated on the terrain cites it.
 
 **The rates are a proxy.** Blizzard publishes rates for Competitive Role
 Queue, 5v5, one tank a side; no source publishes Open Queue 6v6, the
@@ -436,20 +447,23 @@ goes on from the last six that was.
 
 Each row's blurb is worded from the facts, never a model, four sentences
 at most, each dropped when it has nothing to say: the ground its own
-text stresses, else that it reads as the map; the rules its ground turns
-on and off against the whole map; the swaps and the two terms the six
-gains most on, or the six kept under the cost; and how to play it where
-the six's lean turns (`plan.stage_blurb`). A stage differs from its map
-only through the ground in play - its terrain, its name and, on a Hybrid,
-its objective - and the rules that read them, since the rates are per
-map: under the shipped playbook of 2026-10-03, 1 of the 64 stages scores
-a six of its own, on either side and with none - Nepal's Sanctum, which
-`edges-reward-displacement` names; under the terrain rules it replaced, 8
-did. 36 of the 64 have no text of their own on the wiki; fuller stage
-texts are the lever (pm/backlog.md). At the shipped swap cost of 10 the
-plan keeps the board's six through every stage of an open board: the
-stages that score apart gain less than a swap costs, and a lower cost on
-the Swap cost slider shows them.
+text stresses, else that its text stresses nothing beyond the map, else,
+with no text of its own, that it reads as the map; the rules its ground
+turns on and off against the whole map; the swaps and the two terms the
+six gains most on, or the six kept under the cost; and how to play it
+where the six's lean turns (`plan.stage_blurb`). A stage differs from its
+map only through the ground in play - its terrain, its name and, on a
+Hybrid, its objective - and the rules that read them, since the rates are
+per map. Read from the wiki's page cache on 2026-10-04 under the shipped
+playbook, 35 of the 64 stages have text of their own and 18 of those
+stress a feature beyond their map, each on two mentions or more; 3 score
+a six of their own on an open board - Ilios's Ruins, Nepal's Sanctum,
+which `edges-reward-displacement` names, and Route 66's Western Town
+Complex on attack - where 2 did when a stage read only the paragraphs
+about it alone. At the shipped swap cost of 10 the plan still keeps the
+board's six through every stage of an open board: the stages that score
+apart gain less than a swap costs, and a lower cost on the Swap cost
+slider shows them.
 
 **Rules that pull opposite ways.** Both rules of an opposing pair count,
 at the owner's word. Under the shipped playbook of 2026-10-03 the healing
@@ -1201,14 +1215,14 @@ the `team.*` metrics computed for the red side.
 | `map.name` (text) | the map's name; empty with no map |
 | `map.stage` (text) | the stage in play, as the map lists it; empty for the whole map |
 | `map.objective` (text) | what the ground in play is won on: point (Control, Flashpoint, a Hybrid's first phase), payload (Escort, a Hybrid's later phase), push (Push); empty for a Hybrid played whole, or no map |
-| `map.chokes` | chokepoints, narrow streets, corridors, tunnels, gates and doorways on the ground in play: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text), raised to the stage's own where a stage is in play and its text names them 2 times or more |
-| `map.interiors` | rooms, caves and other indoor ground on the ground in play: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text), raised to the stage's own where a stage is in play and its text names them 2 times or more |
-| `map.high_ground` | high ground, rooftops, balconies and other vertical ground on the ground in play: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text), raised to the stage's own where a stage is in play and its text names them 2 times or more |
-| `map.flanks` | flank routes and side paths on the ground in play: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text), raised to the stage's own where a stage is in play and its text names them 2 times or more |
-| `map.sightlines` | long sightlines on the ground in play: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text), raised to the stage's own where a stage is in play and its text names them 2 times or more |
-| `map.open_ground` | open ground and ground said to lack cover on the ground in play: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text), raised to the stage's own where a stage is in play and its text names them 2 times or more |
-| `map.hazards` | drops, pits and other environmental hazards on the ground in play: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text), raised to the stage's own where a stage is in play and its text names them 2 times or more |
-| `map.cover` | cover on the ground in play: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text), raised to the stage's own where a stage is in play and its text names them 2 times or more |
+| `map.chokes` | chokepoints, narrow streets, corridors, tunnels, gates and doorways on the ground in play: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text), raised to the stage's own where a stage is in play and its text names them 2 times or more and more often - its rate pulled toward the map's by 100 words of it, on the same scale |
+| `map.interiors` | rooms, caves and other indoor ground on the ground in play: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text), raised to the stage's own where a stage is in play and its text names them 2 times or more and more often - its rate pulled toward the map's by 100 words of it, on the same scale |
+| `map.high_ground` | high ground, rooftops, balconies and other vertical ground on the ground in play: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text), raised to the stage's own where a stage is in play and its text names them 2 times or more and more often - its rate pulled toward the map's by 100 words of it, on the same scale |
+| `map.flanks` | flank routes and side paths on the ground in play: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text), raised to the stage's own where a stage is in play and its text names them 2 times or more and more often - its rate pulled toward the map's by 100 words of it, on the same scale |
+| `map.sightlines` | long sightlines on the ground in play: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text), raised to the stage's own where a stage is in play and its text names them 2 times or more and more often - its rate pulled toward the map's by 100 words of it, on the same scale |
+| `map.open_ground` | open ground and ground said to lack cover on the ground in play: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text), raised to the stage's own where a stage is in play and its text names them 2 times or more and more often - its rate pulled toward the map's by 100 words of it, on the same scale |
+| `map.hazards` | drops, pits and other environmental hazards on the ground in play: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text), raised to the stage's own where a stage is in play and its text names them 2 times or more and more often - its rate pulled toward the map's by 100 words of it, on the same scale |
+| `map.cover` | cover on the ground in play: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text), raised to the stage's own where a stage is in play and its text names them 2 times or more and more often - its rate pulled toward the map's by 100 words of it, on the same scale |
 | `world.heal_bench` | 2 x the median peak heal across the released supports |
 | `world.hps_bench` | 2 x the median sustained healing across the released supports |
 <!-- /generated:catalog -->

@@ -7,7 +7,7 @@ import pytest
 
 from facts import tables
 from facts.model import TERRAIN_FEATURES, Map
-from facts.records import MapRate
+from facts.records import MapRate, StageTerrain
 from facts.team import pair_score
 
 
@@ -72,16 +72,47 @@ def test_an_announced_hero_moves_no_maps_style(synthetic_world):
     assert all(m.rate_lift["dive"] != before[m.id][1]["dive"] for m in w.maps.values())
 
 
-def test_a_stages_terrain_is_z_scored_across_the_stages_with_text(synthetic_world):
-    """Only Forge and Spire have text of their own: each feature one stage
-    stresses and the other does not sits one sd either side, and a feature
-    neither names reads 0."""
+def test_a_stages_terrain_is_its_rate_pulled_toward_its_maps_on_the_maps_scale(
+        synthetic_world):
+    """Forge's 2 hazard mentions in 700 words and Ember Ruins' 2.0 a
+    thousand, pulled together by STAGE_PRIOR_WORDS: (2000 + 200) / 800 = 2.75
+    a thousand, 2 sd above the maps' mean of 1.25 (sd 0.75). A feature its
+    text never names reads the map's rate thinned by its words: chokes'
+    2.0 to 200 / 800 = 0.25, -1.875 sd. Spire's one high-ground mention in
+    500 words: (1000 + 300) / 600, 0.167 sd. Courtyard has no text."""
     harbor, ember, salt = _maps(synthetic_world)
+    assert tables.STAGE_PRIOR_WORDS == 100
     assert set(ember.stage_z) == {"Forge", "Spire"}               # not Courtyard
-    zero = dict.fromkeys(TERRAIN_FEATURES, 0.0)
-    assert ember.stage_z["Forge"] == {**zero, "hazards": 1.0, "high_ground": -1.0}
-    assert ember.stage_z["Spire"] == {**zero, "hazards": -1.0, "high_ground": 1.0}
+    assert ember.stage_z["Forge"] == {
+        "chokes": -1.875, "interiors": -1.875, "high_ground": -1.625, "flanks": -1.917,
+        "sightlines": -4.5, "open_ground": -1.625, "hazards": 2.0, "cover": -2.75}
+    assert ember.stage_z["Spire"] == {
+        "chokes": -1.833, "interiors": -1.833, "high_ground": 0.167, "flanks": -1.778,
+        "sightlines": -4.333, "open_ground": -1.5, "hazards": -1.222, "cover": -2.667}
     assert harbor.stage_z == {} and salt.stage_z == {}
+
+
+def test_a_stage_reads_against_the_maps_alone_and_needs_its_words(synthetic_world):
+    """No other stage's text moves a stage, as every stage moved when they
+    were z-scored among themselves; a stage whose rows hold no words, stored
+    before the words were, holds nothing and reads as its map; a stage of a
+    map with no text is pulled toward the maps' mean."""
+    w = synthetic_world
+    _, ember, salt = _maps(w)
+    forge = dict(ember.stage_z["Forge"])
+    ember.stage_terrain["Courtyard"] = {"cover": StageTerrain(10.0, 1, 100)}
+    tables.derive_stage_terrain(w)
+    assert ember.stage_z["Forge"] == forge and "Courtyard" in ember.stage_z
+    ember.stage_terrain["Spire"] = {"high_ground": StageTerrain(2.0, 1, 0)}
+    tables.derive_stage_terrain(w)
+    assert "Spire" not in ember.stage_z
+    salt.stages = ["Dunes"]
+    salt.stage_terrain = {"Dunes": {"hazards": StageTerrain(10.0, 1, 100)}}
+    tables.derive_stage_terrain(w)
+    # (1000 + 100 x 1.25) / 200 = 5.625 a thousand: (5.625 - 1.25) / 0.75 sd
+    assert salt.stage_z["Dunes"]["hazards"] == 5.833
+    # 100 words that never name a choke halve the mean's 4.0: (2.0 - 4.0) / 2.0 sd
+    assert salt.stage_z["Dunes"]["chokes"] == -1.0
 
 
 def test_a_heros_best_maps_are_its_largest_positive_lifts_ties_by_name(synthetic_world):

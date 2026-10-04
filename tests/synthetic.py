@@ -8,10 +8,11 @@ Every name and number here is invented. Each value sits where a test needs
 one: on a rule's boundary (a 250 hit at range against SQUISHY_POOL, and a
 swing over it from a melee-only hero and from one with a gun as well; 30 m
 and 25 m hitscan against FLIER_REACH; a map lift of exactly
-SPECIALIST_DELTA; a stage's terrain on STAGE_MENTIONS and one mention
-short), a flying tank and a flying damage hero, a form's armor, a hero that
-heals only off its own damage and one that heals only itself, and a tie
-for the last seat of the likely six.
+SPECIALIST_DELTA; a stage whose text names a feature more often than its
+map's, on STAGE_MENTIONS, and one whose text names one once, less often),
+a flying tank and a flying damage hero, a form's armor, a hero that heals
+only off its own damage and one that heals only itself, and a tie for the
+last seat of the likely six.
 
 The rates are exact binary fractions, so the arithmetic is exact. A hero's
 map rate is its overall win plus a lift per map, chosen so each style's lift
@@ -31,7 +32,6 @@ from typing import TypedDict
 
 from db.data.normalizer import name_key
 from facts import tables
-from facts.compute import STAGE_MENTIONS
 from facts.model import Hero, Map, World
 from facts.records import MapRate, Rates, Snapshot, StageTerrain, Synergy
 
@@ -206,11 +206,15 @@ def _maps() -> list[Map]:
     ember.terrain = {
         "chokes": 2.0, "interiors": 1.0, "high_ground": 3.0, "flanks": 2.5,
         "sightlines": 2.0, "open_ground": 1.5, "hazards": 2.0, "cover": 1.0}
-    # Forge stresses hazards on the mentions a stage fact needs, Spire its
-    # high ground on one fewer; Courtyard has no text of its own
+    # Forge's text names hazards more often than the map's, twice
+    # (STAGE_MENTIONS), Spire's its high ground less often, once; Courtyard
+    # has no text of its own. Pulled toward the map's rate by
+    # STAGE_PRIOR_WORDS (100), Forge's hazards read (2000 + 200) / 800 = 2.75
+    # a thousand words, 2 sd up on the maps' scale (mean 1.25, sd 0.75), and
+    # Spire's high ground (1000 + 300) / 600, 0.167 sd
     ember.stage_terrain = {
-        "Forge": {"hazards": StageTerrain(12.0, STAGE_MENTIONS)},
-        "Spire": {"high_ground": StageTerrain(9.0, STAGE_MENTIONS - 1)}}
+        "Forge": {"hazards": StageTerrain(2.86, 2, 700)},
+        "Spire": {"high_ground": StageTerrain(2.0, 1, 500)}}
     return [harbor, ember, Map(SALT, "Salt Flats", "Push")]
 
 

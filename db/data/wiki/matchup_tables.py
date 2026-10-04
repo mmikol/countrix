@@ -8,7 +8,10 @@ two ways - a wikitable, or a {{MatchupTable/<Role>}} template with
 section_rows reads one column of either into rows, and paragraphs reads a
 cell as plain text. The synergies pull reads the Team Synergy column, the
 counters pull (matchups) the Match-Up one, both of every released hero's
-article as released_articles fetches them. No run(): nothing here stores.
+article as released_articles fetches them. The terrain pull reads the same
+articles' map-strategy tables, each field as paragraphs reads a cell, and
+cuts a map article's paragraphs with split_sentences. No run(): nothing
+here stores.
 """
 
 import re
@@ -55,9 +58,9 @@ class Released(NamedTuple):
 
 
 def released_articles(cursor: psycopg.Cursor, pull: PullContext) -> Released:
-    """Every released hero and its article: what the synergies and counters
-    pulls read before either writes, the heroes' read committed before the
-    first fetch."""
+    """Every released hero and its article: what the synergies, counters and
+    terrain pulls read before any writes, the heroes' read committed before
+    the first fetch."""
     cursor.execute("SELECT name, hero_id FROM heroes WHERE status = 'released' ORDER BY name")
     heroes: dict[str, int] = dict(cursor.fetchall())
     # the read's transaction ends here, so none stays open across the fetches

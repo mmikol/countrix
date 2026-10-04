@@ -197,8 +197,8 @@ def test_the_plan_names_the_stages_the_facts_hold_and_no_other(
         r = copy.copy(blue_r)
         r.facts = board_facts.generate(world, Draft(name))
         return plan.plan(world, world.map(name), "", [], [], r).split("\n")[0]
-    # Forge's text stresses its hazards; Spire's falls a mention short and
-    # Courtyard has no text of its own
+    # Forge's text stresses its hazards; Spire's names its high ground less
+    # often than the map's article, and Courtyard has no text of its own
     held = board_facts.generate(world, Draft("Ember Ruins")).find(
         "map.stage_terrain", "Ember Ruins")
     assert [f.value["stage"] for f in held] == ["Forge"]

@@ -34,7 +34,7 @@ def test_terrain_pulls_from_the_cache(sandbox):
     total = sandbox.execute("select count(*) from maps").fetchone()[0]
 
     assert set(data) == {"maps", "without_text", "missing", "rows", "words", "stages",
-                         "stages_no_text", "stage_rows", "tables"}
+                         "stages_no_text", "stage_rows", "fields", "unmatched", "tables"}
     assert data["missing"] == []                  # every article fetched from the cache
     assert data["tables"] == ["map_terrain", "stage_terrain"]
     assert data["rows"] == len(rows) == data["maps"] * len(terrain.FEATURES)
@@ -90,7 +90,7 @@ def test_stage_terrain_pulls_from_the_cache(sandbox):
     maps.run(sandbox, PullContext(CACHE_DIRS["wiki"], log=lambda _: None))
     data = terrain.run(sandbox, PullContext(CACHE_DIRS["wiki"], log=lambda _: None))
     rows = sandbox.execute(
-        "select t.stage_id, t.feature, t.mentions, t.per_thousand, src.code"
+        "select t.stage_id, t.feature, t.mentions, t.per_thousand, t.words, src.code"
         " from stage_terrain t join sources src using (source_id)").fetchall()
     total = sandbox.execute("select count(*) from map_stages").fetchone()[0]
 
@@ -102,18 +102,25 @@ def test_stage_terrain_pulls_from_the_cache(sandbox):
     assert {code for *_, code in rows} == {"wiki"}
     assert all(
         mentions >= 0 and (mentions == 0) == (per_thousand == 0)
-        for _, _, mentions, per_thousand, _ in rows)
-    by_stage = {}
-    for stage_id, feature, *_ in rows:
+        and float(per_thousand) == terrain.per_thousand(mentions, words)
+        for _, _, mentions, per_thousand, words, _ in rows)
+    by_stage, words_of = {}, {}
+    for stage_id, feature, _, _, words, _ in rows:
         by_stage.setdefault(stage_id, set()).add(feature)
+        words_of.setdefault(stage_id, set()).add(words)
     assert all(features == set(terrain.FEATURES) for features in by_stage.values())
+    # one count of words a stage, the floor or more
+    assert all(len(w) == 1 and min(w) >= terrain.STAGE_MIN_WORDS for w in words_of.values())
 
-    # a stage's mentions are text of its own map's article: never more than the
-    # article holds, when the map's terrain is stored
-    assert sandbox.execute(
-        "select count(*) from stage_terrain t join map_stages s using (stage_id)"
+    # a stage's mentions are text of its own map's article, never more than it
+    # holds, but where a hero's map-strategy table writes about the stage:
+    # Pharah's notes on Ilios, Lijiang Tower and Nepal
+    assert data["fields"] > 0 and "aatlis_towncentre" in data["unmatched"]   # Town Center
+    assert {name for name, in sandbox.execute(
+        "select distinct mp.name from stage_terrain t join map_stages s using (stage_id)"
         " join map_terrain m on m.map_id = s.map_id and m.feature = t.feature"
-        " where t.mentions > m.mentions").fetchone()[0] == 0
+        " join maps mp on mp.map_id = s.map_id where t.mentions > m.mentions")} == {
+        "Ilios", "Lijiang Tower", "Nepal"}
     # no Push map holds a stage, so none holds stage terrain
     assert sandbox.execute(
         "select count(*) from stage_terrain t join map_stages s using (stage_id)"
@@ -134,13 +141,15 @@ def test_the_wiki_states_a_stages_ground(sandbox):
     maps.run(sandbox, PullContext(CACHE_DIRS["wiki"], log=lambda _: None))
     terrain.run(sandbox, PullContext(CACHE_DIRS["wiki"], log=lambda _: None))
 
-    # Ilios: "On the Well section of the map, the big hole in the middle"
+    # Ilios: "On the Well section of the map, the big hole in the middle", and
+    # Pharah's notes on "the massive central pit" and the walls for cover
     well = stage_terrain_of(sandbox, "Ilios", "Well")
-    assert well["hazards"][0] == 2
-    assert [f for f in well if well[f][0]] == ["hazards"]
-    # the article says nothing of the other two
-    assert stage_terrain_of(sandbox, "Ilios", "Lighthouse") == {}
-    assert stage_terrain_of(sandbox, "Ilios", "Ruins") == {}
+    assert well["hazards"][0] == 5
+    assert {f for f in well if well[f][0]} == {"hazards", "cover"}
+    # the article says nothing of the other two; Pharah's notes do: the
+    # Ruins' "exceptionally long sightlines" and "tall stone pillars"
+    ruins = stage_terrain_of(sandbox, "Ilios", "Ruins")
+    assert ruins["sightlines"][0] >= 2 and ruins["cover"][0] >= 2
     # Samoa: "environmental kills on Volcano, as there is a lava moat"
     assert stage_terrain_of(sandbox, "Samoa", "Volcano")["hazards"][0] == 3
     # Lijiang Tower: Garden's bridges and knockback kills, its back route

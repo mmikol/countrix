@@ -3,20 +3,23 @@
 A map's article describes its ground and how it is played. The sections that
 do are kept, the lore is dropped, and the mentions of each terrain feature
 are counted: per map and feature, the count and the count per thousand words
-of the kept text. The same is counted per stage over the text the article
-has about that stage. Both tables are reloaded wholesale.
+of the kept text. The same is counted per stage, with the stage's words,
+over the text the wiki has about that stage: the map article's, and the
+stage's field in each released hero's map-strategy table. Both tables are
+reloaded wholesale.
 """
 
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from typing import NamedTuple
 
 import psycopg
-from psycopg.sql import SQL
+from psycopg.sql import SQL, Placeholder
 
 from db import psql
 from db.data import ArticlePullSummary, cache
-from db.data.wiki import WIKI, fetch_articles, markup
+from db.data.normalizer import name_key
+from db.data.wiki import WIKI, fetch_articles, markup, matchup_tables
 from db.data.wiki.maps import parse_stretches
 
 # --- extract: article -> the text about the ground -------------------------
@@ -152,23 +155,51 @@ def word_count(text: str) -> int:
     return len(WORD_RE.findall(text))
 
 
+def name_pattern(stage: str) -> re.Pattern[str]:
+    """A stage's name as prose writes it: a name of two words or more in any
+    case ("the bomb flats"), a one-word name only as the stage list writes
+    it, so the Well is not every "well"."""
+    return re.compile(r"\b%s\b" % re.escape(stage), re.I if word_count(stage) > 1 else 0)
+
+
+def _naming(text: str, named: Mapping[str, re.Pattern[str]]) -> list[str]:
+    """The stages `text` names, in the map's order."""
+    return [stage for stage, pattern in named.items() if pattern.search(text)]
+
+
+def _by_name(paragraph: str, named: Mapping[str, re.Pattern[str]]) -> Iterator[tuple[str, str]]:
+    """(stage, text) for a paragraph that names one stage; for one that names
+    several, each sentence that names one, so a sentence about two stages is
+    neither's and one about none is dropped."""
+    about = _naming(paragraph, named)
+    if len(about) == 1:
+        yield about[0], paragraph
+    elif about:
+        for sentence in matchup_tables.split_sentences(paragraph):
+            one = _naming(sentence, named)
+            if len(one) == 1:
+                yield one[0], sentence
+
+
 def stage_texts(text: str, stages: list[str], phases: bool = False) -> dict[str, str]:
     """{stage: the article's text about it}, every stage present.
 
     A stage's text is every kept section under a heading that names it, and
     every paragraph or list item elsewhere that names it and no other stage
-    ("On the Well section of the map, the big hole ..."). `phases`: the
-    stages are a Hybrid map's two phases. A phase's text is every Assault or
-    Escort section, attack and defense alike; where the article names the
-    route's stretches, the first is the capture point's and the rest the
-    payload's. A phase's name is a mode's, so no paragraph is read for it.
+    ("On the Well section of the map, the big hole ..."); a paragraph that
+    names several is read a sentence at a time, each sentence going to the
+    one stage it names (name_pattern). `phases`: the stages are a Hybrid
+    map's two phases. A phase's text is every Assault or Escort section,
+    attack and defense alike; where the article names the route's
+    stretches, the first is the capture point's and the rest the payload's.
+    A phase's name is a mode's, so no paragraph is read for it.
     """
     headings = {stage: {stage.casefold()} for stage in stages}
     if phases:
         stretches = [name.casefold() for name in parse_stretches(text)]
         headings[stages[0]].update(stretches[:1])
         headings[stages[-1]].update(stretches[1:])
-    named = {stage: re.compile(r"\b%s\b" % re.escape(stage)) for stage in stages}
+    named = {stage: name_pattern(stage) for stage in stages}
     parts: dict[str, list[str]] = {stage: [] for stage in stages}
     for path, body in sections(text):
         if not is_kept(path):
@@ -179,11 +210,80 @@ def stage_texts(text: str, stages: list[str], phases: bool = False) -> dict[str,
             parts[under[0]] += [markup.tidy(path[-1]), section_plain(body)]
         elif not phases:
             for paragraph in section_paragraphs(body):
-                about = [s for s in stages if named[s].search(paragraph)]
-                if len(about) == 1:
-                    parts[about[0]].append(paragraph)
+                for stage, said in _by_name(paragraph, named):
+                    parts[stage].append(said)
     return {stage: " . ".join(part for part in found if part)
             for stage, found in parts.items()}
+
+
+# --- the heroes' map-strategy tables: a field per stage ---------------------
+
+# A hero article's {{MapStrategyTable/<mode>}} holds a field per stage of a
+# Control or Flashpoint map, <Map>_<Stage>_strat in CamelCase
+# (Lijiang_NightMarket_strat), most of them blank. An Escort, Hybrid or Push
+# map's fields are a side's (_Attack_strat, _Defending_strat): no stage owns
+# them, so they are not read.
+STRATEGY_TEMPLATE = r"MapStrategyTable"
+STAGE_FIELD_RE = re.compile(r"([a-z0-9]+)_([a-z0-9]+)_strat")
+SIDE_FIELDS = frozenset({"attack", "defense", "pushing", "defending"})
+
+
+class StageField(NamedTuple):
+    """A stage field of a hero article's map-strategy table: its map's key and
+    its stage's as the template writes them, keyed by name_key, and its text
+    ('' for a blank field)."""
+    map_key: str
+    stage_key: str
+    text: str
+
+
+def stage_fields(text: str) -> list[StageField]:
+    """Every stage field of the article's map-strategy tables, blank ones
+    included, its text read as a table cell (matchup_tables.paragraphs)."""
+    fields = []
+    for block in markup.find_templates(text, STRATEGY_TEMPLATE):
+        for key, value in markup.parse_params(block).items():
+            match = STAGE_FIELD_RE.fullmatch(key)
+            if match and match.group(2) not in SIDE_FIELDS:
+                fields.append(StageField(
+                    map_key=name_key(match.group(1)), stage_key=name_key(match.group(2)),
+                    text=" . ".join(matchup_tables.paragraphs(value))))
+    return fields
+
+
+def _stage_of(key: str, stages: Sequence[str]) -> str | None:
+    """The stage a field's stage key names: the one whose name_key is the key,
+    else the one whose name_key and the key begin one another (MEKA for MEKA
+    Base, Gardens for Garden); None where none or several do."""
+    exact = [stage for stage in stages if name_key(stage) == key]
+    loose = exact or [stage for stage in stages
+                      if name_key(stage).startswith(key) or key.startswith(name_key(stage))]
+    return loose[0] if len(loose) == 1 else None
+
+
+class PlacedFields(NamedTuple):
+    """The map-strategy fields with text, {(map, stage): [text]} in the order
+    read, and the key of each field no stage takes, 'map_stage', sorted."""
+    texts: dict[tuple[str, str], list[str]]
+    unmatched: list[str]
+
+
+def place_fields(fields: Iterable[StageField], stages: Mapping[str, Sequence[str]]) -> PlacedFields:
+    """Each field on the stage it names, of `stages` ({map: its stages}): its
+    map the one map whose name_key the field's map key begins (Lijiang for
+    Lijiang Tower), its stage by _stage_of. A blank field adds no text, and a
+    field no stage takes is named blank or not, since text written there
+    later would be lost."""
+    texts: dict[tuple[str, str], list[str]] = {}
+    unmatched: set[str] = set()
+    for field in fields:
+        maps = [name for name in stages if name_key(name).startswith(field.map_key)]
+        stage = _stage_of(field.stage_key, stages[maps[0]]) if len(maps) == 1 else None
+        if stage is None:
+            unmatched.add("%s_%s" % (field.map_key, field.stage_key))
+        elif field.text:
+            texts.setdefault((maps[0], stage), []).append(field.text)
+    return PlacedFields(texts, sorted(unmatched))
 
 
 # --- the lexicon: one pattern per terrain feature --------------------------
@@ -307,17 +407,23 @@ class TerrainSummary(ArticlePullSummary):
     stages: int
     stages_no_text: int
     stage_rows: int
+    fields: int
+    unmatched: list[str]
 
 
 def _store(
         cursor: psycopg.Cursor, table: str, key: str, key_id: int, counts: Mapping[str, int],
-        words: int, source_id: int) -> int:
-    insert = SQL("INSERT INTO {} ({}, feature, mentions, per_thousand, source_id)"
-                 " VALUES (%s, %s, %s, %s, %s)").format(psql.identifier(table),
-                                                        psql.identifier(key))
+        words: int, source_id: int, *, keep_words: bool = False) -> int:
+    """One row per feature of one map or stage: its mentions and their rate
+    per thousand words, and with `keep_words` the words themselves."""
+    kept = {"words": words} if keep_words else {}
+    columns = [key, "feature", "mentions", "per_thousand", *kept, "source_id"]
+    insert = SQL("INSERT INTO {} ({}) VALUES ({})").format(
+        psql.identifier(table), SQL(", ").join(psql.identifier(c) for c in columns),
+        SQL(", ").join([Placeholder()] * len(columns)))
     for feature, mentions in counts.items():
-        cursor.execute(
-            insert, (key_id, feature, mentions, per_thousand(mentions, words), source_id))
+        cursor.execute(insert, (key_id, feature, mentions, per_thousand(mentions, words),
+                                *kept.values(), source_id))
     return len(counts)
 
 
@@ -326,8 +432,10 @@ def _counted(counts: Mapping[str, int]) -> str:
 
 
 def run(connection: psycopg.Connection, pull: cache.PullContext) -> TerrainSummary:
-    """Reload map_terrain and stage_terrain from every map's article -> the
-    maps and stages counted, the rows and words, and the maps without text."""
+    """Reload map_terrain and stage_terrain from every map's article and the
+    released heroes' map-strategy tables -> the maps and stages counted, the
+    rows and words, the maps without text, the stage fields read and the
+    keys of those no stage takes."""
     cursor = connection.cursor()
     maps: list[tuple[int, str]] = cursor.execute(
         "SELECT map_id, name FROM maps ORDER BY name").fetchall()
@@ -338,10 +446,16 @@ def run(connection: psycopg.Connection, pull: cache.PullContext) -> TerrainSumma
             " WHERE mm.map_id = s.map_id AND g.code = 'hybrid')"
             " FROM map_stages s ORDER BY s.map_id, s.position").fetchall():
         stages.setdefault(map_id, (hybrid, {}))[1][stage] = stage_id
-    # the read's transaction ends here, so none stays open across the fetches
-    connection.commit()
-
+    # reads the released heroes and commits before it fetches their articles,
+    # so no transaction stays open across the fetches
+    hero_articles = matchup_tables.released_articles(cursor, pull).articles
     articles = fetch_articles(pull, [name for _, name in maps])
+    placed = place_fields(
+        [field for text in hero_articles.found.values() for field in stage_fields(text)],
+        {name: list(stages[map_id][1]) for map_id, name in maps if map_id in stages})
+    fields = sum(map(len, placed.texts.values()))
+    pull.log("  map-strategy fields: %d with text; matching no stage: %s" % (
+        fields, ", ".join(placed.unmatched) or "none"))
     # every article is read before the first write: no row stays locked across a fetch
     source_id = psql.register_source(cursor, WIKI, psql.now())
     cursor.execute("DELETE FROM stage_terrain")
@@ -366,18 +480,21 @@ def run(connection: psycopg.Connection, pull: cache.PullContext) -> TerrainSumma
 
         hybrid, stage_ids = stages.get(map_id, (False, {}))
         for stage, text in stage_texts(article, list(stage_ids), hybrid).items():
+            text = " . ".join(part for part in (text, *placed.texts.get((name, stage), ()))
+                              if part)
             words = word_count(text)
             if words < STAGE_MIN_WORDS:
                 continue
             counts = count_features(text)
             stage_rows += _store(cursor, "stage_terrain", "stage_id",
-                                 stage_ids[stage], counts, words, source_id)
+                                 stage_ids[stage], counts, words, source_id, keep_words=True)
             stages_read += 1
             pull.log("    %-30s %4d words  %s" % (stage, words, _counted(counts)))
     connection.commit()
     total_stages = sum(len(stage_ids) for _, stage_ids in stages.values())
     return {"maps": len(maps) - len(without_text) - len(articles.missing),
-            "without_text": without_text, "missing": articles.missing,
+            "without_text": without_text, "missing": articles.missing + hero_articles.missing,
             "rows": rows, "words": words_read,
             "stages": stages_read, "stages_no_text": total_stages - stages_read,
-            "stage_rows": stage_rows, "tables": ["map_terrain", "stage_terrain"]}
+            "stage_rows": stage_rows, "fields": fields, "unmatched": placed.unmatched,
+            "tables": ["map_terrain", "stage_terrain"]}

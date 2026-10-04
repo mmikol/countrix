@@ -24,12 +24,13 @@ from typing import Literal, NamedTuple, TypedDict
 
 from facts.draft import EXPECTED_SHAPE, TEAM_SIZE, Side, is_sided
 from facts.model import ROLES, TERRAIN_FEATURES, Hero, Map, World
+from facts.tables import STAGE_PRIOR_WORDS
 from facts.team import TEAM_METRICS, VERSUS_METRICS, MetricBag, number
 
 TREND_POINTS = 1.5
 CHEW_UNKNOWN = 999.0      # the seconds a chew time reads where a side's pool or damage is 0
 TERRAIN_STANDOUT = 0.75   # sd from the ordinary map at which a terrain feature is a fact
-STAGE_MENTIONS = 2        # mentions a stage's text must hold of a feature to stand out on it
+STAGE_MENTIONS = 2        # mentions of a feature a stage's text must hold to raise it (ground)
 STAGE_FEATURES = 2        # standout features a stage fact names, largest first
 
 MATCHUP_METRICS = OrderedDict([
@@ -83,7 +84,9 @@ TERRAIN_WORDS = {
 MAP_METRICS.update((f, "%s on the ground in play: the wiki article's mentions per thousand"
                        " words, in sd from the mean of the maps with text (0 with no text),"
                        " raised to the stage's own where a stage is in play and its text"
-                       " names them %d times or more" % (TERRAIN_WORDS[f], STAGE_MENTIONS))
+                       " names them %d times or more and more often - its rate pulled toward"
+                       " the map's by %d words of it, on the same scale"
+                       % (TERRAIN_WORDS[f], STAGE_MENTIONS, STAGE_PRIOR_WORDS))
                    for f in TERRAIN_FEATURES)
 # what each mode's ground is won on, a Hybrid's by its phase (objective)
 OBJECTIVES = {"Control": "point", "Flashpoint": "point", "Escort": "payload", "Push": "push"}
@@ -292,23 +295,6 @@ def phases(m: Map | None) -> list[str]:
     return list(m.stages) if m is not None and is_sided(m) else []
 
 
-class Standout(NamedTuple):
-    """A terrain feature a stage's own text stresses, and its z there."""
-    feature: str
-    z: float
-
-
-def stage_standouts(m: Map, stage: str) -> list[Standout]:
-    """The features a stage's own text stresses: z at or over TERRAIN_STANDOUT
-    on STAGE_MENTIONS or more mentions, largest first, STAGE_FEATURES at most.
-    Stage texts are short: one mention swings the rate, and none says nothing."""
-    terrain, z = m.stage_terrain.get(stage, {}), m.stage_z.get(stage, {})
-    found = [Standout(f, z[f]) for f in TERRAIN_FEATURES
-            if f in terrain and z.get(f, 0.0) >= TERRAIN_STANDOUT
-            and terrain[f].mentions >= STAGE_MENTIONS]
-    return sorted(found, key=lambda s: (-s.z, s.feature))[:STAGE_FEATURES]
-
-
 # whose text a feature on the ground in play was read off
 type GroundSource = Literal["stage", "map"]
 
@@ -323,17 +309,37 @@ class Ground(NamedTuple):
 
 def ground(m: Map, stage: str, feature: str) -> Ground:
     """A feature on the ground in play: the map's z, raised to the stage's
-    where the stage's own text names the feature STAGE_MENTIONS times or
-    more. A stage's text can add a feature, never drop one: a stage's text
-    is a paragraph, and a feature it leaves out is unsaid, not absent. No
+    (tables.derive_stage_terrain) where the stage's own text names the
+    feature STAGE_MENTIONS times or more, and more often than the map's
+    article. One mention raises nothing: the pull toward the map's rate
+    weighs a short text by its length, not by the z it yields, and on the
+    maps' narrow spread one word in a short text can still open a rule's
+    gate - a word that can be a misreading ("Vats blocking sightlines"). A
+    stage's text can add a feature, never drop one: a stage's text is a
+    paragraph or two, and a feature it leaves out is unsaid, not absent. No
     stage reads the map."""
     z = m.terrain_z[feature]
     said = m.stage_terrain.get(stage, {}).get(feature)
-    if said is not None and said.mentions >= STAGE_MENTIONS:
-        own = m.stage_z.get(stage, {}).get(feature, 0.0)
-        if own > z:
-            return Ground(feature, own, "stage")
+    own = m.stage_z.get(stage, {}).get(feature)
+    if said is not None and said.mentions >= STAGE_MENTIONS and own is not None and own > z:
+        return Ground(feature, own, "stage")
     return Ground(feature, z, "map")
+
+
+class Standout(NamedTuple):
+    """A terrain feature a stage's own text stresses, and its z there."""
+    feature: str
+    z: float
+
+
+def stage_standouts(m: Map, stage: str) -> list[Standout]:
+    """The features a stage's own text stresses: those it raises the ground
+    in play to (ground reads them off the stage) at TERRAIN_STANDOUT or more,
+    largest first, STAGE_FEATURES at most."""
+    found = [
+        Standout(g.feature, g.z) for g in (ground(m, stage, f) for f in TERRAIN_FEATURES)
+        if g.source == "stage" and g.z >= TERRAIN_STANDOUT]
+    return sorted(found, key=lambda s: (-s.z, s.feature))[:STAGE_FEATURES]
 
 
 def objective(m: Map | None, stage: str = "") -> str:

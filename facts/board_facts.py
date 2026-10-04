@@ -36,12 +36,14 @@ from facts.model import TERRAIN_FEATURES, Map, Resolved, World
 
 class TerrainValue(TypedDict):
     """A map.terrain fact's value, and each feature of a map.stage_terrain
-    fact's: the feature, its z over the ordinary map or stage, and its
-    mentions per thousand words - a stage's with the count behind them."""
+    fact's: the feature, its z over the ordinary map, and its mentions per
+    thousand words - a stage's with the count behind them and the words of
+    its text."""
     feature: str
     z: float
     per_thousand: float
     mentions: NotRequired[int]
+    words: NotRequired[int]
 
 
 class StageTerrainValue(TypedDict):
@@ -181,16 +183,17 @@ def _map_terrain(fs: FactSet, m: Map) -> None:
     """The ground the wiki's articles stress: each stage's, then the map's."""
     for stage in m.stages:
         standouts = compute.stage_standouts(m, stage)
+        said = m.stage_terrain.get(stage, {})
         if standouts:
             fs.add("map", m.name, "map.stage_terrain",
                 "%s - %s: %s" % (m.name, stage, "; ".join(
-                    "%s, %.1f sd above the ordinary stage (%d mentions in the wiki's article)"
-                    % (f.replace("_", " "), z, m.stage_terrain[stage][f].mentions)
+                    "%s, %.1f sd above the ordinary map (%d mention%s in %d words on the stage)"
+                    % (f.replace("_", " "), z, said[f].mentions,
+                       "" if said[f].mentions == 1 else "s", said[f].words)
                     for f, z in standouts)),
                 value=StageTerrainValue(stage=stage, features=[
-                    TerrainValue(
-                        feature=f, z=z, per_thousand=m.stage_terrain[stage][f].per_thousand,
-                        mentions=m.stage_terrain[stage][f].mentions)
+                    TerrainValue(feature=f, z=z, per_thousand=said[f].per_thousand,
+                                 mentions=said[f].mentions, words=said[f].words)
                     for f, z in standouts]),
                 source="stage_terrain")
     if m.terrain:

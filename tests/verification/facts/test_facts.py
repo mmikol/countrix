@@ -97,20 +97,24 @@ def test_a_map_lists_its_stages_as_arenas_or_as_the_phases_of_a_route(world):
 
 
 def test_a_stage_fact_names_the_terrain_its_own_text_stresses(world):
+    """The Well's hazards: the article's big hole and Pharah's map-strategy
+    notes on the pit, read above the map's own. Ruins has no word in the
+    article; Pharah's notes give it its sightlines and cover."""
     ilios = world.map("Ilios")
     z = ilios.stage_z["Well"]["hazards"]
-    mentions = ilios.stage_terrain["Well"]["hazards"][1]
-    assert z >= TERRAIN_STANDOUT and mentions >= STAGE_MENTIONS
-    assert compute.stage_standouts(ilios, "Well") == [("hazards", z)]
+    said = ilios.stage_terrain["Well"]["hazards"]
+    assert z >= TERRAIN_STANDOUT and z > ilios.terrain_z["hazards"]
+    assert compute.stage_standouts(ilios, "Well")[0] == ("hazards", z)
     facts = board_facts.generate(world, Draft("Ilios")).find("map.stage_terrain")
-    assert [f.value["stage"] for f in facts] == ["Well"]   # the article describes no other
-    assert facts[0].source == "stage_terrain" and facts[0].text == (
-        "Ilios - Well: hazards, %.1f sd above the ordinary stage (%d mentions in the wiki's"
-        " article)" % (z, mentions))
-    assert facts[0].value["features"] == [{
-        "feature": "hazards", "z": z, "mentions": mentions,
-        "per_thousand": ilios.stage_terrain["Well"]["hazards"][0]}]
-    # every stage fact: above the ordinary stage, on two mentions or more, two features at most
+    assert [f.value["stage"] for f in facts] == ["Well", "Ruins"]
+    assert facts[0].source == "stage_terrain" and facts[0].text.startswith(
+        "Ilios - Well: hazards, %.1f sd above the ordinary map (%d mentions in %d words on"
+        " the stage)" % (z, said.mentions, said.words))
+    assert facts[0].value["features"][0] == {
+        "feature": "hazards", "z": z, "mentions": said.mentions, "words": said.words,
+        "per_thousand": said.per_thousand}
+    # every stage fact: its text above the map's on STAGE_MENTIONS mentions or
+    # more, at the standout, two features at most
     for m in world.maps.values():
         facts = board_facts.generate(world, Draft(m.name)).find("map.stage_terrain")
         assert [f.value["stage"] for f in facts] == [
@@ -119,7 +123,8 @@ def test_a_stage_fact_names_the_terrain_its_own_text_stresses(world):
             named = f.value["features"]
             assert 1 <= len(named) <= STAGE_FEATURES
             assert [x["z"] for x in named] == sorted((x["z"] for x in named), reverse=True)
-            assert all(x["z"] >= TERRAIN_STANDOUT and x["mentions"] >= STAGE_MENTIONS
+            assert all(x["z"] >= TERRAIN_STANDOUT and x["z"] > m.terrain_z[x["feature"]]
+                       and x["mentions"] >= STAGE_MENTIONS and x["words"] >= 20
                        for x in named)
     # a Hybrid phase's attack and defense text count together: one fact a phase
     assert [f.value["stage"] for f in board_facts.generate(world, Draft("King's Row")).find(

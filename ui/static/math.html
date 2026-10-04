@@ -59,6 +59,20 @@ pool, range and rates; a map's mode, stages and terrain; the date the rates were
 terrain feature is <i>standardised</i> across the maps whose article has text: its distance from
 the maps' average, counted in standard deviations, a standard deviation being the typical
 distance of a value from the average.</p>
+<p>A stage's terrain is read from the wiki's text on that stage - the map article's sections and
+sentences that name it, and the heroes' map-strategy notes on it - its mentions per thousand
+words pulled toward its map's rate by %(STAGE_PRIOR_WORDS)d words of that rate, so a short text
+weighs less than a long one, and standardised against the maps, as the map's own rate is:</p>
+<pre class='eq'>stage rate = ( 1000 &middot; mentions + %(STAGE_PRIOR_WORDS)d &middot; map rate ) / ( words + %(STAGE_PRIOR_WORDS)d )
+               map rate: the map's mentions per thousand words; the maps' average where it has no text</pre>
+<p>On a board that names a stage, a feature reads the larger of the map's standardised value and
+the stage's, and the stage's counts only where its text names the feature %(STAGE_MENTIONS)d times
+or more. The pull weighs a text by its length, not by the value it yields: the maps' rates sit
+close together on most features, so one mention in a %(STAGE_MIN_WORDS)d-word text still reads a
+standard deviation or more above their average there, and one word can be a misreading - "large
+Vats blocking sightlines" names sightlines once. A stage's text can add a feature, never take one
+away, since a text that leaves a feature out has not said it is absent. A stage with under
+%(STAGE_MIN_WORDS)d words of its own reads as its map.</p>
 <p>The <b>dependent</b> facts are joins (&#8904;), facts that read two or more tables at once.
 A hero's rate on this map is heroes &#8904; map_meta &#8904; maps. A map's style - brawl, dive or
 poke - is the one with the largest sum of two parts, each standardised across the maps, which the
