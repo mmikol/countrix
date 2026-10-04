@@ -94,29 +94,35 @@ def test_a_rarely_picked_heroes_edge_is_pulled_toward_a_coin_flip(synthetic_worl
 
 
 def test_the_synergy_and_counter_terms_read_the_wikis_pairs_and_edges(synthetic_world):
-    """Synergy is team.synergy_score (Anvil+Balm 2, Needle+Tansy 2); against
-    red's locked picks the counter term is the graph's weight each way, every
-    edge here the wiki's at WIKI_WEIGHT: Anvil answers Mortar, Needle answers
-    Gale, Gale answers Anvil - two in, one back, twice team.net_edges. Each
-    term is its weight times its raw value, and the score their sum."""
-    objective, cand = prepared(synthetic_world, "Harbor Gate", ("Mortar", "Gale"), SIX)
+    """Synergy is team.synergy_score (Anvil+Balm 2, Needle+Tansy 2). The
+    counter term reads six of red's heroes - its locked picks first, then its
+    likeliest heroes for the rest - and counts the graph's weight each way
+    against them. Each term is its weight times its raw value, and the score
+    their sum."""
+    w = synthetic_world
+    objective, cand = prepared(w, "Harbor Gate", ("Mortar", "Gale"), SIX)
     team = cand.ns["team"]
     assert cand.terms.synergy == team["synergy_score"] == 4
-    assert (cand.terms.answers, cand.terms.exposures) == (4, 2)
-    assert cand.terms.counters == counters.WIKI_WEIGHT * team["net_edges"] == 2
-    assert objective.engine.opponent == base.Opponent(
-        heroes=tuple(heroes(synthetic_world, ("Mortar", "Gale"))), likely=False)
+    likely = [p["hero"] for p in compute.expected_picks(
+        w, w.map("Harbor Gate"), revealed=heroes(w, ("Mortar", "Gale")))]
+    against = objective.engine.opponent
+    assert [h.name for h in against.heroes] == likely and likely[:2] == ["Mortar", "Gale"]
+    assert against.likely and against.revealed == 2
+    answers = sum(counters.weight(w, e.id, w.hero(h).id) for e in against.heroes for h in SIX)
+    exposures = sum(counters.weight(w, w.hero(h).id, e.id) for h in SIX for e in against.heroes)
+    assert (cand.terms.answers, cand.terms.exposures) == (answers, exposures)
+    assert cand.terms.counters == answers - exposures != 0
     terms = {c["id"]: c for c in cand.contributions}
     assert list(terms) == [base.RATES, base.SYNERGY, base.COUNTERS]    # nothing else scores
     for key, raw, weight in ((base.RATES, cand.terms.rates, DEFAULT.rate),
                              (base.SYNERGY, 4, DEFAULT.synergy),
-                             (base.COUNTERS, 2, DEFAULT.counter)):
+                             (base.COUNTERS, answers - exposures, DEFAULT.counter)):
         c = terms[key]
         assert c["kind"] == c["form"] == "base" and c["applies"]
         assert c["raw"] == pytest.approx(raw) and c["weight"] == weight
         assert c["weighted"] == pytest.approx(weight * raw)
     assert cand.score == pytest.approx(sum(c["weighted"] for c in cand.contributions))
-    assert terms[base.COUNTERS]["against"] == ["Mortar", "Gale"]
+    assert terms[base.COUNTERS]["against"] == likely
 
 
 def test_off_adds_nothing_and_the_playbook_scores_alone(synthetic_world):
@@ -151,11 +157,14 @@ def test_the_counters_read_the_likely_six_until_the_other_side_locks_a_pick(synt
     assert (cand.terms.answers, cand.terms.exposures) == (answers, exposures) != (0, 0)
     assert cand.ns["team"]["net_edges"] == 0 and cand.ns["enemy"]["size"] == 0
     assert objective.static["enemy"] == scoring.team_metrics(w, [], w.map("Harbor Gate"), ())
+    # a reveal replaces one likely hero: red's pick leads, its likeliest heroes
+    # fill the rest, and the term still reads six
     _, locked = prepared(w, "Harbor Gate", ("Gale",), SIX, banned=("Needle",))
-    # Needle answers Gale, Gale answers Anvil: a wiki edge each way
-    assert (locked.terms.answers, locked.terms.exposures) == (2, 2)
+    around = [p["hero"] for p in compute.expected_picks(
+        w, w.map("Harbor Gate"), revealed=heroes(w, ("Gale",)), banned=heroes(w, ("Needle",)))]
     [c] = [c for c in locked.contributions if c["id"] == base.COUNTERS]
-    assert c["against"] == ["Gale"] and c["likely"] is False
+    assert c["against"] == around and around[0] == "Gale" and len(around) == 6
+    assert c["likely"] is True and c["revealed"] == 1
     # red's picks are its picks, whichever heroes they are: six that match the
     # likely six are read as picks, not as a guess
     objective, _ = prepared(w, "Harbor Gate", likely, SIX[:1], banned=("Needle",))
@@ -165,8 +174,8 @@ def test_the_counters_read_the_likely_six_until_the_other_side_locks_a_pick(synt
 def test_blue_counters_reds_likely_six_and_red_is_never_solved(synthetic_world):
     """Before red reveals a pick blue's counter term reads red's likely six,
     and its fact says so. Red is never optimized: the board solves no red
-    seat, and red's likely six reads no strategy - its picks carry their pull
-    and nothing scores them."""
+    seat, and red's likely six reads no strategy - its picks carry how often a
+    six fields them and their pick score, and its Result holds no score."""
     empty = engine.board(synthetic_world, Draft("Harbor Gate", side="attack"),
                          catalog=ASSUMPTIONS_ONLY, brief=BRIEF)
     likely = empty.expected.blue
@@ -179,7 +188,8 @@ def test_blue_counters_reds_likely_six_and_red_is_never_solved(synthetic_world):
         " back (%+d), a wiki edge 2 and a derived one 1" % (
             ", ".join(c["against"]), c["answers"], c["exposures"], c["answers"] - c["exposures"])
     assert {"red", "red_current"}.isdisjoint(empty.to_dict())
-    assert empty.expected.contributions == [] and all("pull" in p for p in empty.expected.picks)
+    assert empty.expected.contributions == []
+    assert all("on_six" in p and "pick_score" in p for p in empty.expected.picks)
     held = engine.board(synthetic_world, Draft("Harbor Gate", (), ("Balm",), side="attack"),
                         catalog=ASSUMPTIONS_ONLY, brief=BRIEF)
     [c] = [c for c in held.blue.contributions if c["id"] == base.COUNTERS]
@@ -242,7 +252,8 @@ def test_every_base_term_cites_a_fact_the_result_carries(synthetic_world):
     terms = {c["id"]: c for c in r.contributions}
     assert terms[base.SYNERGY]["fact"] in {f.id for f in board_facts}
     assert terms[base.RATES]["text"].startswith("blue's six on Harbor Gate: ")
-    assert terms[base.COUNTERS]["text"].startswith("counters read red as it stands: Mortar")
+    assert terms[base.COUNTERS]["text"].startswith(
+        "counters read red's picks and its likeliest heroes for the rest on Harbor Gate: Mortar,")
     assert int(terms[base.RATES]["fact"][1:]) > len([f for f in board_facts if f.id[0] == "F"])
 
 
@@ -261,8 +272,11 @@ def test_a_derived_edge_counts_half_a_wiki_edge_and_the_fact_names_it(synthetic_
         winner=mortar.id, loser=anvil.id, score=1.0, fired=fired)
     six = ("Anvil", "Kite", "Needle", "Sorrel", "Balm", "Tansy")
     _, cand = prepared(w, "Harbor Gate", ("Mortar",), six)
-    assert (cand.terms.answers, cand.terms.exposures) == (
-        counters.WIKI_WEIGHT, counters.DERIVED_WEIGHT) == (2, 1)
+    del w.derived[(kite.id, mortar.id)], w.derived[(anvil.id, mortar.id)]
+    _, plain = prepared(w, "Harbor Gate", ("Mortar",), six)
+    # the derived edge adds its weight back and nothing in; the one on the wiki's pair, nothing
+    assert (cand.terms.answers - plain.terms.answers,
+            cand.terms.exposures - plain.terms.exposures) == (0, counters.DERIVED_WEIGHT) == (0, 1)
     [c] = [c for c in cand.contributions if c["id"] == base.COUNTERS]
     assert c["derived"] == [
         "Mortar answers Kite - derived: hitscan against a flier (Longshot, hitscan, 60 m)"]
@@ -270,8 +284,9 @@ def test_a_derived_edge_counts_half_a_wiki_edge_and_the_fact_names_it(synthetic_
     fact = base.write_counters_fact(
         fs, seat="blue", map_name="Harbor Gate", against=c["against"], likely=False,
         answers=c["answers"], exposures=c["exposures"], derived=c["derived"])
-    assert fact.text.endswith("(+1), a wiki edge 2 and a derived one 1; Mortar answers Kite -"
-                              " derived: hitscan against a flier (Longshot, hitscan, 60 m)")
+    assert fact.text.endswith("(%+d), a wiki edge 2 and a derived one 1; Mortar answers Kite -"
+                              " derived: hitscan against a flier (Longshot, hitscan, 60 m)"
+                              % (c["answers"] - c["exposures"]))
 
 
 def test_the_stamp_holds_a_derived_edges_weight_and_what_an_unwritten_pair_reads():

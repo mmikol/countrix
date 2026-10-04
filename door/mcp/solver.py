@@ -77,8 +77,9 @@ def reach_tool(ctx: Context, hero: str) -> ToolReply:   # _tool: inference.reach
     " and after - the game plan in prose and, on a map with stages, the plan"
     " stage by stage, the shapes the queue and the playbook's limits allow, and"
     " red's likely six from the data alone: its revealed picks, then for each"
-    " open slot the hero the map's pick rates and the wiki's synergies pull"
-    " first, past the bans, each with its pull; red is never optimized.",
+    " open slot the hero with the highest pick score - how often a six fields"
+    " it, plus 2 per synergy partner already chosen - past the bans; red is"
+    " never optimized.",
     {
         "weights": {"type": "object",
                     "description": "{heuristic id: 0..10} - weights to score this"

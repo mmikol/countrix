@@ -152,12 +152,12 @@ function renderInf() {
   var odds = mo.odds, strip = el('momentum');
   strip.title = odds ? odds.tip : '';
   strip.innerHTML = "<span class='lbl'>fight odds</span>" + (odds
-    ? "<span class='side blue'>blue " + odds.blue + "%</span><span class='split'><span class='part blue' style='width:" +
-      odds.blue + "%'></span><span class='part red' style='width:" + odds.red + "%'></span></span><span class='side red'>red " + odds.red + '%</span>'
+    ? "<span class='side blue'>blue " + odds.blue + "</span><span class='split'><span class='part blue' style='width:" +
+      odds.blue + "%'></span><span class='part red' style='width:" + odds.red + "%'></span></span><span class='side red'>red " + odds.red + '</span>'
     : "<span class='verdict'>" + esc(mo.verdict) + '</span>');
   /* red is never optimized: its box is its likely six - its picks and, for
-     each open slot, the hero the map's pick rates and the wiki's synergies
-     pull first - with the six's pull. Blue's shows the six the plan describes -
+     each open slot, the hero with the highest pick score - with how often a
+     six fields its heroes. Blue's shows the six the plan describes -
      the fill around one to five picks, the picks themselves at six - above
      the optimal, which blue's own picks never constrain; before any pick,
      the optimal alone. The picks' figures are the badges above the pickers */

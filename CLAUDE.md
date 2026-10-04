@@ -130,8 +130,8 @@ db <- facts <- inference <- door <- ui.
   `inference/strategies/`.
 - **The default engine scores first.** `inference/base.py` scores every six
   on its win rates on the map, the wiki's synergy scores and the counter
-  graph against the other side's locked picks, else its likely six, which
-  no other term reads (each term defined in docs/inference.md, The
+  graph against the other side's six - its locked picks and its
+  likeliest heroes for the rest - whose likely heroes no other term reads (each term defined in docs/inference.md, The
   objective, and on the math page); the playbook's terms sit on top, so
   the shipped playbook's boards are scored, never *unscored*. Its weights are the playbook's, in `meta.md`: `meta`, which
   scales the whole engine, over the `rate`, `synergy` and `counter` dials
@@ -161,10 +161,10 @@ db <- facts <- inference <- door <- ui.
   to four Results (blue, current, fill, expected); fill is None unless one
   to five blue picks are locked. Blue is the side the playbook optimizes,
   and the only seat solved; red is never optimized: `expected` is red's
-  likely six around its revealed picks, each pick with its pull
-  (`compute.expected_picks`), red's badge is the six's total pull, and
-  the fight odds (`plan.fight_odds`) score that six against blue's on the
-  default engine alone. A
+  likely six around its revealed picks, each pick with its pick score
+  (`compute.expected_picks`), red's badge is how often a six fields those
+  heroes on average, and the fight odds (`plan.fight_odds`) set that six
+  against blue's on the default engine alone. A
   Draft may name a stage the map lists (`stage`, resolved by
   `facts.draft.board_stage`); every seat plays it, and it moves the `map.*`
   metrics alone - the ground in play, `compute.ground`. Blue's seat has one

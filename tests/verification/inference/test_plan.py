@@ -25,18 +25,17 @@ def comp(blue, score, best, partial=False):
                   catalog=FIX, base=OFF, score=score, best=best, partial=partial)
 
 
-def likely(*pulls, revealed=0):
-    """Red's likely six of heroes r0, r1.. with these pulls, the first
-    `revealed` of them red's picks."""
-    picks = [
-        Pick(hero="r%d" % i, role="tank", locked=i < revealed, why="", evidence=[], pull=p)
-        for i, p in enumerate(pulls)]
+def likely(*picked, revealed=0):
+    """Red's likely six of heroes r0, r1.. fielded on these shares of sixes,
+    no partners among them, the first `revealed` of them red's picks."""
+    picks = [Pick(hero="r%d" % i, role="tank", locked=i < revealed, why="", evidence=[],
+                  on_six=p, pick_score=p) for i, p in enumerate(picked)]
     return Result(kind="expected", map_name=None, red=[], blue=[p["hero"] for p in picks],
                   locked=[p["hero"] for p in picks if p["locked"]], catalog=FIX, base=OFF,
                   seat="red", picks=picks)
 
 
-SIX = likely(12, 7.5, 7, 12, 7, 8)          # 53.5 pull
+SIX = likely(12, 7.5, 7, 12, 7, 8)          # on 9% of sixes on average
 
 
 def test_the_verdict_reads_blues_standing():
@@ -72,12 +71,13 @@ def test_the_badge_is_worded_on_the_server():
         "tip": ("unscored on this board - the optimal six scores 0.00, not above the floor of"
                 " 0.00, so no comp is a share of it")}
     assert waiting["badges"]["red"] == {
-        "label": "54 pull",
-        "tip": ("their likely six: 53.5 pull - each hero's pick rate here, plus 2 for each"
-                " documented synergy pair on the six")}
+        "label": "9% avg pick",
+        "tip": ("their likely six: on 9% of sixes here on average. Each open slot took the hero"
+                " with the highest pick score - how often a six fields it, plus 2 for each"
+                " synergy partner already on the six")}
     held = plan.momentum(plan.Seats(comp([], 0, 10), likely(12, 7.5, 7, 12, 7, 8, revealed=2)))
     assert held["badges"]["red"]["tip"].startswith(
-        "their picks and the likeliest heroes for the rest: 53.5 pull")
+        "their picks and the likeliest heroes for the rest: on 9% of sixes")
     assert held["badges"]["blue"] == {
         "label": "100 / 100",
         "tip": "no blue picks yet: the suggested six is this seat's optimal, 100"}
@@ -107,25 +107,25 @@ def test_blue_is_read_through_its_fill_while_half_drafted(synthetic_world, scrat
         % b.momentum["blue"])
 
 
-def test_the_fight_odds_split_100_by_each_score_above_the_floor():
-    """Each side's part of 100 is its score above the floor, a score below
-    it counted as 0; the split holds still when every score is scaled or
-    shifted alike, and there are none where neither side stands above the
-    floor or the sixes were not measured. The verdict quotes them."""
+def test_the_fight_odds_follow_the_gap_in_spreads_of_a_random_six():
+    """The gap between the two scores, in spreads of a random six, on a
+    logistic curve: a gap of one spread reads 73 to 27. Equal sixes split
+    50-50, swapping them swaps the split, scaling or shifting every score
+    alike leaves it, and there are none where the scale has no spread or the
+    sixes were not measured. The verdict quotes them, with no percent sign."""
     from inference import plan
-    head = plan.HeadToHead(blue=9.0, red=7.0, floor=3.0)
+    head = plan.HeadToHead(blue=9.0, red=7.0, spread=2.0)
     odds = plan.fight_odds(head)
-    assert (odds["blue"], odds["red"]) == (60, 40) and "not a chance of winning" in odds["tip"]
-    scaled = plan.HeadToHead(blue=2 * 9.0 + 5, red=2 * 7.0 + 5, floor=2 * 3.0 + 5)
+    assert (odds["blue"], odds["red"]) == (73, 27) and "not a chance of winning" in odds["tip"]
+    scaled = plan.HeadToHead(blue=2 * 9.0 + 5, red=2 * 7.0 + 5, spread=2 * 2.0)
     assert plan.fight_odds(scaled) == odds
-    assert plan.fight_odds(plan.HeadToHead(blue=7.0, red=9.0, floor=3.0))["blue"] == 40
-    assert plan.fight_odds(plan.HeadToHead(blue=5.0, red=2.0, floor=3.0))["blue"] == 100
-    assert plan.fight_odds(plan.HeadToHead(blue=1.0, red=2.0, floor=3.0)) is None
+    assert plan.fight_odds(plan.HeadToHead(blue=7.0, red=9.0, spread=2.0))["blue"] == 27
+    assert plan.fight_odds(plan.HeadToHead(blue=8.0, red=8.0, spread=2.0))["blue"] == 50
+    assert plan.fight_odds(plan.HeadToHead(blue=9.0, red=7.0, spread=0.0)) is None
     assert plan.fight_odds(None) is None
     mo = plan.momentum(plan.Seats(comp(["a"] * 6, 8, 10), SIX, head=head))
     assert mo["odds"] == odds
-    assert mo["verdict"] == (
-        "blue 80 / 100 of its optimal; fight odds on the meta: blue 60%, red 40%")
+    assert mo["verdict"] == "blue 80 / 100 of its optimal; fight odds on the meta: blue 73, red 27"
 
 
 def test_the_plan_names_every_maps_derived_style(synthetic_world, harbor_gate_board):

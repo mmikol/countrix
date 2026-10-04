@@ -34,7 +34,7 @@ def test_a_playbook_that_scores_nothing_reads_unscored(synthetic_world):
     assert d["expected"]["unscored"] == LIKELIHOOD and d["expected"]["normalized"] is None
     assert d["momentum"]["verdict"].startswith("unscored") and d["momentum"]["blue"] is None
     assert d["momentum"]["badges"]["blue"]["label"] == "unscored"
-    assert d["momentum"]["badges"]["red"]["label"].endswith(" pull")    # red is never scored
+    assert d["momentum"]["badges"]["red"]["label"].endswith("% avg pick")   # how often, not a score
     assert "(unscored)" in b.current.rendered() and "UNSCORED:" in b.current.rendered()
     scored = engine.board(world, draft, catalog=reference, brief=BRIEF).to_dict()
     assert scored["current"]["scoring"] is True

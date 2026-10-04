@@ -316,9 +316,9 @@ function renderFacts() {
 /* the empty slots carry the board's suggestions, and a click locks one. Blue's
    are the solver's: the optimal six before any pick, then the fill - the best
    six that keeps the locked ones. Red's are its likely six around its picks:
-   for each open slot the hero the map's pick rates and the wiki's synergies
-   pull first, drawn only for the red picks the board in hand answered. The
-   tile shows the hero alone; its reason and pull ride in the hover title */
+   for each open slot the hero with the highest pick score, drawn only for the
+   red picks the board in hand answered. The tile shows the hero alone; its
+   reason and pick score ride in the hover title */
 function paintSuggestions() {
   var d = INF;
   var src = !d || d.error ? null : (st.blue.length ? d.fill : d.blue);

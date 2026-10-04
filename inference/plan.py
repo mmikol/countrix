@@ -6,6 +6,7 @@ from the facts, the default engine's terms and the strategies the solver
 scored. No sentence comes from anywhere else.
 """
 
+import math
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Literal, NamedTuple
 
@@ -31,12 +32,12 @@ from inference.result import (
 
 
 class HeadToHead(NamedTuple):
-    """Blue's six and red's likely six scored against each other on the
-    default engine alone, and the board's floor on the same terms: the
-    lowest such score among the board's reference sixes."""
+    """Blue's six and red's likely six on one scale - the default engine
+    alone, against red's six - and the spread of that scale: the standard
+    deviation of the same scores over the board's reference sixes."""
     blue: float
     red: float
-    floor: float
+    spread: float
 
 
 class Seats(NamedTuple):
@@ -58,9 +59,9 @@ def momentum(seats: Seats) -> Momentum:
     what it has. Scoring the picks alone sums over a smaller team, so a
     perfectly played draft would read low and could fall when the right pick
     lands; that measures how many picks are in, not how good they are. Red is
-    never optimized and never scored: its badge is its likely six's pull.
-    Each badge is worded here, so the page shows the engine's words and
-    decides nothing."""
+    never optimized: its badge says how often its likely six is picked, and
+    the fight odds set that six against blue's. Each badge is worded here, so
+    the page shows the engine's words and decides nothing."""
     cur, fill = seats.current, seats.fill
     badges = Badges(blue=_badge(cur, fill), red=_likely_badge(seats.expected))
     why = cur.unscored()
@@ -69,30 +70,30 @@ def momentum(seats: Seats) -> Momentum:
     odds = fight_odds(seats.head)
     verdict = _verdict_line(share, partial, fill is not None, why)
     if odds is not None:
-        verdict += "; fight odds on the meta: blue %d%%, red %d%%" % (odds["blue"], odds["red"])
+        verdict += "; fight odds on the meta: blue %d, red %d" % (odds["blue"], odds["red"])
     return Momentum(blue=share, partial=partial, odds=odds, verdict=verdict, badges=badges)
 
 
 def fight_odds(head: HeadToHead | None) -> Odds | None:
-    """The fight odds: each side's score above the board's floor as its part
-    of 100, a score below the floor counted as 0 - so the split holds still
-    when every score is scaled or shifted alike. None where the two sixes
-    were not measured, or where neither stands above the floor."""
-    if head is None:
+    """The fight odds: the gap between the two sixes' scores, in spreads of
+    a random six, put on a logistic curve and split out of 100 -
+    100 / (1 + e^(-gap / spread)) for blue, the rest for red. Equal sixes
+    split 50-50, swapping them swaps the split, and scaling or shifting
+    every score alike leaves it where it is. None where the two sixes were
+    not measured, or where the scale has no spread."""
+    if head is None or head.spread <= 0.0:
         return None
-    blue, red = max(head.blue - head.floor, 0.0), max(head.red - head.floor, 0.0)
-    if blue + red <= 0.0:
-        return None
-    share = round(100.0 * blue / (blue + red))
+    share = round(100.0 / (1.0 + math.exp(-(head.blue - head.red) / head.spread)))
     return Odds(blue=share, red=100 - share, tip=ODDS_TIP)
 
 
 # the strip's tooltip: what the odds compare, and what they are not
 ODDS_TIP = (
-    "blue's six and red's likely six head to head on the meta alone - win rates, synergy"
-    " and counters against each other, no playbook rule for either side; red's six is its"
-    " picks and likeliest heroes, never optimized. Each side's part of 100 is its score"
-    " above the board's floor. A comparison, not a chance of winning")
+    "blue's six and red's likely six on one scale, the meta alone - win rates, synergy and"
+    " counters, each counter between them counted once, no playbook rule for either side;"
+    " red's six is its picks and likeliest heroes, never optimized. The split follows the"
+    " gap between the two scores, measured in the spread of a random six's score. A"
+    " comparison of two sixes, not a chance of winning")
 
 
 def _now(current: Result, fill: Result | None) -> Result:
@@ -125,17 +126,18 @@ def _badge(current: Result, fill: Result | None) -> Badge:
 
 
 def _likely_badge(likely: Result) -> Badge:
-    """The badge above red's picker: the pull of red's likely six - its
-    revealed picks, and for each open slot the hero the map's pick rates and
-    the wiki's synergies pull first (facts.compute.expected_picks). The pull
-    ranks heroes; it is no share and no probability."""
-    pull = sum(p.get("pull", 0.0) for p in likely.picks)
+    """The badge above red's picker: how often a six fields the heroes of
+    red's likely six, on average - its revealed picks, and for each open slot
+    the hero with the highest pick score (facts.compute.expected_picks)."""
+    picked = [p.get("on_six", 0.0) for p in likely.picks]
+    mean = sum(picked) / len(picked) if picked else 0.0
     held = any(p["locked"] for p in likely.picks)
     six = "their picks and the likeliest heroes for the rest" if held else "their likely six"
     tip = (
-        "%s: %.1f pull - each hero's pick rate here, plus %g for each documented synergy"
-        " pair on the six" % (six, pull, compute.SYNERGY_PULL))
-    return Badge(label="%.0f pull" % pull, tip=tip)
+        "%s: on %.0f%% of sixes here on average. Each open slot took the hero with the"
+        " highest pick score - how often a six fields it, plus %g for each synergy partner"
+        " already on the six" % (six, mean, compute.PARTNER_POINTS))
+    return Badge(label="%.0f%% avg pick" % mean, tip=tip)
 
 
 def _verdict_line(share: int | None, partial: bool, filled: bool, why: str | None) -> str:

@@ -329,7 +329,7 @@ def test_the_math_page_quotes_each_weight_from_the_playbooks_meta_file(
 
 @pytest.mark.parametrize(("module", "name", "phrase"), [
     (base, "RATE_PICK_HALF", "t_p = pick_p / ( pick_p + %s )"),
-    (compute, "SYNERGY_PULL", "pull(h) = pick(h, map) + %s &times; partners"),
+    (compute, "PARTNER_POINTS", "pick score(h) = on_six(h) + %s &times; partners"),
     (scale, "REFERENCE_SIZE", "against %s random legal sixes"),
     (scale, "SCALE_POOL", "each role's %s released heroes"),
     (base, "COIN_FLIP", "t_p &middot; ( win_p &minus; %s )"),

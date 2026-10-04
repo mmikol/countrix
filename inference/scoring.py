@@ -152,7 +152,8 @@ class Contribution(TypedDict):
     raw: NotRequired[float | None]     # a heuristic, and a base term
     weight: NotRequired[float]         # a base term
     against: NotRequired[list[str]]    # the counter term: the other side it read,
-    likely: NotRequired[bool]          # whether that is the side's likely six,
+    likely: NotRequired[bool]          # whether any of it is likely heroes,
+    revealed: NotRequired[int]         # how many of it are the side's picks,
     answers: NotRequired[int]          # and the graph's weight each way,
     exposures: NotRequired[int]
     derived: NotRequired[list[str]]    # each derived edge in it, worded
@@ -263,7 +264,8 @@ def _score_base(engine: Base, cand: Candidate, out: list[Contribution] | None) -
                         "raw": raw, "weight": weight, "weighted": weight * raw,
                         "metric": READS[key]})
         out[-1].update({"against": [h.name for h in engine.opponent.heroes],
-                        "likely": engine.opponent.likely, "answers": terms.answers,
+                        "likely": engine.opponent.likely,
+                        "revealed": engine.opponent.revealed, "answers": terms.answers,
                         "exposures": terms.exposures,
                         "derived": [counters.said(engine.world, edge)
                                     for edge in engine.derived(cand.heroes)]})

@@ -110,7 +110,7 @@ def view_board() -> str:
             "<div class='slots' id='blueslots'></div><div class='roles' id='blueroster'>"
             "</div></section>"
             "<section class='team red'><h2>red team <span class='tscore' id='redscore'"
-            " title=\"the pull of their likely six\">"
+            " title=\"how often their likely six is picked\">"
             "</span>"
             "<button class='clearteam' data-clear='red'>clear</button>"
             "</h2>"
@@ -169,7 +169,7 @@ def view_math() -> str:
         "TOP_ANSWERS": counters.TOP_ANSWERS,
         "THRESHOLD": counters.THRESHOLD,
         "RATE_PICK_HALF": base.RATE_PICK_HALF,
-        "SYNERGY_PULL": compute.SYNERGY_PULL,
+        "PARTNER_POINTS": compute.PARTNER_POINTS,
         "REFERENCE_SIZE": format(scale.REFERENCE_SIZE, ","),
         "SCALE_POOL": scale.SCALE_POOL,
         "COIN_FLIP": base.COIN_FLIP,
