@@ -329,26 +329,41 @@ best six that keeps them, since a sum over fewer picks reads low. Where no fill 
 because the fill's search ran past its budget, blue is read off its picks as they stand, and its
 badge says so.</p>
 <p id='fight-odds'><b>Fight odds.</b> The fight odds split 100 between blue's six and red's
-likely six by how far apart their scores are. They compare two scores and are not a chance of
-winning, and the strip above the teams shows them without a percent sign. Blue's six is the six
-the game plan describes. Both sixes are scored on one scale: the default engine alone, against
-red's likely six. No playbook rule scores either six, so both are judged alike. Read against
-itself, red's six counts no counter, so each counter between the two sixes counts once, in
-blue's score. The gap between the two scores, counted in standard deviations of a random six's
-score, goes through a logistic curve, an S-shaped curve that turns any gap into a number between
+likely six by how far apart their scores are. They are the additive model's reading of that gap
+in win-rate points, not a chance of winning measured from matches, and the strip above the teams
+shows them without a percent sign. Blue's six is the six the game plan describes. Both sixes are
+scored on one scale: the default engine alone, against red's likely six. No playbook rule scores
+either six, so both are judged alike. Read against itself, red's six counts no counter, so each
+counter between the two sixes counts once, in blue's score. The <i>additive model</i> adds the
+picks' edges up as log-odds: a chance p has log-odds ln(p / (1 &minus; p)), 0 at a coin flip, and
+near even odds a pick that wins p of its matches adds about 4 &middot; (p &minus; 1/2), 0.04 a
+win-rate point. The rate term is the mean of the six picks' edges, so one point of it is six
+picks' worth, k below. The rates are 5v5, so p is a pick's 5v5 win rate, and k counts its edge in
+full in a six of six. The gap, divided by the engine and rate weights so that it is in win-rate
+points, goes through a logistic curve, an S-shaped curve that turns any gap into a number between
 0 and 100:</p>
-<pre class='eq'>odds(blue) = round( 100 / (1 + e^(&minus;(s(blue) &minus; s(red)) / &sigma;)) ),   odds(red) = 100 &minus; odds(blue)
-           s: the default engine's score against red's likely six
-           &sigma;: the standard deviation of s over the board's reference sample</pre>
-<p>A gap of one &sigma; reads 73 to 27, equal scores read 50 to 50, and swapping the two scores
-swaps the split; scaling or shifting every score alike leaves it where it is. The playbook
-chooses blue's six but scores neither; it reaches the scale only through &sigma;, taken over the
-same draw of reference sixes that scales blue's heuristics, drawn over the shapes the playbook's
-limits allow. With the engine
-off, with a sample whose scores are all equal, with blue's picks not
-allowed, or with blue half-drafted and no fill solved, there are no odds. Blue's six is chosen to
-score well against red's likely six, while red's is chosen by pick score, so blue usually leads
-by far.</p>
+<pre class='eq'>odds(blue) = round( 100 / (1 + e^(&minus;k &middot; gap)) ),   odds(red) = 100 &minus; odds(blue)
+gap        = ( s(blue) &minus; s(red) ) / ( %(W_META)g &middot; %(W_RATE)g ), in win-rate points
+           = rates(blue) &minus; rates(red) + %(W_SYNERGY)g / %(W_RATE)g &middot; ( synergy(blue) &minus; synergy(red) )
+             + %(W_COUNTER)g / %(W_RATE)g &middot; counters(blue)
+k          = 4 &middot; 6 / 100 = %(LOGIT_PER_POINT)g, the log-odds one point of the rate term is worth
+           s: the default engine's score, base(x), with red's likely six as the other side
+           counters(red) is 0: red's six read against itself</pre>
+<p>A gap of one point reads 56 to 44 and four points 72 to 28; equal scores read 50 to 50, and
+swapping the two scores swaps the split. Swap a coin-flip pick of a six for a pick whose trusted
+edge is 3 points, synergy and counters unchanged, and the new six reads 53 to 47 against the old:
+its rate term is half a point higher, and 53 to 47 is that one pick's edge over a coin flip.
+Synergy and counters enter at their weights' exchange into win-rate points, above. Those weights
+are the engine's calibration (<a href='#base-weights'>the engine's weights</a>), each term's
+spread set against the rate term's, not fitted to match results. Shifting every score alike, or
+moving the engine weight, which scales the scores and a point's size alike, leaves the odds of
+the same two sixes where they are. Blue's six is chosen on the engine and the playbook's rules
+together, and the engine weight scales the engine alone, so until blue holds a full six the
+weight can change that six - the optimal before any pick, the fill while blue drafts - and the
+odds follow the new six. No sample is drawn: the playbook chooses blue's six but scores neither.
+With the engine or its rate weight off, with blue's picks not allowed, or with blue half-drafted
+and no fill solved, there are no odds. Blue's six is chosen to score well against red's likely
+six, while red's is chosen by pick score, so blue usually leads.</p>
 <p id='problem'><b>The problem's class.</b> With V the heroes the board leaves open - released
 and unbanned - a six is x &isin; {0,1}^V, x_h = 1 where h is picked, and the search solves</p>
 <pre class='eq'>maximise    score(x)
@@ -494,10 +509,10 @@ href='#argmax'>the argmax</a>), none of them better; the tie-break picks the one
 board page says how many tie. A tie-break number is blind to the hero's rates and name, so when
 every legal six ties, each hero of a role is equally likely to be the one shown across boards,
 and one board shows the same six every time. A share is a score's place between the share floor
-and blue's best six, and the fight odds a curve on the gap between two scores; neither is a
-chance of winning. Red's pick score ranks heroes by how often a six fields them and by their
-documented synergies. Nothing here is learned from match results; the rates enter only as data.
-The playbook holds both points as assumptions, <i>Tied sixes are equally good</i> and
+and blue's best six, and the fight odds the additive model's curve on the gap, in win-rate
+points; neither is a chance of winning measured from matches. Red's pick score ranks heroes by
+how often a six fields them and by their documented synergies. Nothing here is learned from
+match results; the rates enter only as data. The playbook holds both points as assumptions, <i>Tied sixes are equally good</i> and
 <i>Deterministic, not probabilistic</i>.</p>
 <h2 id='board'>The board page</h2>
 <p id='likely-comp'><b>Red's likely comp</b>: red's revealed picks, then, one slot at a time

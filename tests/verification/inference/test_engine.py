@@ -1,12 +1,15 @@
 """board(): blue's seat solved and red's likely six read, never solved; the
-weights it is given, the shapes and the queue's tank limit, an empty catalog
-kept as the caller's, a limit red's reveal already breaks and blue's picks
-may not, the share read from the seat's floor, the likely six, a full six on
-control, every seat of a board on the stage it names, the page's boards
-superseding one another, and the healing floor on top of the default
-engine.
+weights it is given, the Meta slider leaving a held six's fight odds where
+they are and moving them only with the six it chooses, the shapes and the
+queue's tank limit, an empty catalog kept as the caller's, a limit red's
+reveal already breaks and blue's picks may not, the share read from the
+seat's floor, the likely six, a full six on control, every seat of a board
+on the stage it names, the page's boards superseding one another, and the
+healing floor on top of the default engine.
 Every board is the synthetic World's but the last two, King's Row and
 Samoa on the built database. test_board_gate holds the lobby's limits on every door."""
+
+import dataclasses
 
 import pytest
 
@@ -16,7 +19,7 @@ from facts.draft import MAX_TANKS, Draft
 from facts.records import MapRate
 from facts.team import team_metrics
 from inference import catalog, engine
-from inference.base import OFF
+from inference.base import META, OFF
 from inference.result import Momentum
 from tests.verification.inference import (
     ASSUMPTIONS_ONLY,
@@ -73,10 +76,8 @@ def test_board_solves_blues_seat_and_reads_reds_likely_six(synthetic_world):
         "blue %d / 100 of its optimal (the best six from its picks); fight odds" % mo["blue"])
     # the fight odds: blue's six - here its fill - and red's likely six on one
     # scale, the engine alone against red's six, red's six never searched; the
-    # split follows the gap in spreads of the board's reference sixes
-    import statistics
-
-    from inference import scale
+    # split follows the gap in win-rate points, no sample drawn
+    from inference.base import LOGIT_PER_POINT
     from inference.plan import HeadToHead, fight_odds
     from inference.scoring import Candidate, Objective
     ours = world.resolve(None, (), tuple(fill.blue)).blue
@@ -87,10 +88,8 @@ def test_board_solves_blues_seat_and_reads_reds_likely_six(synthetic_world):
 
     def score(cand):
         return alone.score(alone.prepare(cand), detail=False).score
-    reference = scale.sample(Objective(world, m, red=theirs, banned=(), side="attack", stage="",
-                                       catalog=fix, base=DEFAULT))
     head = HeadToHead(blue=score(Candidate(ours)), red=score(Candidate(theirs)),
-                      spread=statistics.pstdev(score(c) for c in reference))
+                      per_logit=DEFAULT.scaled().rate / LOGIT_PER_POINT)
     assert mo["odds"] == fight_odds(head) and mo["odds"]["blue"] + mo["odds"]["red"] == 100
     mean = sum(p["on_six"] for p in likely.picks) / len(likely.picks)
     assert mo["badges"]["red"]["label"] == "%.0f%% avg pick" % mean
@@ -136,6 +135,55 @@ def test_the_board_scores_under_the_weights_it_is_given(synthetic_world, harbor_
     assert tilted.current.score != plain.current.score
     assert next(h for h in catalog.load(FIXTURE_PLAYBOOK)
                 if h.id == heuristic.id).weight == heuristic.weight
+
+
+def test_the_meta_slider_leaves_the_fight_odds_of_a_held_six_where_they_are(synthetic_world):
+    """The fight odds read the gap in win-rate points. The Meta slider scales
+    every score and the engine points a win-rate point is worth alike, so on
+    a board whose two sixes hold still - blue's full six, red's likely six -
+    it moves no odds. With the engine off, or its rate weight at 0, the gap
+    has no point to be read in, and there are none."""
+    fix = catalog.load(FIXTURE_PLAYBOOK)
+    six = Draft("Harbor Gate", ("Mortar", "Gale"),
+                ("Anvil", "Kite", "Rook", "Needle", "Balm", "Myrrh"), side="attack")
+
+    def odds(weights=None, base=DEFAULT):
+        brief = engine.Brief(weights=weights, base=base, search_swaps=False, walk_stages=False)
+        return engine.board(synthetic_world, six, catalog=fix, brief=brief).momentum["odds"]
+    plain = odds()
+    assert plain is not None and plain["blue"] != 50
+    assert [odds({META: meta}) for meta in (0.25, 2.5, 10.0)] == [plain] * 3
+    assert odds({META: 0.0}) is None and odds(base=OFF) is None
+    assert odds(base=dataclasses.replace(DEFAULT, rate=0.0)) is None
+
+
+def test_the_fight_odds_follow_the_six_the_meta_slider_chooses(synthetic_world):
+    """Blue's six is chosen on the engine and the playbook's rules together,
+    and the meta scales the engine alone, so until blue holds a full six the
+    slider can change that six - the optimal before any pick, the fill while
+    blue drafts - and the odds follow it: at each meta they are the odds of
+    the six it chose, held at meta 1. On the open Harbor Gate defense board
+    the optimal changes between meta 1 and 2.5, and with red's Mortar and
+    Gale and blue's Balm the fill changes between meta 0.25 and 1."""
+    fix = catalog.load(FIXTURE_PLAYBOOK)
+
+    def board(draft, meta):
+        brief = engine.Brief(weights={META: meta}, base=DEFAULT, search_swaps=False,
+                             walk_stages=False)
+        return engine.board(synthetic_world, draft, catalog=fix, brief=brief)
+    for draft, metas in ((Draft("Harbor Gate", (), (), side="defense"), (1.0, 2.5)),
+                         (Draft("Harbor Gate", ("Mortar", "Gale"), ("Balm",), side="attack"),
+                          (0.25, 1.0))):
+        seen = []
+        for meta in metas:
+            b = board(draft, meta)
+            six = (b.blue if b.fill is None else b.fill).blue
+            held = board(dataclasses.replace(draft, blue=tuple(six)), 1.0)
+            odds = b.momentum["odds"]
+            assert odds is not None and odds == held.momentum["odds"]
+            seen.append((sorted(six), odds))
+        (before, odds_before), (after, odds_after) = seen
+        assert before != after and odds_before != odds_after
 
 
 def test_legal_shapes_follow_the_playbook_and_the_board_carries_them(synthetic_world):

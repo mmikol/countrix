@@ -17,9 +17,9 @@ import re
 import pytest
 
 from facts import board_facts, compute
-from facts.draft import Draft
+from facts.draft import TEAM_SIZE, Draft
 from facts.records import Patch
-from inference import base, bounds, catalog, engine, scale, scoring, solver
+from inference import base, bounds, catalog, engine, plan, scale, scoring, solver
 from inference.result import (
     Badge,
     Momentum,
@@ -314,6 +314,11 @@ def test_an_apostrophe_cannot_close_a_single_quoted_attribute():
     ("rate", "Under it the rate term is in win-rate points and weighs %s."),
     ("synergy", "+ %s &middot; synergy(x)"),
     ("counter", "+ %s &middot; counters(x) )"),
+    # the fight odds read the gap in win-rate points: over the meta and the rate weight
+    ("meta", "gap = ( s(blue) &minus; s(red) ) / ( %s &middot; "),
+    ("rate", "&middot; %s ), in win-rate points"),
+    ("synergy", "= rates(blue) &minus; rates(red) + %s / "),
+    ("counter", "&minus; synergy(red) ) + %s / "),
 ])
 def test_the_math_page_quotes_each_weight_from_the_playbooks_meta_file(
         monkeypatch, tmp_path, dial, phrase):
@@ -331,6 +336,7 @@ def test_the_math_page_quotes_each_weight_from_the_playbooks_meta_file(
 
 @pytest.mark.parametrize(("module", "name", "phrase"), [
     (base, "RATE_PICK_HALF", "t_p = pick_p / ( pick_p + %s )"),
+    (base, "LOGIT_PER_POINT", "k = 4 &middot; 6 / 100 = %s"),
     (compute, "PARTNER_POINTS", "pick score(h) = on_six(h) + %s &times; partners"),
     (scale, "REFERENCE_SIZE", "against %s random sixes of a legal shape"),
     (scale, "SCALE_POOL", "each role's %s released heroes"),
@@ -351,6 +357,21 @@ def test_the_math_page_quotes_each_constant_from_the_code(monkeypatch, module, n
     as spaces, so rewrapping the article moves no phrase."""
     monkeypatch.setattr(module, name, 37)
     assert phrase % "37" in " ".join(pages.view_math().split())
+
+
+def test_the_math_page_reads_its_fight_odds_examples_off_the_curve():
+    """The fight-odds section's worked examples are plan.fight_odds' own, at
+    the slope the page quotes and meta and rate 1, where an engine point is
+    a win-rate point: a gap of one point and of four, and one pick's 3-point
+    edge in a six, half a point of the rate term."""
+    flat = " ".join(pages.view_math().split())
+
+    def odds(gap):
+        split = plan.fight_odds(plan.HeadToHead(blue=gap, red=0.0,
+                                                per_logit=1.0 / base.LOGIT_PER_POINT))
+        return "%d to %d" % (split["blue"], split["red"])
+    assert "A gap of one point reads %s and four points %s;" % (odds(1.0), odds(4.0)) in flat
+    assert "the new six reads %s against the old" % odds(3.0 / TEAM_SIZE) in flat
 
 
 def test_the_math_page_writes_a_large_count_with_thousands_separators(monkeypatch):

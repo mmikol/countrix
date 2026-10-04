@@ -33,11 +33,12 @@ from inference.result import (
 
 class HeadToHead(NamedTuple):
     """Blue's six and red's likely six on one scale - the default engine
-    alone, against red's six - and the spread of that scale: the standard
-    deviation of the same scores over the board's reference sixes."""
+    alone, against red's six - and the engine's points per unit of log-odds
+    on it: the rate term's weight with the meta applied, over
+    base.LOGIT_PER_POINT."""
     blue: float
     red: float
-    spread: float
+    per_logit: float
 
 
 class Seats(NamedTuple):
@@ -75,15 +76,21 @@ def momentum(seats: Seats) -> Momentum:
 
 
 def fight_odds(head: HeadToHead | None) -> Odds | None:
-    """The fight odds: the gap between the two sixes' scores, in spreads of
-    a random six, put on a logistic curve and split out of 100 -
-    100 / (1 + e^(-gap / spread)) for blue, the rest for red. Equal sixes
-    split 50-50, swapping them swaps the split, and scaling or shifting
-    every score alike leaves it where it is. None where the two sixes were
-    not measured, or where the scale has no spread."""
-    if head is None or head.spread <= 0.0:
+    """The fight odds: the gap between the two sixes' scores in log-odds -
+    a point of the six's mean win rate at base.LOGIT_PER_POINT, the additive
+    model's slope - put on a logistic curve and split out of 100:
+    100 / (1 + e^(-gap / per_logit)) for blue, the rest for red. Equal sixes
+    split 50-50, swapping them swaps the split, and shifting every score
+    alike leaves it, as does the meta, which scales the scores and per_logit
+    together. None where the two sixes were not measured, or where the rate
+    term is off and the gap has no win-rate point to be read in."""
+    if head is None or head.per_logit <= 0.0:
         return None
-    share = round(100.0 / (1.0 + math.exp(-(head.blue - head.red) / head.spread)))
+    logit = (head.blue - head.red) / head.per_logit
+    # the same curve, taken at -|logit| so that e^ never overflows on a gap red
+    # leads by far, and mirrored there, so swapping the sixes swaps it exactly
+    ahead = 100.0 / (1.0 + math.exp(-abs(logit)))
+    share = round(ahead if logit >= 0.0 else 100.0 - ahead)
     return Odds(blue=share, red=100 - share, tip=ODDS_TIP)
 
 
@@ -92,8 +99,9 @@ ODDS_TIP = (
     "blue's six and red's likely six on one scale, the meta alone - win rates, synergy and"
     " counters, each counter between them counted once, no playbook rule for either side;"
     " red's six is its picks and likeliest heroes, never optimized. The split follows the"
-    " gap between the two scores, measured in the spread of a random six's score. A"
-    " comparison of two sixes, not a chance of winning")
+    " gap between the two scores in win-rate points, each pick's edge added on the logit"
+    " scale, synergy and counters at their weights: the additive model's reading of the"
+    " gap, not a chance of winning measured from matches")
 
 
 def _now(current: Result, fill: Result | None) -> Result:

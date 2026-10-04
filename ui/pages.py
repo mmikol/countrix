@@ -169,6 +169,7 @@ def view_math() -> str:
         "TOP_ANSWERS": counters.TOP_ANSWERS,
         "THRESHOLD": counters.THRESHOLD,
         "RATE_PICK_HALF": base.RATE_PICK_HALF,
+        "LOGIT_PER_POINT": base.LOGIT_PER_POINT,
         "PARTNER_POINTS": compute.PARTNER_POINTS,
         "REFERENCE_SIZE": format(scale.REFERENCE_SIZE, ","),
         "SCALE_POOL": scale.SCALE_POOL,
