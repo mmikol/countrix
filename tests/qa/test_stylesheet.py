@@ -1,9 +1,9 @@
 """The board's stylesheet against the page: every class it styles is one
-the scripts, the shell or the math page names."""
+the scripts, the shell, the math page or the strategy registry names."""
 
 import re
 
-from ui import pages
+from ui import pages, registry
 
 
 def test_every_stylesheet_class_is_used_by_the_page():
@@ -29,6 +29,6 @@ def test_every_stylesheet_class_is_used_by_the_page():
     names = re.findall(r"<script src='/static/([\w.-]+\.js)'>", shell)
     assert names, "the shell loads no script"
     sources = "".join(pages.static_file(name)[0].decode() for name in names)
-    sources += shell + pages.view_math()
+    sources += shell + pages.view_math() + registry.view_registry()
     assert len(classes) > 50
     assert [c for c in classes if not re.search(r"\b%s\b" % re.escape(c), sources)] == []

@@ -137,6 +137,37 @@ def normalised(raw: float, lo: float, span: float | None, minimize: bool, need: 
     return 1.0 - norm if minimize else norm
 
 
+# a need's guard: its `when` and its params, the key its gate shares a slot by
+type Guard = tuple[str, tuple[tuple[str, float], ...]]
+
+
+def need_guard(s: Strategy) -> Guard | None:
+    """A need's guard - its `when` and its params - or None where the
+    strategy is no need."""
+    if not s.need or s.when is None:
+        return None
+    return s.when.source, tuple(sorted(s.params.items()))
+
+
+def need_scales(heuristics: Sequence[Strategy]) -> dict[str, float]:
+    """Each need's scale, s_n, by id: the needs on one guard cost NEED_BUDGET
+    at most together, or the largest of their weights where that is more, so
+    each is scaled by min(1, max(NEED_BUDGET, the largest) / their sum), and
+    a need alone on its guard keeps its own weight; a guard whose weights
+    sum to 0 scales by 1. The score (Objective) and the strategy registry
+    both read it."""
+    guards = {g.id: guard for g in heuristics if (guard := need_guard(g)) is not None}
+    written: dict[Guard, float] = {}
+    largest: dict[Guard, float] = {}
+    for g in heuristics:
+        if g.id in guards:
+            guard = guards[g.id]
+            written[guard] = written.get(guard, 0.0) + g.weight
+            largest[guard] = max(largest.get(guard, 0.0), g.weight)
+    return {sid: min(1.0, max(NEED_BUDGET, largest[guard]) / written[guard])
+            if written[guard] else 1.0 for sid, guard in guards.items()}
+
+
 class Contribution(TypedDict):
     """One term in a six's score, the default engine's or a strategy's: the
     `contributions` array of the public payload. Every term carries the
@@ -327,19 +358,8 @@ class Objective:
         self._scored = [(r, gates[r.id], slots.get(r.id, 0)) for r in self.scored]
         self._heuristics = [(g, gates[g.id], slots.get(g.id, 0), *_split_key(g.metric))
                             for g in self.heuristics]
-        # needs that share a guard - its when and its params, as the gates key
-        # a slot - share one budget (NEED_BUDGET; see score())
-        guards = {g.id: (g.when.source, tuple(sorted(g.params.items())))
-                  for g in self.heuristics if g.need and g.when is not None}
-        written: dict[tuple[str, tuple[tuple[str, float], ...]], float] = {}
-        largest: dict[tuple[str, tuple[tuple[str, float], ...]], float] = {}
-        for g in self.heuristics:
-            if g.id in guards:
-                source = guards[g.id]
-                written[source] = written.get(source, 0.0) + g.weight
-                largest[source] = max(largest.get(source, 0.0), g.weight)
-        self._needs = {sid: min(1.0, max(NEED_BUDGET, largest[source]) / written[source])
-                       if written[source] else 1.0 for sid, source in guards.items()}
+        # needs that share a guard share one budget (need_scales; see score())
+        self._needs = need_scales(self.heuristics)
         self._freeze_norms()
 
     def _gates(self) -> tuple[dict[str, bool | None], dict[str, int], int]:

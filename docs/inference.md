@@ -504,7 +504,9 @@ mean or a median of the known values, a max or a min, a product, a sum
 over pairs, the enemies answered, the distinct subroles, the largest
 playstyle's share and the playstyle a majority carry, the isolated
 picks and the largest group of the claimed synergy graph, or fixed by the
-shape - and every team and matchup key has its rule. An expression's
+shape - and every team and matchup key has its rule, which says in words
+how its metric aggregates over the six (`Spec.aggregate`), the words the
+board's strategy registry shows beside the metric. An expression's
 range comes from its tree: an operator takes its operands' ends, a
 comparison is true, false or either, and `and`, `or` and `if` join the
 values they can take. A limit false on every six of a branch drops it. A

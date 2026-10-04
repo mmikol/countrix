@@ -67,6 +67,21 @@ def test_every_relative_link_in_the_docs_resolves():
     assert not broken, broken
 
 
+def test_the_board_doc_lists_every_route_the_board_answers():
+    """docs/ui.md's route table has a row for each path ui/board.py routes -
+    each page, the static files and each endpoint - so a new page, the
+    registry say, is documented where a reader looks for it."""
+    source = _read("ui", "board.py")
+    routes = set(re.findall(r'path == "(/[^"]*)"', source))
+    routes |= set(re.findall(r'path\.startswith\("(/static/)"\)', source))
+    for group in re.findall(r"path not in \(([^)]*)\)", source):
+        routes |= set(re.findall(r'"(/[^"]*)"', group))
+    assert {"/", "/static/", "/math", "/registry", "/health", "/api/board"} <= routes
+    doc = _read("docs", "ui.md")
+    missing = sorted(r for r in routes if not re.search(r"^\| `%s[`?<]" % re.escape(r), doc, re.M))
+    assert not missing, missing
+
+
 # Any quoted COUNTRIX_ name, not only an os.environ.get argument: a setting read
 # through a constant or a helper still spells its name as a literal somewhere
 ENV_RE = re.compile(r"""["'](COUNTRIX_[A-Z_]+|DATABASE_URL)["']""")

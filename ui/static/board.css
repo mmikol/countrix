@@ -12,8 +12,9 @@ h1,h2,h3 { font-family:"Bebas Neue",Impact,"Arial Narrow",sans-serif;
   letter-spacing:.06em; text-transform:uppercase; font-weight:400; }
 a { color:var(--blue); text-decoration:none; } a:hover { text-decoration:underline; }
 main { max-width:1440px; margin:0 auto; padding:14px 18px 60px; }
+/* the right padding keeps the row clear of the three pills pinned top-right */
 header.top { position:relative; display:flex; align-items:center; gap:18px; flex-wrap:wrap;
-  padding:10px 224px 10px 16px; background:linear-gradient(90deg,#161c27,#10141c);
+  padding:10px 366px 10px 16px; background:linear-gradient(90deg,#161c27,#10141c);
   border:1px solid var(--line); border-radius:10px; }
 header.top h1 { margin:0; font-size:30px; }
 header.top h1 span { color:var(--gold); }
@@ -34,6 +35,27 @@ header.top .gh:hover { color:var(--text); border-color:var(--muted); }
 .math .toc a:hover { border-color:var(--gold); color:var(--gold); }
 .math .eq { background:#0b0e14; border:1px solid var(--line); border-radius:8px; padding:12px 14px; overflow-x:auto; font-size:13px; }
 .math code { background:#0b0e14; padding:1px 5px; border-radius:4px; }
+/* the strategy registry: the math page's article, a card per rule, each
+   section of a card under a small label */
+.math .hcard { margin:12px 0; padding:12px 16px 14px; scroll-margin-top:12px; }
+.math .hcard p { font-size:13.5px; line-height:1.6; }
+.math .hcard p.legend { color:var(--muted); font-size:12px; }
+.math .lbl { margin:14px 0 4px; font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); }
+.math .hcard .eq { margin:0; }
+.math .glance, .math .reads { width:100%; border-collapse:collapse; font-size:13px; }
+.math .glance th, .math .reads th { text-align:left; font-weight:400; font-size:10px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--muted); padding:4px 10px 4px 0; border-bottom:1px solid var(--line); }
+.math .glance td, .math .reads td { padding:5px 10px 5px 0; border-bottom:1px solid #202733; vertical-align:top; color:#c9d0db; }
+.math .reads td:first-child { white-space:nowrap; }
+.math .reads td:last-child { width:30%; }
+.math .reads td .legend { margin:2px 0 0; font-size:11px; }
+.math details { margin:4px 0 0; font-size:12.5px; }
+.math summary { cursor:pointer; color:var(--muted); }
+.math .sources { margin:6px 0 0; padding-left:18px; color:var(--muted); overflow-wrap:anywhere; }
+/* a playbook card's link to its rule's math */
+.hcard .reglink { float:right; margin-left:8px; font-size:10px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--muted); border:1px solid var(--line); border-radius:999px; padding:2px 8px; }
+.hcard .reglink:hover { color:var(--gold); border-color:var(--gold); text-decoration:none; }
 .mapsel { margin-left:auto; display:flex; flex-wrap:wrap; justify-content:flex-end;
   align-items:center; gap:10px; }
 .mapsel select { background:#0b0e14; color:var(--text); border:1px solid var(--line);

@@ -69,6 +69,7 @@ function renderPlaybook(d) {
      its prose and the Meta slider over the whole of it */
   var m = d.meta;
   out += "<section class='pbgroup engine' id='pb-engine'><h3>the meta</h3><div class='hcards'><div class='hcard engine'>" +
+    mathLink('/math#default-engine', 'the default engine, on the math page') +
     "<span class='kind engine'>engine</span><b>The meta</b><div class='meta'>" +
     esc('meta.md · meta ' + m.meta + ' × (rate ' + m.rate + ' · synergy ' + m.synergy + ' · counter ' + m.counter + ') · swap cost ' + m.swap) +
     '</div>' + prose(m.body) + weightRow({ id: META, name: 'the meta', weight: m.meta }, 'meta') + costRow(m) + '</div></div></section>';
@@ -106,9 +107,15 @@ function renderPlaybook(d) {
              : h.form === 'assumption' ? 'assumption - taken as given, shown, not scored'
              : h.form;
     var params = Object.keys(h.params || {}).map(function (k) { return k + '=' + h.params[k]; }).join(', ');
-    return "<div class='hcard " + h.kind + "'><span class='kind " + h.kind + "'>" + h.kind + '</span><b>' + esc(h.name) + "</b><div class='meta'>" + esc(meta) + (params ? ' · params ' + esc(params) : '') + '</div>' + prose(h.body) +
+    return "<div class='hcard " + h.kind + "'>" + mathLink('/registry#' + esc(h.id), 'this rule, worked out on the strategy registry') +
+      "<span class='kind " + h.kind + "'>" + h.kind + '</span><b>' + esc(h.name) + "</b><div class='meta'>" + esc(meta) + (params ? ' · params ' + esc(params) : '') + '</div>' + prose(h.body) +
       (weighs(h) ? weightRow(h) : '') + '</div>';
   }
+}
+/* a card's math: a strategy's entry on the registry page (/registry#id), the
+   meta's section of the math page */
+function mathLink(href, title) {
+  return "<a class='reglink' href='" + href + "' title='" + title + "'>its math</a>";
 }
 /* a file's prose as paragraphs, less its title line: the card names it */
 function prose(body) {

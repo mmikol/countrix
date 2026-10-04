@@ -15,12 +15,13 @@ An `http.server` handler over psycopg, no web framework, no build step.
 The board computes the facts and the comps in its own process, as the
 compose stack's `ui` container does. It writes nothing.
 
-## `board.py`, `serve.py` and `pages.py` - the page and its endpoints
+## `board.py`, `serve.py`, `pages.py` and `registry.py` - the pages and their endpoints
 
 `pages.py` renders the page, a shell over the static files that injects
 only `TEAM` (six), `BANS` (five) and `SWAP_MAX` (the swap cost's ceiling,
-`base.SWAP_RANGE`). `board.py` serves it and the JSON endpoints behind
-the host guard `db/web.py` puts on both servers
+`base.SWAP_RANGE`), and the math page; `registry.py` renders the strategy
+registry in the math page's shell. `board.py` serves them and the JSON
+endpoints behind the host guard `db/web.py` puts on both servers
 ([security.md](security.md)); `serve.py` answers the board, the catalog
 and the health for it.
 
@@ -34,6 +35,7 @@ and the health for it.
 | `/api/strategies` | the catalog: every constraint, heuristic and assumption with its kind, form, frontmatter and body, from `serve.handle_strategies` |
 | `/health` | the engine's health, from `serve.handle_health`: ok or degraded, the strategies, the drafts pending and the heroes, and the error naming what is out of reach. The ui container's healthcheck and `orchestrator.py` read it |
 | `/math` | `static/math.html` in the page shell, the numbers it quotes filled in by `pages.py` - the default engine's four weights and the swap cost from the playbook's `meta.md`, and from the code `SWAP_MAX`, the counter graph's four constants, `RATE_PICK_HALF`, `COIN_FLIP`, the fight odds' `LOGIT_PER_POINT`, `PARTNER_POINTS`, `REFERENCE_SIZE`, `SCALE_POOL`, `NEED_BUDGET`, the search's `SCORE_PLACES` and `RANK_CAP`, the counter graph's mechanisms, `MAX_TANKS`, `MAX_BANS`, the weight slider's top, and the healing formation's radius and teammates: the equation, how a six is chosen, the scoring function with the default engine under the playbook, the board and how the layers fit |
+| `/registry` | the strategy registry, rendered by `registry.py` on every call from the code the solver runs, so it cannot drift from it: every strategy of the playbook in force, a card each anchored by its id (`/registry#<id>`), grouped as limits, heuristics and assumptions under a table of every rule at a glance. A card says in plain words what its rule does, then gives its formula: its form as the code reads it (a limit; a reward or a need - a heuristic on a metric whose gate the board or the six settles; a scored heuristic; an assumption; a draft), its weight and the most it moves a six, its gate with its params filled in and who settles it, and its term in the math page's notation with its own numbers - a need's share of its guard's budget from `scoring.need_scales`. Then each metric it reads, with the registry's meaning (`facts/team.py`, `facts/compute.py`) and how its range rule aggregates it over the six (`Spec.aggregate` in `inference/ranges.py`), its prose, and its entries and sources in `inference/README.md`. Each form links its section of `/math`, which gives the forms in general; the page quotes no rate |
 
 The board answers GET alone: any other method is a 501, after the host
 guard.
@@ -175,10 +177,13 @@ applies it to that board only (each result names its `weights`), and the
 file is untouched. A setting whose heuristic the catalog no longer holds
 is dropped when the playbook loads; the meta's and the swap cost's are
 always kept. Only `tune` changes a file's weight, the meta's and the swap
-cost included.
+cost included. Each card's *its math* links its rule's entry on the
+registry (`/registry#<id>`), the meta's the default engine on the math
+page.
 
-**The header** pins two pills top-right: *the math* and the repository on
-GitHub. Its *clear all* empties the map, the side, the bans and both teams
+**The header** pins three pills top-right: *the math*, *the registry*
+beside it, and the repository on GitHub; the header's right padding keeps
+the row clear of them. Its *clear all* empties the map, the side, the bans and both teams
 and leaves the weights; each team's box has its own *clear*. Its only
 messages are short-lived flashes - a banned pick, a full team, a refused
 pick. A patch newer than the rates raises the warning box; the rates'

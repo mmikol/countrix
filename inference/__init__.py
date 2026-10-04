@@ -39,7 +39,8 @@ The search, which reads the playbook:
     intervals     what a value can be over a branch of the search, and an
                   expression read over such values
     ranges        each team.* and matchup.* metric's range over a branch's
-                  completions, the rules the bound reads
+                  completions, the rules the bound reads, each saying in
+                  words how its metric aggregates over the six
     bounds        the search's bounds: the most any six a branch can reach
                   scores, read off the intervals and the ranges
     solver        the exact search over every legal six under the constraints

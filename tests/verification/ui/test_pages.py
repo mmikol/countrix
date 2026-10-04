@@ -1,8 +1,9 @@
-"""The board's pages: the shell, the math page, and the static files they
-load. No server and no database - these read ui/pages.py's output
-and the scripts' source. The scripts are pinned at their seams - the routes
-and query keys they send, the ids they write, the globals and payload keys
-they read - against what the shell and the server write. The decisions
+"""The board's pages: the shell, the math page, the strategy registry's
+seams, and the static files they load. No server and no database - these
+read ui/pages.py's and ui/registry.py's output and the scripts' source.
+The scripts are pinned at their seams - the routes and query keys they
+send, the ids they write, the globals and payload keys they read -
+against what the shell and the server write. The decisions
 only the client can make are pinned in the script: the stale-reply guard;
 the HTML escape; the meta and swap-cost weights, never pruned as a stale
 heuristic's are; the swaps and suggested slots, drawn only for the picks
@@ -34,7 +35,7 @@ from inference.result import (
 from inference.scoring import Contribution
 from inference.strategy import WEIGHT_RANGE, StrategyRecord
 from tests.verification.inference import BRIEF, FIXTURE_PLAYBOOK
-from ui import board, pages, serve
+from ui import board, pages, registry, serve
 
 
 def scripts():
@@ -115,10 +116,12 @@ def test_the_page_is_a_shell_over_static_files():
         assert rule in css, rule
     assert "id='clearall'" in body
     header = body.split("</header>")[0]
-    # the two pills, pinned top-right
+    # the three pills, pinned top-right: the math, the registry beside it, GitHub
     links = header[header.index("<span class='links'>"):]
     assert "href='/math'" in links and pages.REPO_URL in links
-    assert links.count("<a ") == 2
+    assert links.count("<a ") == 3
+    assert links.index("href='/math'") < links.index("href='/registry'") < links.index(
+        pages.REPO_URL)
     assert links.rstrip().endswith("GitHub</a></span>")
     # the page hands the scripts the counts they need
     assert "var TEAM = 6, BANS = 5, TANKS = 2, SWAP_MAX = 50;" in body
@@ -426,3 +429,30 @@ def test_the_math_page_states_the_equation_and_the_layers():
     assert "shows blue's six above the optimal" in counter[:counter.index("</p>")]
     # red is never solved: nothing scores blue's six against red's best reply
     assert "if countered optimally" not in page and "Red is never solved" in page
+
+
+def test_the_registry_is_a_page_in_the_shell_the_math_page_links_and_the_cards_link_into():
+    """/registry is ui/registry.py's page in the shell the math page has,
+    with a table of contents whose links resolve; the math page's
+    paragraphs on the strategies and on the heuristics' forms link it; and
+    each playbook card links its rule's entry, /registry#<id>, which the
+    registry anchors by the same id."""
+    page = registry.view_registry()
+    assert page.startswith(pages.HEAD) and "<h2 id='%s'>The strategy registry</h2>" % (
+        registry.TOP) in page
+    toc = page[page.index("<nav class='toc'>"):page.index("</nav>")]
+    targets = re.findall(r"href='#([^']+)'", toc)
+    assert targets == [registry.TOP, registry.GLANCE, *(a for a, _ in registry.GROUPS.values())]
+    assert all("id='%s'" % t in page for t in targets)
+    flat = " ".join(pages.view_math().split())
+    strategies = flat[flat.index("<p><b>STRATEGIES</b>"):]
+    assert "<a href='/registry'>the strategy registry</a>" in strategies[
+        :strategies.index("</p>")]
+    forms = flat[flat.index("A heuristic's condition, its <code>when</code>"):]
+    assert "<a href='/registry'>the strategy registry</a>" in forms[:forms.index("</p>")]
+    script = scripts()
+    card = function(script, "renderPlaybook")
+    assert "mathLink('/registry#' + esc(h.id)" in card[card.index("function card("):]
+    assert "class='reglink' href='\" + href + \"'" in function(script, "mathLink")
+    for s in catalog.load():
+        assert "<div class='hcard %s' id='%s'>" % (s.kind, s.id) in page, s.id

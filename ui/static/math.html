@@ -97,7 +97,9 @@ even when that six keeps the limit.
 An <b>assumption</b> is prose, shown on the playbook tab; it adds nothing to a score. Read as a
 function, STRATEGIES( FACTS ) is score(x) on the legal sixes: the constraints set its domain, the
 heuristics its terms, over the default engine's base(x), whose weights <code>meta.md</code>
-holds.</p>
+holds. This page gives each form in general; <a href='/registry'>the strategy registry</a> writes
+out every rule of the playbook in force in its form - its gate, its formula with its own numbers,
+the metrics it reads and its sources.</p>
 <h2 id='chosen'>How a six is chosen</h2>
 <p>Inference on maxims and facts. The maxims are the playbook's rules, the facts the database's
 numbers about this board, and together they make one objective, weighted and constrained, which
@@ -184,7 +186,10 @@ in alphabetical order. A need's
 <i>guard</i> is its condition with its params. A scored heuristic is never a need: while its
 condition holds, on the board or on the six, it adds (bonus &minus; penalty) &times; weight, so a
 six can gain by meeting a condition it decides. To make a rule cost points instead of forbidding
-a six, write it as a scored heuristic with <code>when: not (the rule)</code> and a penalty.</p>
+a six, write it as a scored heuristic with <code>when: not (the rule)</code> and a penalty. Each
+heuristic of the playbook in force is written out in these terms on <a href='/registry'>the
+strategy registry</a>: reward, need or scored, its gate and who settles it, and the formula below
+with its weight, its metric or its expressions, and its params filled in.</p>
 <pre class='eq'>for one six x, with every limit holding:
 
 score(x) = base(x)

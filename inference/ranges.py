@@ -13,7 +13,9 @@ which the bound (inference.bounds) reads as the search walks.
                           carry, the claimed synergy graph's isolated picks
                           and largest group, or fixed by the shape. A sum's
                           rule carries each hero's part of it, and one fixed
-                          by the shape says so, for the bound to read
+                          by the shape says so, for the bound to read; every
+                          rule says in words how its metric aggregates over
+                          the six, which the board's strategy registry shows
     rule_order, evaluate  the rules a search reads, each after the rules it
                           reads, and their values over one branch
     pair_halves           half each hero's best and worst few pairs with the
@@ -174,20 +176,33 @@ class Rule(NamedTuple):
 
 class Spec(NamedTuple):
     """A metric's rule as the table holds it: what builds it on a search's
-    Space; the metrics it reads, which are computed first; for a sum over
-    the picks, each hero's part of it (`feature`), which the bound's fold
-    reads (inference.bounds); and whether the six's shape alone fixes it
+    Space; how the metric aggregates over the six, in words (`aggregate`),
+    which the board's strategy registry shows beside the metric; the
+    metrics it reads, which are computed first; for a sum over the picks,
+    each hero's part of it (`feature`), which the bound's fold reads
+    (inference.bounds); and whether the six's shape alone fixes it
     (`shaped`) - the same value on every branch of a shape, so that the
     bound reads a term on such metrics once a shape."""
     build: Callable[[Space], Rule]
+    aggregate: str
     needs: tuple[str, ...] = ()
     feature: Feature | None = None
     shaped: bool = False
 
 
+def _fixed_words(value: Abstract) -> str:
+    """How a metric every six holds the same value of aggregates, in words:
+    the value where it is one number, else what the bound reads it as."""
+    if isinstance(value, Iv) and value.lo == value.hi:
+        return "the same on every six: %g" % value.lo
+    if isinstance(value, Top) and value.size != INF:
+        return "a list of at most %d: the bound reads it as any value" % value.size
+    return "a name or a tally: the bound reads it as any value"
+
+
 def _fixed(value: Abstract) -> Spec:
     """A metric every completion holds the same value of."""
-    return Spec(lambda space: Rule(lambda branch, env: value), shaped=True)
+    return Spec(lambda space: Rule(lambda branch, env: value), _fixed_words(value), shaped=True)
 
 
 class _Sum(NamedTuple):
@@ -224,12 +239,13 @@ def _sum(feature: Feature) -> Spec:
     def build(space: Space) -> Rule:
         values = [float(feature(h, space)) for h in space.heroes]
         return Rule(_summed(space, values).read, _slack(values))
-    return Spec(build, feature=feature)
+    return Spec(build, "a sum over the six's picks, each adding its own part", feature=feature)
 
 
 def _count(test: Callable[[Hero, Space], object]) -> Spec:
     """How many of the six pass a test."""
-    return _sum(lambda h, space: 1.0 if test(h, space) else 0.0)
+    return _sum(lambda h, space: 1.0 if test(h, space) else 0.0)._replace(
+        aggregate="a count of the six's picks, each adding 1 or 0: 0 to %d" % TEAM_SIZE)
 
 
 def _per_pick(test: Callable[[Hero, Space], object]) -> Spec:
@@ -242,29 +258,33 @@ def _per_pick(test: Callable[[Hero, Space], object]) -> Spec:
         def read(branch: Branch, env: Env) -> Abstract:
             return divide(rule.read(branch, env), Iv(TEAM_SIZE, TEAM_SIZE))
         return Rule(read)
-    return Spec(build)
+    return Spec(build, "the share of the six's picks that count: their count over %d, 0 to 1"
+                % TEAM_SIZE)
 
 
-def _scaled(key: str, by: Callable[[Space], float]) -> Spec:
-    """Another metric divided by a board constant; 0 where it is 0."""
+def _scaled(key: str, by: Callable[[Space], float], over: str) -> Spec:
+    """Another metric divided by a board constant, `over` in words; 0 where
+    it is 0."""
     def build(space: Space) -> Rule:
         divisor = by(space)
 
         def read(branch: Branch, env: Env) -> Abstract:
             return divide(env[key], Iv(divisor, divisor))
         return Rule(read)
-    return Spec(build, (key,))
+    return Spec(build, "%s over %s" % (key, over), (key,))
 
 
 def _ratio(numerator: str, denominator: str) -> Spec:
     """One metric over another, 0 where the second is 0."""
     return Spec(lambda space: Rule(lambda branch, env: divide(env[numerator], env[denominator])),
+                "%s over %s, 0 where the second is 0" % (numerator, denominator),
                 (numerator, denominator))
 
 
 def _roles(of: Callable[[list[int]], Abstract]) -> Spec:
     """A metric the shape fixes: read off the six's count per role."""
-    return Spec(lambda space: Rule(lambda branch, env: of(space.counts(branch))), shaped=True)
+    return Spec(lambda space: Rule(lambda branch, env: of(space.counts(branch))),
+                "fixed by the shape: read off the six's count per role", shaped=True)
 
 
 def _known_suffixes(space: Space, values: Sequence[float | None]
@@ -322,7 +342,9 @@ def _mean(known: Known, fallback: str | None = None) -> Spec:
                     hi, lo = max(hi, empty.hi), min(lo, empty.lo)
             return Iv(lo, hi)
         return Rule(read, _slack([v for v in values if v is not None]))
-    return Spec(build, (fallback,) if fallback else ())
+    empty = "%s where none is" % fallback if fallback else "0 where none is"
+    return Spec(build, "a mean over the six's picks whose value is known; %s" % empty,
+                (fallback,) if fallback else ())
 
 
 def _extreme_of(known: Known, lowest: bool) -> Spec:
@@ -365,7 +387,8 @@ def _extreme_of(known: Known, lowest: bool) -> Spec:
                 return Iv(min(near), max(ends))
             return Iv(min(ends), max(near))
         return Rule(read)
-    return Spec(build)
+    return Spec(build, "the %s value known among the six's picks; 0 where none is"
+                % ("smallest" if lowest else "largest"))
 
 
 def _median(of: Callable[[Hero, Space], Sequence[float]]) -> Spec:
@@ -392,7 +415,7 @@ def _median(of: Callable[[Hero, Space], Sequence[float]]) -> Spec:
                 lo, hi = min(lo, 0.0), max(hi, 0.0)
             return Iv(lo, hi)
         return Rule(read)
-    return Spec(build)
+    return Spec(build, "a median of the values the six's picks carry; 0 where they carry none")
 
 
 def _product(factor: Feature) -> Spec:
@@ -424,7 +447,7 @@ def _product(factor: Feature) -> Spec:
                 hi *= high[n]
             return Iv(lo, hi)
         return Rule(read, SLACK * 2.0)
-    return Spec(build)
+    return Spec(build, "a product over the six's picks, each a factor within 0 to 1")
 
 
 def pair_halves(matrix: Sequence[Sequence[float]], pool: Sequence[int],
@@ -478,7 +501,7 @@ def _pairwise(weight: Callable[[Space], list[list[float]]]) -> Spec:
                 lo += sum(worst[:n])
             return Iv(lo, hi)
         return Rule(read, _slack(flat, count=PAIR_COUNT))
-    return Spec(build)
+    return Spec(build, "a sum over the six's %d pairs, each adding its own part" % PAIR_COUNT)
 
 
 def _masks(space: Space) -> list[int]:
@@ -520,7 +543,10 @@ def _coverage(per_enemy: bool = False) -> Spec:
                 return Iv(lo / enemies, hi / enemies) if enemies else FALSE
             return Iv(lo, hi)
         return Rule(read)
-    return Spec(build)
+    if per_enemy:
+        return Spec(build, "the share of red's revealed picks that one of the six's picks"
+                           " answers: 0 to 1, 0 while red has none")
+    return Spec(build, "the count of red's revealed picks that one of the six's picks answers")
 
 
 def _double_covered() -> Spec:
@@ -541,7 +567,8 @@ def _double_covered() -> Spec:
                     can[e] += min(n, answerers)
             return Iv(float(sum(1 for c in have if c >= 2)), float(sum(1 for c in can if c >= 2)))
         return Rule(read)
-    return Spec(build)
+    return Spec(build, "the count of red's revealed picks that two or more of the six's picks"
+                       " answer")
 
 
 def _distinct_subroles() -> Spec:
@@ -561,7 +588,7 @@ def _distinct_subroles() -> Spec:
                 m += n
             return Iv(len(have) / TEAM_SIZE, min(len(reach), len(have) + m) / TEAM_SIZE)
         return Rule(read)
-    return Spec(build)
+    return Spec(build, "the six's distinct subroles over %d: 0 to 1" % TEAM_SIZE)
 
 
 def _styles(space: Space, part: Callable[[Hero], float]) -> list[tuple[str, _Sum]]:
@@ -590,7 +617,8 @@ def _style_share() -> Spec:
                 lo, hi = max(lo, ends.lo), max(hi, ends.hi)
             return Iv(lo / TEAM_SIZE, hi / TEAM_SIZE)
         return Rule(read, SLACK * (1.0 + TEAM_SIZE))
-    return Spec(build)
+    return Spec(build, "the largest playstyle's share of the six's picks, a pick with k"
+                       " playstyles adding 1/k to each: 0 to 1")
 
 
 def _style_lean() -> Spec:
@@ -620,7 +648,7 @@ def _style_lean() -> Spec:
                     return Exact(style)
             return ANY if live else Exact("")
         return Rule(read)
-    return Spec(build)
+    return Spec(build, "the playstyle more than half the six's picks carry, else none: a name")
 
 
 def _partners(space: Space) -> tuple[list[int], list[bool], Suffix[int]]:
@@ -686,7 +714,8 @@ def _isolated() -> Spec:
                 lo += max(0, n - sum(1 for x in rest if not partnered[x] or masks[x] & reach))
             return Iv(float(lo), float(hi))
         return Rule(read)
-    return Spec(build)
+    return Spec(build, "the count of the six's picks with a claimed partner somewhere and none"
+                       " among the six")
 
 
 def _core() -> Spec:
@@ -717,7 +746,8 @@ def _core() -> Spec:
                 min(n, (unions[r][start] & group).bit_count()) for r, start, n in branch.open))
             return Iv(float(lo), float(max(lo, hi)))
         return Rule(read)
-    return Spec(build)
+    return Spec(build, "the size of the largest group of the six's picks the claimed pairs"
+                       " join")
 
 
 def _banproof() -> Spec:
@@ -731,12 +761,15 @@ def _banproof() -> Spec:
                 return FALSE
             return Iv(0.0, cover.hi) if isinstance(cover, Iv) else ANY
         return Rule(read)
-    return Spec(build, ("team.coverage",))
+    return Spec(build, "team.coverage once the six's most banned pick is gone; 0 while red has"
+                       " no picks", ("team.coverage",))
 
 
 def _versus(feature: Callable[[Hero, Space], float]) -> Spec:
     """A sum over the six that reads red's picks, 0 while red has none."""
-    return _sum(lambda h, space: feature(h, space) if space.red else 0.0)
+    return _sum(lambda h, space: feature(h, space) if space.red else 0.0)._replace(
+        aggregate="a sum over the six's picks of what each reads off red's revealed picks; 0"
+                  " while red has none")
 
 
 def _answers(h: Hero, space: Space) -> float:
@@ -766,12 +799,13 @@ def _map_ban_factor(h: Hero, space: Space) -> float:
 def _on_map(on: Spec, off: Spec) -> Spec:
     """A map metric: `on` with a map set, `off` without one."""
     return Spec(lambda space: (on if space.m is not None else off).build(space),
+                "%s; with no map, %s" % (on.aggregate, off.aggregate),
                 tuple({*on.needs, *off.needs}))
 
 
 def _read(key: str) -> Spec:
     """Another metric's value, as it is."""
-    return Spec(lambda space: Rule(lambda branch, env: env[key]), (key,))
+    return Spec(lambda space: Rule(lambda branch, env: env[key]), "%s's value" % key, (key,))
 
 
 TEAM_RULES: dict[str, Spec] = {
@@ -825,9 +859,10 @@ TEAM_RULES: dict[str, Spec] = {
     "heal_peak_total": _sum(lambda h, s: max(h.peak_heal, h.self_heal)),
     "heal_peak_supports": _sum(lambda h, s: h.peak_heal if h.role == "support" else 0.0),
     "heal_peak_max": _extreme_of(lambda h, s: h.peak_heal, lowest=False),
-    "heal_ratio": _scaled("team.heal_peak_supports", lambda s: s.world.heal_bench),
+    "heal_ratio": _scaled("team.heal_peak_supports", lambda s: s.world.heal_bench,
+                          "world.heal_bench"),
     "hps_supports": _sum(lambda h, s: h.hps if h.role == "support" else 0.0),
-    "hps_ratio": _scaled("team.hps_supports", lambda s: s.world.hps_bench),
+    "hps_ratio": _scaled("team.hps_supports", lambda s: s.world.hps_bench, "world.hps_bench"),
     "hps_per_support": _mean(lambda h, s: h.hps if h.role == "support" else None),
     "heal_amp": _count(lambda h, s: h.heal_amp),
     "antiheal": _count(lambda h, s: h.antiheal < 0),
@@ -852,7 +887,8 @@ TEAM_RULES: dict[str, Spec] = {
     "synergy_edges": _pairwise(lambda s: [[1.0 if a is not b and s.world.synergy(a.id, b.id)
                                            else 0.0 for b in s.heroes] for a in s.heroes]),
     "synergy_score": _pairwise(Space.pairs),
-    "synergy_density": _scaled("team.synergy_edges", lambda s: PAIR_COUNT),
+    "synergy_density": _scaled("team.synergy_edges", lambda s: PAIR_COUNT,
+                               "the %d pairs a six holds" % PAIR_COUNT),
     "isolated_count": _isolated(),
     "isolated": _fixed(Top(TEAM_SIZE)),
     "core_size": _core(),
@@ -902,7 +938,7 @@ def _less_red(key: str, red: str) -> Spec:
     def build(space: Space) -> Rule:
         theirs = _red(space, red)
         return Rule(lambda branch, env: subtract(env[key], Iv(theirs, theirs)))
-    return Spec(build, (key,))
+    return Spec(build, "%s less red's %s, which the board fixes" % (key, red), (key,))
 
 
 def _red_less(red: str, key: str) -> Spec:
@@ -910,7 +946,7 @@ def _red_less(red: str, key: str) -> Spec:
     def build(space: Space) -> Rule:
         theirs = _red(space, red)
         return Rule(lambda branch, env: subtract(Iv(theirs, theirs), env[key]))
-    return Spec(build, (key,))
+    return Spec(build, "red's %s, which the board fixes, less %s" % (red, key), (key,))
 
 
 # a chew time where either side's pool or damage is 0 (compute.matchup_metrics)
@@ -932,7 +968,8 @@ def _chew_ours() -> Spec:
             out = divide(Iv(pool, pool), dps)
             return join(out, CHEW_POINT) if dps.lo <= 0 <= dps.hi else out
         return Rule(read)
-    return Spec(build, ("team.dps_floor",))
+    return Spec(build, "red's pool, which the board fixes, over team.dps_floor; %g where either"
+                       " is 0" % compute.CHEW_UNKNOWN, ("team.dps_floor",))
 
 
 def _chew_theirs() -> Spec:
@@ -950,7 +987,8 @@ def _chew_theirs() -> Spec:
             out = divide(pool, Iv(dps, dps))
             return join(out, CHEW_POINT) if pool.lo <= 0 <= pool.hi else out
         return Rule(read)
-    return Spec(build, ("team.pool_total",))
+    return Spec(build, "team.pool_total over red's damage floor, which the board fixes; %g where"
+                       " either is 0" % compute.CHEW_UNKNOWN, ("team.pool_total",))
 
 
 def _range_diff() -> Spec:
@@ -971,7 +1009,8 @@ def _range_diff() -> Spec:
                 return gap
             return FALSE if known.hi < 1 else join(gap, FALSE)
         return Rule(read)
-    return Spec(build, ("team.range_known", "team.range_median"))
+    return Spec(build, "team.range_median less red's, which the board fixes; 0 where either side's"
+                       " picks publish no range", ("team.range_known", "team.range_median"))
 
 
 def _heal_need() -> Spec:
@@ -986,7 +1025,8 @@ def _heal_need() -> Spec:
             ends = (compute.heal_need(read_red, pool.lo), compute.heal_need(read_red, pool.hi))
             return Iv(min(ends), max(ends))
         return Rule(read)
-    return Spec(build, ("team.pool_total",))
+    return Spec(build, "red's healing per pool, which the board fixes, times team.pool_total, at"
+                       " least red's healing", ("team.pool_total",))
 
 
 def _heal_shortfall() -> Spec:
@@ -999,7 +1039,9 @@ def _heal_shortfall() -> Spec:
         corners = [compute.heal_shortfall(n, h) for n in (need.lo, need.hi)
                    for h in (healing.lo, healing.hi)]
         return Iv(min(corners), max(corners))
-    return Spec(lambda space: Rule(read, SLACK * 4.0), ("matchup.heal_need", "team.hps_floor"))
+    return Spec(lambda space: Rule(read, SLACK * 4.0),
+                "the share of matchup.heal_need team.hps_floor leaves unhealed: 0 to 1",
+                ("matchup.heal_need", "team.hps_floor"))
 
 
 MATCHUP_RULES: dict[str, Spec] = {
@@ -1012,7 +1054,7 @@ MATCHUP_RULES: dict[str, Spec] = {
     "chew_time_theirs": _chew_theirs(),
     "tempo_diff": _red_less("cooldown_median", "team.cooldown_median"),
     "range_diff": _range_diff(),
-    "exposure_share": _scaled("team.exposed_count", lambda s: TEAM_SIZE),
+    "exposure_share": _scaled("team.exposed_count", lambda s: TEAM_SIZE, "%d" % TEAM_SIZE),
     "ult_answers": _sum(lambda h, s: float(bool(h.invuln_tools)) + float(bool(h.cleanse_tools))),
     "heal_need": _heal_need(),
     "heal_shortfall": _heal_shortfall(),
