@@ -13,8 +13,11 @@ Bring the map pool up to date. Work through the
 2. **The pool.** `pull_maps` with `refresh: true`: the wiki's map pool -
    maps, game modes, playable stages. A new map arrives here. Then
    `pull_terrain` with `refresh: true`: the ground each map's article
-   describes, counted per map and per stage - it needs the stages
-   `pull_maps` just stored.
+   describes, counted per map and per stage, a stage's with the released
+   heroes' map-strategy notes on it - it needs the stages `pull_maps`
+   just stored. Its summary's `unmatched` names each hero-table key no
+   stage takes; a new map's stage the wiki spells another way shows
+   there.
 3. **Rates.** `pull_rates` with `refresh: true` brings the per-map rates
    for a map in the game's rotation. Each hero's best maps are derived
    from them when the facts load: the three maps where its win rate is

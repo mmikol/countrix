@@ -475,9 +475,10 @@ def stage_blurb(
     """A stage of the plan in four sentences at most, each dropped when it
     has nothing to say: the ground - the stage, its place on the route
     (`index`, phase and phases; (0, 0) for an arena), and what its own text
-    stresses, else that it reads as the map; what changes here - the rules
-    its ground turns on and off; what came of its search (`outcome`): the
-    six the board suggests played as it is (origin), no six within the
+    stresses, else that its text stresses nothing beyond the map, else, with
+    no text of its own, that it reads as the map; what changes here - the
+    rules its ground turns on and off; what came of its search (`outcome`):
+    the six the board suggests played as it is (origin), no six within the
     search's budget (unsolved) or the stage's limits (infeasible), else the
     swaps and what the six gains most on (`gains`, titled), or the six kept
     under the cost; and how to play it, where the six's lean turns (`lean`,
@@ -486,6 +487,8 @@ def stage_blurb(
     stressed = compute.stage_standouts(m, stage)[:TERRAIN_NAMED]
     if stressed:
         ground = "its own text stresses %s" % _and(TERRAIN_GROUND[s.feature] for s in stressed)
+    elif stage in m.stage_z:
+        ground = "its own text stresses nothing beyond %s as a whole" % m.name
     else:
         ground = "the wiki says too little of it, so it reads as %s" % m.name
     read = ["%s%s: %s" % (stage, place, ground)]

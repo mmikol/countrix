@@ -7,6 +7,7 @@ import pytest
 from psycopg.conninfo import make_conninfo
 from psycopg.sql import SQL, Identifier
 
+from db.data.wiki import terrain
 from db.data.wiki.kits.measurements import CANONICAL_UNITS
 from db.psql import schema
 
@@ -62,9 +63,12 @@ def test_each_mode_has_its_stages(rows, one):
 
 
 def test_stage_terrain_is_whole_per_stage(one):
-    # a stage with text holds all eight features, as a map does
+    # a stage with text holds all eight features, as a map does, each row with
+    # the words of the one text, STAGE_MIN_WORDS or more: 0 is a row
+    # pull_terrain has not counted since migration 030
     assert one("""select count(*) from (select stage_id from stage_terrain
-                  group by stage_id having count(*) <> 8) t""") == 0
+                  group by stage_id having count(*) <> 8 or count(distinct words) <> 1
+                  or min(words) < %d) t""" % terrain.STAGE_MIN_WORDS) == 0
 
 
 # --- the measurement model ----------------------------------------------

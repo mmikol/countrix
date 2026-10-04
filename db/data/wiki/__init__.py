@@ -10,7 +10,8 @@ Page to table, each ends in run(connection, pull):
                     phases from the Hybrid article
     terrain         the ground each map article describes - chokes,
                     interiors, high ground, flanks, sightlines, open ground,
-                    hazards, cover - counted per map and per stage
+                    hazards, cover - counted per map and per stage, a
+                    stage's with the heroes' map-strategy notes on it
                     (pull_terrain, after maps)
     matchups        who answers whom (counters), from each hero article's
                     Match-Up column and its Strategy section
@@ -33,7 +34,8 @@ The readers the loaders share, no run():
     matchup_tables  a hero article's Match-Ups and Team Synergy section:
                     one column of its tables as rows, in either markup,
                     and a cell as plain text; synergies and matchups read
-                    it, over the released heroes' articles it fetches
+                    it, and terrain its sentences and cells, over the
+                    released heroes' articles it fetches
 
 The article HTML sits behind a bot challenge; the only open path is the
 MediaWiki endpoint below, which returns JSON (Cargo) and raw wikitext and

@@ -12,13 +12,15 @@ here: a test greps this module's source for each one.
 """
 
 import statistics
-from typing import SupportsFloat
+from collections.abc import Iterable
+from typing import NamedTuple, SupportsFloat
 
 import psycopg
 from psycopg.rows import TupleRow
 
 from db import KIND_WEAPON
 from db.data.normalizer import name_key
+from db.data.wiki.terrain import WORDS_PER_RATE
 from facts import counters, kit_format
 from facts.draft import EXPECTED_SHAPE
 from facts.kit import KitPiece, Stat
@@ -36,7 +38,18 @@ from facts.scalars import ally_lifesteal, derive_scalars
 
 type Connection = psycopg.Connection[TupleRow]
 
-NO_TEXT = StageTerrain(0.0, 0)
+NO_TEXT = StageTerrain(0.0, 0, 0)
+# The words of its map's rate a stage's own rate is pulled toward. A stage's
+# text runs from 20 words to a few hundred, where one mention swings its rate
+# per thousand words by 5 to 50: read alone, a 20-word sentence that names a
+# feature once reads 50 a thousand, several times the maps' mean on every
+# feature. 100 words, about one paragraph on the stage, is where its own text
+# weighs even with the map's: a 20-word text counts a sixth, a 200-word one
+# two thirds. That weighs the text, not the z it yields: weighed at a sixth,
+# the one mention still lifts the rate about 8 a thousand, a sd or more on a
+# feature the maps name seldom, so compute.ground raises a feature only on
+# compute.STAGE_MENTIONS mentions.
+STAGE_PRIOR_WORDS = 100
 
 LATEST_BLIZZARD = """(select ms.snapshot_id from meta_snapshots ms
     join sources s on s.source_id = ms.source_id where s.code = 'blizzard'
@@ -56,45 +69,86 @@ def _rows(cx: Connection, sql: str) -> list[TupleRow]:
     return cx.execute(sql).fetchall()
 
 
+class Scale(NamedTuple):
+    """A population's mean and sd: what a z-score is read against."""
+    mean: float
+    sd: float
+
+
+def _scale(values: Iterable[float]) -> Scale:
+    """The values' mean and population sd."""
+    population = list(values)
+    return Scale(statistics.fmean(population), statistics.pstdev(population))
+
+
+def _z(value: float, scale: Scale) -> float:
+    """The value in sd from the scale's mean, to three places; 0 where sd is 0."""
+    return round((value - scale.mean) / scale.sd, 3) if scale.sd else 0.0
+
+
 def _z_scores[K](values: dict[K, float]) -> dict[K, float]:
     """{key: value} -> {key: z}, by the population's mean and sd; 0 where sd is 0."""
     if not values:
         return {}
-    mean, sd = statistics.fmean(values.values()), statistics.pstdev(values.values())
-    return {k: round((v - mean) / sd, 3) if sd else 0.0 for k, v in values.items()}
+    scale = _scale(values.values())
+    return {k: _z(v, scale) for k, v in values.items()}
+
+
+def terrain_scales(w: World) -> dict[str, Scale]:
+    """{F: the mean and sd of the maps' mentions of F per thousand words},
+    across the maps that have text: the scale every terrain z is read on,
+    a map's and a stage's alike. Empty while no map has text."""
+    read = [m for m in w.maps.values() if m.terrain]
+    if not read:
+        return {}
+    return {f: _scale(m.terrain.get(f, 0.0) for m in read) for f in TERRAIN_FEATURES}
 
 
 def derive_map_terrain(w: World) -> None:
     """Map.terrain_z[F]: the map's mentions of F per thousand words, z-scored
-    across the maps that have text; 0 for every F on a map with none.
-    Map.terrain_lean[S]: the mean of terrain_z over TERRAIN_LEAN[S], z-scored
-    across the same maps; absent on a map with no text."""
+    across the maps that have text (terrain_scales); 0 for every F on a map
+    with none. Map.terrain_lean[S]: the mean of terrain_z over
+    TERRAIN_LEAN[S], z-scored across the same maps; absent on a map with no
+    text."""
     read = sorted((m for m in w.maps.values() if m.terrain), key=lambda m: m.id)
     for m in w.maps.values():
         m.terrain_z = dict.fromkeys(TERRAIN_FEATURES, 0.0)
         m.terrain_lean = {}
-    for feature in TERRAIN_FEATURES:
-        for mid, z in _z_scores({m.id: m.terrain.get(feature, 0.0) for m in read}).items():
-            w.maps[mid].terrain_z[feature] = z
+    for feature, scale in terrain_scales(w).items():
+        for m in read:
+            m.terrain_z[feature] = _z(m.terrain.get(feature, 0.0), scale)
     for style, features in sorted(TERRAIN_LEAN.items()):
         means = {m.id: statistics.fmean(m.terrain_z[f] for f in features) for m in read}
         for mid, z in _z_scores(means).items():
             w.maps[mid].terrain_lean[style] = z
 
 
+def stage_rate(mentions: int, words: int, prior: float) -> float:
+    """A stage's mentions of a feature per thousand words: its own text's
+    rate pulled toward `prior`, its map's, by STAGE_PRIOR_WORDS words of it -
+    the two rates' mean weighted by the stage's words and the prior's."""
+    return ((WORDS_PER_RATE * mentions + STAGE_PRIOR_WORDS * prior)
+            / (words + STAGE_PRIOR_WORDS))
+
+
 def derive_stage_terrain(w: World) -> None:
-    """Map.stage_z[stage][F]: the stage's mentions of F per thousand words of its
-    own text, z-scored across every stage that has text; a stage without text
-    holds nothing."""
-    read = sorted((m.id, stage) for m in w.maps.values() for stage in m.stage_terrain)
+    """Map.stage_z[stage][F]: the stage's stage_rate of F - pulled toward its
+    map's rate, the maps' mean on a map with no text - in sd on the maps'
+    scale (terrain_scales), so a stage reads against the maps as its map
+    does and no other stage's text moves it. A stage without counted text -
+    no rows, or rows of 0 words, stored before the words were - holds
+    nothing and reads as its map."""
+    scales = terrain_scales(w)
     for m in w.maps.values():
-        m.stage_z = {stage: {} for stage in m.stage_terrain}
-    for feature in TERRAIN_FEATURES:
-        rates = {
-            (mid, stage): w.maps[mid].stage_terrain[stage].get(feature, NO_TEXT).per_thousand
-            for mid, stage in read}
-        for (mid, stage), z in _z_scores(rates).items():
-            w.maps[mid].stage_z[stage][feature] = z
+        m.stage_z = {}
+        for stage, said in m.stage_terrain.items():
+            words = max((t.words for t in said.values()), default=0)
+            if not words or not scales:
+                continue
+            m.stage_z[stage] = {
+                f: _z(stage_rate(said.get(f, NO_TEXT).mentions, words,
+                                 m.terrain.get(f, 0.0) if m.terrain else scale.mean), scale)
+                for f, scale in scales.items()}
 
 
 def derive_map_styles(w: World) -> None:
@@ -309,16 +363,16 @@ def _read_map_rates(cx: Connection, w: World) -> None:
 
 
 def _read_terrain(cx: Connection, w: World) -> None:
-    """The terrain the wiki's articles describe, per map and per stage, with
-    their z-scores."""
+    """The terrain the wiki describes, per map and per stage - a stage's with
+    the words of its text - with their z-scores."""
     for mid, feature, rate in _rows(cx, "select map_id, feature, per_thousand from map_terrain"):
         w.maps[mid].terrain[feature] = float(rate)
     derive_map_terrain(w)
-    for mid, stage, feature, rate, mentions in _rows(cx, """
-            select s.map_id, s.name, t.feature, t.per_thousand, t.mentions
+    for mid, stage, feature, rate, mentions, words in _rows(cx, """
+            select s.map_id, s.name, t.feature, t.per_thousand, t.mentions, t.words
             from stage_terrain t join map_stages s using(stage_id)"""):
         w.maps[mid].stage_terrain.setdefault(stage, {})[feature] = StageTerrain(
-            float(rate), mentions)
+            float(rate), mentions, words)
     derive_stage_terrain(w)
 
 

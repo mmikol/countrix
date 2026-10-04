@@ -143,10 +143,10 @@ def test_an_unscored_seat_walks_its_stages_at_no_cost(synthetic_world):
 
 
 def test_two_stages_on_one_ground_are_one_search(forged, staged):
-    """Courtyard has no text and Spire's names its high ground one mention
-    short, so both read as Ember Ruins and score every six alike: from the
-    same origin they are one memoised search, and Forge, whose hazards
-    stand out, is another."""
+    """Courtyard has no text and Spire's names its high ground less often
+    than the map's article, so both read as Ember Ruins and score every six
+    alike: from the same origin they are one memoised search, and Forge,
+    whose hazards stand out, is another."""
     memo: swaps.Memo = {}
     rows, _, _ = planned(forged, Draft("Ember Ruins", ("Mortar", "Gale")), staged, DEFAULT,
                          ORIGIN, memo)
@@ -156,13 +156,18 @@ def test_two_stages_on_one_ground_are_one_search(forged, staged):
 
 def test_a_stage_blurb_drops_the_sentences_that_have_nothing_to_say(synthetic_world):
     """A stage with no text of its own, no rule it turns, no swap and no
-    turn in the lean reads its ground and that the six holds; a stage with
-    swaps names them and what the six gains on; each sentence ends once."""
+    turn in the lean reads its ground and that the six holds; a stage whose
+    text stresses nothing past its map's says so, not that the wiki says too
+    little; a stage with swaps names them and what the six gains on; each
+    sentence ends once."""
     m = synthetic_world.resolve("Ember Ruins", (), (), ())[0]
     none = StageRules(on=[], off=[])
     quiet = plan.stage_blurb(m, "Courtyard", (0, 0), none, [], [], COST)
     assert quiet == ("Courtyard: the wiki says too little of it, so it reads as Ember Ruins."
                      " Keep the six: no swap pays for its cost (5).")
+    level = plan.stage_blurb(m, "Spire", (0, 0), none, [], [], COST)
+    assert level.startswith("Spire: its own text stresses nothing beyond Ember Ruins as a"
+                            " whole. Keep the six")
     busy = plan.stage_blurb(m, "Forge", (0, 0), StageRules(on=["hazards want mobility"], off=[]),
                             [{"out": "Rook", "in": "Flint"}], ["hazards want mobility"], COST)
     assert busy.startswith("Forge: its own text stresses ")

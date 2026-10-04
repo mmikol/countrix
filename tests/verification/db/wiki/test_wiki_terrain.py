@@ -1,6 +1,7 @@
-"""Map and stage terrain read off the wiki's map articles: the section filter
-and a stage's own text, on inline wikitext. The lexicon is
-test_wiki_terrain_lexicon.py's, the pull test_wiki_terrain_pull.py's."""
+"""Map and stage terrain read off the wiki's map articles: the section filter,
+a stage's own text and the heroes' map-strategy fields on a stage, on inline
+wikitext. The lexicon is test_wiki_terrain_lexicon.py's, the pull
+test_wiki_terrain_pull.py's."""
 
 import pytest
 
@@ -228,6 +229,82 @@ def test_a_stage_the_article_says_nothing_about_has_no_text():
     assert terrain.stage_texts("==Gameplay==\n*Docks\n*Market\n", ["Docks", "Market"]) == {
         "Docks": "", "Market": ""}
     assert terrain.stage_texts(CONTROL, []) == {}
+
+
+def test_a_paragraph_that_names_several_stages_is_read_a_sentence_at_a_time():
+    """Each sentence goes to the one stage it names; a sentence that names
+    two is neither's, and one that names none is dropped, though it follows
+    a stage's."""
+    text = ("==Strategy==\nOn the Docks, the cranes give high ground. The Market is"
+            " cramped, with narrow alleys. The Docks and the Market both reward a flank."
+            " Hold the point.\n")
+    texts = terrain.stage_texts(text, ["Docks", "Market"])
+    assert texts == {"Docks": "On the Docks, the cranes give high ground.",
+                     "Market": "The Market is cramped, with narrow alleys."}
+
+
+def test_a_name_of_two_words_matches_in_any_case_and_one_word_as_written():
+    """The bomb flats are the Bomb Flats; a well is not the Well."""
+    text = ("==Strategy==\nThe bomb flats are open ground with no cover.\n\n"
+            "Fights go well near the Arena's pillars.\n\n"
+            "The well-known arena is a pit.\n")
+    texts = terrain.stage_texts(text, ["Arena", "Bomb Flats", "Well"])
+    assert texts == {"Arena": "Fights go well near the Arena's pillars.",
+                     "Bomb Flats": "The bomb flats are open ground with no cover.",
+                     "Well": ""}
+    assert terrain.name_pattern("Bomb Flats").search("THE BOMB FLATS")
+    assert not terrain.name_pattern("Well").search("all is well")
+
+
+# --- the heroes' map-strategy tables -------------------------------------------
+
+HERO = """'''Tess''' is a hero.
+
+==Map Strategies==
+{{MapStrategyTable/Control
+| Thera_rating = GOOD VIABILITY
+| Thera_strategy = Thera suits her.
+| Thera_Lighthouse_strat = Hover past the {{al|Cliff Edge}} and boop them off the cliff.
+| Thera_Well_strat =
+| Thera_Gardens_strat = A text for the Garden.
+| Thera_Pier_strat = No stage of Thera is called this.
+| Docklands_Docks_strat = A text for the Docks.
+}}
+{{MapStrategyTable/Hybrid
+| Kingsbridge_Attack_strat = A side's text, which no stage owns.
+}}
+"""
+
+
+def test_a_heros_map_strategy_table_holds_a_field_per_stage_and_none_per_side():
+    fields = terrain.stage_fields(HERO)
+    assert [(f.map_key, f.stage_key) for f in fields] == [
+        ("thera", "lighthouse"), ("thera", "well"), ("thera", "gardens"), ("thera", "pier"),
+        ("docklands", "docks")]
+    # a field is read as a table cell: an ability's template is its name
+    assert fields[0].text == "Hover past the Cliff Edge and boop them off the cliff."
+    assert fields[1].text == ""                                  # blank, but a field
+    assert terrain.stage_fields("No table here.") == []
+
+
+def test_a_field_lands_on_the_stage_its_keys_name_and_a_key_no_stage_takes_is_named():
+    """The map key begins the map's name (Thera for Thera Isle); the stage
+    key is a stage's name, else it and the name begin one another (Gardens
+    for Garden). The Docks key is the Docks' name and also begins Docks
+    Two's: the name wins. A blank field adds nothing, and a key no stage
+    takes is named, blank or not."""
+    placed = terrain.place_fields(terrain.stage_fields(HERO), {
+        "Thera Isle": ["Lighthouse", "Well", "Garden"], "Docklands": ["Docks", "Docks Two"]})
+    assert placed.texts == {
+        ("Thera Isle", "Lighthouse"): ["Hover past the Cliff Edge and boop them off the cliff."],
+        ("Thera Isle", "Garden"): ["A text for the Garden."],
+        ("Docklands", "Docks"): ["A text for the Docks."]}
+    assert placed.unmatched == ["thera_pier"]
+    # a map key two maps' names begin is neither's, nor is one no map's name begins
+    ambiguous = terrain.place_fields(terrain.stage_fields(HERO), {
+        "Thera Isle": ["Lighthouse"], "Thera Ruins": ["Lighthouse"]})
+    assert ambiguous.texts == {} and ambiguous.unmatched == [
+        "docklands_docks", "thera_gardens", "thera_lighthouse", "thera_pier", "thera_well"]
 
 
 def test_a_phases_text_is_every_section_of_its_name_and_its_stretches():

@@ -15,7 +15,8 @@ import html
 import os
 from typing import NamedTuple
 
-from facts import compute, counters, scalars
+from db.data.wiki import terrain
+from facts import compute, counters, scalars, tables
 from facts.draft import MAX_BANS, MAX_TANKS, TEAM_SIZE
 from inference import base, bounds, catalog, scale, scoring, solver, strategy
 
@@ -171,6 +172,9 @@ def view_math() -> str:
         "RATE_PICK_HALF": base.RATE_PICK_HALF,
         "LOGIT_PER_POINT": base.LOGIT_PER_POINT,
         "PARTNER_POINTS": compute.PARTNER_POINTS,
+        "STAGE_PRIOR_WORDS": tables.STAGE_PRIOR_WORDS,
+        "STAGE_MENTIONS": compute.STAGE_MENTIONS,
+        "STAGE_MIN_WORDS": terrain.STAGE_MIN_WORDS,
         "REFERENCE_SIZE": format(scale.REFERENCE_SIZE, ","),
         "SCALE_POOL": scale.SCALE_POOL,
         "COIN_FLIP": base.COIN_FLIP,

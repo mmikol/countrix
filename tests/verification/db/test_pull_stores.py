@@ -19,7 +19,7 @@ from db import INPUT_DEVICE, PLATFORM, REGION, psql
 from db.data import cache
 from db.data.blizzard import meta
 from db.data.cache import cache_key
-from db.data.wiki import maps, patches, playstyles, terrain
+from db.data.wiki import maps, matchup_tables, patches, playstyles, terrain
 from tests.verification.db import COMPOSITION, HYBRID_PAGE, write_aged
 from tests.verification.db.recording import RecordingConnection
 
@@ -301,46 +301,76 @@ ILIOS_TERRAIN = """== Strategy ==
 Fight near the point and hold it.
 """
 
+# a hero article's map-strategy tables: a filled Sanctuary field, blank ones,
+# a key no stage takes and a Hybrid side's field, which no stage owns
+PHARAH_STRATEGY = """'''Pharah''' flies.
 
-def _terrain_rows(key_id, words, source_id, **mentions):
+==Map Strategies==
+{{MapStrategyTable/Control
+| Busan_rating = GOOD VIABILITY
+| Busan_strategy = Busan rewards flight.
+| Busan_Downtown_strat =
+| Busan_Sanctuary_strat = The temple garden is wide open, so hover over the trees and rain
+{{al|Rocket Launcher}} splash onto the defenders below.
+| Busan_MEKA_strat =
+| Busan_Garage_strat = No stage of Busan is called this.
+}}
+{{MapStrategyTable/Hybrid
+| KingsRow_Attack_strat = Fly over the first choke.
+}}
+"""
+
+
+def _terrain_rows(key_id, words, source_id, keep_words=False, **mentions):
     """The eight rows one map or stage is stored as, a feature the text does
-    not name at 0."""
+    not name at 0; a stage's (keep_words) with its text's words."""
     counts = {feature: mentions.get(feature, 0) for feature in terrain.FEATURES}
-    return [(key_id, feature, n, terrain.per_thousand(n, words), source_id)
+    kept = [words] if keep_words else []
+    return [(key_id, feature, n, terrain.per_thousand(n, words), *kept, source_id)
             for feature, n in counts.items()]
 
 
 def test_the_terrain_pull_counts_each_map_and_stage_and_deletes_nothing_before_it_reads(
         tmp_path, monkeypatch):
     """Busan's 93 kept words name a choke, the high ground and the pillars,
-    its Downtown section 30 of them the pillars, and nothing is said about
-    Sanctuary; the Trivia is dropped. Ilios says too little to count, and
-    Nepal's article is not in the cache."""
+    its Downtown section 30 of them the pillars; its article says nothing
+    about Sanctuary, and Pharah's map-strategy table says 20 words, the
+    floor, naming the open ground once. The Trivia is dropped. Ilios says
+    too little to count, and Nepal's article is not in the cache."""
     _cache(tmp_path, {cache_key("Busan") + ".wikitext": BUSAN_TERRAIN,
-                      cache_key("Ilios") + ".wikitext": ILIOS_TERRAIN})
+                      cache_key("Ilios") + ".wikitext": ILIOS_TERRAIN,
+                      cache_key("Pharah") + ".wikitext": PHARAH_STRATEGY})
     connection, lines = RecordingConnection([
         ("SELECT map_id, name FROM maps", [(1, "Busan"), (2, "Ilios"), (3, "Nepal")]),
         ("SELECT s.map_id, s.stage_id", [(1, 11, "Downtown", False),
-                                         (1, 12, "Sanctuary", False)])]), []
+                                         (1, 12, "Sanctuary", False),
+                                         (1, 13, "MEKA Base", False)]),
+        ("SELECT name, hero_id FROM heroes", [("Pharah", 7)])]), []
     at_fetch = _writes_at_fetch(monkeypatch, terrain, connection)
+    at_hero_fetch = _writes_at_fetch(monkeypatch, matchup_tables, connection)
     pull = _pull(tmp_path, lines)
     summary = terrain.run(connection, pull)
-    assert at_fetch == [[]]                   # neither table emptied before the articles read
+    # neither table emptied before the articles read, the heroes' or the maps'
+    assert at_hero_fetch == at_fetch == [[]]
     [cursor] = connection.cursors
     source_id = 1
     assert cursor.written("DELETE FROM stage_terrain") == [()]
     assert cursor.written("DELETE FROM map_terrain") == [()]
     assert cursor.written('INSERT INTO "map_terrain"') == _terrain_rows(
         1, 93, source_id, chokes=1, high_ground=1, cover=1)
-    assert cursor.written('INSERT INTO "stage_terrain"') == _terrain_rows(
-        11, 30, source_id, cover=1)
+    assert cursor.written('INSERT INTO "stage_terrain"') == [
+        *_terrain_rows(11, 30, source_id, keep_words=True, cover=1),
+        *_terrain_rows(12, 20, source_id, keep_words=True, open_ground=1)]
     assert summary["without_text"] == ["Ilios"]
     [missing] = summary["missing"]
     assert missing.startswith("Nepal: ") and "offline" in missing
     assert {key: summary[key] for key in (
-        "maps", "rows", "words", "stages", "stages_no_text", "stage_rows")} == {
-        "maps": 1, "rows": 8, "words": 93, "stages": 1, "stages_no_text": 1, "stage_rows": 8}
-    # one commit ends the maps and stages read before the fetches, one the reload
+        "maps", "rows", "words", "stages", "stages_no_text", "stage_rows", "fields",
+        "unmatched")} == {
+        "maps": 1, "rows": 8, "words": 93, "stages": 2, "stages_no_text": 1, "stage_rows": 16,
+        "fields": 1, "unmatched": ["busan_garage"]}
+    assert "  map-strategy fields: 1 with text; matching no stage: busan_garage" in lines
+    # one commit ends the maps, stages and heroes read before the fetches, one the reload
     assert connection.commits == 2 and pull.session.calls == 1   # Nepal, asked for once
 
 

@@ -35,13 +35,26 @@ keeps it current.
   drawn once per board, keeping the clamp's guarantee. And the
   `team.one_shots` docstring misdescribes it: it counts picks with no
   melee weapon. Cost: a day.
-- **Fuller stage texts.** 36 of the 64 stages have no text of their own
-  on the wiki as the pull reads it, and most of the rest a few sentences,
-  so under the rules of 2026-10-03 only Nepal's Sanctum scores a six of
-  its own (the terrain rules they replaced made 8 stages of 5 maps do).
-  Reading each article's stage sections more fully, or a second
-  paragraph per stage, is the lever that makes the plan stage by stage
-  say more. Cost: the map pull and its cache; no engine change.
+- **A plan that swaps between stages.** The pull reads each stage's
+  sentences and the heroes' map-strategy notes, weighed by length against
+  its map, and a stage raises a feature on two mentions or more
+  (migration 030; 2026-10-04): 35 of the 64 stages have text, a terrain
+  rule differs between the stages of 3 maps and Nepal by name, and 3
+  stages score a six of their own, but the plan swaps on no open board
+  at the swap cost of 10, nor at 5; at 2 it swaps on one stage row, at 1
+  on two. Making it swap is a tuning call, a lower `swap` or heavier
+  terrain rules through `tune`. 29 stages still have no text: neither
+  their map's article nor a hero's notes speak of them, and 17 of the 35
+  with text stress nothing beyond their map. The lexicon reads no
+  negation - Havana's Distillery's "Vats blocking sightlines" counts as a
+  sightline - one reason one mention raises nothing. A Hybrid map's
+  sentences cued by the first point or the payload outside its phase
+  headings stay unread (Blizzard World, Hollywood, Neon Junction), and
+  six map-strategy keys match no stage - Antarctic's Labs and Sublevel,
+  New Junk City's Foundation, Scrapyard and Waterworks, and Aatlis's
+  TownCentre for Town Center - which `pull_terrain` lists as unmatched.
+  Cost: a tuning pass; a phase cue reader and an alias table for the
+  keys, a morning.
 - **A faster board under the researched playbook.** The researched rules
   made a search walk far more branches than the terrain playbook did only
   where `edges-reward-displacement` is on - about ten times on Ilios, three
@@ -52,11 +65,11 @@ keeps it current.
   `team.style_lean` on the branch, and folds the count rules, four counts
   at most, into the default engine's joint bound: Ilios walks 3,991
   branches where it walked 32,165, and a board takes about half a
-  second, the slowest maps included. Most of that is now the scale's freeze, three quarters of it
-  the field's sixes measured in `scale._field_sample`, which a board
-  cannot share with the next while the field reads red (Red never
-  reorders the scale's field). Cost: half a day once the field reads the
-  map alone.
+  second, the slowest maps included. Most of that is now the scale's
+  freeze, three quarters of it the field's sixes measured in
+  `scale._field_sample`, which a board cannot share with the next while
+  the field reads red (Red never reorders the scale's field). Cost: half
+  a day once the field reads the map alone.
 - **The keys the research could not use.** The 2026-10-03 research
   dropped sourced rules for want of a metric: peel tools near the
   backline (`team.support_peel`), team speed sources such as Speed Boost

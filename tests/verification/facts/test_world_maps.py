@@ -83,10 +83,10 @@ def test_every_stage_with_text_reads_every_feature_as_the_wiki_states_it(world, 
     for m, stage in read:
         assert stage in m.stages and set(m.stage_terrain[stage]) == set(features)
         assert set(m.stage_z[stage]) == set(features)
-    (rate, mentions), = rows("""select t.per_thousand, t.mentions from stage_terrain t
-        join map_stages s using(stage_id) join maps m using(map_id)
+    (rate, mentions, words), = rows("""select t.per_thousand, t.mentions, t.words
+        from stage_terrain t join map_stages s using(stage_id) join maps m using(map_id)
         where m.name = 'Ilios' and s.name = 'Well' and t.feature = 'hazards'""")
-    assert world.map("Ilios").stage_terrain["Well"]["hazards"] == (float(rate), mentions)
+    assert world.map("Ilios").stage_terrain["Well"]["hazards"] == (float(rate), mentions, words)
     # the same on every pass
     before = {m.id: {s: dict(z) for s, z in m.stage_z.items()} for m in world.maps.values()}
     tables.derive_stage_terrain(world)

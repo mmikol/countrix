@@ -74,9 +74,11 @@ class DerivedEdge(NamedTuple):
 # --- a map's -------------------------------------------------------------
 
 class StageTerrain(NamedTuple):
-    """How often a stage's own text mentions one terrain feature."""
+    """How often a stage's own text mentions one terrain feature, and the
+    words of that text (0 where stored before the words were)."""
     per_thousand: float
     mentions: int
+    words: int
 
 
 # --- the World's ---------------------------------------------------------

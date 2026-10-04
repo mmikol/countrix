@@ -182,45 +182,63 @@ def test_a_seat_has_a_side_only_on_a_sided_map(synthetic_world):
     assert opposite("") == ""
 
 
-def test_a_stage_stands_out_on_its_own_text_and_enough_mentions(synthetic_world):
-    """Stage texts are short: one mention swings a rate, so a feature stands
-    out on STAGE_MENTIONS or more. Forge's hazards and Spire's high ground both
-    sit one sd up; Forge's text names them twice, Spire's once."""
+def test_a_stage_stands_out_where_its_text_raises_a_feature_to_the_standout(synthetic_world):
+    """A stage's own text stresses a feature it raises the ground in play
+    to at TERRAIN_STANDOUT or more. Forge's hazards read 2 sd to the map's 1;
+    Spire's text names its high ground once, less often than the map's
+    article, and Courtyard has no text of its own."""
     w = synthetic_world
     ember = w.map("Ember Ruins")
-    assert STAGE_MENTIONS == 2 and TERRAIN_STANDOUT == 0.75
-    assert compute.stage_standouts(ember, "Forge") == [("hazards", 1.0)]
-    assert ember.stage_z["Spire"]["high_ground"] == 1.0
+    assert TERRAIN_STANDOUT == 0.75
+    assert compute.stage_standouts(ember, "Forge") == [("hazards", 2.0)]
     assert compute.stage_standouts(ember, "Spire") == []
-    assert compute.stage_standouts(ember, "Courtyard") == []        # no text of its own
+    assert compute.stage_standouts(ember, "Courtyard") == []
+    # named once, a feature stands out nowhere, however high it reads
+    ember.stage_z["Spire"]["high_ground"] = 3.0
+    assert compute.stage_standouts(ember, "Spire") == []
+    # raised short of the standout (chokes, -1 on the map), or at it but below
+    # the map's own (high ground, 1): no standout. Each named twice, as Forge's
+    # hazards are
+    twice = StageTerrain(2.86, STAGE_MENTIONS, 700)
+    named = ("chokes", "high_ground", "cover", "flanks")
+    ember.stage_terrain["Forge"].update(dict.fromkeys(named, twice))
+    ember.stage_z["Forge"].update({"chokes": 0.5, "high_ground": 0.9})
+    assert compute.ground(ember, "Forge", "chokes") == ("chokes", 0.5, "stage")
+    assert compute.ground(ember, "Forge", "high_ground") == ("high_ground", 1.0, "map")
+    assert compute.stage_standouts(ember, "Forge") == [("hazards", 2.0)]
     # STAGE_FEATURES at most, the largest first, a tie by name
-    ember.stage_terrain["Forge"] = {
-        f: StageTerrain(9.0, STAGE_MENTIONS) for f in ("cover", "flanks", "hazards")}
-    ember.stage_z["Forge"] = {"cover": 0.8, "flanks": 1.5, "hazards": 1.5}
+    ember.stage_z["Forge"].update({"cover": 0.8, "flanks": 1.5, "hazards": 1.5})
     assert STAGE_FEATURES == 2
     assert compute.stage_standouts(ember, "Forge") == [("flanks", 1.5), ("hazards", 1.5)]
 
 
-def test_the_ground_in_play_is_the_map_raised_where_a_stage_text_names_a_feature(
-        synthetic_world):
+def test_the_ground_in_play_is_the_map_raised_where_a_stage_text_says_more(synthetic_world):
     """A stage's text can add a feature, never drop one: its z counts where
-    the text names the feature STAGE_MENTIONS times or more and stands above
-    the map's; a feature it leaves out, names once or reads lower is the
+    the text names the feature STAGE_MENTIONS times or more and it stands
+    above the map's, which a stage's rate pulled toward its map's does only
+    where its text names the feature more often; a feature it names once,
+    reads lower or level with the map, or a stage with no text, is the
     map's. No stage is the map."""
     w = synthetic_world
     ember = w.map("Ember Ruins")
+    assert STAGE_MENTIONS == 2
     assert ember.terrain_z["hazards"] == 1.0 and ember.terrain_z["flanks"] == 1.0
     assert compute.ground(ember, "", "hazards") == ("hazards", 1.0, "map")
+    assert compute.ground(ember, "Forge", "hazards") == ("hazards", 2.0, "stage")
+    assert compute.ground(ember, "Forge", "flanks") == ("flanks", 1.0, "map")   # lower: kept
+    assert compute.ground(ember, "Spire", "high_ground") == ("high_ground", 1.0, "map")
+    assert compute.ground(ember, "Courtyard", "cover") == ("cover", -1.0, "map")
+    ember.stage_z["Forge"]["hazards"] = 1.0
     assert compute.ground(ember, "Forge", "hazards") == ("hazards", 1.0, "map")    # a tie
     ember.stage_z["Forge"]["hazards"] = 2.5
     assert compute.ground(ember, "Forge", "hazards") == ("hazards", 2.5, "stage")
     assert compute.ground(ember, "", "hazards") == ("hazards", 1.0, "map")
-    ember.stage_z["Spire"]["high_ground"] = 3.0                     # named once
+    # Spire names its high ground once: read 3 sd up, it is still the map's,
+    # and on STAGE_MENTIONS mentions the stage's
+    ember.stage_z["Spire"]["high_ground"] = 3.0
     assert compute.ground(ember, "Spire", "high_ground") == ("high_ground", 1.0, "map")
-    ember.stage_terrain["Forge"]["flanks"] = StageTerrain(1.0, STAGE_MENTIONS)
-    ember.stage_z["Forge"]["flanks"] = -0.5                           # lower: never drops
-    assert compute.ground(ember, "Forge", "flanks") == ("flanks", 1.0, "map")
-    assert compute.ground(ember, "Courtyard", "cover") == ("cover", -1.0, "map")
+    ember.stage_terrain["Spire"]["high_ground"] = StageTerrain(4.0, STAGE_MENTIONS, 500)
+    assert compute.ground(ember, "Spire", "high_ground") == ("high_ground", 3.0, "stage")
     staged = compute.map_metrics(ember, ban_count=0, stage="Forge")
     whole = compute.map_metrics(ember, ban_count=0)
     assert {k for k in staged if staged[k] != whole[k]} == {"hazards", "stage"}

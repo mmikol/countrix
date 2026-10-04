@@ -126,9 +126,10 @@ def pull_maps(connection: psycopg.Connection, pull: cache.PullContext) -> PullSu
     "pull_terrain", "The wiki's map articles: per map, the mentions of each"
     " terrain feature (chokes, interiors, high_ground, flanks, sightlines,"
     " open_ground, hazards, cover) and the mentions per thousand words; the"
-    " same per stage, where the article has text about the stage. Reloads"
-    " map_terrain and stage_terrain whole. Run after pull_maps: a stage must"
-    " exist before its terrain.", source="wiki", stored="terrain stored")
+    " same per stage, with the stage's words, where the article or a released"
+    " hero's map-strategy table has text about the stage. Reloads map_terrain"
+    " and stage_terrain whole. Run after pull_maps: a stage must exist before"
+    " its terrain.", source="wiki", stored="terrain stored")
 def pull_terrain(connection: psycopg.Connection, pull: cache.PullContext) -> PullSummary:
     return wiki_terrain.run(connection, pull)
 
@@ -206,9 +207,10 @@ def load_authored(ctx: Context) -> ToolReply:
 def sync_all(ctx: Context, refresh: bool = False) -> ToolReply:
     results: dict[str, Mapping[str, object]] = {}
     pulls = ctx.tools.pulls()
-    # one cutoff for every pull: the hero articles pull_kits, pull_synergies
-    # and pull_counters read, and the map articles pull_maps and pull_terrain
-    # read, are fetched by the first and read from the cache by the rest
+    # one cutoff for every pull: the hero articles pull_kits, pull_synergies,
+    # pull_counters and pull_terrain read, and the map articles pull_maps and
+    # pull_terrain read, are fetched by the first and read from the cache by
+    # the rest
     run = ctx.refreshing() if refresh else ctx
     for spec in pulls:
         ctx.log("=== %s ===" % spec.name)

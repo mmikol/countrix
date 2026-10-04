@@ -76,8 +76,9 @@ summary, never out of sight.
    the database, fetches every page, and only then writes, so no row stays
    locked across a fetch. A run that reads before it fetches commits that
    read before the first fetch - pull_rates its map ids, pull_terrain its
-   maps and stages, pull_synergies and pull_counters the released heroes -
-   so no transaction stays open across the fetches either.
+   maps, stages and released heroes, pull_synergies and pull_counters the
+   released heroes - so no transaction stays open across the fetches
+   either.
 2. **One transaction.** A run writes, then commits once. The door opens
    the connection in a `with` block, so a run that raises leaves the
    tables as they were.
@@ -240,7 +241,7 @@ it:
 | 1 | `pull_heroes` | blizzard | `blizzard/heroes.py` | roles, subroles, heroes, abilities, perks | everything links to a hero |
 | 2 | `pull_kits` | wiki | `wiki/heroes.py` | the kit tables, each hero's pools, the announced heroes | it fills in the rows pull_heroes owns, and announces only a hero the roster lacks |
 | 3 | `pull_maps` | wiki | `wiki/maps.py` | game_modes, maps, map_modes, map_stages | the terrain and the rates link to maps |
-| 4 | `pull_terrain` | wiki | `wiki/terrain.py` | map_terrain, stage_terrain | a stage exists before its terrain |
+| 4 | `pull_terrain` | wiki | `wiki/terrain.py` | map_terrain, stage_terrain | a stage exists before its terrain, and pull_kits has fetched the hero articles whose map-strategy notes it reads |
 | 5 | `pull_patches` | wiki | `wiki/patches.py` | patches | a snapshot links to the patch live at capture |
 | 6 | `pull_rates` | blizzard | `blizzard/meta.py` | regions, competitive_tiers, meta_snapshots, hero_meta, map_meta | it needs the heroes, the maps and the patches |
 | 7 | `pull_playstyles` | wiki | `wiki/playstyles.py` | playstyle | a style lists heroes on the roster |

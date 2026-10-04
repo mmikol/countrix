@@ -16,7 +16,8 @@ import re
 
 import pytest
 
-from facts import board_facts, compute
+from db.data.wiki import terrain
+from facts import board_facts, compute, tables
 from facts.draft import TEAM_SIZE, Draft
 from facts.records import Patch
 from inference import base, bounds, catalog, engine, plan, scale, scoring, solver
@@ -338,6 +339,12 @@ def test_the_math_page_quotes_each_weight_from_the_playbooks_meta_file(
     (base, "RATE_PICK_HALF", "t_p = pick_p / ( pick_p + %s )"),
     (base, "LOGIT_PER_POINT", "k = 4 &middot; 6 / 100 = %s"),
     (compute, "PARTNER_POINTS", "pick score(h) = on_six(h) + %s &times; partners"),
+    (tables, "STAGE_PRIOR_WORDS", "pulled toward its map's rate by %s words of that rate"),
+    (tables, "STAGE_PRIOR_WORDS", "( 1000 &middot; mentions + %s &middot; map rate )"),
+    (compute, "STAGE_MENTIONS", "the stage's counts only where its text names the feature %s"
+                                " times or more"),
+    (terrain, "STAGE_MIN_WORDS", "one mention in a %s-word text"),
+    (terrain, "STAGE_MIN_WORDS", "A stage with under %s words of its own reads as its map"),
     (scale, "REFERENCE_SIZE", "against %s random sixes of a legal shape"),
     (scale, "SCALE_POOL", "each role's %s released heroes"),
     (base, "COIN_FLIP", "t_p &middot; ( win_p &minus; %s )"),

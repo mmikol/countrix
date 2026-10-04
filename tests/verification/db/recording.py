@@ -9,11 +9,14 @@ import itertools
 class RecordingCursor:
     """`reads` pairs a statement's opening text with the rows it reads - a
     list, or a function of the statement's parameters. A statement no pair
-    names reads back the next id from fetchone and nothing from fetchall."""
+    names reads back the next id from fetchone and nothing from fetchall.
+    `connection` is the RecordingConnection that handed it out, as a
+    psycopg cursor's is."""
 
-    def __init__(self, reads=()):
+    def __init__(self, reads=(), connection=None):
         self.statements = []
         self.reads = list(reads)
+        self.connection = connection
         self.rowcount = 1
         self._ids = itertools.count(1)
         self._rows = None
@@ -50,7 +53,7 @@ class RecordingConnection:
         self.commits = 0
 
     def cursor(self):
-        self.cursors.append(RecordingCursor(self.reads))
+        self.cursors.append(RecordingCursor(self.reads, self))
         return self.cursors[-1]
 
     def commit(self):
