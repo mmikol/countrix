@@ -413,27 +413,57 @@ class Objective:
     def lean_keys(self) -> frozenset[str] | None:
         """The team keys a six of the scale's field is read on, where they
         are all it needs (inference.scale): every heuristic on a metric reads
-        a team key or one the board settles, under a gate the board settles,
-        and every limit is a shape limit, which the field's shapes keep
-        already. None where one is not - a matchup metric, a gate a six
-        decides, a limit on a metric - and the field is prepared whole."""
+        a team key or one the board settles, under a gate the board settles
+        or one the six decides from team keys and the board's own alone - its
+        team keys read too - and every limit is a shape limit, which the
+        field's shapes keep already. None where one is not - a matchup metric,
+        a gate that reads matchup, a limit on a metric - and the field is
+        prepared whole."""
         if not all(is_shape_limit(s) for s in self.limits):
             return None
         keys = set()
-        for _, gate, _, section, key in self._heuristics:
-            if gate is None or section not in ("team", *self.measured):
+        for g, gate, _, section, key in self._heuristics:
+            if section not in ("team", *self.measured):
                 return None
             if section == "team":
                 keys.add(key)
+            if gate is None:
+                read = self._guard_keys(g)
+                if read is None:
+                    return None
+                keys |= read
         return frozenset(keys)
+
+    def _guard_keys(self, g: Strategy) -> set[str] | None:
+        """The team keys a gate the six decides reads, where every other name
+        it reads is a param or a section the board settles; None where it
+        reads one the lean read lacks (matchup)."""
+        keys = set()
+        for name in g.when.names if g.when is not None else ():
+            section, _, key = name.partition(".")
+            if section == "team":
+                keys.add(key)
+            elif section != "params" and section not in self.measured:
+                return None
+        return keys
 
     def measure_lean(self, cand: Candidate, keys: frozenset[str]) -> Candidate:
         """A six of the scale's field read on `keys` alone (lean_keys): its
-        raw heuristic values as prepare(measure=True) reads them, every
-        heuristic read, and no limit broken - the field's shapes keep them."""
+        raw heuristic values as prepare(measure=True) reads them - a heuristic
+        whose gate the six decides read where that gate holds on the six, the
+        rest read whatever the board settles - and no limit broken: the
+        field's shapes keep them."""
         bag = team_metrics(self.world, cand.heroes, self.m, self.red, only=keys)
+        sc: Scope | None = None
+        held: list[bool | None] = [None] * self.gate_slots
         raw: list[float | None] = []
-        for _, _, _, section, key in self._heuristics:
+        for g, gate, slot, section, key in self._heuristics:
+            if gate is None:
+                if sc is None:
+                    sc = scope({**self.measured, "team": bag})
+                if not _slot_gate(held, slot, g, sc):
+                    raw.append(None)
+                    continue
             value = (bag if section == "team" else self.measured.get(section, _EMPTY)).get(key)
             raw.append(float(value) if isinstance(value, NUMBER_TYPES) else _not_a_number(value))
         cand.raw, cand.violations = raw, []

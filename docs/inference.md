@@ -595,9 +595,10 @@ most, or the largest of their weights where that is more, so a need alone
 on its guard weighs its own weight, a slider's past 2 too. The scale is
 a seeded sample of 1200 legal sixes plus the field of each role's top six
 by the board's prior (`inference/scale.py`), measured on the whole map
-whatever the stage. The field is 12,038 sixes on an open board; where
-every heuristic on a metric reads a team key under a gate the board
-settles, and every limit is a shape limit, each is read on the sections
+whatever the stage. The field is 11,115 sixes on an open board under
+the shipped limits; where every heuristic on a metric reads a team key
+under a gate the board settles or one the six decides from team keys,
+and every limit is a shape limit, each is read on the sections
 of `team_metrics` those keys live in alone (`Objective.lean_keys`), the
 same values at a third of the cost, and
 `tests/verification/inference/test_scale.py` holds the two readings to the
@@ -886,9 +887,9 @@ Long sightlines belong to long-reach hitscan. A hitscan shot lands the instant i
 
 ##### A brawl six heals the scrum (`brawl-heals-the-scrum`, shape)
 
-`maximize team.hps_floor` - summed sustained healing onto teammates, hp per second over every teammate reached, reloads in. weight 0.5, a need; when `team.style_lean == 'brawl'`
+`maximize team.hps_per_support` - sustained healing per support, hp per second: the supports' mean. weight 0.5, a need; when `team.style_lean == 'brawl'`
 
-A brawl six outlasts the other side at close range by healing through the fight. Brawl moves as one tight group and trades damage face to face, so its supports need consistent healing, from an area or a high primary output, that keeps the tanks up through the trade, and area healing is called strongest when the team is grouped. Summed sustained healing onto teammates, an area heal counted once per teammate it reaches, is read while brawl is the six's majority playstyle, and a shortfall costs up to the weight.
+A brawl six outlasts the other side at close range by healing through the fight. Brawl moves as one tight group and trades damage face to face, so its supports need consistent healing, from an area or a high primary output, that keeps the tanks up through the trade, and area healing is called strongest when the team is grouped. The supports' sustained healing per support is read while brawl is the six's majority playstyle, and a shortfall costs up to the weight.
 
 ##### A dive six moves together (`dive-moves-together`, shape)
 
@@ -898,9 +899,10 @@ A dive six moves as one: every pick reaches the target with the tanks and gets o
 
 ##### A poke six needs reach (`poke-needs-reach`, shape)
 
-`maximize team.range_median` - median of each pick's longest published range. weight 0.5, a need; when `team.style_lean == 'poke'`
+`maximize team.range_median` - median of each pick's longest published range. weight 0.5, a need; when `team.style_lean == 'poke' and team.range_known >= params.KNOWN`
+params: KNOWN=3
 
-A poke six wins the chip war before the fight closes, and it chips only what it reaches. Poke trades damage from range and from several angles, its tanks playing from the sides rather than the front, so a short-range pick idles through the poke or walks in alone. The median of the picks' longest published ranges is read while poke is the six's majority playstyle, and a shortfall costs up to the weight.
+A poke six wins the chip war before the fight closes, and it chips only what it reaches. Poke trades damage from range and from several angles, its tanks playing from the sides rather than the front, so a short-range pick idles through the poke or walks in alone. The median of the picks' longest published ranges is read while poke is the six's majority playstyle and three or more picks publish a range, and a shortfall costs up to the weight.
 
 ##### Carry a damage amplifier (`carry-a-damage-amplifier`, damage, scored)
 
@@ -918,23 +920,24 @@ The tank line carries a barrier that shields the team. In 6v6 the two tanks spli
 
 ##### Edges reward displacement (`edges-reward-displacement`, map, scored)
 
-weight 1; when `map.hazards >= params.STANDOUT or (map.name == 'Nepal' and map.stage == 'Sanctum')`; bonus `min(max(team.cc_count - params.BOOP_FLOOR, 0), params.BOOP_CAP) * 0.5`
-params: BOOP_CAP=3, BOOP_FLOOR=2, STANDOUT=0.5
+weight 1.5; when `map.hazards >= params.STANDOUT or (map.name == 'Nepal' and map.stage == 'Sanctum')`; bonus `min(max(team.shove_count - params.SHOVE_FLOOR, 0), params.SHOVE_CAP) / params.SHOVE_CAP`
+params: SHOVE_CAP=3, SHOVE_FLOOR=2, STANDOUT=0.5
 
-Where the ground has drops, displacement kills. A knockback, hook or pull over a pit, a ledge or a lava moat removes a full-health enemy outright, and the wiki's pages for Ilios, Lijiang Tower, Nepal and Samoa each name the abilities that do it on or beside the objective. Each pick with crowd control beyond the second earns half the weight, up to three, on the ground whose hazards stand 0.5 sd or more above the ordinary map's and on Nepal's Sanctum, which the wiki names.
+Where the ground has drops, displacement kills. A knockback, hook or pull over a pit, a ledge or a lava moat removes a full-health enemy outright, and the wiki's pages for Ilios, Lijiang Tower, Nepal and Samoa each name the abilities that do it on or beside the objective. Each pick with a tool that moves an enemy beyond the second earns a third of the weight, up to three, on the ground whose hazards stand 0.5 sd or more above the ordinary map's and on Nepal's Sanctum, which the wiki names.
 
 ##### Commit to one playstyle (`commit-to-one-playstyle`, shape, scored)
 
-weight 0.5; when `team.style_lean == ''`; penalty `1`
+weight 0.5; when `team.style_share <= params.SPLIT`; penalty `1`
+params: SPLIT=0.5
 
-A six commits to one plan, dive, brawl or poke, carried by a strict majority of its picks. Each archetype wins one way - brawl walks in as one unit, dive collapses on one target from several angles, poke holds range from several angles - and a six split between them fights as two half-teams: a brawl tank in front of a poke backline can neither peel a dive nor swing at what stands far away. A six whose picks share no playstyle by a strict majority pays the weight.
+A six commits to one plan, dive, brawl or poke. Each archetype wins one way - brawl walks in as one unit, dive collapses on one target from several angles, poke holds range from several angles - and a six split between them fights as two half-teams: a brawl tank in front of a poke backline can neither peel a dive nor swing at what stands far away. Each pick's playstyles are counted as fractions of one, a pick with two styles giving half to each, and a six whose largest style carries no more than half its picks pays the weight.
 
 ##### Two of each role (`two-of-each-role`, shape, scored)
 
-weight 1.5; penalty `team.shape_excess + max(0, params.TANKS - team.tanks)`
-params: TANKS=2
+weight 4.5; penalty `(team.shape_excess + max(0, params.TANKS - team.tanks)) / params.WORST`
+params: TANKS=2, WORST=3
 
-A six plays two tanks, two damage and two supports. In 6v6 the second tank holds the off-angle and doubles the front's mitigation, so one tank facing two loses the trade for space, two damage picks make the pressure that lets the tanks take it, and each pick past two in a role gives one of those jobs up; a third support behind both tanks is the one off-shape six called strong. Each pick over two in a role costs the weight, and a six one tank short pays it once more.
+A six plays two tanks, two damage and two supports. In 6v6 the second tank holds the off-angle and doubles the front's mitigation, so one tank facing two loses the trade for space, two damage picks make the pressure that lets the tanks take it, and each pick past two in a role gives one of those jobs up; a third support behind both tanks is the one off-shape six called strong. Each pick over two in a role costs a third of the weight, a six one tank short pays that once more, and a one-tank six with four damage pays the whole weight.
 
 ##### Defenders stack barriers at a choke (`defenders-stack-barriers`, side, scored)
 
@@ -1024,6 +1027,7 @@ the `team.*` metrics computed for the red side.
 | `team.style_counts` (text) | picks per playstyle tag (a hero can carry several) |
 | `team.style_top` (text) | the modal playstyle among the picks |
 | `team.style_lean` (text) | the playstyle a strict majority of picks carry, else none |
+| `team.style_share` | the largest playstyle's share of the picks, each pick's tags counted as fractions of one (a pick with k tags adds 1/k to each) |
 | `team.style_fit` | share of picks tagged with the map's rewarded style (0 without a map) |
 | `team.shape_excess` | picks over EXPECTED_SHAPE's two per role |
 | `team.pool_total` | team effective HP: sum of health + shield + armor, plus a form's armor by its uptime |
@@ -1063,6 +1067,7 @@ the `team.*` metrics computed for the red side.
 | `team.heal_peak_max` | the biggest single heal a teammate can receive |
 | `team.heal_ratio` | support heal peak / the roster's two-support bench |
 | `team.hps_supports` | summed sustained healing across the supports, hp per second |
+| `team.hps_per_support` | sustained healing per support, hp per second: the supports' mean |
 | `team.hps_ratio` | support sustained healing / the roster's two-support bench |
 | `team.heal_amp` | picks that amplify healing |
 | `team.antiheal` | picks with anti-heal |
@@ -1073,7 +1078,8 @@ the `team.*` metrics computed for the red side.
 | `team.lifelines` | picks carrying any healing at all, their own and lifesteal included |
 | `team.cooldown_median` | median cooldown across every ability on the team |
 | `team.cooldown_count` | cooldowns counted |
-| `team.cc_count` | picks with crowd control (stun, sleep, immobilize, hinder, knockback) |
+| `team.cc_count` | picks with crowd control (stun, sleep, immobilize, hinder, knockback, knockdown, hack, or a slow) |
+| `team.shove_count` | picks with a tool that moves an enemy: a knockback, a hook, a displacement |
 | `team.mobility_count` | picks with a movement or evasive ability |
 | `team.flyers` | picks that fly or hover |
 | `team.light_flyers` | picks that fly or hover, tanks aside |

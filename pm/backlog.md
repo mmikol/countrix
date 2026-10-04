@@ -42,6 +42,14 @@ keeps it current.
   Reading each article's stage sections more fully, or a second
   paragraph per stage, is the lever that makes the plan stage by stage
   say more. Cost: the map pull and its cache; no engine change.
+- **A faster search under the researched playbook.** Its fourteen rules,
+  eight of them scored, make a search walk about ten times the branches
+  the terrain playbook did: a board takes about a second, and the reach
+  recorder over an hour. The field's fast path now covers gates the six
+  decides (`Objective.lean_keys`); what is left is the bound - a scored
+  rule whose penalty the open slots can still clear bounds at no cost.
+  A tighter range for `team.style_share` and the save and barrier
+  penalties would prune earlier. Cost: a day, with test_bounds.
 - **The keys the research could not use.** The 2026-10-03 research
   dropped sourced rules for want of a metric: peel tools near the
   backline (`team.support_peel`), team speed sources such as Speed Boost

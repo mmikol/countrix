@@ -701,6 +701,7 @@ TEAM_RULES: dict[str, Spec] = {
     "style_counts": _fixed(ANY),
     "style_top": _fixed(ANY),
     "style_lean": _fixed(ANY),
+    "style_share": _fixed(Iv(0.0, 1.0)),
     "style_fit": _per_pick(lambda h, s: s.map_style is not None and s.map_style in h.styles),
     "shape_excess": _roles(lambda c: lift(sum(
         max(0, c[i] - EXPECTED_SHAPE[r]) for i, r in enumerate(ROLES)))),
@@ -742,6 +743,7 @@ TEAM_RULES: dict[str, Spec] = {
     "heal_ratio": _scaled("team.heal_peak_supports", lambda s: s.world.heal_bench),
     "hps_supports": _sum(lambda h, s: h.hps if h.role == "support" else 0.0),
     "hps_ratio": _scaled("team.hps_supports", lambda s: s.world.hps_bench),
+    "hps_per_support": _mean(lambda h, s: h.hps if h.role == "support" else None),
     "heal_amp": _count(lambda h, s: h.heal_amp),
     "antiheal": _count(lambda h, s: h.antiheal < 0),
     "cleanse": _count(lambda h, s: h.cleanse_tools),
@@ -753,6 +755,7 @@ TEAM_RULES: dict[str, Spec] = {
     "cooldown_median": _median(lambda h, s: h.cooldowns),
     "cooldown_count": _sum(lambda h, s: len(h.cooldowns)),
     "cc_count": _count(lambda h, s: h.cc_tools),
+    "shove_count": _count(lambda h, s: h.shove_tools),
     "mobility_count": _count(lambda h, s: h.mobility_tools),
     "flyers": _count(lambda h, s: h.flyer),
     "light_flyers": _count(lambda h, s: h.flyer and h.role != "tank"),
