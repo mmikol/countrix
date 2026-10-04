@@ -34,13 +34,17 @@ header.top .gh:hover { color:var(--text); border-color:var(--muted); }
 .math .toc a:hover { border-color:var(--gold); color:var(--gold); }
 .math .eq { background:#0b0e14; border:1px solid var(--line); border-radius:8px; padding:12px 14px; overflow-x:auto; font-size:13px; }
 .math code { background:#0b0e14; padding:1px 5px; border-radius:4px; }
-.mapsel { margin-left:auto; display:flex; align-items:center; gap:10px; }
+.mapsel { margin-left:auto; display:flex; flex-wrap:wrap; justify-content:flex-end;
+  align-items:center; gap:10px; }
 .mapsel select { background:#0b0e14; color:var(--text); border:1px solid var(--line);
   border-radius:6px; padding:9px 12px; font-family:"Bebas Neue",Impact,sans-serif;
-  font-size:22px; letter-spacing:.06em; min-width:280px; }
+  font-size:22px; letter-spacing:.06em; min-width:200px; }
 .mode { font-family:"Bebas Neue",Impact,sans-serif; font-size:18px; letter-spacing:.1em;
   color:var(--gold); border:1px solid var(--gold); border-radius:4px; padding:3px 10px; }
 .sideseg { display:none; border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+/* the chip, the sides and clear all keep their width and one line; the row wraps
+   before any of them is clipped */
+.mode, .sideseg, .mapsel > button { flex:none; white-space:nowrap; }
 .sideseg.show { display:inline-flex; }
 .sideseg button { border:0; border-radius:0; background:#141922; color:var(--muted);
   font-family:"Bebas Neue",Impact,sans-serif; font-size:17px; letter-spacing:.12em; padding:7px 14px; }
