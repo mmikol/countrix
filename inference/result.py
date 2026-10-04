@@ -36,8 +36,8 @@ type StageKind = Literal["phase", "arena"]
 class Pick(TypedDict):
     """One hero of a result's six, with the reason it is there and the ids of
     the facts the reason cites. A solved six carries each hero's subrole and
-    portrait; red's likely six carries neither, and its pull instead
-    (facts.compute.expected_picks)."""
+    portrait; red's likely six carries neither, and instead how often a six
+    fields the hero and its pick score (facts.compute.expected_picks)."""
     hero: str
     role: str
     locked: bool
@@ -45,7 +45,8 @@ class Pick(TypedDict):
     evidence: list[str]
     subrole: NotRequired[str]
     portrait: NotRequired[str | None]
-    pull: NotRequired[float]
+    on_six: NotRequired[float]
+    pick_score: NotRequired[float]
 
 
 class Alternative(TypedDict):
@@ -434,7 +435,8 @@ class Result:
         return base_module.write_counters_fact(
             fs, seat=self.seat, map_name=self.map_name, against=c.get("against", []),
             likely=c.get("likely", False), answers=c.get("answers", 0),
-            exposures=c.get("exposures", 0), derived=c.get("derived", []))
+            exposures=c.get("exposures", 0), derived=c.get("derived", []),
+            revealed=c.get("revealed", 0))
 
     def to_dict(self) -> ResultRecord:
         """The result as JSON-ready data. The facts it cites ride along as
@@ -474,15 +476,17 @@ class Result:
     def rendered(self) -> str:
         """The result as text: the heading, the six and its score, and a line
         each for the picks, the breakdown and the alternatives. Red's likely
-        six has no score: its line gives the six's pull, and each pick's."""
+        six has no score: its line gives how often a six fields its heroes on
+        average, and each pick's line its pick score."""
         counts = catalog_module.counts(self.catalog)
         unscored = self.unscored()
         picks = ["  %-8s %-14s %s" % (p["role"], p["hero"] + ("*" if p["locked"] else ""), p["why"])
                  for p in self.picks]
         if self.kind == "expected":
-            pull = sum(p.get("pull", 0.0) for p in self.picks)
-            return "\n".join([self._headline(), "  %s - %.1f pull %s" % (
-                ", ".join(self.blue), pull, self._share_label(unscored)), *picks])
+            picked = [p.get("on_six", 0.0) for p in self.picks]
+            return "\n".join([self._headline(), "  %s - on %.0f%% of sixes on average %s" % (
+                ", ".join(self.blue), sum(picked) / len(picked) if picked else 0.0,
+                self._share_label(unscored)), *picks])
         under = (" under the meta at %g, %d constraints, %d heuristics and %d assumptions"
                  % (self.base.meta, counts["constraint"], counts["heuristic"],
                     counts["assumption"]))

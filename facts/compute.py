@@ -93,33 +93,46 @@ WORLD_METRICS = OrderedDict([
     ("hps_bench", "2 x the median sustained healing across the released supports"),
 ])
 
-SYNERGY_PULL = 2.0        # pick-rate points a hero gains per synergy partner already on the six
+PARTNER_POINTS = 2.0      # pick-score points a hero gains per synergy partner already on the six
+# a 5v5 Role Queue team's seats per role, the queue Blizzard's rates come from:
+# a hero's pick rate is the share of those teams that field it
+RATE_SEATS = {"tank": 1, "damage": 2, "support": 2}
 
 
 class ExpectedPick(TypedDict):
     """One of the other side's likely six: the hero, its role, the pick rate
-    it rests on (None for a hero with no rate), whether it was revealed, its
-    pull and the reason in words."""
+    it rests on as published (None for a hero with no rate), whether it was
+    revealed, how often a six fields it (on_six), its pick score and the
+    reason in words."""
     hero: str
     role: str
     rate: float | None
     locked: bool
-    pull: float
+    on_six: float
+    score: float
     why: str
+
+
+def on_six(h: Hero, rate: float | None) -> float:
+    """How often a six fields the hero, in percent: its published pick rate,
+    the share of 5v5 Role Queue teams that field it, put on a two-two-two's
+    seats - a tank's doubled, since a six has two tank seats to a 5v5 team's
+    one - and capped at 100."""
+    return min(100.0, (rate or 0.0) * EXPECTED_SHAPE[h.role] / RATE_SEATS[h.role])
 
 
 def expected_picks(world: World, m: Map | None, *, revealed: Sequence[Hero] = (),
                    banned: Sequence[Hero] = ()) -> list[ExpectedPick]:
     """What the other side is likely to field, from the data alone - no
     strategy read: any picks given as revealed first, then slot by slot the
-    hero the map's pick rates (the overall meta with no map set) and the
-    wiki's synergies rank first - a hero's pull is its pick rate plus
-    SYNERGY_PULL per partner already on the six - toward a two-two-two,
-    past the bans, six heroes in all. Ties go to the alphabetically first
-    name. Deterministic. Each entry carries its pull - a revealed pick's
-    counts the revealed picks before it - so the six's pulls sum to its pick
-    rates plus SYNERGY_PULL per documented pair on it, and says what it
-    rests on."""
+    hero with the highest pick score - how often a six fields it (on_six:
+    the map's pick rate, the overall rate with no map set, a tank's doubled
+    for a six's two tank seats) plus PARTNER_POINTS per synergy partner
+    already on the six - toward a two-two-two, past the bans, six heroes in
+    all. Ties go to the alphabetically first name. Deterministic. Each entry
+    carries its pick score - a revealed pick's counts the revealed picks
+    before it - so the six's scores sum to its on_six figures plus
+    PARTNER_POINTS per documented pair on it, and says what it rests on."""
     shape = dict(EXPECTED_SHAPE)
     chosen = list(revealed)
     for h in revealed:
@@ -136,11 +149,12 @@ def expected_picks(world: World, m: Map | None, *, revealed: Sequence[Hero] = ()
     def entry(h: Hero, among: Sequence[Hero], locked: bool) -> ExpectedPick:
         value, on_map = rate(h)
         mates = partners(h, among)
-        pull = (value or 0.0) + SYNERGY_PULL * len(mates)
-        why = _pick_reason(value, on_map, m, mates)
+        share = on_six(h, value)
+        score = share + PARTNER_POINTS * len(mates)
+        why = _pick_reason(value, share, on_map, m, mates)
         return {"hero": h.name, "role": h.role, "rate": value, "locked": locked,
-                "pull": round(pull, 2),
-                "why": "%spull %.1f: %s" % ("revealed; " if locked else "", pull, why)}
+                "on_six": round(share, 2), "score": round(score, 2),
+                "why": "%spick score %.1f: %s" % ("revealed; " if locked else "", score, why)}
 
     picked: list[ExpectedPick] = []
     while any(shape.values()) and len(chosen) < TEAM_SIZE:
@@ -149,7 +163,7 @@ def expected_picks(world: World, m: Map | None, *, revealed: Sequence[Hero] = ()
         if not field:
             break
         best = min(field, key=lambda h: (
-            -((rate(h)[0] or 0.0) + SYNERGY_PULL * len(partners(h, chosen))), h.name))
+            -(on_six(h, rate(h)[0]) + PARTNER_POINTS * len(partners(h, chosen))), h.name))
         picked.append(entry(best, chosen, False))
         chosen.append(best)
         taken.add(best.id)
@@ -158,10 +172,11 @@ def expected_picks(world: World, m: Map | None, *, revealed: Sequence[Hero] = ()
     return out + sorted(picked, key=lambda p: (ROLES.index(p["role"]), p["hero"]))
 
 
-def _pick_reason(value: float | None, on_map: bool, m: Map | None,
+def _pick_reason(value: float | None, share: float, on_map: bool, m: Map | None,
                  partners: Sequence[Hero]) -> str:
     """What an expected pick rests on: its pick rate here, or overall with
-    why, and the partners already on the six it pairs with."""
+    why, a tank's on a six's two seats, and the partners already on the six
+    it pairs with."""
     if value is None:
         why = "no pick rate on record"
     elif on_map and m is not None:
@@ -169,6 +184,8 @@ def _pick_reason(value: float | None, on_map: bool, m: Map | None,
     else:
         why = "picked in %.1f%% of matches overall%s" % (
             value, " (no rate on this map)" if m is not None else " (no map set)")
+    if value is not None and share != value:
+        why += ", on %.1f%% of sixes with two tank seats" % share
     if partners:
         why += "; pairs with " + ", ".join(c.name for c in partners)
     return why

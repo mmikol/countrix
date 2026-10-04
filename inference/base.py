@@ -76,7 +76,7 @@ from collections.abc import Mapping, Sequence
 from typing import NamedTuple, Self, TypedDict
 
 from facts import compute, counters
-from facts.draft import Seat
+from facts.draft import TEAM_SIZE, Seat
 from facts.factset import Fact, FactSet
 from facts.model import Hero, Map, World
 from facts.records import DerivedEdge
@@ -201,10 +201,12 @@ def stamp(weights: BaseWeights) -> BaseStamp | None:
 
 
 class Opponent(NamedTuple):
-    """The other side the counter term reads: its heroes, and whether they are
-    its likely six rather than picks it has made."""
+    """The other side the counter term reads: its heroes, whether any of them
+    is a likely hero rather than a pick it has made, and how many are its
+    picks."""
     heroes: tuple[Hero, ...]
     likely: bool
+    revealed: int = 0
 
 
 class Edges(NamedTuple):
@@ -240,11 +242,16 @@ def likely_six(world: World, m: Map | None, banned: Sequence[Hero]) -> tuple[Her
 
 def opponent(
         world: World, m: Map | None, red: Sequence[Hero], banned: Sequence[Hero]) -> Opponent:
-    """The other side as the counter term reads it: its locked picks, else its
-    likely six."""
-    if not red:
-        return Opponent(heroes=likely_six(world, m, banned), likely=True)
-    return Opponent(heroes=tuple(red), likely=False)
+    """The other side as the counter term reads it: six heroes, its picks and
+    the likeliest heroes for the rest (compute.expected_picks) - its likely
+    six before any pick, and its picks alone once it holds six. A reveal
+    replaces one likely hero, so the term's weight holds still as red picks."""
+    if len(red) >= TEAM_SIZE:
+        return Opponent(heroes=tuple(red), likely=False, revealed=len(red))
+    likely = [world.hero(p["hero"]) for p in compute.expected_picks(
+        world, m, revealed=red, banned=banned)]
+    return Opponent(heroes=tuple(h for h in likely if h is not None), likely=True,
+                    revealed=len(red))
 
 
 def rate_edge(h: Hero, m: Map | None) -> float:
@@ -330,13 +337,17 @@ def write_rates_fact(fs: FactSet, *, seat: Seat, map_name: str | None, rates: fl
 
 def write_counters_fact(
         fs: FactSet, *, seat: Seat, map_name: str | None, against: Sequence[str],
-        likely: bool, answers: int, exposures: int, derived: Sequence[str] = ()) -> Fact:
+        likely: bool, answers: int, exposures: int, derived: Sequence[str] = (),
+        revealed: int = 0) -> Fact:
     """The fact the counter term cites: which of the other side's sixes it
-    read - its picks, or its likely six - the graph's weight each way, and
-    each derived edge in it, worded with its mechanism (counters.said)."""
+    read - its picks, its likely six, or its picks with the likeliest heroes
+    for the rest - the graph's weight each way, and each derived edge in it,
+    worded with its mechanism (counters.said)."""
     other = "blue" if seat == "red" else "red"
     if likely:
-        whom = "%s's likely six %s" % (other, "on %s" % map_name if map_name else "with no map")
+        where = "on %s" % map_name if map_name else "with no map"
+        whom = ("%s's picks and its likeliest heroes for the rest %s" % (other, where)
+                if revealed else "%s's likely six %s" % (other, where))
     else:
         whom = "%s as it stands" % other
     fs.add(

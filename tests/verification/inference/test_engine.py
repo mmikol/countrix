@@ -48,7 +48,7 @@ def test_board_solves_blues_seat_and_reads_reds_likely_six(synthetic_world):
     assert likely.seat == "red" and likely.side == "defense" and len(likely.blue) == 6
     assert likely.locked == ["Mortar", "Gale"] and likely.red == ["Balm"]
     assert {"Mortar", "Gale"} <= set(likely.blue) and likely.contributions == []
-    assert all(p["pull"] >= 0 for p in likely.picks)
+    assert all(p["pick_score"] >= p["on_six"] >= 0 for p in likely.picks)
     assert cur.kind == "current" and cur.partial and cur.blue == ["Balm"]
     assert cur.contributions and cur.score is not None
     assert "countered" not in b.to_dict()
@@ -71,30 +71,29 @@ def test_board_solves_blues_seat_and_reads_reds_likely_six(synthetic_world):
     assert cur.to_dict()["normalized"] is None
     assert mo["verdict"].startswith(
         "blue %d / 100 of its optimal (the best six from its picks); fight odds" % mo["blue"])
-    # the fight odds: blue's six - here its fill - and red's likely six scored
-    # against each other on the engine alone, red's six never searched, each
-    # side's part of 100 its score above the floor of the board's reference sixes
+    # the fight odds: blue's six - here its fill - and red's likely six on one
+    # scale, the engine alone against red's six, red's six never searched; the
+    # split follows the gap in spreads of the board's reference sixes
+    import statistics
+
     from inference import scale
     from inference.plan import HeadToHead, fight_odds
     from inference.scoring import Candidate, Objective
     ours = world.resolve(None, (), tuple(fill.blue)).blue
     theirs = world.resolve(None, (), tuple(likely.blue)).blue
     m = world.resolve("Harbor Gate", (), (), ())[0]
+    alone = Objective(world, m, red=theirs, banned=(), side="attack", stage="", catalog=[],
+                      base=DEFAULT)
 
-    def alone(side, against):
-        return Objective(world, m, red=against, banned=(), side=side, stage="", catalog=[],
-                         base=DEFAULT)
-
-    def score(objective, cand):
-        return objective.score(objective.prepare(cand), detail=False).score
-    for_blue = alone("attack", theirs)
-    floor = min(score(for_blue, c) for c in scale.sample(Objective(
-        world, m, red=theirs, banned=(), side="attack", stage="", catalog=fix, base=DEFAULT)))
-    head = HeadToHead(blue=score(for_blue, Candidate(ours)),
-                      red=score(alone("defense", ours), Candidate(theirs)), floor=floor)
+    def score(cand):
+        return alone.score(alone.prepare(cand), detail=False).score
+    reference = scale.sample(Objective(world, m, red=theirs, banned=(), side="attack", stage="",
+                                       catalog=fix, base=DEFAULT))
+    head = HeadToHead(blue=score(Candidate(ours)), red=score(Candidate(theirs)),
+                      spread=statistics.pstdev(score(c) for c in reference))
     assert mo["odds"] == fight_odds(head) and mo["odds"]["blue"] + mo["odds"]["red"] == 100
-    pull = sum(p["pull"] for p in likely.picks)
-    assert mo["badges"]["red"]["label"] == "%.0f pull" % pull
+    mean = sum(p["on_six"] for p in likely.picks) / len(likely.picks)
+    assert mo["badges"]["red"]["label"] == "%.0f%% avg pick" % mean
     # prose: the ground, what to play, them, the family
     plan = b.plan
     assert plan.startswith("Harbor Gate is a Hybrid map: a capture point and then the payload path")
@@ -206,7 +205,7 @@ def test_red_may_reveal_what_a_limit_forbids(synthetic_world, tmp_path):
     d = engine.board(world, Draft("Harbor Gate", SUPPORTS), catalog=cat, brief=BRIEF).to_dict()
     assert sum(world.hero(n).role == "support" for n in d["blue"]["blue"]) <= 3
     assert d["expected"]["locked"] == list(SUPPORTS) and set(SUPPORTS) <= set(d["expected"]["blue"])
-    assert d["momentum"]["badges"]["red"]["label"].endswith(" pull")
+    assert d["momentum"]["badges"]["red"]["label"].endswith("% avg pick")
     assert d["shapes"] and max(supports for _, _, supports in d["shapes"]) == 3
     (tmp_path / "a-draft.md").write_text(
         "---\nname: A draft\nkind: heuristic\n---\nprose\n", "utf-8")

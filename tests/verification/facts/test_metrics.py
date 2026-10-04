@@ -252,10 +252,11 @@ def test_expected_picks_read_the_map_and_the_meta_and_no_strategy(synthetic_worl
     """Red's likely six: their revealed picks first, then the most-picked
     heroes on the map, never a banned hero, never a third tank (the queue's
     own limit), six in all whatever the revealed picks' roles, the overall
-    meta when no map is set - each with the rate it rests on and its pull, a
-    revealed pick's counting only the picks revealed before it, which sum to
-    the six's rates plus SYNERGY_PULL a documented pair. No strategy is
-    read: the same six under any playbook."""
+    meta when no map is set - each with the rate it rests on, how often a six
+    fields it (a tank's rate doubled on a six's two tank seats) and its pick
+    score, a revealed pick's counting only the picks revealed before it, the
+    scores summing to the six's on_six figures plus PARTNER_POINTS a
+    documented pair. No strategy is read: the same six under any playbook."""
     w = synthetic_world
     harbor = w.map("Harbor Gate")
     # announced, and the likeliest pick on record: still never expected
@@ -263,28 +264,35 @@ def test_expected_picks_read_the_map_and_the_meta_and_no_strategy(synthetic_worl
     wisp.pick, wisp.map_rates = 50.0, {harbor.id: MapRate(50.0, 50.0)}
     kite, needle = w.hero("Kite"), w.hero("Needle")
     six = compute.expected_picks(w, harbor, revealed=[kite], banned=[needle])
-    # Anvil's 12 fills the tank seat; Balm's 10 and Gale's 5.5 each gain 2 for a
-    # partner already on the six. Flint, Rook and Sorrel then tie at 7: the name
-    # gives Flint the last damage seat, though the roster reads Rook first.
-    # Unbanned, Needle's 9 would have taken Gale's seat
+    # Anvil's 12 doubles to 24 on a six's two tank seats and fills the tank seat;
+    # Balm's 10 and Gale's 5.5 each gain 2 for a partner already on the six.
+    # Flint, Rook and Sorrel then tie at 7: the name gives Flint the last damage
+    # seat, though the roster reads Rook first. Unbanned, Needle's 9 would have
+    # taken Gale's seat
+    tank_six = "on %.1f%% of sixes with two tank seats"
     assert six == [
-        {"hero": "Kite", "role": "tank", "rate": 8.0, "locked": True, "pull": 8.0,
-            "why": "revealed; pull 8.0: picked in 8.0% of matches on Harbor Gate"},
-        {"hero": "Anvil", "role": "tank", "rate": 12.0, "locked": False, "pull": 12.0,
-            "why": "pull 12.0: picked in 12.0% of matches on Harbor Gate"},
-        {"hero": "Flint", "role": "damage", "rate": 7.0, "locked": False, "pull": 7.0,
-            "why": "pull 7.0: picked in 7.0% of matches on Harbor Gate"},
-        {"hero": "Gale", "role": "damage", "rate": 5.5, "locked": False, "pull": 7.5,
-            "why": "pull 7.5: picked in 5.5% of matches on Harbor Gate; pairs with Kite"},
-        {"hero": "Balm", "role": "support", "rate": 10.0, "locked": False, "pull": 12.0,
-            "why": "pull 12.0: picked in 10.0% of matches on Harbor Gate; pairs with Anvil"},
-        {"hero": "Sorrel", "role": "support", "rate": 5.0, "locked": False, "pull": 7.0,
-            "why": "pull 7.0: picked in 5.0% of matches on Harbor Gate; pairs with Gale"}]
+        {"hero": "Kite", "role": "tank", "rate": 8.0, "locked": True, "on_six": 16.0,
+            "score": 16.0, "why": "revealed; pick score 16.0: picked in 8.0% of matches on"
+                                  " Harbor Gate, " + tank_six % 16.0},
+        {"hero": "Anvil", "role": "tank", "rate": 12.0, "locked": False, "on_six": 24.0,
+            "score": 24.0, "why": "pick score 24.0: picked in 12.0% of matches on Harbor Gate, "
+                                  + tank_six % 24.0},
+        {"hero": "Flint", "role": "damage", "rate": 7.0, "locked": False, "on_six": 7.0,
+            "score": 7.0, "why": "pick score 7.0: picked in 7.0% of matches on Harbor Gate"},
+        {"hero": "Gale", "role": "damage", "rate": 5.5, "locked": False, "on_six": 5.5,
+            "score": 7.5, "why": "pick score 7.5: picked in 5.5% of matches on Harbor Gate;"
+                                 " pairs with Kite"},
+        {"hero": "Balm", "role": "support", "rate": 10.0, "locked": False, "on_six": 10.0,
+            "score": 12.0, "why": "pick score 12.0: picked in 10.0% of matches on Harbor Gate;"
+                                  " pairs with Anvil"},
+        {"hero": "Sorrel", "role": "support", "rate": 5.0, "locked": False, "on_six": 5.0,
+            "score": 7.0, "why": "pick score 7.0: picked in 5.0% of matches on Harbor Gate;"
+                                 " pairs with Gale"}]
     assert len(six) == TEAM_SIZE and Counter(p["role"] for p in six) == EXPECTED_SHAPE
     heroes = [w.hero(p["hero"]) for p in six]
     pairs = sum(1 for i, a in enumerate(heroes) for b in heroes[i + 1:] if w.synergy(a.id, b.id))
-    assert sum(p["pull"] for p in six) == pytest.approx(
-        sum(p["rate"] for p in six) + compute.SYNERGY_PULL * pairs)
+    assert sum(p["score"] for p in six) == pytest.approx(
+        sum(p["on_six"] for p in six) + compute.PARTNER_POINTS * pairs)
     # three damage revealed: two tanks and a support fill the six, and no more
     damage = [w.hero(n) for n in ("Rook", "Gale", "Flint")]
     off_role = compute.expected_picks(w, harbor, revealed=damage)
@@ -293,9 +301,9 @@ def test_expected_picks_read_the_map_and_the_meta_and_no_strategy(synthetic_worl
     # Kite and Gale are a documented pair: revealed, the later of the two gains it
     gale = w.hero("Gale")
     pair = compute.expected_picks(w, harbor, revealed=[kite, gale])
-    assert [(p["hero"], p["pull"]) for p in pair[:2]] == [("Kite", 8.0), ("Gale", 7.5)]
+    assert [(p["hero"], p["score"]) for p in pair[:2]] == [("Kite", 16.0), ("Gale", 7.5)]
     flipped = compute.expected_picks(w, harbor, revealed=[gale, kite])
-    assert [(p["hero"], p["pull"]) for p in flipped[:2]] == [("Gale", 5.5), ("Kite", 10.0)]
+    assert [(p["hero"], p["score"]) for p in flipped[:2]] == [("Gale", 5.5), ("Kite", 18.0)]
     # deterministic
     assert six == compute.expected_picks(w, harbor, revealed=[kite], banned=[needle])
     anywhere = compute.expected_picks(w, None)
@@ -317,18 +325,20 @@ def test_an_expected_pick_says_what_its_rate_rests_on(synthetic_world):
     harbor = w.map("Harbor Gate")
     anvil = w.hero("Anvil")
     del anvil.map_rates[harbor.id]
-    # Anvil's 11 overall still beats Kite's 8 on the map
+    # Anvil's 11 overall still beats Kite's 8 on the map, each doubled on a six
     first = compute.expected_picks(w, harbor)[0]
-    assert first == {"hero": "Anvil", "role": "tank", "rate": 11.0, "locked": False, "pull": 11.0,
-                     "why": "pull 11.0: picked in 11.0% of matches overall (no rate on this map)"}
+    assert first == {"hero": "Anvil", "role": "tank", "rate": 11.0, "locked": False,
+                     "on_six": 22.0, "score": 22.0,
+                     "why": "pick score 22.0: picked in 11.0% of matches overall (no rate on"
+                            " this map), on 22.0% of sixes with two tank seats"}
     kite = w.hero("Kite")
     kite.pick, kite.map_rates = None, {}
     banned = [w.hero(n) for n in ("Anvil", "Mortar", "Quarry")]
     five = compute.expected_picks(w, harbor, banned=banned)
     assert len(five) == TEAM_SIZE - 1
     assert [p for p in five if p["role"] == "tank"] == [
-        {"hero": "Kite", "role": "tank", "rate": None, "locked": False, "pull": 0.0,
-            "why": "pull 0.0: no pick rate on record"}]
+        {"hero": "Kite", "role": "tank", "rate": None, "locked": False, "on_six": 0.0,
+            "score": 0.0, "why": "pick score 0.0: no pick rate on record"}]
 
 
 def test_the_world_metrics_and_the_registry_the_catalog_validates_against(synthetic_world):

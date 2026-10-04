@@ -119,8 +119,10 @@ the wiki leaves out count; the others are not replaced. A wiki edge counts %(WIK
 derived one %(DERIVED_WEIGHT)d, and the board names every derived edge it counts with the
 mechanism that fired. Only this term reads a derived edge - the playbook's counter metrics read
 the wiki's graph alone.</p>
-<p>The other side is its locked picks, or its likely six on this map until it locks one. Only
-this term reads the likely six: every other term - the healing floor, the <code>enemy.*</code>
+<p>The other side is six heroes: its locked picks and its likeliest heroes for the rest
+(<a href='#likely-comp'>red's likely comp</a>), its likely six before it locks one, so a pick
+replaces one likely hero and the term's weight holds still as red picks. Of the objective's
+terms only this one reads the likely heroes: every other term - the healing floor, the <code>enemy.*</code>
 and <code>matchup.*</code> metrics, the counter metrics, the scale's field - reads the side's
 revealed picks, none before a reveal, on the board and in <code>infer</code> alike. A playbook of
 assumptions alone gets the six these three favour, scored and explained, and every other term
@@ -165,7 +167,7 @@ synergy(x)  = &Sigma; over the pairs in x of their two cells, one in each hero's
 counters(x) = &Sigma; over x's picks p and the other side's heroes e of  v(e, p) &minus; v(p, e)
               v(l, a) = %(WIKI_WEIGHT)d where the wiki reads a answering l, 0 where it reads the
               reverse, else %(DERIVED_WEIGHT)d for a derived answer, else 0
-              the other side: its locked picks, else its likely six here
+              the other side: its locked picks and its likeliest heroes for the rest, six in all
 
 norm_h(v) = clamp( (v &minus; min_ref) / (max_ref &minus; min_ref), 0, 1 )
             and 1 &minus; that when h minimises
@@ -276,19 +278,20 @@ and never ruled out. Blue still drafting is read through its fill, the best six 
 reach: a sum over fewer picks reads low. Where no fill is solved - a fill past the search's
 budget - the seat is read off its picks as they stand, and its badge says so.</p>
 <p id='fight-odds'><b>Fight odds.</b> The strip above the teams compares blue's six - the six
-its badge reads - with red's likely six. Each is scored by the default engine alone against the
-other: its win-rate edge, its synergy, and its counters against the other six. No playbook rule
-counts for either side, since red reads none, and red's six is scored, never searched. Each
-side's part of 100 is its score above the board's floor, the lowest such score among the
-board's reference sixes:</p>
-<pre class='eq'>odds(blue) = round( 100 &middot; b / (b + r) ),   odds(red) = 100 &minus; odds(blue)
-           b = max( s(blue) &minus; f, 0 ),   r = max( s(red) &minus; f, 0 )
-           s: the default engine's score against the other six
-           f: the lowest s among the board's reference sixes, read against red's six</pre>
-<p>Scaling or shifting every score alike leaves the split where it is. With neither six above
-the floor, with the engine off, or with blue's picks not allowed, there are no odds. Blue's six
-is chosen to score well and red's likely six is the most-picked heroes, so blue usually leads:
-the odds compare the two sixes as they stand, and are not a chance of winning.</p>
+the game plan describes - with red's likely six. Both are scored on one scale: the default
+engine alone, against red's likely six. No playbook rule counts for either side, so both are
+judged alike, and red's six is scored, never searched. Read against itself, red's six counts no
+counter, so each counter between the two sixes counts once, in blue's score. The gap between the
+two scores, measured in the spread of a random six's score, goes through a logistic curve:</p>
+<pre class='eq'>odds(blue) = round( 100 / (1 + e^(&minus;(s(blue) &minus; s(red)) / &sigma;)) ),   odds(red) = 100 &minus; odds(blue)
+           s: the default engine's score against red's likely six
+           &sigma;: the standard deviation of s over the board's reference sample</pre>
+<p>A gap of one &sigma; reads 73 to 27, equal sixes 50 to 50, and swapping the sixes swaps the
+split; scaling or shifting every score alike leaves it where it is. With the engine off, with a
+sample of no spread, with blue's picks not allowed, or with blue half-drafted and no fill
+solved, there are no odds. Blue's six is chosen to score well and red's likely six is its picks
+and the most-picked heroes for the rest, so blue usually leads by far: the odds compare the two
+sixes as they stand, and are not a chance of winning.</p>
 <p id='problem'><b>The problem's class.</b> With V the heroes the board leaves open - released
 and unbanned - a six is x &isin; {0,1}^V, x_h = 1 where h is picked, and the search solves</p>
 <pre class='eq'>maximise    score(x)
@@ -345,10 +348,10 @@ the role queue, the default engine on and off and the swap search's keep term wi
 search returns exactly the sixes a full enumeration ranks first. On the built database, a brute
 force of every legal six on real boards agreed with it six for six, score for score.</p>
 <p id='against-red'><b>What it is optimal against.</b> A comp is optimal <i>against the red
-you can see</i>, not against every red they might pick. Before red reveals anything the board
-answers their likely starting comp, filled from the map's pick rates and the wiki's synergies,
-through the default engine's counter term; each pick they show
-re-solves against what is now known. It is a best reply to present information and changes as
+you can see</i>, not against every red they might pick. The board answers red's likely six
+through the default engine's counter term: before red reveals anything, the heroes picked
+most here with the partners that suit them; each pick red shows replaces one likely hero, and
+the board re-solves against what is now known. It is a best reply to present information and changes as
 that information does. Red is never solved, so nothing scores your six against red's best reply
 to it.</p>
 <p id='swaps'><b>Swaps and stages.</b> A six is not held for the map. Above blue's picks the
@@ -404,25 +407,28 @@ better; the board's draws - each hero's a hash of the map, the side and the hero
 its rates and its name - pick the one shown, the six whose draws sum highest, and the board says
 how many tie. With the meta at 0 and every weight at 0, every legal six ties: each hero of a role
 has the same chance of being the one drawn across boards, and one board draws the same six every
-time. A share is a score's place on blue's span and the fight odds a split of two scores, not
-probabilities of winning, and red's pull ranks heroes by their pick rates and documented synergies: nothing here is fitted to match
-results. The playbook holds both as assumptions, <i>Tied sixes are equally good</i> and <i>Deterministic, not probabilistic</i>.</p>
+time. A share is a score's place on blue's span and the fight odds a curve on the gap between
+two scores, not probabilities of winning, and red's pick score ranks heroes by how often they are picked and
+their documented synergies: nothing here is fitted to match results. The playbook holds both as assumptions, <i>Tied sixes are equally good</i> and <i>Deterministic, not probabilistic</i>.</p>
 <h2 id='board'>The board</h2>
 <p id='likely-comp'><b>Red's likely comp</b>: red's revealed picks, then slot by slot toward a
-two-two-two, past the bans, six in all, the open-role hero of the highest pull below - a greedy
-fill by a score in pick-rate points, not the six a probability ranks first. Red is never
-optimized: no strategy is read and nothing scores it. The board suggests it in red's empty
-slots, red's badge is its pull, and blue's counter term reads it before red reveals a pick.</p>
-<pre class='eq'>pull(h)    = pick(h, map) + %(SYNERGY_PULL)g &times; partners(h, the six so far)
-pull(six)  = &Sigma; pull(h) = &Sigma; pick(h, map) + %(SYNERGY_PULL)g &times; the documented pairs on the six
-
-pick(h, map)   the hero's pick rate on this map; overall with no map set or no rate here, 0 with none
+two-two-two, past the bans, six in all, the open-role hero with the highest pick score - a greedy
+fill, not the six a probability ranks first. Red is never optimized: no strategy is read for
+it, and only the fight odds score it, on the default engine alone. The board suggests it in
+red's empty slots, red's badge says how often a six fields its heroes on average, and blue's
+counter term reads it: red's picks, and the likeliest heroes for the rest.</p>
+<pre class='eq'>pick score(h) = on_six(h) + %(PARTNER_POINTS)g &times; partners(h, the six so far)
+on_six(h)     = min( 100, pick(h, map) &times; 2 / seats(h) ), in percent of sixes
+pick(h, map)  the hero's published pick rate on this map: the share of 5v5 Role Queue teams that
+              field it; overall with no map set or no rate here, 0 with none
+seats(h)      a 5v5 Role Queue team's seats in h's role: 1 tank, 2 damage, 2 support - so a
+              tank's rate doubles on a six's two tank seats
 partners(h, S) how many heroes already on S the synergy table pairs h with; a revealed pick
-               counts the revealed picks before it
-               a tie goes to the name first in alphabetical order</pre>
-<p id='counter'><b>Blue's optimal counter</b>: solved against red's revealed picks - before they
-reveal one, the counter term reads their likely comp - on this map, side and bans; never against
-blue's own picks. Once blue picks, its seat shows blue's six above the optimal: from one to five picks,
+              counts the revealed picks before it
+              a tie goes to the name first in alphabetical order</pre>
+<p id='counter'><b>Blue's optimal counter</b>: solved against red's six - its revealed picks and
+its likeliest heroes for the rest, read by the counter term - on this map, side and bans; never
+against blue's own picks. Once blue picks, its seat shows blue's six above the optimal: from one to five picks,
 the picks with the rest filled by a second solve that keeps them - the six the suggestion
 tiles offer; at six, the six itself. The game plan describes that six. Blue's is the only seat
 the engine solves.</p>

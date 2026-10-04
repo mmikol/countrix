@@ -23,6 +23,7 @@ result.py's and the prose plan.py's. Every search is exact
 """
 
 import dataclasses
+import statistics
 import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import NamedTuple
@@ -165,8 +166,17 @@ def infer(
     catalog = catalog_module.load() if catalog is None else catalog
     base = weights_in_force(base)
     try:
-        return _optimal(world, draft, catalog=catalog, base=base, top=top,
-                        kind="infer").result
+        if not draft.blue:
+            return _optimal(world, draft, catalog=catalog, base=base, top=top,
+                            kind="infer").result
+        # around locked picks the share is the seat's own optimal's, as the
+        # board reads its fill, so infer and the board give one six one share
+        seat = _optimal(world, dataclasses.replace(draft, blue=()), catalog=catalog,
+                        base=base, top=1, kind="infer")
+        result = _optimal(world, draft, catalog=catalog, base=base, top=top, kind="infer",
+                          scale_of=seat.solver).result
+        result.scale_to(seat.span)
+        return result
     except Infeasible as error:
         if not draft.blue:
             raise
@@ -339,8 +349,8 @@ def board(
                      blue's optimal's scale (None unless one to five are
                      locked, or when no six keeps them and meets the limits)
         momentum     blue's standing, a half-drafted seat read through its
-                     fill, and the badge above each picker: blue's share,
-                     red's likely six's pull
+                     fill, the fight odds, and the badge above each picker:
+                     blue's share, how often red's likely six is picked
         plan         the game plan in prose, from the same facts, for the six
                      the comps tab shows for blue: its optimal before any
                      blue pick, the fill around one to five, the picks
@@ -353,11 +363,11 @@ def board(
                      playbook's shape limits allow - what the roster enforces
                      as you pick; a team past six picks or two tanks is refused
         expected     red's likely six from the data alone - red's revealed
-                     picks, and for each open slot the hero the map's pick
-                     rates and the wiki's synergies pull first, past the bans;
-                     no strategy read, nothing scored, each pick with its
-                     pull. Red is never optimized: this is what the board
-                     suggests for red
+                     picks, and for each open slot the hero with the highest
+                     pick score, past the bans; no strategy read, each pick
+                     with its pick score. Red is never optimized: this is
+                     what the board suggests for red, and what the counter
+                     term and the fight odds read
 
     The brief's weights override the files' for this board only - the
     playbook tab's sliders, its Meta slider among them; the files stay as
@@ -412,8 +422,9 @@ def board(
     shown = fill if fill is not None else cur if held else blue.result
     # the fight odds read that six against red's likely six on the default
     # engine alone; a comp the limits rule out has none
-    head = None if cur.barred is not None else _head_to_head(
-        world, m, draft, shown.blue, expected.blue, catalog, base, bans_h)
+    measured = cur.barred is None and not (_drafting(draft) and fill is None)
+    head = _head_to_head(world, m, draft, shown.blue, expected.blue, catalog, base,
+                         bans_h) if measured else None
     mo = momentum(Seats(current=cur, expected=expected, fill=fill, head=head))
     # the swap cost, read once: the swaps above the picks and the chosen
     # stage's row are one answer
@@ -575,32 +586,30 @@ def _scored(world: World, draft: Draft, optimal: _Optimal, cand: Candidate,
 def _head_to_head(
         world: World, m: Map | None, draft: Draft, blue: Sequence[str], red: Sequence[str],
         catalog: list[Strategy], base: BaseWeights, bans: Sequence[Hero]) -> HeadToHead | None:
-    """Blue's six and red's likely six scored against each other on the
-    default engine alone - no playbook rule for either side, red's six
-    scored and never searched - and the board's floor on the same terms: the
-    lowest such score among the board's reference sixes (scale.sample, drawn
-    under the playbook's limits as blue's own scale is), each read against
-    red's six. None with the engine off or a six short of a team."""
+    """Blue's six and red's likely six on one scale: the default engine alone
+    against red's six - no playbook rule for either side, red's six scored
+    and never searched. Red's six read against itself counts no counter, so
+    each counter between the two sixes counts once, in blue's score. The
+    spread is the standard deviation of the same scores over the board's
+    reference sixes (scale.sample, drawn under the playbook's limits as
+    blue's own scale is). None with the engine off or a six short of a
+    team."""
     if not base.on or len(blue) != TEAM_SIZE or len(red) != TEAM_SIZE:
         return None
     ours = world.resolve(None, (), tuple(blue)).blue
     theirs = world.resolve(None, (), tuple(red)).blue
+    against_red = Objective(world, m, red=theirs, banned=bans, side=draft.side,
+                            stage=draft.stage, catalog=[], base=base)
 
-    def engine_alone(side: Side, against: Sequence[Hero]) -> Objective:
-        return Objective(world, m, red=against, banned=bans, side=side, stage=draft.stage,
-                         catalog=[], base=base)
+    def score(cand: Candidate) -> float:
+        return against_red.score(against_red.prepare(cand), detail=False).score
 
-    def score(objective: Objective, cand: Candidate) -> float:
-        return objective.score(objective.prepare(cand), detail=False).score
-
-    for_blue = engine_alone(draft.side, theirs)
     reference = scale.sample(Objective(world, m, red=theirs, banned=bans, side=draft.side,
                                        stage=draft.stage, catalog=catalog, base=base))
-    if not reference:
+    if len(reference) < 2:
         return None
-    return HeadToHead(blue=score(for_blue, Candidate(ours)),
-                      red=score(engine_alone(draft.flipped().side, ours), Candidate(theirs)),
-                      floor=min(score(for_blue, c) for c in reference))
+    return HeadToHead(blue=score(Candidate(ours)), red=score(Candidate(theirs)),
+                      spread=statistics.pstdev(score(c) for c in reference))
 
 
 def _check_teams(red_h: Sequence[Hero], blue_h: Sequence[Hero]) -> None:
@@ -615,15 +624,15 @@ def _likely(
         world: World, m: Map | None, red_h: Sequence[Hero], bans_h: Sequence[Hero],
         draft: Draft, catalog: list[Strategy], base: BaseWeights) -> Result:
     """Red's likely six: its revealed picks, then for each open slot the hero
-    the map's pick rates and the wiki's synergies pull first, past the bans
-    (compute.expected_picks) - the six the board suggests for red. Red is
-    never optimized and never scored: each pick carries its pull and what it
-    rests on. A Result like blue's, from red's side of the board."""
+    with the highest pick score, past the bans (compute.expected_picks) - the
+    six the board suggests for red. Red is never optimized and its Result
+    holds no score: each pick carries how often a six fields it, its pick
+    score and what it rests on. A Result like blue's, from red's side."""
     likely = compute.expected_picks(world, m, revealed=red_h, banned=bans_h)
     return Result(kind="expected", map_name=m.name if m else None, red=list(draft.blue),
                   blue=[p["hero"] for p in likely], locked=[h.name for h in red_h],
                   catalog=catalog, base=base, bans=list(draft.bans),
                   side=draft.flipped().side, stage=draft.stage, seat="red",
                   picks=[Pick(hero=p["hero"], role=p["role"], locked=p["locked"], why=p["why"],
-                              evidence=[], pull=p["pull"])
+                              evidence=[], on_six=p["on_six"], pick_score=p["score"])
                          for p in likely])

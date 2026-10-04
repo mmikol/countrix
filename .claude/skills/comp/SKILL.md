@@ -30,7 +30,7 @@ shows). Prefer whichever is connected; they expose the same tools.
    and per strategy, and alternatives. `board` with the same
    arguments also returns the game plan in prose, the user's current comp
    scored, their locked picks with the empty slots filled, and red's likely
-   six around red's picks with its pull (red is never optimized), and
+   six around red's picks with its pick scores (red is never optimized), and
    the fight odds between the two sixes. Use it when the user asks how
    the game is going, how their six rates, what the enemy is likely to
    play, or for the plan in a few lines. With blue picks it also

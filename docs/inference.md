@@ -150,11 +150,13 @@ the sixes its three terms favour, scored and explained:
   every ordered pair of released heroes, and of each loser's six best
   answers, scoring 0.5 or more and more than the reverse, those on a
   pair the wiki leaves out weigh 1 each; the others are not replaced.
-  The other side is its locked picks, or, with none, its likely six on
-  this map past the bans (`compute.expected_picks` with nothing
-  revealed), on the board and in `infer` alike. Only this term reads the
-  likely six or a
-  derived edge: every other term reads the side's revealed picks, and the
+  The other side is six heroes: its locked picks and its likeliest
+  heroes for the rest on this map past the bans
+  (`compute.expected_picks`), its likely six before any pick, on the
+  board and in `infer` alike, so a reveal replaces one likely hero and
+  the term's weight holds still as red picks. Of the objective's terms
+  only this one reads the likely heroes or a derived edge: every other
+  term reads the side's revealed picks, and the
   `team.*` and `enemy.*` counter metrics read the wiki's graph against
   them. The board
   names every derived edge it counts with the mechanism and the numbers
@@ -263,7 +265,8 @@ reads at, so a reason never passes an unwritten cell off as a
 documented one. The graph metrics - `team.synergy_edges`,
 `synergy_density`, `core_size`, `isolated` and `pairs` - count the pairs
 the wiki claims, and describe what is documented; so does the other
-side's likely six, which adds `SYNERGY_PULL` for each documented partner.
+side's likely six, whose pick score adds `PARTNER_POINTS` for each
+documented partner.
 A fixture's stamp (`base.stamp`) names the reading, so one recorded
 under an earlier reading reads as another objective.
 
@@ -293,15 +296,18 @@ blue's comps on a real scale. A best no higher than the floor leaves
 nothing to divide, and every comp but the optimal reads *unscored*.
 
 Red is never optimized: the board's red is its likely six around its
-revealed picks (`compute.expected_picks`), each pick with its pull - its
-pick rate here plus `SYNERGY_PULL` for each partner already on the six -
-and red's badge is the six's total pull. Red has no share. The fight
-odds compare the two sides another way (`plan.fight_odds`): blue's six
-and red's likely six scored against each other on the default engine
-alone, no playbook rule for either side, each side's part of 100 its
-score above the floor of the board's reference sixes. They are a
-comparison of the two sixes, not a chance of winning (the math page,
-Fight odds).
+revealed picks (`compute.expected_picks`), each open slot filled with
+the hero of the highest pick score - how often a six fields it, its
+pick rate with a tank's doubled for a six's two tank seats, plus
+`PARTNER_POINTS` for each partner already on the six - and red's badge
+is how often a six fields those heroes on average. Red has no share.
+The fight odds compare the two sides another way (`plan.fight_odds`):
+blue's six and red's likely six on one scale, the default engine alone
+against red's six, each counter between them counted once, no playbook
+rule for either side; the gap between the two scores, in standard
+deviations of the board's reference sample, goes through a logistic
+curve. They are a comparison of the two sixes, not a chance of winning
+(the math page, Fight odds).
 
 A comp the limits rule out is not allowed: blue's full six that breaks
 one, or picks that no six keeping them completes within the limits
@@ -402,7 +408,8 @@ picks at six, the fill around fewer, the optimal before any pick.
   phases before it read as played, with no six; the phases after it go
   on from its six.
 
-Red on every stage is its revealed picks, else its likely six. Two stages
+Red on every stage is its revealed picks with its likeliest heroes for
+the rest. Two stages
 that score every six alike from the same six - the same gates and the
 same map values a rule reads (`Objective.ground_key`) - are one search.
 A stage past the search's budget reads not solved, and the next phase

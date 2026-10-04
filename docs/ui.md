@@ -113,8 +113,9 @@ five picks, *your six* at six - over blue's *optimal vs red's picks* (*vs
 red's likely six* before red reveals one, alone before any pick), which
 blue's own picks never constrain. Red's (right) is their likely six,
 *their picks, the rest likely* once red reveals one: red's picks, then a
-two-two-two filled slot by slot from the map's pick rates and the wiki's
-synergies, past the bans, with the six's pull in its title. Red is never
+two-two-two filled slot by slot with the hero of the highest pick score -
+how often a six fields it, plus 2 for each synergy partner already on the
+six - past the bans, with red's badge in its title. Red is never
 optimized: it reads no strategy, and only a new map, ban or red pick sends
 it back to *searching*. Under a six's cards sit
 the search's numbers (the candidates, every six of the legal shapes its
@@ -126,10 +127,12 @@ filter, each bar's tooltip saying why it paid or did not, and last the
 alternatives. The bars share one scale.
 
 **The fight odds** strip above the teams splits 100 between blue's six
-and red's likely six, scored against each other on the default engine
-alone ([The share](inference.md#the-share)); its tooltip is the engine's
-words, and where there are no odds the engine's verdict says why. It
-reads *solving* while a board is searched.
+and red's likely six, both scored on the default engine alone against
+red's six, the gap between them put through a logistic curve
+([The share](inference.md#the-share)); it shows no percent sign, since
+the split is no chance of winning. Its tooltip is the engine's words, and
+where there are no odds the engine's verdict says why. It reads
+*solving* while a board is searched.
 
 **The badges** above the pickers: blue's is its comp as a share of blue's
 optimal, read from the seat's floor, the lowest of its reference sixes,
@@ -141,15 +144,15 @@ Where blue's own picks break one of the playbook's limits the badge reads
 share; where the optimal scores no higher than the floor, as every six
 does when a caller turns the engine off under a playbook that scores
 nothing, it reads *unscored*, the engine's reason in the tooltip. Red's
-badge is its likely six's pull - each hero's pick rate here plus 2 for
-each documented synergy pair on the six - since red is never scored. The engine
+badge is how often a six fields the heroes of its likely six, on average
+(*24% avg pick*), since red has no share. The engine
 words each badge (`momentum.badges`, a label and a tip); the page only
 shows it.
 
 **The suggestions.** Blue's empty slots carry the fill - the best six that
 keeps your locked picks, the optimal six before any pick - and red's carry
 its likely six around its picks, each a click from locking, its reasons
-(and for red its pull) in the tooltip and on the comps tab. A filled
+(and for red its pick score) in the tooltip and on the comps tab. A filled
 slot's tooltip is the reason this board gives its hero: blue's from the
 fill or the six, red's from their likely six.
 
@@ -203,10 +206,10 @@ sequenceDiagram
     Facts-->>Board: F1..Fn - every fact about those heroes,<br/>the map, each team, the matchup
     Board->>Solver: /api/board (map, side, red, blue, bans)
     Solver->>Solver: blue's seat: shapes the limits allow · every legal six,<br/>bounded and pruned · the best proved, a few dozen scored in full
-    Solver->>Solver: red's likely six: their picks, the rest by pick rate and synergy pull
+    Solver->>Solver: red's likely six: their picks, the rest by pick score (pick rate and synergy)
     Solver->>Solver: blue's current comp: six locked -> ranked among every legal six;<br/>fewer -> scored with the optimal search's bounds
     Solver->>Facts: the FactSet for each (map, side, red, the six)
-    Solver-->>Board: the game plan, blue's optimal with reasons and [F#]<br/>citations, red's likely six with its pull, the suggestions for the empty slots
+    Solver-->>Board: the game plan, blue's optimal with reasons and [F#]<br/>citations, red's likely six with its pick scores, the fight odds, the suggestions for the empty slots
 ```
 
 Sides exist on Escort and Hybrid maps only, and the facts say which side

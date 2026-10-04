@@ -15,8 +15,8 @@ gives cites a fact.
 *King's Row, blue on attack, two picks a side, Widowmaker banned. The solver
 fills blue's six around Ana and Reinhardt; blue's badge is its six as a share
 of the best six it could field here, 100. The picture predates red's likely
-six: the fight-odds strip is gone, and red is no longer scored - its badge
-now reads the pull of that six.
+six: the fight odds now set blue's six against red's likely six on the
+default engine, and red's badge says how often its heroes are picked.
 The screenshots run the reference playbook ([below](#quick-start)) without its
 two rules that read Blizzard's published win rates, and the cards hide the rate
 figures: Blizzard licenses those for personal use only.*
