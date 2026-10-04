@@ -107,22 +107,33 @@ def test_blue_is_read_through_its_fill_while_half_drafted(synthetic_world, scrat
         % b.momentum["blue"])
 
 
-def test_the_fight_odds_follow_the_gap_in_spreads_of_a_random_six():
-    """The gap between the two scores, in spreads of a random six, on a
-    logistic curve: a gap of one spread reads 73 to 27. Equal sixes split
-    50-50, swapping them swaps the split, scaling or shifting every score
-    alike leaves it, and there are none where the scale has no spread or the
-    sixes were not measured. The verdict quotes them, with no percent sign."""
+def test_the_fight_odds_read_the_gap_in_win_rate_points():
+    """The gap between the two scores in log-odds, per_logit engine points
+    to one, on a logistic curve: a gap of one per_logit reads 73 to 27, and
+    at meta 1 and rate 1 a gap of one win-rate point 56 to 44, four 72 to
+    28. Equal sixes split 50-50, swapping them swaps the split, shifting
+    every score alike leaves it, and so does the meta, which scales the
+    scores and per_logit together. There are none where the rate term is
+    off or the sixes were not measured, and a gap far past the curve's ends
+    reads 0 or 100 without overflowing. The verdict quotes them, with no
+    percent sign."""
     from inference import plan
-    head = plan.HeadToHead(blue=9.0, red=7.0, spread=2.0)
+    head = plan.HeadToHead(blue=9.0, red=7.0, per_logit=2.0)
     odds = plan.fight_odds(head)
     assert (odds["blue"], odds["red"]) == (73, 27) and "not a chance of winning" in odds["tip"]
-    scaled = plan.HeadToHead(blue=2 * 9.0 + 5, red=2 * 7.0 + 5, spread=2 * 2.0)
-    assert plan.fight_odds(scaled) == odds
-    assert plan.fight_odds(plan.HeadToHead(blue=7.0, red=9.0, spread=2.0))["blue"] == 27
-    assert plan.fight_odds(plan.HeadToHead(blue=8.0, red=8.0, spread=2.0))["blue"] == 50
-    assert plan.fight_odds(plan.HeadToHead(blue=9.0, red=7.0, spread=0.0)) is None
+    assert plan.fight_odds(head._replace(blue=9.0 + 5, red=7.0 + 5)) == odds
+    for meta in (0.25, 2.5, 10.0):
+        assert plan.fight_odds(plan.HeadToHead(blue=meta * 9.0, red=meta * 7.0,
+                                               per_logit=meta * 2.0)) == odds
+    assert plan.fight_odds(head._replace(blue=7.0, red=9.0))["blue"] == 27
+    assert plan.fight_odds(head._replace(blue=8.0, red=8.0))["blue"] == 50
+    point = 1.0 / base.LOGIT_PER_POINT      # meta and rate 1: an engine point a win-rate point
+    assert [plan.fight_odds(plan.HeadToHead(blue=gap, red=0.0, per_logit=point))["blue"]
+            for gap in (1.0, 4.0, -1.0)] == [56, 72, 44]
+    assert plan.fight_odds(head._replace(per_logit=0.0)) is None
     assert plan.fight_odds(None) is None
+    assert [plan.fight_odds(head._replace(blue=gap, red=0.0))["blue"]
+            for gap in (-1e6, 1e6)] == [0, 100]
     mo = plan.momentum(plan.Seats(comp(["a"] * 6, 8, 10), SIX, head=head))
     assert mo["odds"] == odds
     assert mo["verdict"] == "blue 80 / 100 of its optimal; fight odds on the meta: blue 73, red 27"

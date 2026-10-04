@@ -33,7 +33,7 @@ and the health for it.
 | `/api/board?map=&side=&red=&blue=&bans=[&stage=&weights=&client=]` | the board solved at any step of the draft, every seat on the stage in play (the whole map without one), under the playbook tab's weights: the `board` tool's answer ([mcp.md](mcp.md#the-tools)), from `serve.handle_board`. One board solves at a time; another waits, and answers 429 after a minute (`serve.Admission`); a newer board from the same `client` stops one still solving, which answers 400 (`serve.LATEST`, a lane per client) |
 | `/api/strategies` | the catalog: every constraint, heuristic and assumption with its kind, form, frontmatter and body, from `serve.handle_strategies` |
 | `/health` | the engine's health, from `serve.handle_health`: ok or degraded, the strategies, the drafts pending and the heroes, and the error naming what is out of reach. The ui container's healthcheck and `orchestrator.py` read it |
-| `/math` | `static/math.html` in the page shell, the numbers it quotes filled in by `pages.py` - the default engine's four weights and the swap cost from the playbook's `meta.md`, and from the code `SWAP_MAX`, the counter graph's four constants, `RATE_PICK_HALF`, `COIN_FLIP`, `SYNERGY_PULL`, `REFERENCE_SIZE`, `SCALE_POOL`, `NEED_BUDGET`, the search's `SCORE_PLACES` and `RANK_CAP`, the counter graph's mechanisms, `MAX_TANKS`, `MAX_BANS`, the weight slider's top, and the healing formation's radius and teammates: the equation, how a six is chosen, the scoring function with the default engine under the playbook, the board and how the layers fit |
+| `/math` | `static/math.html` in the page shell, the numbers it quotes filled in by `pages.py` - the default engine's four weights and the swap cost from the playbook's `meta.md`, and from the code `SWAP_MAX`, the counter graph's four constants, `RATE_PICK_HALF`, `COIN_FLIP`, the fight odds' `LOGIT_PER_POINT`, `PARTNER_POINTS`, `REFERENCE_SIZE`, `SCALE_POOL`, `NEED_BUDGET`, the search's `SCORE_PLACES` and `RANK_CAP`, the counter graph's mechanisms, `MAX_TANKS`, `MAX_BANS`, the weight slider's top, and the healing formation's radius and teammates: the equation, how a six is chosen, the scoring function with the default engine under the playbook, the board and how the layers fit |
 
 The board answers GET alone: any other method is a 501, after the host
 guard.
@@ -128,11 +128,12 @@ alternatives. The bars share one scale.
 
 **The fight odds** strip above the teams splits 100 between blue's six
 and red's likely six, both scored on the default engine alone against
-red's six, the gap between them put through a logistic curve
-([The share](inference.md#the-share)); it shows no percent sign, since
-the split is no chance of winning. Its tooltip is the engine's words, and
-where there are no odds the engine's verdict says why. It reads
-*solving* while a board is searched.
+red's six, the gap between them in win-rate points, put through the
+additive model's logistic curve ([The share](inference.md#the-share));
+it shows no percent sign, since the split is the model's reading of the
+gap, not a chance of winning measured from matches. Its tooltip is the
+engine's words; where there are no odds the strip shows the engine's
+verdict instead. It reads *solving* while a board is searched.
 
 **The badges** above the pickers: blue's is its comp as a share of blue's
 optimal, read from the seat's floor, the lowest of its reference sixes,

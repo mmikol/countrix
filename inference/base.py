@@ -92,6 +92,15 @@ COIN_FLIP = 50.0        # the win rate the rate term is centred on
 # chosen so that only the rarest heroes lose more than half their edge; the
 # calibration read the personal-use rates and stays out of the repo.
 RATE_PICK_HALF = 3.0
+# The log-odds one point of the rate term is worth: the fight odds' slope
+# (inference.plan.fight_odds). The additive model sums a six's log-odds over
+# its picks, each adding logit(p) - logit(1/2), logit(p) = ln(p / (1 - p))
+# for p its share of matches won; near even odds that is about 4 x (p - 1/2),
+# so 4 / 100 a win-rate point. The rate term is a mean over the six, so one
+# point of it is TEAM_SIZE picks' worth: 4 x 6 / 100. Arithmetic on the
+# logit's slope at a coin flip, reading no rate; it scores no six, so the
+# stamp leaves it out.
+LOGIT_PER_POINT = 4.0 * TEAM_SIZE / 100.0
 
 # the three terms' ids in a six's breakdown: a strategy's id is lowercase
 # kebab, so none can take a dotted one

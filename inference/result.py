@@ -149,9 +149,10 @@ class Badges(TypedDict):
 
 class Odds(TypedDict):
     """The fight odds: blue's six and red's likely six head to head on the
-    default engine alone, each side's score above the board's floor as its
-    part of 100, and the strip's tooltip. A comparison of the two sixes, not
-    a probability of winning."""
+    default engine alone, the gap between their scores in win-rate points on
+    the additive model's logistic curve, each side's part of 100, and the
+    strip's tooltip. The model's reading of the gap, not a chance of winning
+    measured from matches."""
     blue: int
     red: int
     tip: str

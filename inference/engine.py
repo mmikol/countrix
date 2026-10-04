@@ -23,7 +23,6 @@ result.py's and the prose plan.py's. Every search is exact
 """
 
 import dataclasses
-import statistics
 import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import NamedTuple
@@ -40,8 +39,8 @@ from facts.draft import (
 from facts.factset import FactSet
 from facts.model import ROLES, Hero, Map, Resolved, World
 from inference import catalog as catalog_module
-from inference import scale, supersede, swaps
-from inference.base import OFF, SWAP, BaseWeights
+from inference import supersede, swaps
+from inference.base import LOGIT_PER_POINT, OFF, SWAP, BaseWeights
 from inference.plan import HeadToHead, Seats, momentum, plan
 from inference.result import (
     Alternative,
@@ -423,7 +422,7 @@ def board(
     # the fight odds read that six against red's likely six on the default
     # engine alone; a comp the limits rule out has none
     measured = cur.barred is None and not (_drafting(draft) and fill is None)
-    head = _head_to_head(world, m, draft, shown.blue, expected.blue, catalog, base,
+    head = _head_to_head(world, m, draft, shown.blue, expected.blue, base,
                          bans_h) if measured else None
     mo = momentum(Seats(current=cur, expected=expected, fill=fill, head=head))
     # the swap cost, read once: the swaps above the picks and the chosen
@@ -585,15 +584,15 @@ def _scored(world: World, draft: Draft, optimal: _Optimal, cand: Candidate,
 
 def _head_to_head(
         world: World, m: Map | None, draft: Draft, blue: Sequence[str], red: Sequence[str],
-        catalog: list[Strategy], base: BaseWeights, bans: Sequence[Hero]) -> HeadToHead | None:
+        base: BaseWeights, bans: Sequence[Hero]) -> HeadToHead | None:
     """Blue's six and red's likely six on one scale: the default engine alone
     against red's six - no playbook rule for either side, red's six scored
     and never searched. Red's six read against itself counts no counter, so
-    each counter between the two sixes counts once, in blue's score. The
-    spread is the standard deviation of the same scores over the board's
-    reference sixes (scale.sample, drawn under the playbook's limits as
-    blue's own scale is). None with the engine off or a six short of a
-    team."""
+    each counter between the two sixes counts once, in blue's score. The gap
+    is read in the rate term's unit, the win-rate point: the rate weight with
+    the meta applied, over LOGIT_PER_POINT, is the engine's points per unit
+    of log-odds, so no sample is drawn and the meta moves no odds. None with
+    the engine off or a six short of a team."""
     if not base.on or len(blue) != TEAM_SIZE or len(red) != TEAM_SIZE:
         return None
     ours = world.resolve(None, (), tuple(blue)).blue
@@ -604,12 +603,8 @@ def _head_to_head(
     def score(cand: Candidate) -> float:
         return against_red.score(against_red.prepare(cand), detail=False).score
 
-    reference = scale.sample(Objective(world, m, red=theirs, banned=bans, side=draft.side,
-                                       stage=draft.stage, catalog=catalog, base=base))
-    if len(reference) < 2:
-        return None
     return HeadToHead(blue=score(Candidate(ours)), red=score(Candidate(theirs)),
-                      spread=statistics.pstdev(score(c) for c in reference))
+                      per_logit=base.scaled().rate / LOGIT_PER_POINT)
 
 
 def _check_teams(red_h: Sequence[Hero], blue_h: Sequence[Hero]) -> None:

@@ -314,10 +314,19 @@ is how often a six fields those heroes on average. Red has no share.
 The fight odds compare the two sides another way (`plan.fight_odds`):
 blue's six and red's likely six on one scale, the default engine alone
 against red's six, each counter between them counted once, no playbook
-rule for either side; the gap between the two scores, in standard
-deviations of the board's reference sample, goes through a logistic
-curve. They are a comparison of the two sixes, not a chance of winning
-(the math page, Fight odds).
+rule for either side. The gap between the two scores, divided by the
+meta and the rate weight into win-rate points, goes through the
+additive model's logistic curve at `base.LOGIT_PER_POINT` log-odds a
+point, 4 x 6 / 100 = 0.24: a pick that wins a share p of its matches
+adds about 4 (p - 0.5) to its six's log-odds, and the rate term is a
+mean over six picks. Synergy and counters enter at their weights over
+the rate weight; no sample is drawn, and for the same two sixes the
+meta moves no odds. Blue's six is chosen on the engine and the
+playbook's rules together, and the meta scales the engine alone, so
+until blue holds a full six the meta can change that six - the optimal
+before any pick, the fill while blue drafts - and the odds follow the
+new six. They are the additive model's reading of the gap, not a
+chance of winning measured from matches (the math page, Fight odds).
 
 A comp the limits rule out is not allowed: blue's full six that breaks
 one, or picks that no six keeping them completes within the limits
