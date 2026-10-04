@@ -146,7 +146,7 @@ taking it out changes the six. The catalog is `docs/inference.md`.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1vwg6wr/how_to_deal_with_ana_as_a_tank/
 - `brawl-has-no-backline` - Brawl has no backline (heuristic). applies on 4/6 boards, spreads on 4.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1rb9vcn/if_rein_is_brawl_why_does_he_feel_useless_against/
-- `brawl-heals-the-scrum` - A brawl six heals the scrum (heuristic). Researched 2026-10-03: applies on 33/122 boards, moves the six on 42.
+- `brawl-heals-the-scrum` - A brawl six heals the scrum (heuristic). Researched 2026-10-03: applies on 36/122 boards, moves the six on 14.
   - https://overwatch.fandom.com/wiki/Team_Composition
   - https://overwatch.fandom.com/wiki/Illari
   - https://overwatch.fandom.com/wiki/Brigitte
@@ -216,7 +216,7 @@ taking it out changes the six. The catalog is `docs/inference.md`.
 - `burst-through-heals` - Burst through their biggest save (heuristic). applies on 4/6 boards, spreads on 4.
   - https://www.reddit.com/r/OverwatchUniversity/comments/bwi0sl/widowmaker_is_the_reason_goats_is_meta_in_owl/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w9epk0/has_2_tanks_4_supports_ever_been_a_viable_6v6_comp/
-- `carry-a-damage-amplifier` - Carry a damage amplifier (heuristic). Researched 2026-10-03: applies on 122/122 boards, moves the six on 6.
+- `carry-a-damage-amplifier` - Carry a damage amplifier (heuristic). Researched 2026-10-03: applies on 122/122 boards, moves the six on 5.
   - https://overwatch.fandom.com/wiki/Zenyatta
   - https://overwatch.fandom.com/wiki/Mercy
   - https://overwatch.fandom.com/wiki/Ana
@@ -271,7 +271,7 @@ taking it out changes the six. The catalog is `docs/inference.md`.
 - `coin-flip-lineup` - A coin-flip lineup is no plan (constraint). applies on 0/6 boards, spreads on 0.
   - https://www.reddit.com/r/Competitiveoverwatch/comments/b8l41z/satire_i_just_want_goats_to_die_says_owl_viewer/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1whed0u/as_a_tank_what_should_i_do_vs_mauga_swap_when_my/
-- `commit-to-one-playstyle` - Commit to one playstyle (heuristic). Researched 2026-10-03: no chosen six of the 122 boards lacks a lean, and taking it out changes the six on 64.
+- `commit-to-one-playstyle` - Commit to one playstyle (heuristic). Researched 2026-10-03: no chosen six of the 122 boards is split between styles, and taking it out changes the six on 74.
   - https://overwatch.fandom.com/wiki/Team_Composition
   - https://overwatch.fandom.com/wiki/Reinhardt
   - https://overwatch.fandom.com/wiki/Vendetta
@@ -325,7 +325,7 @@ taking it out changes the six. The catalog is `docs/inference.md`.
 - `cycle-ults-faster` - Cycle ultimates faster than red (heuristic). applies on 2/6 boards, spreads on 2.
   - https://www.reddit.com/r/Competitiveoverwatch/comments/b8l41z/satire_i_just_want_goats_to_die_says_owl_viewer/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w6ihev/what_causes_steamrolls/
-- `damage-breaks-two-tanks` - Bring damage that breaks two tanks (heuristic). Researched 2026-10-03: applies on 122/122 boards, moves the six on 55.
+- `damage-breaks-two-tanks` - Bring damage that breaks two tanks (heuristic). Researched 2026-10-03: applies on 122/122 boards, moves the six on 44.
   - https://overwatch.blizzard.com/en-us/news/24104605/director-s-take-opening-up-the-conversation-on-5v5-and-6v6/
   - https://overwatch.fandom.com/wiki/Reaper
   - https://overwatch.fandom.com/wiki/Doomfist
@@ -355,7 +355,7 @@ taking it out changes the six. The catalog is `docs/inference.md`.
 - `defenders-set-deployables` - Defenders set deployables (heuristic). applies on 1/6 boards, spreads on 1.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w9vje7/how_do_you_counter_bastion_and_torb_in_super/
   - https://www.reddit.com/r/OverwatchUniversity/comments/9oo9zv/3_dps_exists_because_dps_are_largely_easy_to/
-- `defenders-stack-barriers` - Defenders stack barriers at a choke (heuristic). Researched 2026-10-03: applies on 6/122 boards, moves the six on 4.
+- `defenders-stack-barriers` - Defenders stack barriers at a choke (heuristic). Researched 2026-10-03: applies on 6/122 boards, moves the six on 2.
   - https://overwatch.blizzard.com/en-us/news/24104605/director-s-take-opening-up-the-conversation-on-5v5-and-6v6/
   - https://overwatch.fandom.com/wiki/Winston
   - https://overwatch.fandom.com/wiki/Symmetra
@@ -401,7 +401,7 @@ taking it out changes the six. The catalog is `docs/inference.md`.
 - `dive-maps-need-peel` - Dive maps need peel (constraint). applies on 2/6 boards, spreads on 0.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1jge0s5/a_detailed_guide_on_how_to_think_through_which/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w45p4i/is_it_true_that_supports_shouldnt_need_or_expect/
-- `dive-moves-together` - A dive six moves together (heuristic). Researched 2026-10-03: applies on 60/122 boards, moves the six on 25.
+- `dive-moves-together` - A dive six moves together (heuristic). Researched 2026-10-03: applies on 54/122 boards, moves the six on 19.
   - https://overwatch.fandom.com/wiki/Team_Composition
   - https://overwatch.fandom.com/wiki/Winston
   - https://overwatch.fandom.com/wiki/Watchpoint:_Gibraltar
@@ -486,7 +486,7 @@ taking it out changes the six. The catalog is `docs/inference.md`.
   - https://www.reddit.com/r/Competitiveoverwatch/comments/naye5a/how_to_play_winston/
   - https://www.reddit.com/r/OverwatchUniversity/comments/9oo9zv/3_dps_exists_because_dps_are_largely_easy_to/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w9epk0/has_2_tanks_4_supports_ever_been_a_viable_6v6_comp/
-- `heal-rate` - Heal at the other side's rate (heuristic). The owner's request of 2026-09-25 for a healing threshold in the six's total health, read from the healer data; the model and the threshold are docs/inference.md's The healing floor. Kept by the research of 2026-10-03: applies on 122/122 boards, moves the six on 32.
+- `heal-rate` - Heal at the other side's rate (heuristic). The owner's request of 2026-09-25 for a healing threshold in the six's total health, read from the healer data; the model and the threshold are docs/inference.md's The healing floor. Kept by the research of 2026-10-03: applies on 122/122 boards, moves the six on 20.
   - https://overwatch.fandom.com/wiki/Zenyatta
   - https://overwatch.fandom.com/wiki/Brigitte
   - https://overwatch.fandom.com/wiki/Mercy
@@ -581,7 +581,7 @@ taking it out changes the six. The catalog is `docs/inference.md`.
 - `meta-drifts-to-range` - The meta drifts toward range (heuristic). applies on 6/6 boards, spreads on 6.
   - https://www.reddit.com/r/Competitiveoverwatch/comments/v1r3si/understanding_owl_metagames_analysis/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1rb9vcn/if_rein_is_brawl_why_does_he_feel_useless_against/
-- `mobility-wins-races` - Mobility wins races and high ground (heuristic). Researched 2026-10-03: applies on 44/122 boards, moves the six on 15.
+- `mobility-wins-races` - Mobility wins races and high ground (heuristic). Researched 2026-10-03: applies on 44/122 boards, moves the six on 10.
   - https://overwatch.fandom.com/wiki/Flashpoint
   - https://overwatch.fandom.com/wiki/Doomfist
   - https://overwatch.fandom.com/wiki/Aatlis
@@ -700,7 +700,7 @@ taking it out changes the six. The catalog is `docs/inference.md`.
 - `poke-needs-reach` - Poke needs reach (heuristic). applies on 1/6 boards, spreads on 1.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w00w6m/can_someone_explain_team_comps_to_me_like_im_in/
   - https://www.reddit.com/r/OverwatchUniversity/comments/1rb9vcn/if_rein_is_brawl_why_does_he_feel_useless_against/
-- `poke-needs-reach` - A poke six needs reach (heuristic). Researched 2026-10-03: applies on 29/122 boards, moves the six on 33.
+- `poke-needs-reach` - A poke six needs reach (heuristic). Researched 2026-10-03: applies on 32/122 boards, moves the six on 30.
   - https://overwatch.fandom.com/wiki/Team_Composition
   - https://overwatch.fandom.com/wiki/Sub-Roles
   - https://overwatch.fandom.com/wiki/Sigma
@@ -770,7 +770,7 @@ taking it out changes the six. The catalog is `docs/inference.md`.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w4j78i/when_is_it_best_to_use_hitscan_or_dive_in_game/
   - https://www.reddit.com/r/Competitiveoverwatch/comments/1wdhogb/calculating_the_map_synergy_of_every_overwatch/
   - https://www.reddit.com/r/Competitiveoverwatch/comments/b8l41z/satire_i_just_want_goats_to_die_says_owl_viewer/
-- `sightlines-want-long-hitscan` - Long sightlines want long hitscan (heuristic). Researched 2026-10-03: applies on 20/122 boards, moves the six on 16.
+- `sightlines-want-long-hitscan` - Long sightlines want long hitscan (heuristic). Researched 2026-10-03: applies on 20/122 boards, moves the six on 14.
   - https://overwatch.fandom.com/wiki/Widowmaker
   - https://overwatch.fandom.com/wiki/Circuit_Royal
   - https://overwatch.fandom.com/wiki/Havana
@@ -781,7 +781,7 @@ taking it out changes the six. The catalog is `docs/inference.md`.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w4j78i/when_is_it_best_to_use_hitscan_or_dive_in_game/
   - https://www.reddit.com/r/Competitiveoverwatch/comments/1wdhogb/calculating_the_map_synergy_of_every_overwatch/
   - https://www.reddit.com/r/Competitiveoverwatch/comments/b8l41z/satire_i_just_want_goats_to_die_says_owl_viewer/
-- `six-carries-a-save` - Every six carries a save (heuristic). Researched 2026-10-03: applies on 122/122 boards, moves the six on 72.
+- `six-carries-a-save` - Every six carries a save (heuristic). Researched 2026-10-03: applies on 122/122 boards, moves the six on 62.
   - https://overwatch.fandom.com/wiki/Kiriko
   - https://overwatch.fandom.com/wiki/Sigma
   - https://overwatch.fandom.com/wiki/Zarya
@@ -893,7 +893,7 @@ taking it out changes the six. The catalog is `docs/inference.md`.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1rtseib/to_my_fellow_flanker_dps_heres_something_i/
 - `synergy-that-answers` - Synergy that also answers (constraint). applies on 6/6 boards, spreads on 0.
   - https://www.reddit.com/r/Competitiveoverwatch/comments/1vcs69k/thoughts_on_the_absence_of_the_prevalent/
-- `tank-line-barrier` - The tank line carries a barrier (heuristic). Researched 2026-10-03: applies on 122/122 boards, moves the six on 37.
+- `tank-line-barrier` - The tank line carries a barrier (heuristic). Researched 2026-10-03: applies on 122/122 boards, moves the six on 32.
   - https://overwatch.fandom.com/wiki/Zarya
   - https://overwatch.fandom.com/wiki/Winston
   - https://overwatch.fandom.com/wiki/Roadhog
@@ -958,7 +958,7 @@ taking it out changes the six. The catalog is `docs/inference.md`.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w9epk0/has_2_tanks_4_supports_ever_been_a_viable_6v6_comp/
 - `two-light-healers-lose` - Two light healers lose fights (constraint). applies on 6/6 boards, spreads on 0.
   - https://www.reddit.com/r/OverwatchUniversity/comments/1w00w6m/can_someone_explain_team_comps_to_me_like_im_in/
-- `two-of-each-role` - Two of each role (heuristic). Researched 2026-10-03: applies on 122/122 boards, moves the six on 89.
+- `two-of-each-role` - Two of each role (heuristic). Researched 2026-10-03: applies on 122/122 boards, moves the six on 68.
   - https://overwatch.blizzard.com/en-us/news/24187726/director-s-take-season-16-on-the-horizon/
   - https://overwatch.blizzard.com/en-us/news/24104605/director-s-take-opening-up-the-conversation-on-5v5-and-6v6/
   - https://overwatch.blizzard.com/en-us/news/24151413/director-s-take-continuing-the-6v6-discussion/

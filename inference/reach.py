@@ -19,7 +19,7 @@ records a board per released hero in tests/fixtures/reach.json beside the object
 it ran under, and the suite checks none is lost.
 
     maps    every map, the ones its map rates lift it most on first: a board solves in
-            about a tenth of a second, so none is left out
+            about a second, so none is left out
     reds    none (blue counters the likely six); the heroes it answers, two a role, on
             the counter graph the default engine scores (counters.weight: a wiki edge,
             then a derived one); the same without the heroes that answer it back

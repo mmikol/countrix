@@ -307,7 +307,9 @@ def test_an_apostrophe_cannot_close_a_single_quoted_attribute():
 
 @pytest.mark.parametrize(("dial", "phrase"), [
     ("meta", "base(x) = %s &middot; ( "),
-    ("meta", "The meta, %s, scales the whole engine"),
+    ("meta",
+        "The engine weight, <code>meta</code> in <code>meta.md</code>, is %s: it scales the"
+        " whole default engine"),
     ("rate", "&middot; ( %s &middot; rates(x)"),
     ("rate", "Under it the rate term is in win-rate points and weighs %s."),
     ("synergy", "+ %s &middot; synergy(x)"),
@@ -330,13 +332,13 @@ def test_the_math_page_quotes_each_weight_from_the_playbooks_meta_file(
 @pytest.mark.parametrize(("module", "name", "phrase"), [
     (base, "RATE_PICK_HALF", "t_p = pick_p / ( pick_p + %s )"),
     (compute, "PARTNER_POINTS", "pick score(h) = on_six(h) + %s &times; partners"),
-    (scale, "REFERENCE_SIZE", "against %s random legal sixes"),
+    (scale, "REFERENCE_SIZE", "against %s random sixes of a legal shape"),
     (scale, "SCALE_POOL", "each role's %s released heroes"),
     (base, "COIN_FLIP", "t_p &middot; ( win_p &minus; %s )"),
     (pages, "MAX_TANKS", "at most %s tanks"),
     (pages, "MAX_BANS", "within a match's %s bans"),
     (scoring, "NEED_BUDGET", "min( 1, max( %s, the largest w on n's guard ) / &Sigma; w"),
-    (scoring, "NEED_BUDGET", "one state costs %s at most"),
+    (scoring, "NEED_BUDGET", "the needs on one guard cost %s at most together"),
     (scoring, "SCORE_PLACES", "by their score to %s decimal places"),
     (solver, "RANK_CAP", "exactly up to %s"),
 ])
@@ -351,7 +353,7 @@ def test_the_math_page_quotes_each_constant_from_the_code(monkeypatch, module, n
 
 def test_the_math_page_writes_a_large_count_with_thousands_separators(monkeypatch):
     monkeypatch.setattr(scale, "REFERENCE_SIZE", 12000)
-    assert "against 12,000 random legal sixes" in " ".join(pages.view_math().split())
+    assert "against 12,000 random sixes of a legal shape" in " ".join(pages.view_math().split())
 
 
 def test_the_math_page_states_the_equation_and_the_layers():
@@ -374,14 +376,15 @@ def test_the_math_page_states_the_equation_and_the_layers():
     assert "The function: STRATEGIES( FACTS )" in page
     flat = " ".join(page.split())
     assert "<b>The default engine</b>" in page and "Only this term reads a derived edge" in flat
-    assert "score(x) = base(x)\n         + &Sigma; heuristics h" in page
+    assert "score(x) = base(x)\n         + &Sigma; rewards h" in page
     assert "norm_h(v) = clamp(" in page
     assert "A heuristic on a metric moves a six by its weight at most" in flat
     assert "What 100 means" in page and "not a win probability" in page
     assert "When nothing scores" in page
     # how a six is chosen: the five steps in order, then what a reader must not assume
     chosen = flat[flat.index("<h2 id='chosen'>"):flat.index("<h2 id='function'>")]
-    steps = ["1 the space", "2 the limits", "3 the meta", "4 the heuristics", "5 the argmax"]
+    steps = [
+        "1 the space", "2 the limits", "3 the default engine", "4 the heuristics", "5 the argmax"]
     assert [chosen.index(s) for s in steps] == sorted(chosen.index(s) for s in steps)
     for claim in ("weighs nothing", "The weights are not learned", "A score is not a probability",
                   "a proxy for Open Queue 6v6", "unknown, not zero"):

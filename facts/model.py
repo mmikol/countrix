@@ -95,6 +95,7 @@ class Hero:
     heal_amp: float = 0.0
     dmg_amp: float = 0.0
     cc_tools: list[str] = field(default_factory=list)
+    shove_tools: list[str] = field(default_factory=list)
     mobility_tools: list[str] = field(default_factory=list)
     flyer: bool = False
     cleanse_tools: list[str] = field(default_factory=list)

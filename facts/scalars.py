@@ -677,7 +677,7 @@ def _amps(hero: Hero, with_ults: list[KitPiece], in_fight: list[KitPiece]) -> No
 
 
 def _control(hero: Hero, base: list[KitPiece], with_ults: list[KitPiece]) -> None:
-    """cc_tools, mobility_tools and flyer."""
+    """cc_tools, shove_tools, mobility_tools and flyer."""
     # crowd control: tagged as such, an ability that slows, or an ABILITY
     # that knocks an enemy back at MIN_KNOCKBACK or more - a weapon's knockback
     # stat is recoil, and a movement tool's is the hero's own flight
@@ -687,6 +687,12 @@ def _control(hero: Hero, base: list[KitPiece], with_ults: list[KitPiece]) -> Non
         or (k.kind in (KIND_ABILITY, KIND_ULTIMATE) and k.damages and k.shoves and not moves(k))
         or (k.kind in (KIND_ABILITY, KIND_ULTIMATE)
             and any((s.value or 0) < 0 for s in k.stats.get("mspeed_slow", ())))})
+    # a tool that moves an enemy: an ABILITY that knocks one back at
+    # MIN_KNOCKBACK or more - a movement tool's included, as a Rocket Punch or
+    # a Coach Gun throws the target too - or one the wiki tags displace
+    hero.shove_tools = sorted({
+        k.name for k in with_ults
+        if (k.kind in (KIND_ABILITY, KIND_ULTIMATE) and k.shoves) or "displace" in k.keywords})
     hero.mobility_tools = sorted({k.name for k in mobility_tools(base)})
     hero.flyer = any(k.keywords & set(FLIGHT_KEYWORDS)
                      for k in base if k.kind in (KIND_ABILITY, KIND_PASSIVE))

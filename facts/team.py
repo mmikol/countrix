@@ -54,6 +54,8 @@ TEAM_METRICS = OrderedDict([
     ("style_counts", "picks per playstyle tag (a hero can carry several)"),
     ("style_top", "the modal playstyle among the picks"),
     ("style_lean", "the playstyle a strict majority of picks carry, else none"),
+    ("style_share", "the largest playstyle's share of the picks, each pick's tags counted as"
+                    " fractions of one (a pick with k tags adds 1/k to each)"),
     ("style_fit", "share of picks tagged with the map's rewarded style (0 without a map)"),
     ("shape_excess", "picks over EXPECTED_SHAPE's two per role"),
     # durability
@@ -97,6 +99,7 @@ TEAM_METRICS = OrderedDict([
     ("heal_peak_max", "the biggest single heal a teammate can receive"),
     ("heal_ratio", "support heal peak / the roster's two-support bench"),
     ("hps_supports", "summed sustained healing across the supports, hp per second"),
+    ("hps_per_support", "sustained healing per support, hp per second: the supports' mean"),
     ("hps_ratio", "support sustained healing / the roster's two-support bench"),
     ("heal_amp", "picks that amplify healing"), ("antiheal", "picks with anti-heal"),
     ("cleanse", "picks with a cleanse"),
@@ -108,7 +111,9 @@ TEAM_METRICS = OrderedDict([
     # tempo and tools
     ("cooldown_median", "median cooldown across every ability on the team"),
     ("cooldown_count", "cooldowns counted"),
-    ("cc_count", "picks with crowd control (stun, sleep, immobilize, hinder, knockback)"),
+    ("cc_count", "picks with crowd control (stun, sleep, immobilize, hinder, knockback,"
+                 " knockdown, hack, or a slow)"),
+    ("shove_count", "picks with a tool that moves an enemy: a knockback, a hook, a displacement"),
     ("mobility_count", "picks with a movement or evasive ability"),
     ("flyers", "picks that fly or hover"),
     ("light_flyers", "picks that fly or hover, tanks aside"),
@@ -291,6 +296,10 @@ def _shape(heroes: list[Hero], m: Map | None) -> MetricBag:
     tanks, damage, supports = roles["tank"], roles["damage"], roles["support"]
     subroles = sorted({h.subrole for h in heroes})
     counts = Counter(s for h in heroes for s in h.styles)
+    shares: dict[str, float] = {}
+    for h in heroes:
+        for s in h.styles:
+            shares[s] = shares.get(s, 0.0) + 1.0 / len(h.styles)
     majority = [s for s, c in counts.items() if c > n / 2.0]
     # ties fall to the alphabetically first style: the answer must not depend on
     # the order a set of names happens to iterate in (hash randomisation)
@@ -304,6 +313,7 @@ def _shape(heroes: list[Hero], m: Map | None) -> MetricBag:
             "style_top": sorted(counts, key=lambda s: (-counts[s], s))[0] if counts else "",
             "style_lean": (sorted(majority, key=lambda s: (-counts[s], s != map_style, s))[0]
                            if majority else ""),
+            "style_share": max(shares.values()) / n if n and shares else 0.0,
             "style_fit": (sum(1 for h in heroes if map_style in h.styles) / n
                           if n and map_style else 0.0),
             "shape_excess": sum(max(0, roles[r] - slots) for r, slots in EXPECTED_SHAPE.items())}
@@ -383,6 +393,7 @@ def _sustain(world: World, heroes: list[Hero]) -> MetricBag:
             "heal_ratio": (heal_peak_supports / world.heal_bench
                            if world.heal_bench else 0.0),
             "hps_supports": hps_supports,
+            "hps_per_support": _mean([h.hps for h in supports]),
             "hps_ratio": hps_supports / world.hps_bench if world.hps_bench else 0.0,
             "heal_amp": sum(1 for h in heroes if h.heal_amp),
             "antiheal": sum(1 for h in heroes if h.antiheal < 0),
@@ -400,6 +411,7 @@ def _tools(heroes: list[Hero]) -> MetricBag:
     cooldowns = [c for h in heroes for c in h.cooldowns]
     return {"cooldown_median": _median(cooldowns), "cooldown_count": len(cooldowns),
             "cc_count": sum(1 for h in heroes if h.cc_tools),
+            "shove_count": sum(1 for h in heroes if h.shove_tools),
             "mobility_count": sum(1 for h in heroes if h.mobility_tools),
             "flyers": sum(1 for h in heroes if h.flyer),
             "light_flyers": sum(1 for h in heroes if h.flyer and h.role != "tank"),
