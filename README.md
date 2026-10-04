@@ -13,13 +13,13 @@ gives cites a fact.
 ![The board: King's Row, blue on attack, Widowmaker banned](docs/img/board.jpg)
 
 *King's Row, blue on attack, two picks a side, Widowmaker banned. The solver
-fills blue's six around Ana and Reinhardt; blue's badge is its six as a share
-of the best six it could field here, 100. The picture predates red's likely
-six: the fight odds now set blue's six against red's likely six on the
-default engine, and red's badge says how often its heroes are picked.
-The screenshots run the reference playbook ([below](#quick-start)) without its
-two rules that read Blizzard's published win rates, and the cards hide the rate
-figures: Blizzard licenses those for personal use only.*
+fills blue's six around Ana and Reinhardt, and red's dashed tiles are its
+likely six; blue's badge is its six as a share of the best six it could field
+here. The pictures run the shipped playbook with the default engine off, so no
+number in them reads Blizzard's win rates, which Blizzard licenses for personal
+use only: where the fight odds would be, the strip shows the engine's verdict,
+red's badge - how often its heroes are picked - is hidden, and the cards leave
+out their rate phrases.*
 
 ## What it does
 
@@ -61,8 +61,8 @@ figures: Blizzard licenses those for personal use only.*
 ![The score breakdown, one bar per strategy](docs/img/breakdown.jpg)
 
 *How they scored: one bar per strategy, each with the fact it read. A limit
-that holds adds nothing; what a six gives up shows under costing. The picture
-predates the exact search; the count over the bars is now the space it covers.*
+that holds adds nothing; what a six gives up shows under costing. The count over
+the bars is the space the exact search covered.*
 
 ## How it works
 
