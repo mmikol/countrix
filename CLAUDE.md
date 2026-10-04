@@ -135,7 +135,7 @@ db <- facts <- inference <- door <- ui.
   objective, and on the math page); the playbook's terms sit on top, so
   the shipped playbook's boards are scored, never *unscored*. Its weights are the playbook's, in `meta.md`: `meta`, which
   scales the whole engine, over the `rate`, `synergy` and `counter` dials
-  (1, 1, 0.26, 0.05 shipped); `tune` with id `meta` changes them and the
+  (1, 1, 0.13, 0.025 shipped); `tune` with id `meta` changes them and the
   file's prose (`body`), and the playbook tab's Meta slider
   (`weights=meta:<v>`) sets the meta for a session. Its fifth field,
   `swap` (named by `base.SWAP`; 10 shipped, within `base.SWAP_RANGE`,

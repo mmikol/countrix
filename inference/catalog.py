@@ -10,8 +10,8 @@ and digest.
     ---
     meta: 1
     rate: 1
-    synergy: 0.26
-    counter: 0.05
+    synergy: 0.13
+    counter: 0.025
     swap: 10
     ---
     prose: what the weights do and why they are set so

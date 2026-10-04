@@ -57,17 +57,21 @@ stamp: RATE_PICK_HALF, and a derived counter edge at DERIVED_WEIGHT
 against a wiki edge's WIKI_WEIGHT, which keeps the tallies whole.
 
 The calibration. rate is 1: the rate term is in win-rate points. The other
-two are set so that each term's median range within one board is about
+two were set so that each term's median range within one board was about
 half the rate term's, measured over the reference sample
 (inference.scale.sample, 1,200 legal sixes a board) on each of the 30
 maps, each board's other side its likely six, the side the term reads
-until one is revealed. meta.md holds the values, tuning-log.md beside it
-their history, and docs/inference.md (Why the weights are the playbook's)
-the measurements behind them. The rate term's own range reads Blizzard's
-rates, which are licensed for personal use, so its figures stay out of
-the repo. At meta 1 each term's weight is the file's exactly (1.0 x w is w
-in floating point). OFF is meta 0 with every dial at 0, and a board scored
-under it is the playbook's alone.
+until one is revealed; then both were halved against 6v6 results, so each
+range is now about a quarter of the rate term's. The rates are 5v5, and on
+a private benchmark against CounterWatch's public 6v6 numbers, kept out of
+the repo, sixes picked with both terms at half that weight scored a little
+better on most of the maps held out of the tuning. meta.md holds the
+values, tuning-log.md beside it their history, and docs/inference.md (Why
+the weights are the playbook's) the measurements behind them. The rate
+term's own range reads Blizzard's rates, which are licensed for personal
+use, so its figures stay out of the repo. At meta 1 each term's weight is
+the file's exactly (1.0 x w is w in floating point). OFF is meta 0 with
+every dial at 0, and a board scored under it is the playbook's alone.
 """
 
 import dataclasses

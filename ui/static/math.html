@@ -212,9 +212,10 @@ s_n       = min( 1, max( %(NEED_BUDGET)g, the largest w on n's guard ) / &Sigma;
 strategy files, and the tune tool changes them. The engine weight, <code>meta</code> in
 <code>meta.md</code>, is %(W_META)g: it scales the whole default engine, and at 0 the playbook
 scores alone. Under it the rate term is in win-rate points and weighs %(W_RATE)g. The synergy and
-counter weights are set so that each term's <i>spread</i> - its highest value less its lowest over
-a board's reference sample, with red's likely six as the other side - is about half the rate
-term's, as a median over the maps; the calibration is in <code>inference/base.py</code>. The
+counter weights were set so that each term's <i>spread</i> - its highest value less its lowest
+over a board's reference sample, with red's likely six as the other side - was about half the
+rate term's, as a median over the maps, and were then halved against 6v6 results, so each is now
+about a quarter of it; the calibration is in <code>inference/base.py</code>. The
 comparisons below are at engine weight 1 and the shipped weights, each spread taken as its median
 over the maps; under another playbook the weights are its own <code>meta.md</code>'s, and the
 comparisons do not carry over. A heuristic on a metric moves a six by its weight at most, since
@@ -226,9 +227,9 @@ short, and divides by 3, the most the limits allow, which a one-tank, four-damag
 <code>edges-reward-displacement</code> counts the picks past the second with a tool that moves an
 enemy, up to its cap of 3, and divides by that cap. A base term has no such bound. These
 comparisons hold for any rule whose weight bounds its move, and every shipped rule's does: at
-weight 1 such a rule moves a six less than any base term's spread, at 2 about as far as the
-synergy or the counter term's, and at the slider's %(WEIGHT_MAX)g further than the three
-together.</p>
+weight 1 such a rule moves a six a little less than the synergy or the counter term's spread, at
+2 nearly twice as far as either and a little under half as far as the rate term's, and at the
+slider's %(WEIGHT_MAX)g further than the three together.</p>
 <p id='sustained-healing'><b>Sustained healing.</b> A hero's <code>hps</code> (healing per
 second) is the healing it lands on teammates each second: its best healing weapon and every
 ability and passive it can use beside that weapon, ultimates aside, each counted over every
