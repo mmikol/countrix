@@ -229,6 +229,10 @@ ADVANTAGE_CUES = _compiled_cues([
     # "you have the advantage", "you excel", "one of your best match-ups"
     (r"\b(?<!has )(?<!have )%s %s%s\b(?! against you)" % (YOURS, MODAL, WINS), 1.5),
     (r"\badvantage (?:over|against) foe\b|\bsuperior(?:ity)? (?:to|over) foe\b", 1.5),
+    # "gives you all the edge you need", "easily kite him", "making it very easy for you to"
+    (r"\bgives? you (?:\w+ ){0,3}(?:edge|advantage|upper hand)\b(?! against you)", 1.5),
+    (r"\b(?:easily|quickly|freely) (?:kite|out-?maneuver|outplay) foe\b", 1.5),
+    (r"\bmak(?:es?|ing) it %s(?:%s|simple|simpler) for you to\b" % (VERY, EASY), 1.5),
     (r"\byour (?:\w+ )?(?:best|favou?rite|easiest|favou?rable) (?:match-?ups?|targets?|prey)\b"
         r"|\b(?:easy|favou?rable|good|great|strong) match-?up\b", 1.5),
     (r"\b(?:%s|trouble) (?:to|for) %s\b" % (MENACE, FOE), 1.5),

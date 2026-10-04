@@ -167,6 +167,16 @@ def test_every_cell_but_a_placeholder_is_written_and_a_rating_alone_claims():
     assert synergies.claimed(synergies.read_cells(BARE_RATINGS)) == [("pharah", "")]
 
 
+def test_a_contracted_denial_is_no_claim():
+    """Junker Queen's article writes "There aren't any notable synergies" for
+    several teammates; a contraction denies the pair as "no" does."""
+    for advice in ("There aren't any notable synergies between these two heroes.",
+                   "There isn’t much synergy between Reaper and Junker Queen.",
+                   "They don't synergize well."):
+        assert synergies.NO_SYNERGY_RE.search(synergies.first_sentence(advice))
+    assert not synergies.NO_SYNERGY_RE.search("Their ultimates synergize brilliantly")
+
+
 def test_an_article_without_the_section_claims_nothing():
     assert synergies.claimed(synergies.read_cells("==Abilities==\n[[Genji]] is fast.")) == []
 
