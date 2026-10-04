@@ -10,17 +10,19 @@ it describes more than the folder does, and is meant to. The catalog in
 cites nothing.
 
 One entry per strategy the playbook has held: the community's rules, the
-queue's limit and the user's assumptions. The first 245 rules come from
-r/OverwatchUniversity, r/Competitiveoverwatch and r/Overwatch, each citation a
-link to reddit itself. The fifteen of 2026-10-03 come from Blizzard's site and
-forums, the wiki - read from the project's page cache, as the live wiki
-refuses automated readers - and this record's own Reddit links, cited as
-recorded: Reddit is never crawled, and new Reddit reading waits for its API.
-Each rule is standardized into the playbook's form, stored through the tune
-module's validated add and logged in `strategies/tuning-log.md`. "applies"
-and "spreads" are the six-board check made before a rule was chosen; the
-entries of 2026-10-03 carry that day's check over 122 boards - every map and
-side, red's dive, brawl and poke sixes and two-pick reveals, and the three
+queue's limit and the user's assumptions. An id two rules have held in turn
+has an entry for each, the earlier first: the last is the rule in force, and
+the strategy registry (/registry) marks the earlier one as such. The first 245
+rules come from r/OverwatchUniversity, r/Competitiveoverwatch and r/Overwatch,
+each citation a link to reddit itself. The fifteen of 2026-10-03 come from
+Blizzard's site and forums, the wiki - read from the project's page cache, as
+the live wiki refuses automated readers - and this record's own Reddit links,
+cited as recorded: Reddit is never crawled, and new Reddit reading waits for
+its API. Each rule is standardized into the playbook's form, stored through
+the tune module's validated add and logged in `strategies/tuning-log.md`.
+"applies" and "spreads" are the six-board check made before a rule was chosen;
+the entries of 2026-10-03 carry that day's check over 122 boards - every map
+and side, red's dive, brawl and poke sixes and two-pick reveals, and the three
 most-picked heroes banned - the boards a rule applies on and the boards where
 taking it out changes the six. The catalog is `docs/inference.md`.
 

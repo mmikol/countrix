@@ -1127,7 +1127,7 @@ the `team.*` metrics computed for the red side.
 | `team.melee` | picks with a melee weapon |
 | `team.aoe_count` | kit pieces tagged area of effect or shockwave |
 | `team.aoe_damage_count` | kit pieces that damage an area |
-| `team.range_known` | picks whose weapons publish a range: the three below read these alone, and read 0 where none does |
+| `team.range_known` | picks with a known longest range: a weapon that publishes one, where a held projectile that publishes none leaves only the hitscan figures; range_median, range_max and range_min read these picks alone, and read 0 where there are none |
 | `team.range_median` | median of each pick's longest published range |
 | `team.range_max` | the longest range on the team |
 | `team.range_min` | the shortest longest-range |

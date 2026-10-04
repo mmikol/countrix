@@ -12,7 +12,8 @@ h1,h2,h3 { font-family:"Bebas Neue",Impact,"Arial Narrow",sans-serif;
   letter-spacing:.06em; text-transform:uppercase; font-weight:400; }
 a { color:var(--blue); text-decoration:none; } a:hover { text-decoration:underline; }
 main { max-width:1440px; margin:0 auto; padding:14px 18px 60px; }
-/* the right padding keeps the row clear of the three pills pinned top-right */
+/* the right padding keeps the row clear of the three pills pinned top-right;
+   below 800 px they join the row instead (max-width:800px, further down) */
 header.top { position:relative; display:flex; align-items:center; gap:18px; flex-wrap:wrap;
   padding:10px 366px 10px 16px; background:linear-gradient(90deg,#161c27,#10141c);
   border:1px solid var(--line); border-radius:10px; }
@@ -46,6 +47,9 @@ header.top .gh:hover { color:var(--text); border-color:var(--muted); }
 .math .glance th, .math .reads th { text-align:left; font-weight:400; font-size:10px; letter-spacing:.14em;
   text-transform:uppercase; color:var(--muted); padding:4px 10px 4px 0; border-bottom:1px solid var(--line); }
 .math .glance td, .math .reads td { padding:5px 10px 5px 0; border-bottom:1px solid #202733; vertical-align:top; color:#c9d0db; }
+/* a table wider than its card or the page scrolls sideways in its own box: the
+   card never cuts it off, and the page never scrolls sideways for it */
+.math .wide { overflow-x:auto; }
 .math .reads td:first-child { white-space:nowrap; }
 .math .reads td:last-child { width:30%; }
 .math .reads td .legend { margin:2px 0 0; font-size:11px; }
@@ -338,12 +342,21 @@ table.facts tr.warn td { color:#ff9d8f; } table.facts tr.derived td.text { color
 .top h1 .expand { font-size: .44em; letter-spacing: .1em; text-transform: uppercase;
                   opacity: .55; margin-left: .6em; white-space: nowrap; }
 @media (max-width: 560px) { .top h1 .expand { display: none; } }
-/* a phone: the header's pills flow under the title, and the map and stage
-   pickers share a wrapping row */
+/* below 800 px the pills join the header's row, the controls after them: beside
+   the title where both fit, under it where they would meet. The title runs to
+   270 px, 330 in the fallback face, and the pills take 350 at the top right,
+   so pinned they would meet the fallback's title under about 750 px */
+@media (max-width:800px) {
+  header.top { padding:10px 16px; justify-content:space-between; }
+  header.top .links { position:static; order:1; flex-wrap:wrap; }
+  header.top .mapsel { order:2; }
+}
+/* a phone: the map and stage pickers share a wrapping row, which starts at the
+   left, and the map's chip may break over two lines, so a long one never runs
+   off the screen's left edge */
 @media (max-width:700px) {
-  header.top { padding:10px 16px; }
-  header.top .links { position:static; }
-  .mapsel { margin-left:0; width:100%; flex-wrap:wrap; }
+  .mapsel { margin-left:0; width:100%; flex-wrap:wrap; justify-content:flex-start; }
+  .mapsel .mode { white-space:normal; flex:0 1 auto; }
   .mapsel select { min-width:0; flex:1 1 140px; }
   .swapcell img, .swapcell .ph { width:100%; }
 }

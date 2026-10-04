@@ -6,17 +6,26 @@ metric they read; a heuristic on a metric names its metric and the
 registry's meaning of it; every metric an entry reads says how its range
 rule aggregates it over the six; a need and a reward are told apart as
 Strategy.need tells them, and a need's budget is the score's; the citation
-record's entries and sources are the entry's; the page reads the playbook
-in force and links only sections the math page holds; and every string
-from a file is escaped. No database."""
+record's last entry for an id is the entry's, an earlier one marked as the
+earlier rule of that id; the page reads the playbook in force - a crafted
+one's drafts counted apart, its gates worded whatever they read, a need at
+weight 0 divided by nothing - and links only sections the math page holds;
+the shipped scored rules keep the bound the page claims for them; and
+every string from a file is escaped. No database, but for that bound on
+the built roster."""
 
+import itertools
+import os
 import re
+import shutil
 
 import pytest
 
 from facts import compute
-from inference import catalog, ranges, scoring
+from facts.model import ROLES
+from inference import base, bounds, catalog, intervals, ranges, scoring
 from inference.expr import Expr
+from inference.shapes import legal_shapes
 from inference.strategy import Strategy
 from tests.verification.inference import DEFAULT, FIXTURE_PLAYBOOK
 from ui import pages, registry
@@ -51,6 +60,8 @@ def test_every_strategy_of_the_reference_playbook_has_an_entry_anchored_by_its_i
     assert ids == [s.id for s in strategies]
     glance = page[page.index("id='%s'" % registry.GLANCE):page.index("<div class='hcard")]
     assert re.findall(r"<a href='#([a-z0-9-]+)'>", glance) == ids
+    # in its own box that scrolls sideways, so a phone's page never does
+    assert "<div class='wide'><table class='glance'>" in glance
     groups = [page.index("id='%s'" % registry.GROUPS[kind][0]) for kind in catalog.KINDS]
     for s in strategies:
         at = page.index("id='%s'" % s.id)
@@ -85,6 +96,10 @@ def test_a_scored_rules_entry_writes_its_bonus_and_penalty_with_its_params_fille
     assert pages.esc(registry.SETTLED["map"]) in entry
     assert "the board settles it once: it reads only the ground in play" in entry
     assert "the bonus adds up to 1.5 times its largest value" in entry
+    # the table sits in a box that scrolls sideways, so a narrow card never cuts it off
+    assert "<div class='wide'><table class='reads'>" in entry
+    css = pages.static_file("board.css")[0].decode()
+    assert ".math .wide { overflow-x:auto; }" in css
 
 
 def test_a_constant_bonus_or_penalty_moves_a_six_by_exactly_its_weight_times_it():
@@ -136,6 +151,13 @@ def test_a_need_and_a_reward_are_told_apart_as_the_code_tells_them():
     assert "= min( 1, max( 2, 3 ) / 4 ) = 0.75" in escape
     assert "It costs 0 to 2.25" in escape and "here solo-escape and solo-control" in escape
     assert "the six decides it: it reads the six" in escape
+    # a need's norm is read over the reference sixes that meet its gate, and with
+    # no spread it reads 1, where a reward's reads 0.5 (scoring.normalised)
+    flat = " ".join(escape.split())
+    assert "sixes take where they meet the gate" in flat
+    assert "or none of them meets the gate, the norm is 1 and the need costs nothing" in flat
+    assert scoring.normalised(3.0, 3.0, None, False, need=True) == 1.0
+    assert scoring.normalised(3.0, 3.0, None, False, need=False) == 0.5
     assert "&minus;0.75 to 0" in page and "&minus;2.25 to 0" in page
     fliers = card(page, "their-fliers")
     assert "so it adds 0 to 2" in fliers and "the board settles it once" in fliers
@@ -152,6 +174,10 @@ def test_a_limit_writes_its_require_with_its_params_and_weighs_nothing():
     assert "a six where it fails is removed before any score is read" in entry
     assert "weighs nothing" in entry and "drops the shapes that break it" in entry
     assert "weight" not in entry[:entry.index("what it does")]
+    # the floor is the reference sample's alone; the top-hero sixes set the scale
+    flat = " ".join(entry.split())
+    assert ("the share's 0 is the lowest score among the reference sample's sixes alone - the"
+            " top-hero sixes set the scale, not the floor") in flat
 
 
 def test_an_assumption_adds_nothing_to_a_score():
@@ -190,9 +216,44 @@ def test_the_citation_record_gives_each_entry_its_lines_and_sources(tmp_path):
     # a link reads as the address without its scheme or its escapes, and goes where it says
     assert "href='https://example.org/L%C3%BAcio' target='_blank' rel='noopener'>" + (
         "example.org/L\u00facio</a>") in entry
-    assert "<summary>3 sources</summary>" in entry and "<summary>1 source</summary>" in entry
+    # the id's last entry is the rule's; the one before it is folded away, marked as the
+    # earlier rule of the id
+    sources = entry[entry.index("<div class='lbl'>sources</div>"):]
+    assert sources.index("<p>Edges, again (heuristic).</p>") < sources.index(
+        "<summary>1 source</summary>") < sources.index("<details class='earlier'>")
+    earlier = sources[sources.index("<details class='earlier'>"):]
+    assert earlier.startswith("<details class='earlier'><summary>the earlier rule of this id")
+    assert "Edges reward shoves" in earlier and earlier.count("<li>") == 3
+    assert "Edges reward shoves" not in sources[:sources.index("<details class='earlier'>")]
     assert "holds no entry for it" in card(render([strategy("uncited", kind="assumption")]),
                                            "uncited")
+
+
+def test_a_rule_whose_id_two_rules_have_held_cites_the_last_entry_of_the_record():
+    """On inference/README.md itself: an id the playbook has held twice -
+    poke-needs-reach, a rule of the emptied playbook and one of the reset of
+    2026-10-03 - lists its entries the earlier first, and its card shows the
+    last as its own and folds the earlier away, marked so. The emptied
+    playbook's entries carry the six-board check; the reset's, its check over
+    122 boards."""
+    cited = registry.citations()
+    shipped = catalog.load(catalog.SHIPPED_DIR)
+    twice = {s.id: cited[s.id] for s in shipped if len(cited.get(s.id, ())) > 1}
+    earlier, last = twice["poke-needs-reach"]
+    assert "/6 boards" in earlier.note and "Researched 2026-10-03" in last.note
+    page = render(shipped, cited, shipped=True)
+    for sid, entries in twice.items():
+        entry = card(page, sid)
+        sources = entry[entry.index("<div class='lbl'>sources</div>"):]
+        folded = sources.index("<details class='earlier'>")
+        assert registry._marked(entries[-1].note) in sources[:folded], sid
+        for older in entries[:-1]:
+            assert registry._marked(older.note) not in sources[:folded], sid
+            assert registry._marked(older.note) in sources[folded:], sid
+    # an id cited once shows its one entry, with nothing folded away
+    once = card(page, "heal-rate")
+    assert registry._marked(cited["heal-rate"][0].note) in once
+    assert "class='earlier'" not in once
 
 
 def test_the_parser_reads_every_entry_and_source_of_the_record():
@@ -240,8 +301,134 @@ def test_the_page_reads_the_playbook_in_force_and_its_meta(monkeypatch):
             " &middot; counters(x) )") in page
     assert "Every shipped scored rule" not in page
     monkeypatch.delenv("COUNTRIX_STRATEGIES")
-    assert "Every shipped scored rule keeps its bonus and its penalty within 0 to 1" in (
-        registry.view_registry())
+    assert registry.SHIPPED_SCORED_BOUND in registry.view_registry()
+
+
+@pytest.fixture()
+def crafted(tmp_path, monkeypatch):
+    """A playbook folder of its own, in force through COUNTRIX_STRATEGIES: a
+    limit and a constraint's draft, a reward whose gate reads only its
+    params, a scored rule whose gate reads no name at all, and a need at
+    weight 0 - beside the reference playbook's meta.md. -> the registry's
+    page for it."""
+    files = {
+        "cap-supports": "kind: constraint\nrequire: team.supports <= params.MOST\n"
+                        "params:\n    MOST: 3\n",
+        "ban-the-carry": "kind: constraint\n",
+        "switched-on": "kind: heuristic\nmetric: team.win_mean\ndirection: maximize\n"
+                       "weight: 1\nwhen: params.ON >= 1\nparams:\n    ON: 1\n",
+        "always-on": "kind: heuristic\nweight: 1\nwhen: 1 > 0\nbonus: min(team.dmg_amp, 1)\n",
+        "idle-need": "kind: heuristic\nmetric: team.mobility_count\ndirection: maximize\n"
+                     "weight: 0\nwhen: team.supports <= 1\n"}
+    for sid, fields in files.items():
+        (tmp_path / ("%s.md" % sid)).write_text(
+            "---\nname: %s\n%s---\n# %s\n\nThe rule's prose.\n" % (sid, fields, sid), "utf-8")
+    shutil.copy(os.path.join(FIXTURE_PLAYBOOK, catalog.META_FILE), tmp_path / catalog.META_FILE)
+    monkeypatch.setenv("COUNTRIX_STRATEGIES", str(tmp_path))
+    return registry.view_registry()
+
+
+def test_a_draft_counts_as_a_draft_alone_never_as_a_limit(crafted):
+    """One limit and one constraint's draft are one limit and one draft."""
+    assert ("<p>The playbook holds 5 strategies: 1 limit; 3 heuristics - 1 reward, 1 need and"
+            " 1 scored; and 0 assumptions; 1 draft awaiting /strategy.</p>") in crafted
+    assert "<a href='#ban-the-carry'>ban-the-carry</a></td><td>draft</td>" in crafted
+
+
+def test_a_gate_that_reads_no_metric_says_what_it_reads(crafted):
+    """A gate on its params alone, or on no name at all, is settled by the
+    board, and its words say what it reads - never an empty list."""
+    switched, always = card(crafted, "switched-on"), card(crafted, "always-on")
+    assert "as the gate reads only its params, so no six can change it" in switched
+    assert "the board settles it once: it reads only its params" in switched
+    assert "as the gate reads no metric and no param, so no six can change it" in always
+    assert "the board settles it once: it reads no metric and no param" in always
+    for entry in (switched, always):
+        assert not re.search(r"reads (only )?[,.\n<]", entry)
+
+
+def test_a_need_at_weight_0_is_scaled_by_1_and_costs_nothing(crafted):
+    """need_scales scales a guard whose weights sum to 0 by 1, dividing by
+    nothing; the card says so, and that the need costs nothing."""
+    entry = card(crafted, "idle-need")
+    assert scoring.need_scales(catalog.load()) == {"idle-need": 1.0}
+    assert "s           = 1\n" in entry and "/ 0" not in entry
+    assert "the weights on this guard sum to 0, so s scales nothing" in entry
+    assert "At weight 0 it costs nothing." in entry
+    glance = crafted[crafted.index("href='#idle-need'"):]
+    assert glance[:glance.index("</tr>")].endswith("<td>need</td><td>0</td><td>0</td>"
+                                                   "<td>the six</td>")
+
+
+def test_every_shipped_scored_rule_keeps_its_bonus_and_its_penalty_within_0_to_1(
+        synthetic_world):
+    """The claim the registry and the math page's engine's weights make of
+    the shipped playbook (registry.SHIPPED_SCORED_BOUND), held by brute
+    force: on every six the shipped limits allow on the synthetic World -
+    every shape they allow, from four heroes a role - with no map and on
+    each of its maps, red unrevealed and two of its picks revealed, each
+    shipped scored rule's bonus and penalty, read whether its gate holds or
+    not, lie within 0 to 1."""
+    shipped = catalog.load(catalog.SHIPPED_DIR)
+    scored = [s for s in shipped if s.form == "scored"]
+    roles = {
+        role: [h for h in synthetic_world.heroes.values() if h.role == role and h.released]
+        for role in ROLES}
+    shapes = legal_shapes(shipped)
+    sixes = [
+        [*t, *d, *s] for shape in shapes
+        for t in itertools.combinations(roles["tank"], shape.tanks)
+        for d in itertools.combinations(roles["damage"], shape.damage)
+        for s in itertools.combinations(roles["support"], shape.supports)]
+    assert scored
+    reds = [(), (synthetic_world.hero("Mortar"), synthetic_world.hero("Gale"))]
+    read = set()
+    for m in (None, *synthetic_world.maps_sorted()):
+        for red in reds:
+            objective = scoring.Objective(synthetic_world, m, red=red, side="defense",
+                                          catalog=shipped, base=base.OFF)
+            for heroes in sixes:
+                cand = objective.prepare(scoring.Candidate(heroes))
+                if cand.violations:
+                    continue
+                sc = cand.scope
+                for r in scored:
+                    sc["params"] = r.params_section
+                    for expr in (r.bonus, r.penalty):
+                        if expr is not None:
+                            value = expr.evaluate(sc)
+                            assert 0 <= value <= 1, (r.id, expr.source, value, cand.names)
+                read.add(tuple(sum(h.role == role for h in cand.heroes) for role in ROLES))
+    # every shape the shipped limits allow was read
+    assert read == {tuple(shape) for shape in shapes}
+    # the claim the test holds is the one both pages make, word for word
+    assert registry.SHIPPED_SCORED_BOUND in registry.view_registry()
+    assert registry.SHIPPED_SCORED_BOUND in " ".join(pages.view_math().split())
+
+
+@pytest.mark.invariant
+def test_the_shipped_scored_rules_keep_the_bound_on_the_built_roster(world):
+    """The same claim on the built database's roster, too many sixes for a
+    brute force: each shipped scored rule's bonus and penalty over every
+    six of each shape the shipped limits allow, read off the range rules at
+    the shape's root - which hold every completion (test_bounds) - lie
+    within 0 to 1, give or take the rules' float slack."""
+    shipped = catalog.load(catalog.SHIPPED_DIR)
+    objective = scoring.Objective(world, None, red=(), catalog=shipped, base=base.OFF)
+    space = ranges.Space(objective, (), bounds.roster(world, (), set()))
+    static = bounds._board_values(objective)
+    roots = [
+        ranges.Branch((), tuple((r, 0, n) for r, n in enumerate(shape) if n))
+        for shape in legal_shapes(shipped)]
+    for r in (s for s in shipped if s.form == "scored"):
+        for expr in (e for e in (r.bonus, r.penalty) if e is not None):
+            steps = ranges.rule_order(space, [
+                n for n in expr.names if n.split(".", 1)[0] in ("team", "matchup")])
+            read = intervals.abstract(expr, r.params, static)
+            for root in roots:
+                value = read(ranges.evaluate(steps, root))
+                assert isinstance(value, intervals.Iv), (r.id, root.open, value)
+                assert value.lo >= -1e-9 and value.hi <= 1 + 1e-9, (r.id, root.open, value)
 
 
 def test_the_page_links_only_anchors_it_or_the_math_page_holds():

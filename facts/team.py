@@ -86,8 +86,10 @@ TEAM_METRICS = OrderedDict([
     ("beam", "picks with a damaging beam"), ("melee", "picks with a melee weapon"),
     ("aoe_count", "kit pieces tagged area of effect or shockwave"),
     ("aoe_damage_count", "kit pieces that damage an area"),
-    ("range_known", "picks whose weapons publish a range: the three below read these alone,"
-                    " and read 0 where none does"),
+    ("range_known", "picks with a known longest range: a weapon that publishes one, where a"
+                    " held projectile that publishes none leaves only the hitscan figures;"
+                    " range_median, range_max and range_min read these picks alone, and read"
+                    " 0 where there are none"),
     ("range_median", "median of each pick's longest published range"),
     ("range_max", "the longest range on the team"), ("range_min", "the shortest longest-range"),
     ("dmg_amp", "picks that amplify someone's damage"),
