@@ -68,7 +68,7 @@ def test_a_foreign_host_or_origin_is_refused_on_every_route(served, monkeypatch)
         assert get(served + path, {"Host": "localhost:8017"})[0] == 200, path
 
 
-def test_the_page_the_statics_the_math_and_the_strategies_need_no_database(
+def test_the_page_the_statics_the_math_the_registry_and_the_strategies_need_no_database(
         served, monkeypatch, tmp_path):
     monkeypatch.setattr(board.psql, "default_dsn", lambda: NOWHERE)
     code, ctype, body = get(served + "/")
@@ -81,6 +81,8 @@ def test_the_page_the_statics_the_math_and_the_strategies_need_no_database(
     assert get(served + "/static/OFL.txt")[0] == 404        # the licence ships, unserved
     code, _, body = get(served + "/math")
     assert code == 200 and b"The Counter Utility Matrix" in body
+    code, ctype, body = get(served + "/registry")
+    assert code == 200 and "text/html" in ctype and b"The strategy registry" in body
     code, _, body = get(served + "/api/strategies")
     assert code == 200 and json.loads(body)["strategies"]
     code, _, body = get(served + "/health")      # the engine's, for the container's healthcheck

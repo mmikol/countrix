@@ -210,9 +210,10 @@ db <- facts <- inference <- door <- ui.
   same `Objective.ground_key` are one search. Each row's blurb is
   `plan.stage_blurb`, worded from the facts. `BRIEF` leaves it out too
   (`Brief.walk_stages`); test_stage_plan names its brief.
-- **The board** (`ui/board.py`, its pages in `ui/pages.py`) serves
-  `/api/facts` and answers `/api/board`, `/api/strategies` and `/health`
-  with `ui/serve.py`'s handlers, all in its own process - the
+- **The board** (`ui/board.py`, its pages in `ui/pages.py` and the strategy
+  registry in `ui/registry.py`) serves `/api/facts` and answers
+  `/api/board`, `/api/strategies` and `/health` with `ui/serve.py`'s
+  handlers, all in its own process - the
   compose stack's `ui` container runs the engine.
   `serve.Admission` solves `BOARDS_AT_ONCE` (one) board at a time. The
   board answers GET alone and writes nothing: a slider's weight rides

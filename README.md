@@ -183,7 +183,7 @@ the data current, `/maintain` runs the checks and keeps the docs current.
 - [docs/architecture.md](docs/architecture.md) - the layers, the folders, the settings, the skills, the scope
 - [docs/db.md](docs/db.md) - the data layer: the sources, the schema, the refresh
 - [docs/inference.md](docs/inference.md) - the playbook format, the solver, the tuning loop
-- [docs/ui.md](docs/ui.md) - the board: its pages and endpoints, and the math page (the objective, with the code's constants)
+- [docs/ui.md](docs/ui.md) - the board: its pages and endpoints, the math page (the objective, with the code's constants) and the strategy registry (each rule's math, with its own numbers)
 - [docs/mcp.md](docs/mcp.md) - the two MCP servers and every tool
 - [docs/security.md](docs/security.md) - the threat model and what stands in the way
 

@@ -93,11 +93,17 @@ def playbook(directory):
 def test_every_metric_and_every_expression_rule_has_a_bound():
     """A metric without a rule, or a node type or operator the whitelist
     admits without an interval rule, would leave the bound nothing to read:
-    the tables must cover the registry and the whitelist exactly."""
+    the tables must cover the registry and the whitelist exactly. Each rule
+    says how its metric aggregates over the six, in the words the strategy
+    registry shows: one line of ASCII."""
     assert set(ranges.TEAM_RULES) == set(TEAM_METRICS)
     assert set(ranges.MATCHUP_RULES) == set(compute.MATCHUP_METRICS)
     assert set(intervals.NODES) == set(expr._RULES)
     assert set(intervals.OPERATORS) == {*expr.BINARY, *expr.UNARY, *expr.COMPARE}
+    for key, rule in ranges.RULES.items():
+        words = rule.aggregate
+        assert words and words.isascii() and words == words.strip() and "\n" not in words, key
+        assert not words.endswith("."), key
 
 
 def holds(value, abstract):

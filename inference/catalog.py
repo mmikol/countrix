@@ -392,8 +392,9 @@ def _form_line(s: Strategy, reg: Mapping[str, str]) -> str:
         if expr is not None))
 
 
-def _without_title(body: str) -> str:
-    """The prose without its title line: the docs' heading names the strategy."""
+def without_title(body: str) -> str:
+    """The prose without its title line: the docs' heading and the strategy
+    registry's card name the strategy."""
     first, newline, rest = body.partition("\n")
     return rest.lstrip("\n") if first.startswith("#") and newline else body
 
@@ -421,7 +422,7 @@ def write_docs(catalog: Sequence[Strategy], path: str = DOCS_PATH) -> str | None
         "", "#### The meta", "",
         "`%s`: %s - the default engine's weights, which the tune tool changes (id `%s`)"
         % (META_FILE, meta_rendered(meta.weights, meta.swap), META),
-        "", _without_title(meta.body), ""]
+        "", without_title(meta.body), ""]
     for kind in KINDS:
         items = [s for s in catalog if s.kind == kind]
         if not items:
@@ -433,7 +434,7 @@ def write_docs(catalog: Sequence[Strategy], path: str = DOCS_PATH) -> str | None
             out += ["", _form_line(s, reg)]
             if s.params:
                 out.append("params: " + _params_line(s))
-            out += ["", _without_title(s.body), ""]
+            out += ["", without_title(s.body), ""]
     out += ["#### The vocabulary", "",
             "Every key a strategy may reference, with its meaning. `enemy.*` are",
             "the `team.*` metrics computed for the red side.", "",

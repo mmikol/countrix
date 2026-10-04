@@ -7,15 +7,16 @@ layer.
 http.server and psycopg, no web framework, no build step. This module is
 the board's server - the roster and facts endpoints, and the handler that
 routes to them, to the engine's routes ui/serve.py answers and to the
-pages ui/pages.py renders. Every click re-reads the database: the facts
+pages ui/pages.py and ui/registry.py render: the board, /math and
+/registry, each rule's math. Every click re-reads the database: the facts
 panel is the FactSet for (map, side, red, blue, bans); the comps panel is
 the inference layer's board - red's likely six around its picks, each
 with its pick score, blue's picks filled and its optimal counter to red's,
 blue's picks scored as a share of its optimal, the fight odds and the game
-plan; the
-playbook panel is the strategies catalog as it sits on disk. JSON
-endpoints under /api/ serve them; /health is the engine's - the playbook
-and the database - for the container's healthcheck and orchestrator.py.
+plan; the playbook panel is the strategies catalog as it sits on disk.
+JSON endpoints under /api/ serve them; /health is the engine's - the
+playbook and the database - for the container's healthcheck and
+orchestrator.py.
 
 The board writes nothing: a weight set on the playbook panel rides with
 the session's own requests and never reaches a strategy file.
@@ -37,7 +38,7 @@ from db import psql, web
 from facts import board_facts, tables
 from facts.draft import Query, parse_board
 from facts.roster import roster_of
-from ui import pages, serve
+from ui import pages, registry, serve
 
 # --- JSON endpoints ---------------------------------------------------------
 
@@ -94,6 +95,8 @@ class Handler(web.Handler):
                     served.body, served.content_type, headers={"Cache-Control": "no-cache"})
             if path == "/math":
                 return self._html(pages.view_math())
+            if path == "/registry":
+                return self._html(registry.view_registry())
             if path == "/api/strategies":
                 return self._json(*serve.handle_strategies())
             if path == "/health":
