@@ -478,7 +478,8 @@ The bound (`inference/bounds.py`) adds up, in the score's own order:
 
 A metric's range comes from the aggregate it is - a sum over the picks, a
 mean or a median of the known values, a max or a min, a product, a sum
-over pairs, the enemies answered, the distinct subroles, the isolated
+over pairs, the enemies answered, the distinct subroles, the largest
+playstyle's share and the playstyle a majority carry, the isolated
 picks and the largest group of the claimed synergy graph, or fixed by the
 shape - and every team and matchup key has its rule. An expression's
 range comes from its tree: an operator takes its operands' ends, a
@@ -487,6 +488,40 @@ values they can take. A limit false on every six of a branch drops it. A
 metric the bound sums in another order than the metric itself carries a
 slack, `SLACK` (1e-12) per unit of its addends, outward on both ends; one
 of whole numbers carries none, so a threshold on a count reads exactly.
+
+The walk asks three bounds of a branch, cheapest first, each only while
+the ones before keep it (`Bound.bounds`):
+
+- the default engine's terms as above, with every other term at its most
+  over the branch's whole shape - every six of that shape around the
+  locked picks - read once a shape, so a branch it drops reads no metric;
+- the bound above;
+- the fold: the default engine and the terms that read nothing but
+  per-pick counts of 0 or 1 bounded together - in the shipped playbook
+  `six-carries-a-save`, `carry-a-damage-amplifier`, and where the map
+  turns them on `edges-reward-displacement`,
+  `sightlines-want-long-hitscan` and `mobility-wins-races`. Apart, the
+  engine seats each open role's best candidates and each such term the
+  heroes that suit it, who need not be the same; the fold takes, over
+  each vector of counts the open picks can add, the best the engine's
+  terms reach with picks that add it plus each count term at the picks'
+  counts and that vector. A six's count is its picks' parts added up - a
+  sum's rule is exact on a full six - so a term read at that count bounds
+  it on the six. The fold adds its terms in another order than the score,
+  so it carries `SLACK` per unit of each term's magnitude, beside the
+  engine's. It reads `FOLD_COUNTS` (4) counts at most: it takes such
+  terms heaviest first, ties in the score's order, each where the counts
+  it and those taken before it read stay within the cap, and a term it
+  leaves out is bounded apart, as above. The vectors multiply with each
+  count the fold reads, and past a few the fold costs the walk more than
+  its pruning saves: on Ilios against three red picks, the shipped
+  playbook with twelve more count rules took about 18 s a search with
+  every count folded, 3 s with none and under 2 s with four.
+
+What a term reads decides its most, so each term's most is memoised on
+those values, `MEMO_CAP` (4,096) of them a term, and a term on the shape
+alone - the role counts, `team.shape_excess`, `team.shape_flags` - is read
+once a shape.
 
 Sixes rank by `scoring.rank_key`: the score rounded to `SCORE_PLACES` (9)
 decimal places, then the tie-break, then the names. The tie-break is the
@@ -551,8 +586,9 @@ the best six it met: on Samoa against D.Va, Roadhog, Sombra, Lúcio and
 Brigitte one returned a two-one-three where a two-two-two scored higher,
 since the shape it needed was never searched from a good start, and no
 pool size could promise it would be. The exact search proves its answer
-and costs less, about 0.08 s a search and 0.2-0.3 s a board in one
-process. `top` is its one knob, and it buys the next best sixes in order.
+and costs less, about 0.05 s a search and about half a second a board in
+one process, the slowest maps included. `top` is its one knob, and it buys the next best sixes in
+order.
 
 ## How a strategy file works
 

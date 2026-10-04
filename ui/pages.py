@@ -17,7 +17,7 @@ from typing import NamedTuple
 
 from facts import compute, counters, scalars
 from facts.draft import MAX_BANS, MAX_TANKS, TEAM_SIZE
-from inference import base, catalog, scale, scoring, solver, strategy
+from inference import base, bounds, catalog, scale, scoring, solver, strategy
 
 GITHUB_MARK = (
     "<svg viewBox='0 0 16 16' width='15' height='15' aria-hidden='true'><path fill='currentColor' d='M8 0C3.58 0 0 3.58 0 8"  # noqa: E501
@@ -180,6 +180,7 @@ def view_math() -> str:
         "NEED_BUDGET": scoring.NEED_BUDGET,
         "SCORE_PLACES": scoring.SCORE_PLACES,
         "RANK_CAP": solver.RANK_CAP,
+        "FOLD_COUNTS": bounds.FOLD_COUNTS,
         "FORMATION_RADIUS": scalars.FORMATION_RADIUS,
         "TEAMMATES": scalars.TEAMMATES,
         "TEAMMATES_BUT_ONE": scalars.TEAMMATES - 1})

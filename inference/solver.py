@@ -9,7 +9,7 @@ A Solver is the board's Objective (inference.scoring) on the board's scale
                 at most two tanks, every limit kept - in the full rank order
                 (scoring.rank_key), by branch and bound: each shape is filled
                 role by role, a role's picks at rising places of its walk
-                order, and a branch is dropped only where its bound
+                order, and a branch is dropped only where one of its bounds
                 (inference.bounds) proves that no six in it can enter the
                 top K. The answer is the enumeration's own, whatever order
                 the walk takes; no hero is left out of any role
@@ -303,20 +303,22 @@ class Solver(Objective):
         for _, slots in ranked:
             if goal.done:
                 break
-            self._branch(walk, goal, slots, 0, 0, start)
+            self._branch(walk, goal, slots, 0, 0, start, _open(slots, 0, 0))
 
     def _branch(self, walk: Bound, goal: Goal, slots: tuple[int, ...], j: int, start: int,
-                frame: Frame) -> None:
-        """One node: its bound, then its leaf or its children - the next
-        slot's role filled at each place from `start` that leaves the role's
-        later slots room."""
+                frame: Frame, root: Open) -> None:
+        """One node: its bounds, cheapest first (Bound.bounds), each asked
+        only while the ones before it keep the branch, then its leaf or its
+        children - the next slot's role filled at each place from `start`
+        that leaves the role's later slots room. `root` is the open roles of
+        the shape around the locked picks."""
         self.nodes += 1
         if not self.nodes % CHECK_EVERY:
             self._checkpoint()
         open_roles = _open(slots, j, start)
-        bound = walk.of(frame, open_roles)
-        if bound is None or goal.prunes(bound, walk, frame, open_roles):
-            return
+        for bound in walk.bounds(frame, open_roles, root):
+            if bound is None or goal.prunes(bound, walk, frame, open_roles):
+                return
         if j == len(slots):
             self._leaf(walk, goal, frame)
             return
@@ -329,7 +331,7 @@ class Solver(Objective):
             if goal.done:
                 return
             self._branch(walk, goal, slots, j + 1, i + 1 if later else 0,
-                         walk.push(frame, candidates[i]))
+                         walk.push(frame, candidates[i]), root)
 
     def _leaf(self, walk: Bound, goal: Goal, frame: Frame) -> None:
         """A six its branch's bound let through: scored in full, by the one

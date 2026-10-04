@@ -4,13 +4,16 @@ whitelist admits has one; and on random branches of random boards, synergy
 cells no article writes among them, under the reference playbook and
 scratch strategies of every form - a need, text gates, and/or/not, a
 chained comparison, a clamped division, len, in, if, powers and
-remainders, the synergy graph's isolated picks and largest group - and
-the swap search's keep term, the default engine on and off, every
-metric's range holds its value on every
-completion, every expression's holds its value, the bound holds every
-completion's score and tie-break, and a branch the limits rule out holds
-no six that keeps them. Every board is the synthetic World's: no
-database."""
+remainders, the synergy graph's isolated picks and largest group, rules
+on per-pick counts that the fold bounds with the default engine, every
+one of them or the heaviest within its cap - and the swap search's keep
+term, the default engine on and off, every metric's range holds its
+value on every completion, every expression's holds its value, the bound
+and every bound the walk asks of a branch hold every completion's score,
+the tie-break bound its tie-break, and a branch the limits rule out holds
+no six that keeps them. The fold takes the heaviest count rules within
+its cap, and the playstyle rules hold where two styles can lead a six.
+Every board is the synthetic World's: no database."""
 
 import ast
 import copy
@@ -24,7 +27,7 @@ import pytest
 
 from facts import compute
 from facts.draft import Draft
-from facts.team import TEAM_METRICS
+from facts.team import TEAM_METRICS, team_metrics
 from inference import bounds, catalog, expr, intervals, ranges
 from inference.base import OFF
 from inference.expr import scope
@@ -60,6 +63,17 @@ SCRATCH = {
     "tempo": "metric: matchup.tempo_diff\ndirection: maximize\nweight: 0.5",
     "lonely": "metric: team.isolated_count\ndirection: maximize\nweight: 0.5",
     "tight-core": "metric: team.core_size\ndirection: minimize\nweight: 0.5",
+    # a list beside a count: a term the walk reads afresh, its values unhashable
+    "flagged": "bonus: (0.5 if team.shape_flags == ['double tank'] else 0) + min(team.flyers, 1)",
+    # rules on per-pick counts alone, which the fold bounds with the default
+    # engine: a bonus on two counts, a heuristic and a penalty on one, a gate
+    # the six decides off a count, and a need guarded on one
+    "two-counts": "bonus: min(team.mobility_count, 2) * 0.5 + min(team.cc_count, 1)",
+    "count-metric": "metric: team.hitscan\ndirection: maximize\nweight: 1",
+    "count-penalty": "penalty: max(0, 1 - team.team_saves) * 0.75",
+    "count-gate": "when: team.squish_count >= 4\nbonus: min(team.invuln, 2) * 0.5",
+    "count-need": (
+        "metric: team.dmg_amp\ndirection: maximize\nweight: 1\nwhen: team.melee >= 1"),
 }
 LIMITS = {
     "ranged": "require: team.range_known >= 2 or team.hitscan >= 1",
@@ -103,7 +117,8 @@ def holds(value, abstract):
 def branches(solver, rng, count):
     """Random nodes of the walk on a solver's board: a shape, the first j of
     its slots filled at rising places of each role's walk order, and the
-    next slot's first place."""
+    next slot's first place; and the shape's root, its open roles around
+    the locked picks."""
     walk = solver._walker()
     roles = walk.space.roles
     shapes = solver._slots(walk.space)
@@ -122,7 +137,7 @@ def branches(solver, rng, count):
             start = place + 1
         if j < len(slots) and (j == 0 or slots[j - 1] != slots[j]):
             start = 0
-        yield walk, frame, _open(slots, j, start)
+        yield walk, frame, _open(slots, j, start), _open(slots, 0, 0)
 
 
 def completions(walk, frame, open_roles):
@@ -176,29 +191,38 @@ CASES = {
     "unwritten-pairs": ("scratch", PAIRS_HEAVY, True, False),
     "keep-base-off": ("scratch", OFF, False, True),
     "keep-alone": ("assumptions", OFF, False, True),
-    "keep-base-on": ("assumptions", DEFAULT, False, True)}
+    "keep-base-on": ("assumptions", DEFAULT, False, True),
+    "keep-scratch-base-on": ("scratch", DEFAULT, False, True),
+    "capped-fold": ("capped", DEFAULT, False, False)}
 
 
 @pytest.mark.parametrize(("rules", "base", "imputed", "keeps"), list(CASES.values()),
                          ids=list(CASES))
 def test_every_bound_holds_every_completion_of_random_branches(
-        synthetic_world, catalog_copy, rules, base, imputed, keeps):
+        synthetic_world, catalog_copy, monkeypatch, rules, base, imputed, keeps):
     """On random branches of each board, for every six the branch can still
     become: each team and matchup metric lies in its rule's range, each
     strategy's expressions lie in their abstract values, the tie-break lies
-    under its bound, the score under the bound, and a branch the bound
-    rules out holds no six that keeps every limit. Under assumptions alone
-    the bound is the default engine's and the keep term's, nothing else's
-    slack beside it, and on some branch it is within a hair of a
-    completion's score."""
-    rules = playbook(catalog_copy) if rules == "scratch" else ASSUMPTIONS_ONLY
+    under its bound, the score under the bound and under every bound the
+    walk asks of the branch (Bound.bounds) - the engine's with every other
+    term at the shape's root, the whole, and the fold - and a branch a
+    bound rules out holds no six that keeps every limit. Under the scratch
+    strategies the fold takes every count, so it meets each form of count
+    rule, and capped it takes the heaviest and the rest are bounded apart;
+    either way it is asked on many branches and reads below the whole bound
+    on some. Under assumptions alone the bound is the default engine's and
+    the keep term's, nothing else's slack beside it, and on some branch it
+    is within a hair of a completion's score."""
+    if rules == "scratch":      # every count folds, so the fold meets each form of count rule
+        monkeypatch.setattr(bounds, "FOLD_COUNTS", len(ranges.RULES))
+    rules = playbook(catalog_copy) if rules in ("scratch", "capped") else ASSUMPTIONS_ONLY
     world = imputing(synthetic_world) if imputed else synthetic_world
     keep = frozenset(world.hero(name).id for name in KEEP) if keeps else frozenset()
     rng = random.Random("bounds|%s|%s|%s%s" % (len(rules), base, imputed,
                                                "|keep" if keeps else ""))
     closest = math.inf
     keys = sorted(ranges.RULES)
-    checked = 0
+    checked = folds = tighter = 0
     for draft in BOARDS:
         m, red, locked, banned = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans)
         solver = Solver(world, m, red=red, locked=locked, banned=banned,
@@ -207,10 +231,13 @@ def test_every_bound_holds_every_completion_of_random_branches(
         expressions = [(s, e, intervals.abstract(e, s.params, static))
                        for s in rules for e in (s.when, s.require, s.bonus, s.penalty)
                        if e is not None]
-        for walk, frame, open_roles in branches(solver, rng, 60):
+        for walk, frame, open_roles, root in branches(solver, rng, 60):
             branch = ranges.Branch(frame.picks, open_roles)
             env = ranges.evaluate(ranges.rule_order(walk.space, keys), branch)
             top = walk.of(frame, open_roles)
+            asked = list(walk.bounds(frame, open_roles, root))
+            folds += len(asked) == 3
+            tighter += len(asked) == 3 and asked[2] < asked[1]
             tiebreak = walk.tiebreak(frame, open_roles)
             for six in completions(walk, frame, open_roles):
                 cand = solver.score(solver.prepare(Candidate(six)), detail=False)
@@ -229,10 +256,94 @@ def test_every_bound_holds_every_completion_of_random_branches(
                 assert cand.tiebreak <= tiebreak
                 if not cand.violations:
                     assert cand.score <= top, (draft, cand.score, top)
+                    assert all(b is not None and cand.score <= b for b in asked), (
+                        draft, cand.score, asked)
                     closest = min(closest, top - cand.score)
                 checked += 1
     assert checked > 1000
+    assert rules is ASSUMPTIONS_ONLY or (folds > 50 and tighter)
     assert rules is not ASSUMPTIONS_ONLY or closest < 1e-9    # the engine's bound is tight
+
+
+def test_the_fold_takes_the_heaviest_count_rules_within_its_cap(
+        synthetic_world, catalog_copy, monkeypatch):
+    """The vectors the fold weighs multiply with each count it reads, so it
+    reads FOLD_COUNTS counts at most: of the terms on per-pick counts alone
+    it takes the heaviest first, ties in the score's order, each where it
+    and those taken before it read no more counts than that. Under the
+    scratch strategies and a penalty on saves at three times their weight,
+    which the score sums after lighter count rules, every board holds more
+    such counts than the cap: the fold takes the penalty over a lighter rule
+    before it, a term it leaves out would take it past the cap with the
+    terms taken before it, and every term it takes is one the uncapped fold
+    takes."""
+    with open(os.path.join(catalog_copy, "heavy-save.md"), "w", encoding="utf-8") as handle:
+        handle.write("---\nname: heavy-save\nkind: heuristic\nweight: 3\n"
+                     "penalty: max(0, 1 - team.team_saves)\n---\nx\n")
+    rules = playbook(catalog_copy)
+
+    def walker(draft):
+        m, red, locked, banned = synthetic_world.resolve(
+            draft.map_name, draft.red, draft.blue, draft.bans)
+        return Solver(synthetic_world, m, red=red, locked=locked, banned=banned,
+                      side=draft.side, catalog=rules, base=DEFAULT)._walker()
+    for draft in BOARDS:
+        capped = walker(draft)
+        with monkeypatch.context() as uncapped:
+            uncapped.setattr(bounds, "FOLD_COUNTS", len(ranges.RULES))
+            whole = walker(draft)
+        terms = capped.terms
+        counts = {n for f in capped._fold for n in terms[f.term].reads}
+        assert len(counts) == len(capped._counts) <= bounds.FOLD_COUNTS < len(whole._counts)
+        assert capped._in_fold < whole._in_fold, draft
+        heavy = max(sorted(whole._in_fold), key=lambda i: terms[i].weight)
+        assert terms[heavy].weight == 3 and heavy in capped._in_fold, draft
+        assert any(i < heavy and i not in capped._in_fold for i in whole._in_fold), draft
+        taken: set[str] = set()
+        for i in sorted(sorted(whole._in_fold), key=lambda i: -terms[i].weight):
+            wanted = taken | set(terms[i].reads)
+            if i in capped._in_fold:
+                taken = wanted
+            assert (i in capped._in_fold) == (len(wanted) <= bounds.FOLD_COUNTS), (
+                draft, terms[i].reads)
+
+
+# heroes given a second playstyle, so that brawl and dive can both pass half a six
+TWO_STYLES = ("Anvil", "Kite", "Rook", "Gale", "Balm", "Sorrel")
+
+
+def test_the_playstyle_rules_hold_every_completion_where_two_styles_can_lead(synthetic_world):
+    """team.style_lean and team.style_share hold every completion of random
+    branches on a roster where six heroes carry both brawl and dive, so both
+    can pass half a six and tie there: on boards whose maps reward brawl,
+    dive and poke, the tie goes to the map's style, else to the name, as
+    facts.team ranks them. The lean reads each of brawl, dive, '' and any
+    on some branch, and settles some branch whose six ties its two leading
+    styles; the share reads less than its whole range on some."""
+    for name in TWO_STYLES:
+        synthetic_world.hero(name).styles = {"brawl", "dive"}
+    keys = ("team.style_lean", "team.style_share")
+    rng = random.Random("bounds|styles")
+    read, settled_ties, narrowed = set(), 0, False
+    for map_name in ("Harbor Gate", "Ember Ruins", "Salt Flats"):
+        m = synthetic_world.resolve(map_name, (), (), ())[0]
+        solver = Solver(synthetic_world, m, red=[], locked=[], catalog=ASSUMPTIONS_ONLY, base=OFF)
+        for walk, frame, open_roles, _ in branches(solver, rng, 80):
+            env = ranges.evaluate(ranges.rule_order(walk.space, keys),
+                                  ranges.Branch(frame.picks, open_roles))
+            lean, share = env["team.style_lean"], env["team.style_share"]
+            read.add(lean)
+            narrowed = narrowed or share.hi - share.lo < 0.5
+            for six in completions(walk, frame, open_roles):
+                team = team_metrics(synthetic_world, six, m, (), only=("style_lean",))
+                for key, value in (("style_lean", lean), ("style_share", share)):
+                    assert holds(team[key], value), (map_name, six, key, team[key], value)
+                counts = team["style_counts"]
+                tied = counts.get("brawl", 0) == counts.get("dive", 0) > 3
+                settled_ties += tied and isinstance(lean, intervals.Exact)
+    assert {intervals.Exact("brawl"), intervals.Exact("dive"), intervals.Exact(""),
+            intervals.ANY} <= read
+    assert narrowed and settled_ties
 
 
 def test_an_expression_reads_three_ways_where_a_branch_leaves_it_open():

@@ -42,14 +42,21 @@ keeps it current.
   Reading each article's stage sections more fully, or a second
   paragraph per stage, is the lever that makes the plan stage by stage
   say more. Cost: the map pull and its cache; no engine change.
-- **A faster search under the researched playbook.** Its fourteen rules,
-  eight of them scored, make a search walk about ten times the branches
-  the terrain playbook did: a board takes about a second, and the reach
-  recorder over an hour. The field's fast path now covers gates the six
-  decides (`Objective.lean_keys`); what is left is the bound - a scored
-  rule whose penalty the open slots can still clear bounds at no cost.
-  A tighter range for `team.style_share` and the save and barrier
-  penalties would prune earlier. Cost: a day, with test_bounds.
+- **A faster board under the researched playbook.** The researched rules
+  made a search walk far more branches than the terrain playbook did only
+  where `edges-reward-displacement` is on - about ten times on Ilios, three
+  to four on Lijiang Tower and Samoa, near the old count elsewhere - and
+  made every branch about three times as costly. The search now asks a
+  cheap bound at the shape's root before it reads a metric, memoises each
+  term's bound on what it reads, ranges `team.style_share` and
+  `team.style_lean` on the branch, and folds the count rules, four counts
+  at most, into the default engine's joint bound: Ilios walks 3,991
+  branches where it walked 32,165, and a board takes about half a
+  second, the slowest maps included. Most of that is now the scale's freeze, three quarters of it
+  the field's sixes measured in `scale._field_sample`, which a board
+  cannot share with the next while the field reads red (Red never
+  reorders the scale's field). Cost: half a day once the field reads the
+  map alone.
 - **The keys the research could not use.** The 2026-10-03 research
   dropped sourced rules for want of a metric: peel tools near the
   backline (`team.support_peel`), team speed sources such as Speed Boost
@@ -60,7 +67,9 @@ keeps it current.
   Barrier, `team.barrier_hp` reads Domina's array as one segment, and
   Winston's bubble counts in full as a main tank's barrier. Each key is a
   metric and a range rule (CLAUDE.md, a new metric), then a rule through
-  `add_strategy`. Cost: half a day a key.
+  `add_strategy`; a rule on a count of 0 or 1 a pick folds with the
+  default engine only among the heaviest rules within the fold's four
+  counts (`FOLD_COUNTS`). Cost: half a day a key.
 - **A source for the cover rule.** "Cover closes the distance" (cover
   rewards mobility, `team.mobility_count` where `map.cover` stands out)
   was held back on 2026-09-30 for want of a source, and the 2026-10-03
@@ -162,12 +171,23 @@ keeps it current.
   far below the field crowds every share toward 100. A low quantile (the
   5th percentile) holds still, read off the sample's sorted scores. Cost:
   half a day, and every share moves once.
-- **Bound the metric heuristics jointly.** The exact search bounds each
-  heuristic on a summed metric apart, so each takes its own best heroes;
-  folding such a term's line into the default engine's joint bound (its
-  metric is a per-pick sum) cut the reference playbook's nodes by half to
-  two thirds in the design's prototype. The shipped playbook does not
-  need it; a heavy playbook would. Cost: a day, with its fuzz.
+- **Bound the real-valued sums jointly.** The fold bounds the default
+  engine together with the heaviest terms on per-pick counts of 0 or 1,
+  four counts at most, so a six's worth and its counts come off the same
+  picks (`Bound.bounds`). A term on a real-valued sum is still bounded
+  apart, on its own best heroes: `damage-breaks-two-tanks` on
+  `team.dps_floor` and `heal-rate` on the healing shortfall, both loose
+  beside the engine on real boards. A linear upper bound on each, folded
+  into the same pass, would take them in. Cost: a day, with its fuzz.
+- **A fold sized by what it prunes.** The fold reads four counts at most
+  (`FOLD_COUNTS`), the heaviest rules first, since the vectors it weighs
+  multiply with each count: on Ilios with twelve more count rules at
+  weight 0.5, folding every count took about 18 s a search and four
+  under 2 s. Where count rules outweigh the default engine the whole
+  fold prunes more than it costs: eight more at weight 5 took about 4 s
+  folded whole and 7 s at four. A cap that weighs what a count's rules
+  can move a six against the vectors the count adds would take both.
+  Cost: a day, with test_bounds.
 - **A strict dead-CSS test.** The test word-matches class names, so a dead
   compound selector passes (`.hcard .legend` did). Needs an exception list
   for the four classes built by concatenation.

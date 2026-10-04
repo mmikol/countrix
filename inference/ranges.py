@@ -8,9 +8,12 @@ which the bound (inference.bounds) reads as the search walks.
                           completions, by the aggregate it is: a sum over the
                           picks, a mean or median of the known values, a max or
                           a min, a product, a sum over pairs, the enemies
-                          answered, the distinct subroles, the claimed synergy
-                          graph's isolated picks and largest group, or fixed by
-                          the shape
+                          answered, the distinct subroles, the largest
+                          playstyle's share and the playstyle a majority
+                          carry, the claimed synergy graph's isolated picks
+                          and largest group, or fixed by the shape. A sum's
+                          rule carries each hero's part of it, and one fixed
+                          by the shape says so, for the bound to read
     rule_order, evaluate  the rules a search reads, each after the rules it
                           reads, and their values over one branch
     pair_halves           half each hero's best and worst few pairs with the
@@ -158,6 +161,10 @@ def _slack(values: Sequence[float], count: int = TEAM_SIZE) -> float:
 
 # --- the metric rules -----------------------------------------------------------
 
+type Feature = Callable[[Hero, Space], float]
+type Known = Callable[[Hero, Space], float | None]
+
+
 class Rule(NamedTuple):
     """How one metric reads over a branch, and the slack its interval takes
     outward on both ends."""
@@ -167,38 +174,57 @@ class Rule(NamedTuple):
 
 class Spec(NamedTuple):
     """A metric's rule as the table holds it: what builds it on a search's
-    Space, and the metrics it reads, which are computed first."""
+    Space; the metrics it reads, which are computed first; for a sum over
+    the picks, each hero's part of it (`feature`), which the bound's fold
+    reads (inference.bounds); and whether the six's shape alone fixes it
+    (`shaped`) - the same value on every branch of a shape, so that the
+    bound reads a term on such metrics once a shape."""
     build: Callable[[Space], Rule]
     needs: tuple[str, ...] = ()
-
-
-type Feature = Callable[[Hero, Space], float]
-type Known = Callable[[Hero, Space], float | None]
+    feature: Feature | None = None
+    shaped: bool = False
 
 
 def _fixed(value: Abstract) -> Spec:
     """A metric every completion holds the same value of."""
-    return Spec(lambda space: Rule(lambda branch, env: value))
+    return Spec(lambda space: Rule(lambda branch, env: value), shaped=True)
+
+
+class _Sum(NamedTuple):
+    """A sum over the six of each hero's part, by dense index, and each
+    role's running sums of its largest and smallest parts from each start
+    on (Space.extremes)."""
+    parts: list[float]
+    tops: Suffix[list[float]]
+    bottoms: Suffix[list[float]]
+
+    def read(self, branch: Branch, env: Env) -> Iv:
+        """The sum's least and most over the branch's completions: the
+        picks' own, plus each open role's smallest and largest few."""
+        parts, tops, bottoms = self.parts, self.tops, self.bottoms
+        total = 0.0
+        for i in branch.picks:
+            total += parts[i]
+        lo = hi = total
+        for r, start, n in branch.open:
+            lo += bottoms[r][start][n]
+            hi += tops[r][start][n]
+        return Iv(lo, hi)
+
+
+def _summed(space: Space, parts: list[float]) -> _Sum:
+    """The sum over the six of these parts, its tables built on the space."""
+    tops, bottoms = space.extremes(parts)
+    return _Sum(parts, tops, bottoms)
 
 
 def _sum(feature: Feature) -> Spec:
     """A sum over the six: the picks' own, plus each open role's smallest
-    and largest few."""
+    and largest few. Its Spec carries `feature`, each hero's part."""
     def build(space: Space) -> Rule:
         values = [float(feature(h, space)) for h in space.heroes]
-        tops, bottoms = space.extremes(values)
-
-        def read(branch: Branch, env: Env) -> Abstract:
-            total = 0.0
-            for i in branch.picks:
-                total += values[i]
-            lo = hi = total
-            for r, start, n in branch.open:
-                lo += bottoms[r][start][n]
-                hi += tops[r][start][n]
-            return Iv(lo, hi)
-        return Rule(read, _slack(values))
-    return Spec(build)
+        return Rule(_summed(space, values).read, _slack(values))
+    return Spec(build, feature=feature)
 
 
 def _count(test: Callable[[Hero, Space], object]) -> Spec:
@@ -238,7 +264,7 @@ def _ratio(numerator: str, denominator: str) -> Spec:
 
 def _roles(of: Callable[[list[int]], Abstract]) -> Spec:
     """A metric the shape fixes: read off the six's count per role."""
-    return Spec(lambda space: Rule(lambda branch, env: of(space.counts(branch))))
+    return Spec(lambda space: Rule(lambda branch, env: of(space.counts(branch))), shaped=True)
 
 
 def _known_suffixes(space: Space, values: Sequence[float | None]
@@ -538,6 +564,65 @@ def _distinct_subroles() -> Spec:
     return Spec(build)
 
 
+def _styles(space: Space, part: Callable[[Hero], float]) -> list[tuple[str, _Sum]]:
+    """Every playstyle the space's heroes carry, by name, each as a sum over
+    the six: `part` of a hero that carries it, 0 of one that does not."""
+    return [(style, _summed(space, [part(h) if style in h.styles else 0.0
+                                    for h in space.heroes]))
+            for style in sorted({s for h in space.heroes for s in h.styles})]
+
+
+def _style_share() -> Spec:
+    """team.style_share: the largest playstyle's share of the six, a pick
+    with k playstyles giving 1/k to each. Each style's sum lies within its
+    range over the branch (_Sum), so the largest lies between the largest
+    low end and the largest high end; a six with no playstyle reads 0,
+    which every low end allows, as no part is below 0. The thirds add up
+    in another order than the metric's, so the share carries the slack of
+    six parts of at most 1."""
+    def build(space: Space) -> Rule:
+        styles = _styles(space, lambda h: 1.0 / len(h.styles))
+
+        def read(branch: Branch, env: Env) -> Abstract:
+            lo = hi = 0.0
+            for _, total in styles:
+                ends = total.read(branch, env)
+                lo, hi = max(lo, ends.lo), max(hi, ends.hi)
+            return Iv(lo / TEAM_SIZE, hi / TEAM_SIZE)
+        return Rule(read, SLACK * (1.0 + TEAM_SIZE))
+    return Spec(build)
+
+
+def _style_lean() -> Spec:
+    """team.style_lean: the playstyle a strict majority of the six carry,
+    ranked as facts.team ranks them - the most picks, then the map's
+    rewarded style, then the name - else ''. A style leads no completion
+    whose count cannot pass half the six, so where none can, every
+    completion reads ''. Where one passes half on every completion and
+    every other that can pass it has fewer picks there, or as many at most
+    and ranks after it, every completion reads that one; else any. The
+    counts are whole numbers, so each reads exactly."""
+    def build(space: Space) -> Rule:
+        styles = _styles(space, lambda h: 1.0)
+        half, rewarded = TEAM_SIZE / 2.0, space.map_style
+
+        def ranked(style: str) -> tuple[bool, str]:
+            return style != rewarded, style
+
+        def read(branch: Branch, env: Env) -> Abstract:
+            live = [(style, ends) for style, total in styles
+                    if (ends := total.read(branch, env)).hi > half]
+            for style, ends in live:
+                if ends.lo > half and all(
+                        other == style or theirs.hi < ends.lo
+                        or (theirs.hi == ends.lo and ranked(other) > ranked(style))
+                        for other, theirs in live):
+                    return Exact(style)
+            return ANY if live else Exact("")
+        return Rule(read)
+    return Spec(build)
+
+
 def _partners(space: Space) -> tuple[list[int], list[bool], Suffix[int]]:
     """The synergy graph the wiki claims, by dense index: each hero's
     partners in the space, a bit per hero; whether it has a partner
@@ -700,8 +785,8 @@ TEAM_RULES: dict[str, Spec] = {
     "shape_flags": _roles(lambda c: Exact(shape_flags(*c))),
     "style_counts": _fixed(ANY),
     "style_top": _fixed(ANY),
-    "style_lean": _fixed(ANY),
-    "style_share": _fixed(Iv(0.0, 1.0)),
+    "style_lean": _style_lean(),
+    "style_share": _style_share(),
     "style_fit": _per_pick(lambda h, s: s.map_style is not None and s.map_style in h.styles),
     "shape_excess": _roles(lambda c: lift(sum(
         max(0, c[i] - EXPECTED_SHAPE[r]) for i, r in enumerate(ROLES)))),
