@@ -1,19 +1,21 @@
-/* the strategy registry's dialog: a click on a rule - its row in the table at
-   a glance, or a rule an entry names - opens the rule's entry in the page's
-   dialog (#rule_box) over the list, which stays where it was. An entry goes in
-   as a copy of the server's node, so the script writes no markup and escapes
-   nothing: the one text it sets, the dialog's name, it sets as text.
+/* the strategy registry's dialog: a click on a rule - its row in its kind's
+   table, or a rule an entry names - opens the rule's entry in the page's
+   dialog (#rule_box) over the page, which stays where it was. The entries sit
+   hidden under the tables (#rule_entries), and one goes in as a copy of the
+   server's node, so the script writes no markup and escapes nothing: the one
+   text it sets, the dialog's name, it sets as text.
    The address names the open rule, /registry#<id>: opening one pushes its
    hash, a rule opened from inside the dialog takes the open one's place,
-   Back closes it and Forward opens it again over the list where it is now;
+   Back closes it and Forward opens it again over the page where it is now;
    Esc, the close button and the backdrop close it too and take the hash
    away, and nothing moves the page. Arriving at /registry#<id> - the
-   playbook tab's 'its math', a shared address - opens it over the list.
-   Without the script the links scroll to the entries, as the server anchors
-   them. The dialog's ids hold an underscore, as the page's own anchors do, so
+   playbook tab's 'its math', a shared address - opens it over the page.
+   Without the script, or without the dialog, the entries show under the
+   tables and the links scroll to them, as the server anchors them. The ids
+   the script looks up hold an underscore, as the page's own anchors do, so
    no rule's id is one and a lookup never finds an entry in its place. */
 var el = function (id) { return document.getElementById(id); };
-var box = el('rule_box'), shut = el('rule_shut'), pane = el('rule_body');
+var box = el('rule_box'), shut = el('rule_shut'), pane = el('rule_body'), entries = el('rule_entries');
 var RULES = Object.create(null);   /* each rule's entry by its id; no prototype key names one */
 var shown = null;                  /* the id of the rule the dialog shows */
 var openedBy = null;               /* the link that opened the dialog, which gets the focus back */
@@ -24,7 +26,7 @@ var openedAt = 0;                  /* when the dialog last opened, in ms */
 var SECOND_PRESS = 500;
 
 /* the rule an address's hash or a link's href names, or null: only an
-   entry's id, so the page's own anchors - the contents, the groups - stay
+   entry's id, so the page's own anchors - the top, each kind's table - stay
    links that scroll */
 function rule(hash) {
   var id = String(hash || '').replace(/^#/, '');
@@ -47,7 +49,7 @@ function show(id) {
   box.focus();
 }
 
-/* a click on a link to a rule: the dialog opens over the list and the
+/* a click on a link to a rule: the dialog opens over the page and the
    address names the rule, so Back closes it; a rule opened from inside the
    dialog replaces the open one's address, so one Back still closes it */
 function openRule(id, link) {
@@ -66,9 +68,9 @@ function sync() {
 }
 
 /* Back or Forward: the dialog follows the address, and where it shows a rule
-   the list stays where it is. The browser puts back the scroll the address
+   the page stays where it is. The browser puts back the scroll the address
    had when it was last left only after this handler, which would move the
-   list behind the dialog, so the list goes back a frame later, before that
+   page behind the dialog, so the page goes back a frame later, before that
    frame is drawn */
 function traversed() {
   var x = window.scrollX, y = window.scrollY;
@@ -79,7 +81,7 @@ function traversed() {
 /* however the dialog closed - Esc, the close button, the backdrop, Back -
    the address leaves the rule and the focus goes back to the link that
    opened it. A hash this page pushed is undone by going back to the entry
-   before it, so the history never holds the list twice; a hash the page
+   before it, so the history never holds the page twice; a hash the page
    arrived with is cleared in place. Neither moves the page */
 function afterClose() {
   if (rule(location.hash)) {
@@ -100,9 +102,10 @@ function outside(e) {
 }
 
 function start() {
-  /* each entry gives its id up to the script, so the browser's own jump to
-     an address's entry - on arrival, or a hash typed in - finds nothing, and
-     the list stays where it was under the dialog */
+  /* each entry gives its id up to the script, so the copy the dialog shows
+     never repeats it, and the browser's own jump to an address's entry - on
+     arrival, or a hash typed in - finds none and leaves the page where it
+     was under the dialog */
   document.querySelectorAll('.hcard[id]').forEach(function (card) {
     RULES[card.id] = card;
     card.removeAttribute('id');
@@ -132,5 +135,7 @@ function start() {
   window.addEventListener('hashchange', sync);
   sync();
 }
-/* a browser without the dialog keeps the page as the server wrote it */
+/* a browser without the dialog shows the entries under the tables, as a page
+   without the script does, and the links scroll to them */
 if (box && box.showModal) start();
+else if (entries) entries.style.display = 'block';

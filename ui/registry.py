@@ -6,16 +6,20 @@ which say how each metric aggregates over the six (inference.ranges), the
 needs' budget (inference.scoring.need_scales) and the citation record
 (inference/README.md) - so the page cannot drift from the code.
 
-An entry says in plain words what its rule does - its form as the code
-reads it, its weight and the most it moves a six, its gate and who settles
-it - then writes its formula with its own numbers, its params filled in,
-each metric it reads, its prose and its sources; where its text names
-another rule of the playbook, the name links that rule's entry. The math
-page (ui/static/math.html) gives the general forms, and each entry links
-its form there. A click on a rule opens its entry in the page's dialog,
-over the list (ui/static/registry.js); without the script the links scroll
-to the entries. ui/board.py serves it; nothing here reads the database, and
-every string read from a file is escaped.
+The page shows every rule in a row of a table under its kind - limits,
+heuristics, assumptions - and a click on a rule opens its entry in the
+page's dialog (ui/static/registry.js). An entry says in plain words what
+its rule does - its form as the code reads it, its weight and the most it
+moves a six, its gate and who settles it - then writes its formula with its
+own numbers, its params filled in, each metric it reads, its prose and its
+sources; where its text names another rule of the playbook, the name links
+that rule's entry. The math page (ui/static/math.html) gives the general
+forms, and each entry links its form there. The entries sit under the
+tables, hidden from the first paint (ui/static/board.css) for the dialog to
+copy; a noscript style in the page's head shows them where scripts are off,
+and print shows them, so the links scroll to them. ui/board.py serves it;
+nothing here reads the database, and every string read from a file is
+escaped.
 """
 
 import io
@@ -47,22 +51,30 @@ ENTRY_RE = re.compile(r"- `([a-z0-9][a-z0-9-]*)` - (.*)")
 SOURCE_RE = re.compile(r"  - (.+)")
 LINKABLE_RE = re.compile(r"https?://\S+")
 
-# every id the page writes beside an entry's - its own anchors here, the dialog's
-# in DIALOG - holds an underscore, which no strategy id does (catalog.ID_RE), so
-# an entry's anchor, its strategy's id, never meets one
-TOP, GLANCE = "the_registry", "at_a_glance"
+# every id the page writes beside an entry's - its own anchors here, the
+# entries' box's and the dialog's below - holds an underscore, which no strategy
+# id does (catalog.ID_RE), so an entry's anchor, its strategy's id, never meets
+# one. The contents' pills link the top and each kind's table, all on screen
+TOP = "the_registry"
 GROUPS: dict[Kind, tuple[str, str]] = {
     "constraint": ("the_limits", "Limits"),
     "heuristic": ("the_heuristics", "Heuristics"),
     "assumption": ("the_assumptions", "Assumptions")}
+# the columns of a kind's table: a weight and a gate are a heuristic's alone
+COLUMNS: dict[Kind, tuple[str, ...]] = {
+    "constraint": ("rule", "form", "moves a six by"),
+    "heuristic": ("rule", "form", "weight", "moves a six by", "gate settled by"),
+    "assumption": ("rule", "form", "moves a six by")}
 
 # a strategy's form as this page names it: a heuristic on a metric is a
 # reward or a need, by who settles its gate (Strategy.need)
 type Shown = Literal["limit", "reward", "need", "scored", "assumption", "draft"]
 SHOWN: dict[Form, Shown] = {"limit": "limit", "heuristic": "reward", "scored": "scored",
                             "assumption": "assumption", "draft": "draft"}
-# who settles a strategy's gate: none it has, the board, or the six
+# who settles a strategy's gate: none it has, the board, or the six; and as a
+# table names them
 type Settler = Literal["none", "board", "six"]
+SETTLERS: dict[Settler, str] = {"none": "none", "board": "the board", "six": "the six"}
 
 # what each section an expression reads is, in words, in the order they are named
 SECTIONS = {"team": "the six", "matchup": "the six against red's revealed picks",
@@ -100,16 +112,21 @@ SHIPPED_SCORED_BOUND = (
     " shipped limits, so it too moves a six by its weight at most.")
 # a formula block's columns: the label, then what it is, wrapped to fit the card
 LABEL_WIDTH, FORMULA_WIDTH = 12, 88
-# the dialog a click on a rule opens its entry in, over the list, and the script
-# that opens it; the script looks up the dialog, its close button and its body by
-# these ids, before it reads the entries by theirs, so no entry may hold one of
-# them. The dialog takes the focus itself, so Space scrolls a long entry rather
-# than pressing the close button
+# the dialog a click on a rule opens its entry in, over the page, and the script
+# that opens it; the script looks up the dialog, its close button and its body,
+# and the entries' box, by these ids before it reads the entries by theirs, so no
+# entry may hold one of them. The dialog takes the focus itself, so Space scrolls
+# a long entry rather than pressing the close button
 SCRIPT = "registry.js"
 DIALOG = (
     "<dialog id='rule_box' class='rulebox' tabindex='-1'><div class='rulebar'>"
     "<button type='button' id='rule_shut' title='close (Esc)'>close</button></div>"
     "<div id='rule_body'></div></dialog>")
+# the entries' box under the tables, which board.css hides from the first paint
+# for the dialog to copy; the page's head shows it where scripts are off, as print
+# does, so every entry stays in reach and the links scroll to it
+ENTRIES = "rule_entries"
+NOSCRIPT = "<noscript><style>.math .entries { display:block; }</style></noscript>"
 
 
 # --- the citation record ---------------------------------------------------------
@@ -580,7 +597,7 @@ def entry(
 # --- the page ----------------------------------------------------------------------
 
 def _moves(s: Strategy, book: Needs) -> str:
-    """The most the rule moves a six, as the table at a glance says it."""
+    """The most the rule moves a six, as its kind's table says it."""
     form, w = shown_form(s), _num(s.weight)
     if form == "limit":
         return "removes the sixes that break it"
@@ -594,19 +611,20 @@ def _moves(s: Strategy, book: Needs) -> str:
     return "nothing"
 
 
-def _glance(strategies: Sequence[Strategy], book: Needs) -> str:
-    """Every rule in a row: its form, its weight, the most it moves a six and
-    who settles its gate, each linked to its entry."""
+def _glance(kind: Kind, these: Sequence[Strategy], book: Needs) -> str:
+    """A kind's rules at a glance, a row each, its name linked to its entry:
+    its form and the most it moves a six, and a heuristic's weight and who
+    settles its gate (COLUMNS); a line saying none where the kind has none."""
+    if not these:
+        return "<p class='legend'>None in this playbook.</p>"
     rows = []
-    for s in strategies:
-        gate = {"none": "none", "board": "the board", "six": "the six"}[settler(s)]
-        rows.append("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
-                    "<td>%s</td></tr>" % (_rule_link(s.id, esc(s.name)), shown_form(s),
-                                          _num(s.weight) if s.weighs else "-", _moves(s, book),
-                                          gate if s.kind == "heuristic" else "-"))
-    return ("<div class='wide'><table class='glance'><tr><th>rule</th><th>form</th>"
-            "<th>weight</th><th>moves a six by</th><th>gate settled by</th></tr>%s</table></div>"
-            % "".join(rows))
+    for s in these:
+        cells = {"rule": _rule_link(s.id, esc(s.name)), "form": shown_form(s),
+                 "weight": _num(s.weight) if s.weighs else "-", "moves a six by": _moves(s, book),
+                 "gate settled by": SETTLERS[settler(s)]}
+        rows.append("<tr>%s</tr>" % "".join("<td>%s</td>" % cells[c] for c in COLUMNS[kind]))
+    return ("<div class='wide'><table class='glance'><tr>%s</tr>%s</table></div>"
+            % ("".join("<th>%s</th>" % c for c in COLUMNS[kind]), "".join(rows)))
 
 
 def _tally(strategies: Sequence[Strategy]) -> str:
@@ -625,8 +643,9 @@ def _tally(strategies: Sequence[Strategy]) -> str:
 def article(strategies: Sequence[Strategy], record: Mapping[str, Sequence[Citation]],
             weights: BaseWeights, *, playbook: str, shipped: bool) -> str:
     """The registry's article: what it is, the default engine under the
-    rules, every rule at a glance, then an entry per rule grouped by kind,
-    and last the dialog a click opens an entry in. `shipped` says the
+    rules, then each kind's rules at a glance under its heading, then the
+    entries' box, an entry per rule in the tables' order, which the page
+    hides, and last the dialog a click opens an entry in. `shipped` says the
     playbook is the shipped one, of whose scored rules the page says
     SHIPPED_SCORED_BOUND, as the math page does."""
     book, rules = needs(strategies), frozenset(s.id for s in strategies)
@@ -634,17 +653,17 @@ def article(strategies: Sequence[Strategy], record: Mapping[str, Sequence[Citati
             " counters(x) )" % tuple(_num(getattr(weights, f)) for f in
                                       ("meta", "rate", "synergy", "counter")))
     out = [
-        "<article class='math'><nav class='toc'><a href='#%s'>the registry</a>"
-        "<a href='#%s'>at a glance</a>%s</nav>" % (TOP, GLANCE, "".join(
-            "<a href='#%s'>%s</a>" % (anchor, title.lower())
-            for anchor, title in GROUPS.values())),
+        "<article class='math'><nav class='toc'><a href='#%s'>the registry</a>%s</nav>" % (
+            TOP, "".join("<a href='#%s'>%s</a>" % (anchor, title.lower())
+                         for anchor, title in GROUPS.values())),
         "<h2 id='%s'>The strategy registry</h2>" % TOP,
-        "<p>Every rule of the playbook in force, <code>%s</code>, as the solver reads it: what"
-        " it does in plain words, then its formula with its own numbers filled in, each metric"
-        " it reads, its prose and its sources. The page is rendered from the code on every"
-        " load - the catalog, the metric registry, the range rules and the citation record -"
-        " so it says what the solver runs. <a href='/math'>The math page</a> gives the"
-        " general forms, and each entry links its form there.</p>" % esc(playbook),
+        "<p>Every rule of the playbook in force, <code>%s</code>, as the solver reads it, a row"
+        " each in its kind's table; a click on a rule opens its entry - what it does in plain"
+        " words, then its formula with its own numbers filled in, each metric it reads, its"
+        " prose and its sources. The page is rendered from the code on every load - the"
+        " catalog, the metric registry, the range rules and the citation record - so it says"
+        " what the solver runs. <a href='/math'>The math page</a> gives the general forms, and"
+        " each entry links its form there.</p>" % esc(playbook),
         "<p>Every six is scored first by <a href='/math#default-engine'>the default"
         " engine</a> at <code>meta.md</code>'s weights; the playbook's terms sit on top, and"
         " the limits decide which sixes are read at all:</p>",
@@ -655,8 +674,7 @@ def article(strategies: Sequence[Strategy], record: Mapping[str, Sequence[Citati
         "         + &Sigma; scored r    w_r &middot; ( bonus_r(x) &minus; penalty_r(x) )\n"
         "           for a six x every limit allows; a term whose gate fails adds 0, and an"
         " assumption adds nothing\n%s</pre>" % base,
-        "<p>The playbook holds %s.</p>" % _tally(strategies),
-        "<h2 id='%s'>At a glance</h2>" % GLANCE, _glance(strategies, book)]
+        "<p>The playbook holds %s.</p>" % _tally(strategies)]
     intros: dict[Kind, str] = {
         "constraint": "A limit cuts the space: every six must keep it, and it weighs nothing"
                       " (<a href='/math#chosen'>how a six is chosen</a>).",
@@ -670,21 +688,24 @@ def article(strategies: Sequence[Strategy], record: Mapping[str, Sequence[Citati
                          BOUND_LINK, " " + SHIPPED_SCORED_BOUND if shipped else ""),
         "assumption": "An assumption is prose the solver takes as given; it adds nothing to a"
                       " score (<a href='/math#equation'>the equation</a>)."}
+    cards = []
     for kind in KINDS:
         anchor, title = GROUPS[kind]
         these = [s for s in strategies if s.kind == kind]
-        out.append("<h2 id='%s'>%s</h2><p>%s</p>" % (anchor, title, intros[kind]))
-        out += [entry(s, book, record, rules) for s in these] or [
-            "<p class='legend'>None in this playbook.</p>"]
-    out += [DIALOG, "</article>"]
+        out.append("<h2 id='%s'>%s</h2><p>%s</p>%s" % (anchor, title, intros[kind],
+                                                       _glance(kind, these, book)))
+        cards += [entry(s, book, record, rules) for s in these]
+    out += ["<div id='%s' class='entries'><h2>The entries</h2>\n%s</div>" % (
+        ENTRIES, "\n".join(cards)), DIALOG, "</article>"]
     return "\n".join(out)
 
 
 def view_registry() -> str:
     """The registry page: the playbook in force, read on every call with
-    its meta.md and the citation record, in the page shell, with the script
-    that opens a rule in the dialog."""
+    its meta.md and the citation record, in the page shell, with the style
+    that shows the entries where scripts are off and the script that opens a
+    rule in the dialog."""
     folder = catalog.strategies_dir()
     body = article(catalog.load(folder), citations(), catalog.engine_weights(folder),
                    playbook=catalog.playbook_name(), shipped=folder == catalog.SHIPPED_DIR)
-    return pages.page("the strategy registry", body, scripts=(SCRIPT,))
+    return pages.page("the strategy registry", body, scripts=(SCRIPT,), head=NOSCRIPT)

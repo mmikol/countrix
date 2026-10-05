@@ -12,10 +12,12 @@ picked hero; each team's row, its picks and suggestions drawn together
 tank, damage, support while the picks stay stored as picked, each role
 keeping its slots while a board solves; a taken swap, checked against the
 bans and the role caps as a pick is; and on the registry, the dialog a rule
-opens in - the address that names it, the list held still on Back and
+opens in - the address that names it, the page held still on Back and
 Forward, the links that open it and the ones that stay links, the focus,
-and no markup written. Any other decision worth pinning is made on the
-server, as the seat badge is (momentum.badges), and tested there."""
+no markup written, and the entries it copies, hidden but where scripts or
+the dialog are missing and in print. Any other decision worth pinning is
+made on the server, as the seat badge is (momentum.badges), and tested
+there."""
 
 import os
 import re
@@ -504,17 +506,19 @@ def test_the_math_page_states_the_equation_and_the_layers():
 
 def test_the_registry_is_a_page_in_the_shell_the_math_page_links_and_the_cards_link_into():
     """/registry is ui/registry.py's page in the shell the math page has,
-    with a table of contents whose links resolve; the math page's
-    paragraphs on the strategies and on the heuristics' forms link it; and
-    each playbook card links its rule's entry, /registry#<id>, which the
-    registry anchors by the same id."""
+    with a table of contents whose links land on headings the page shows -
+    the top and each kind's table, never in the entries' box it hides; the
+    math page's paragraphs on the strategies and on the heuristics' forms
+    link it; and each playbook card links its rule's entry, /registry#<id>,
+    which the registry anchors by the same id."""
     page = registry.view_registry()
     assert page.startswith(pages.HEAD) and "<h2 id='%s'>The strategy registry</h2>" % (
         registry.TOP) in page
     toc = page[page.index("<nav class='toc'>"):page.index("</nav>")]
     targets = re.findall(r"href='#([^']+)'", toc)
-    assert targets == [registry.TOP, registry.GLANCE, *(a for a, _ in registry.GROUPS.values())]
-    assert all("id='%s'" % t in page for t in targets)
+    assert targets == [registry.TOP, *(a for a, _ in registry.GROUPS.values())]
+    hidden = page.index("<div id='%s' class='entries'>" % registry.ENTRIES)
+    assert all(-1 < page.find("<h2 id='%s'>" % t) < hidden for t in targets), targets
     flat = " ".join(pages.view_math().split())
     strategies = flat[flat.index("<p><b>STRATEGIES</b>"):]
     assert "<a href='/registry'>the strategy registry</a>" in strategies[
@@ -532,19 +536,21 @@ def test_the_registry_is_a_page_in_the_shell_the_math_page_links_and_the_cards_l
 def test_the_registry_loads_its_script_and_holds_the_dialog_it_opens():
     """The registry loads registry.js after its article, as the board loads
     its scripts, and holds every element the script looks up by a literal
-    id - the dialog, its close button and its body - inside the article, so
-    an entry in the dialog wears the article's styles. The script reads the
-    entries the server anchors by their ids, each named by its first <b>;
-    no other element on the page is one."""
+    id - the dialog, its close button and its body, and the entries' box -
+    inside the article, so an entry in the dialog wears the article's
+    styles. The script reads the entries the server anchors by their ids,
+    each named by its first <b>; no other element on the page is one."""
     page, script = registry.view_registry(), registry_script()
     data, ctype = pages.static_file(registry.SCRIPT)
     assert ctype.startswith("application/javascript") and b"function show" in data
     assert page.endswith("</main><script src='/static/%s'></script>" % registry.SCRIPT)
     ids = set(re.findall(r"\bel\('([^']+)'\)", script))
-    assert ids == {"rule_box", "rule_shut", "rule_body"}
+    assert ids == {"rule_box", "rule_shut", "rule_body", registry.ENTRIES}
     article = page[page.index("<article class='math'>"):page.index("</article>")]
     assert article.rstrip().endswith(registry.DIALOG)
-    assert [i for i in sorted(ids) if "id='%s'" % i not in registry.DIALOG] == []
+    dialog = ids - {registry.ENTRIES}
+    assert [i for i in sorted(dialog) if "id='%s'" % i not in registry.DIALOG] == []
+    assert "<div id='%s' class='entries'>" % registry.ENTRIES in article
     assert registry.DIALOG.startswith("<dialog id='rule_box' class='rulebox'")
     assert "<button type='button' id='rule_shut'" in registry.DIALOG
     assert "document.querySelectorAll('.hcard[id]')" in function(script, "start")
@@ -562,14 +568,15 @@ def test_the_registry_script_keeps_the_address_and_the_dialog_in_step():
     follows Back, Forward and a hash typed in; closing it any way takes the
     hash away - back to the entry before the one the page pushed, or cleared
     in place where the page arrived with it. Back or Forward onto a rule
-    leaves the list where it is: the browser puts back the scroll that
+    leaves the page where it is: the browser puts back the scroll that
     address had when it was last left, after the popstate handler, so the
-    handler puts the list back a frame later, before the frame is drawn. A
+    handler puts the page back a frame later, before the frame is drawn. A
     hash names a rule only where it is an entry's id, decoded with care and
     looked up where no prototype key answers. The entries give their ids up
     to the script before it reads the hash the page arrived with, so the
-    browser's jump to that entry finds nothing and the list stays where it
-    was."""
+    dialog's copy never repeats one and the browser's jump to that entry
+    finds nothing, and the page stays where it was. A browser without the
+    dialog shows the entries instead."""
     script = registry_script()
     rule = function(script, "rule")
     assert "var RULES = Object.create(null);" in script
@@ -592,7 +599,8 @@ def test_the_registry_script_keeps_the_address_and_the_dialog_in_step():
     assert "window.addEventListener('hashchange', sync);" in start
     assert "box.addEventListener('close', afterClose);" in start
     assert start.index("card.removeAttribute('id');") < start.rindex("sync();")
-    assert script.rstrip().endswith("if (box && box.showModal) start();")
+    assert script.rstrip().endswith("if (box && box.showModal) start();\n"
+                                    "else if (entries) entries.style.display = 'block';")
 
 
 def test_a_plain_click_on_a_rule_opens_it_and_every_other_link_stays_a_link():
@@ -628,7 +636,7 @@ def test_a_plain_click_on_a_rule_opens_it_and_every_other_link_stays_a_link():
     assert "if (openedBy) openedBy.focus({ preventScroll: true });" in function(
         script, "afterClose")
     rules = {s.id for s in catalog.load()}
-    own = {registry.TOP, registry.GLANCE, *(a for a, _ in registry.GROUPS.values())}
+    own = {registry.TOP, *(a for a, _ in registry.GROUPS.values())}
     hrefs = set(re.findall(r"href='#([^']+)'", page))
     assert hrefs - rules == own and not own & rules
     others = set(re.findall(r"\sid=['\"]([^'\"]+)['\"]", page)) - rules
@@ -649,3 +657,33 @@ def test_the_registry_script_writes_no_markup():
     assert "RULES[id].cloneNode(true)" in show and "pane.replaceChildren(copy);" in show
     assert "box.setAttribute('aria-label', name ? name.textContent : id);" in show
     assert script.count("setAttribute(") == 1
+
+
+def test_the_registry_hides_its_entries_but_without_scripts_and_in_print():
+    """The page shows the tables and hides the entries' box from the first
+    paint: board.css, which the head loads before anything is drawn, hides
+    it, for the dialog to copy. Where scripts are off, the noscript style in
+    the head, after the stylesheet, shows it, as the script does in a browser
+    without the dialog, so the links scroll to the entries; print shows it
+    too, without the dialog, which Chrome would print over every page, and
+    without the dialog's hold on the page's scroll - each rule after the
+    screen rule it overrides."""
+    page, script = registry.view_registry(), registry_script()
+    css = pages.static_file("board.css")[0].decode()
+    head, body = page[:page.index("<main>")], page[page.index("<main>"):]
+    assert head.endswith(registry.NOSCRIPT)
+    assert head.index("/static/board.css") < head.index(registry.NOSCRIPT)
+    assert registry.NOSCRIPT == (
+        "<noscript><style>.math .entries { display:block; }</style></noscript>")
+    assert "<noscript" not in body and "<div id='%s' class='entries'>" % registry.ENTRIES in body
+    # hidden on screen by a rule of its own, outside any @media block
+    assert "\n.math .entries { display:none; }\n" in css
+    printed = css[css.index("@media print {"):]
+    printed = printed[:printed.index("\n}") + 2]
+    for rule in (".math .entries { display:block; }", ".math .rulebox { display:none; }",
+                 "html:has(.rulebox[open]) { overflow:visible; }"):
+        assert rule in printed, rule
+    for screen in (".math .entries { display:none; }",
+                   "html:has(.rulebox[open]) { overflow:hidden; }"):
+        assert css.index(screen) < css.index("@media print {"), screen
+    assert script.rstrip().endswith("else if (entries) entries.style.display = 'block';")

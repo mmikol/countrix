@@ -141,14 +141,15 @@ def view_board() -> str:
     return shell % (REPO_URL, GITHUB_MARK, TEAM_SIZE, MAX_BANS, MAX_TANKS, base.SWAP_RANGE[1])
 
 
-def page(title: str, body: str, scripts: Sequence[str] = ()) -> str:
+def page(title: str, body: str, scripts: Sequence[str] = (), head: str = "") -> str:
     """A page in the shell the math, registry and error pages share: the
-    stylesheet, the title, a header that links back to the board, and after
-    the body the scripts under ui/static it loads - the registry's, which
-    opens a rule in a dialog."""
-    return (HEAD + "<title>%s</title>"
+    stylesheet, the title and `head`, markup the head holds after them - the
+    registry's style for a browser without scripts - then a header that links
+    back to the board, and after the body the scripts under ui/static it
+    loads - the registry's, which opens a rule in a dialog."""
+    return (HEAD + "<title>%s</title>%s"
             "<main><header class='top'><h1><a href='/'>Counter <span>Utility Matrix</span></a></h1>"
-            "</header>%s</main>%s" % (esc(title), body, "".join(
+            "</header>%s</main>%s" % (esc(title), head, body, "".join(
                 "<script src='/static/%s'></script>" % esc(name) for name in scripts)))
 
 
