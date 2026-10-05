@@ -1,0 +1,528 @@
+<article class='math study'>
+<nav class='toc'>
+<a href='#the-study'>the study</a>
+<a href='#plain-words'>in plain words</a>
+<a href='#the-proof'>the proof</a>
+<a class='sub' href='#the-theorem'>the theorem</a>
+<a class='sub' href='#the-lemmas'>the lemmas</a>
+<a class='sub' href='#what-it-buys'>what the weights buy</a>
+<a class='sub' href='#exact-or-not'>exact, a reading, or greedy</a>
+<a class='sub' href='#the-assumptions'>the assumptions</a>
+<a class='sub' href='#the-evidence'>the evidence</a>
+<a href='#hard-coded'>nothing hard-coded?</a>
+<a href='#the-method'>the method</a>
+<a href='#the-results'>the results</a>
+<a class='sub' href='#landing'>where each six lands</a>
+<a class='sub' href='#makeup'>what each six is made of</a>
+<a class='sub' href='#meta-team'>the meta against the team</a>
+<a class='sub' href='#rules'>the rules</a>
+<a class='sub' href='#holds'>does it hold up</a>
+<a href='#what-it-shows'>what it shows</a>
+<a href='#the-report'>the report</a>
+</nav>
+<h2 id='the-study'>The study</h2>
+%(STATUS)s
+<p>Countrix picks a team of six with one formula and one search. This page asks two questions
+of them. Does the search return the best team its formula allows, or a good guess? And how close
+do its teams come to what players pick and to what wins, while they carry synergy, answer the
+other side and keep the playbook's rules? The first is answered by a proof, checked against brute
+force. The second is answered by a study: Countrix's teams beside the kinds of tool people use
+online - CounterWatch's team builder, tier lists built from the rates, counter pickers and the
+most-picked heroes - every tool's six scored on the same boards, on Countrix's own scale and on
+CounterWatch's 6v6 numbers, which Countrix never reads. A section between them asks whether
+anything in the engine is written for Overwatch alone.</p>
+<h2 id='plain-words'>In plain words</h2>
+<ul class='plain'>
+<li><b>One formula scores every team.</b> Countrix scores each team of six with the same formula.
+The <a href='/math#default-engine'>default engine</a> comes first: each pick's win rate on the
+map, the wiki's synergy among the six, and its counters to the other side. The playbook's
+heuristics then add to that score or take from it, and its limits decide which teams are allowed
+at all.</li>
+<li><b>The claim.</b> For any board and any playbook, the team Countrix calls optimal is the
+highest-scoring allowed team of all of them - not a good guess, the best. On a board with nothing
+picked or banned that is the best of over thirteen million teams (the count check below).</li>
+<li><b>How it knows without scoring them all.</b> The search groups the teams into branches: all
+the teams that share the picks made so far. For each branch it works out a safe overestimate, a
+number no team in the branch can beat. Once that number falls below the teams already kept, the
+whole branch is dropped. Every drop rests on arithmetic, never on a hunch.</li>
+<li><b>How much work that takes.</b> On an open board the search scores a few dozen teams in full
+and proves that none of the others can place, in hundredths of a second
+(<a href='#the-evidence'>the evidence</a>).</li>
+<li><b>It never guesses.</b> If it cannot prove its answer within its budget - %(NODE_BUDGET)s
+branches or %(SCORE_BUDGET)s teams scored in full - it refuses. If no team is allowed, it proves
+that too.</li>
+<li><b>It is repeatable.</b> The same board, playbook and weights give the same team in any
+process. Two scores that agree to %(SCORE_PLACES)s decimal places are a tie, settled by a fixed
+number per hero: a hash of the map, the side and the hero, which never reads a hero's rates or
+name.</li>
+<li><b>The check.</b> A brute force scores every allowed team of a real board, one by one, for
+minutes; the search answers in hundredths of a second; and the two agree on the best teams to the
+last bit (<a href='#the-evidence'>the evidence</a>).</li>
+<li><b>What optimal means.</b> Best under the scoring formula, given the playbook's assumptions -
+players play their heroes well, Open Queue 6v6, console rates and the rest
+(<a href='#the-assumptions'>the assumptions</a>). It is not a proven chance of winning. Four
+things on the board are readings around the optimum, not more optimising: the 0 to 100 share,
+the fight odds, red's likely six, and the plan stage by stage, which takes one stage at a time
+(<a href='#exact-or-not'>exact, a reading, or greedy</a>).</li>
+<li><b>Against the tools.</b> The table below is the study's answer in numbers: each tool's six
+placed among a board's random sixes - 50 is a random six, 100 beats them all - on the meta, its
+popularity and strength, and on the team, its synergy and counters, by Blizzard's rates and the
+wiki and by CounterWatch's 6v6 numbers; and the share of the playbook's rules each six keeps. The
+charts follow (<a href='#the-results'>the results</a>).</li>
+</ul>
+%(PROFILE)s
+<h2 id='the-proof'>The proof</h2>
+<p>What follows proves that the search returns the best legal sixes of its objective, in order,
+or refuses. Each step names the code it rests on, and each link opens those lines at commit
+<code>%(COMMIT)s</code>, where the proof read them. The <a href='/math#argmax'>math page</a>
+states the search in brief; this is the argument in full.</p>
+<p id='the-setting'><b>The setting.</b> Every quantity is the one the code computes.</p>
+<pre class='eq'>board     the map or none, blue's side, the stage or the whole map, the bans, blue's locked
+          picks L and red's revealed picks; red is never solved
+V_r       the released heroes of role r neither banned nor locked     <a href='%(CODE)s/inference/bounds.py#L611-L617'>bounds.py:611-617</a>
+SH        the shapes (t, d, s): t + d + s = %(TEAM_SIZE)s, t &le; %(MAX_TANKS)s, each count at least its
+          role's locks, every shape limit true                        <a href='%(CODE)s/inference/shapes.py#L23-L38'>shapes.py:23-38</a>
+CAND      L, plus for a shape of SH, shape_r &minus; |L_r| heroes of V_r in each role r
+LEGAL     the sixes of CAND that keep every other limit               <a href='%(CODE)s/inference/scoring.py#L403-L407'>scoring.py:403-407</a>
+score(x)  the objective, its terms added in catalog order on a scale
+          frozen before the search                                    <a href='%(CODE)s/inference/scoring.py#L559-L590'>scoring.py:559-590</a>
+tb(x)     the six heroes' draws summed, each a whole number below
+          2^%(DRAW_BITS)s hashed from the map, the side and the hero's id      <a href='%(CODE)s/inference/scoring.py#L260-L273'>scoring.py:260-273</a>
+key(x)    ( &minus;round(score(x), %(SCORE_PLACES)s), &minus;tb(x), x's names sorted ): x comes before y
+          where key(x) &lt; key(y), a total order, names being unique  <a href='%(CODE)s/inference/scoring.py#L247-L257'>scoring.py:247-257</a>
+
+score(x) = base(x)
+         + &Sigma; rewards h   w_h &middot; norm_h( m_h(x) )
+         + &Sigma; needs n     s_n &middot; w_n &middot; ( norm_n( m_n(x) ) &minus; 1 )
+         + &Sigma; scored r    w_r &middot; ( bonus_r(x) &minus; penalty_r(x) )
+           a term whose gate is shut adds 0; every weight w lies in [0, %(WEIGHT_MAX)s]
+norm(v)  = clamp( (v &minus; lo) / (hi &minus; lo), 0, 1 ), flipped where the rule minimises
+base(x)  = meta &middot; ( rate &middot; rates(x) + synergy &middot; synergy(x) + counter &middot; counters(x) )</pre>
+<h3 id='the-theorem'>The theorem</h3>
+<p>For every World, board and playbook, and every k &ge; 1, <code>Solver.solve(top=k)</code>
+(<a href='%(CODE)s/inference/solver.py#L248-L258'>solver.py:248-258</a>) ends in exactly one of
+three ways:</p>
+<ol>
+<li>it returns the first min(k, |LEGAL|) sixes of LEGAL in key order, with their exact
+scores;</li>
+<li>it raises <code>Infeasible</code>, and LEGAL is empty;</li>
+<li>it raises <code>Unbounded</code> - past %(NODE_BUDGET)s branches or %(SCORE_BUDGET)s sixes
+scored in full (<a href='%(CODE)s/inference/solver.py#L47-L48'>solver.py:47-48</a>) - or
+<code>Superseded</code>, a newer board from the same page, and returns nothing.</li>
+</ol>
+<p>It never returns any other list. So the six it returns first, x1, is <i>optimal</i>: for every
+legal six y, round(score(y), %(SCORE_PLACES)s) &le; round(score(x1), %(SCORE_PLACES)s), and among
+the sixes tied there x1 holds the largest draw sum, then the names first in order. Two more
+things follow.</p>
+<ul>
+<li><b>Determinism.</b> The answer depends on the World, the board, the playbook and the weights
+alone: the scale is drawn from a string seed of the map and the side, the draws are hashes, and
+the walk's order - the roots by their bounds, the candidates in walk order - changes how fast the
+answer is found, never the answer.</li>
+<li><b>The other exact answers ride the same walk.</b> A full six's rank counts the sixes above
+it, exactly up to %(RANK_CAP)s; the tie count is exact up to %(RANK_CAP)s within %(TIE_BUDGET)s
+sixes scored and reads "at least" past either; the fill is the theorem with blue's picks locked;
+the swap target is the theorem with the keep term; and each stage of the plan is exact given the
+six it starts from (<a href='%(CODE)s/inference/solver.py#L260-L285'>solver.py:260-285</a>,
+<a href='%(CODE)s/inference/swaps.py#L195-L211'>swaps.py:195-211</a>).</li>
+</ul>
+<h3 id='the-lemmas'>The lemmas</h3>
+<p>Three lemmas carry the proof: the walk reaches every candidate six once; every bound it asks
+of a branch is at least every legal six in it; and a branch is dropped only when the sixes
+already kept beat everything in it. Each opens below.</p>
+<details class='proof'><summary><b>Lemma 1.</b> The walk covers every candidate six exactly
+once.</summary>
+<ol>
+<li><b>The roster.</b> Each role's candidates are V_r sorted by id
+(<a href='%(CODE)s/inference/bounds.py#L611-L617'>bounds.py:611-617</a>); the space lays the
+locked picks out first, then each role's candidates, and permutes each role's list into walk
+order (<a href='%(CODE)s/inference/ranges.py#L96-L121'>ranges.py:96-121</a>). A permutation
+leaves a role's subsets of each size as they were.</li>
+<li><b>The shapes.</b> <code>legal_shapes</code> walks t from 0 to %(MAX_TANKS)s and d from 0
+to %(TEAM_SIZE)s &minus; t, s the rest, and keeps a shape only where it seats the locks and every
+shape limit holds. A shape limit reads only the role counts, the size and the open slots, which
+every six of a shape shares (<a href='%(CODE)s/inference/shapes.py#L57-L65'>shapes.py:57-65</a>),
+so it keeps or removes whole shapes, never part of one.</li>
+<li><b>The slots.</b> For each shape the walk needs shape_r &minus; |L_r| heroes of each role,
+skips a shape a role cannot fill, and lays the slots out role by role
+(<a href='%(CODE)s/inference/solver.py#L236-L244'>solver.py:236-244</a>).</li>
+<li><b>The branching.</b> A slot of role r takes each candidate from position <i>start</i> to
+the last that leaves room for the role's later slots; the next slot of the same role starts one
+past it, the next role's at 0
+(<a href='%(CODE)s/inference/solver.py#L325-L334'>solver.py:325-334</a>). By induction over the
+slots, a role's picks are exactly its strictly increasing index sequences of the length needed -
+each subset once - so a shape holds &Pi;_r C(|V_r|, n_r) leaves. Two shapes differ in their role
+counts, so the shapes partition CAND, and the sum is the <i>considered</i> the search reports
+(<a href='%(CODE)s/inference/solver.py#L293-L295'>solver.py:293-295</a>), which the suite holds
+to a full enumeration's count on every board it checks.</li>
+<li><b>The other limits.</b> At each leaf the six's facts are prepared and every limit it breaks
+is listed; a six that breaks one is never offered
+(<a href='%(CODE)s/inference/solver.py#L340-L347'>solver.py:340-347</a>), so the sixes offered
+are exactly the legal leaves reached.</li>
+</ol>
+<p><b>The count check.</b> On the roster the proof was checked on, on 2026-10-05 - %(TANKS)s
+tanks, %(DAMAGE)s damage and %(SUPPORTS)s supports released - the shapes the playbook in force
+allows hold these sixes, and the walk's <i>considered</i> equalled the sum on every open
+board:</p>
+%(SHAPES)s
+</details>
+<details class='proof'><summary><b>Lemma 2.</b> Every bound the walk asks of a branch is at least
+the score of every legal six in it.</summary>
+<p>A branch holds the picks made so far, the locks among them, and for each open role its
+candidates from a start on; its completions are exactly the leaves under it (Lemma 1). The walk
+asks three bounds in turn - the root's, the whole bound, then the fold - each only while those
+before leave the branch in
+(<a href='%(CODE)s/inference/bounds.py#L411-L428'>bounds.py:411-428</a>). Each is at least the
+float score of every legal six below the branch, and the branch's tie-break bound is at least the
+six's draw sum, by these steps:</p>
+<ol>
+<li><b>Intervals.</b> Every expression a rule writes is read over intervals: a value that holds
+every number between two ends, an exact value, or anything. By induction over the expression,
+each node's interval holds its value on every completion - sums at the ends, products and
+quotients at their corners, floor division lowered by one for a quotient rounded up, powers of
+the whitelisted exponents, comparisons three-valued, <code>and</code>, <code>or</code> and
+<code>if</code> joining what the branch can still take. A test fails any node or operator
+without its rule
+(<a href='%(CODE)s/inference/intervals.py#L523-L531'>intervals.py:523-531</a>).</li>
+<li><b>The metrics' ranges.</b> Every team and matchup metric has a range rule that holds its
+value on every completion - a sum between each open role's smallest and largest parts, a count
+exactly, a mean between its extremes, a pair sum by half of each open pick's best pairs -
+widened by a slack of %(SLACK)s a unit of magnitude for another order of summation
+(<a href='%(CODE)s/inference/ranges.py#L1090-L1098'>ranges.py:1090-1098</a>). A test fails a
+metric with no rule.</li>
+<li><b>A heuristic's most.</b> A norm is monotone in its metric and a weight is never below 0,
+so a reward adds at most its weight times the norm at the interval's better end, and a need whose
+guard may not hold at most 0; a gate the board settles is read once, and a heuristic it shuts adds
+nothing (<a href='%(CODE)s/inference/bounds.py#L87-L104'>bounds.py:87-104</a>).</li>
+<li><b>A scored rule's most.</b> Its weight times the bonus's high end less the penalty's low
+end, at least 0 where its gate may not hold, and unbounded where an expression's interval is not
+a number (<a href='%(CODE)s/inference/bounds.py#L115-L131'>bounds.py:115-131</a>).</li>
+<li><b>The engine's part.</b> base splits into each pick's own part - its rate and counter terms -
+and a synergy term over pairs. For the open picks B, the pairs among them sum to half of each
+pick's pairs with the others, which is at most half of its best ones, for any sign of a pair, so
+each role's best few <i>worths</i> bound the engine
+(<a href='%(CODE)s/inference/bounds.py#L384-L402'>bounds.py:384-402</a>):
+<pre class='eq'>base(x) &le; own(A) + pairs(A) + &Sigma; over the open picks y of worth(y)
+worth(y) = own(y) + its pairs with the picks A + half of its m &minus; 1 best pairs among the candidates</pre></li>
+<li><b>The memo and the shape.</b> A term's most depends only on the intervals of the names it
+reads, so the memo returns what the term would; one on shape-fixed metrics alone is read once a
+shape; and clearing the memo at %(MEMO_CAP)s entries changes no value
+(<a href='%(CODE)s/inference/bounds.py#L430-L471'>bounds.py:430-471</a>).</li>
+<li><b>The order of addition.</b> The bound adds its pieces in the score's order, and IEEE
+addition is monotone in both operands, so by induction the float score is at most the float bound
+(<a href='%(CODE)s/inference/bounds.py#L177-L184'>bounds.py:177-184</a>).</li>
+<li><b>The root.</b> The root's bound is the branch's engine part plus each term's most over every
+six of the branch's shape around the locks - every completion among them
+(<a href='%(CODE)s/inference/bounds.py#L473-L479'>bounds.py:473-479</a>).</li>
+<li><b>The fold.</b> A term that reads only counts of picks, each pick adding 0 or 1, is a
+function of the counts. For each way the open picks can add to the counts, the fold takes the
+most worth among the picks that add it and the count terms at those counts - at least every
+completion's score. It reads %(FOLD_COUNTS)s counts at most, which bounds its cost, not its
+soundness (<a href='%(CODE)s/inference/bounds.py#L483-L599'>bounds.py:483-599</a>).</li>
+<li><b>The tie-break.</b> The draws are whole numbers below 2^%(DRAW_BITS)s, exact in any sum of
+six; the bound adds the picks' draws and each open role's largest, the exact maximum
+(<a href='%(CODE)s/inference/bounds.py#L601-L608'>bounds.py:601-608</a>).</li>
+<li><b>Limits.</b> A limit the intervals prove false on every completion makes the bound None,
+and no legal six lies below
+(<a href='%(CODE)s/inference/bounds.py#L438-L440'>bounds.py:438-440</a>).</li>
+</ol>
+</details>
+<details class='proof'><summary><b>Lemma 3.</b> A branch is dropped only when k sixes already
+kept beat every legal six in it.</summary>
+<p>The search keeps the k best sixes offered so far, by key, so the k-th key only improves
+(<a href='%(CODE)s/inference/solver.py#L126-L131'>solver.py:126-131</a>). It drops a branch in
+two cases (<a href='%(CODE)s/inference/solver.py#L319-L321'>solver.py:319-321</a>): a bound is
+None, and no legal six lies below it; or k sixes are kept and the bound, rounded as a score is,
+falls below the k-th's score, or meets it while the branch's best tie-break falls below the
+k-th's (<a href='%(CODE)s/inference/solver.py#L117-L124'>solver.py:117-124</a>). Rounding is
+monotone, so every legal six below ranks strictly after the k kept. An equal tie-break is never
+dropped, so the names can still decide.</p>
+</details>
+<details class='proof'><summary><b>The proof of the theorem.</b></summary>
+<ol>
+<li>Let T be the first n = min(k, |LEGAL|) legal sixes in key order.</li>
+<li>Every six of T is reached: were it below a dropped branch, Lemma 3 would put k legal sixes
+before it, and fewer than k exist.</li>
+<li>Every six of T is offered, since it keeps every limit (Lemma 1), and once kept it stays: only
+k sixes strictly before it could push it out.</li>
+<li>The search keeps k at most, so where |LEGAL| &ge; k it ends holding T in order; where |LEGAL|
+&lt; k no branch is dropped on its score, and it ends holding LEGAL sorted.</li>
+<li><code>Infeasible</code> is raised only where nothing was offered
+(<a href='%(CODE)s/inference/solver.py#L253-L257'>solver.py:253-257</a>); with nothing kept, no
+branch is dropped on its score, so every drop was a None bound, and LEGAL is empty.</li>
+<li><code>Unbounded</code> and <code>Superseded</code> stop the search, and no caller passes a
+part of one off as an answer: blue's optimal passes the refusal on, the fill and the swaps read
+none, a stage reads unsolved, a tie count reads "at least" and a rank reads unranked
+(<a href='%(CODE)s/inference/engine.py#L409-L421'>engine.py:409-421</a>,
+<a href='%(CODE)s/inference/engine.py#L529-L537'>engine.py:529-537</a>,
+<a href='%(CODE)s/inference/swaps.py#L347-L353'>swaps.py:347-353</a>,
+<a href='%(CODE)s/inference/solver.py#L373-L376'>solver.py:373-376</a>). &#8718;</li>
+</ol>
+</details>
+<h3 id='what-it-buys'>What the weights buy</h3>
+<p>Exactness has a consequence a good guess lacks: each weight pulls the six the way it says.</p>
+<ul>
+<li><b>Turning a rule up never makes the optimal six worse on that rule.</b> Write score = F +
+w &middot; g for one rule of weight w, F free of w. Where w' &gt; w, the two optimal sixes x and
+x' satisfy F(x) + w &middot; g(x) &ge; F(x') + w &middot; g(x') and F(x') + w' &middot; g(x')
+&ge; F(x) + w' &middot; g(x); added, they give (w' &minus; w)(g(x') &minus; g(x)) &ge; 0, up to
+ties at %(SCORE_PLACES)s places. It needs F to hold still as w moves, and it does: the scale
+reads the sample's metrics, never a weight. Two needs on one guard share a budget, so raising one
+rescales the other; every shipped need sits alone on its guard.</li>
+<li><b>The Meta slider trades in one direction.</b> The same argument with the meta and the
+engine's part: raising the meta never lowers the optimal six's engine part and never raises its
+playbook part.</li>
+<li><b>With no rule scoring</b>, scaling the meta moves no six, and raising one hero's win rate
+raises every six that holds it alike, so a hero in the optimal six stays there.</li>
+</ul>
+<p>The study checks the first two on every board (<a href='#the-evidence'>the evidence</a>), and
+the suite holds the first and the third on its synthetic boards
+(<code>tests/verification/inference/test_stages.py</code>).</p>
+<p><b>What the proof leans on.</b> IEEE-754 doubles rounded to nearest, which is monotone, with
+Python's round() monotone and math.fsum exact before its one rounding. The range rules matching
+the metrics' definitions: this one link is held by tests rather than derived -
+<code>test_bounds</code> checks every metric on every completion of random branches, and the
+brute force checks real boards - so a metric changed without its rule could break exactness.
+Every weight within [0, %(WEIGHT_MAX)s], every exponent whole from 0 to 8, and hero names unique.
+Finite scores, which the World's finite numbers give. And the slack, %(SLACK)s a unit of
+magnitude, about two orders above the rounding of the few dozen operations it covers: a standard
+error bound, not a machine-checked one.</p>
+<h3 id='exact-or-not'>Exact, a reading, or greedy</h3>
+<div class='wide'><table class='numbers'>
+<tr><th>on the board</th><th>what it is</th></tr>
+<tr><td>blue's optimal six and the alternatives after it</td><td>exact: the theorem</td></tr>
+<tr><td>the fill around blue's picks</td><td>exact: the theorem with the picks locked</td></tr>
+<tr><td>a full six's rank</td><td>exact up to %(RANK_CAP)s</td></tr>
+<tr><td>the tie count</td><td>exact up to %(RANK_CAP)s within %(TIE_BUDGET)s sixes scored</td></tr>
+<tr><td>the swap target</td><td>exact for its own objective: the score less the swap cost for
+each pick dropped</td></tr>
+<tr><td>a stage of the plan, from the one before</td><td>exact given where it starts</td></tr>
+<tr><td>the plan stage by stage, as a whole</td><td>greedy: a stage at a time, never trading a swap
+now against one later</td></tr>
+<tr><td>the 0 to 100 share</td><td>a reading: the score placed between the share floor and the
+optimum</td></tr>
+<tr><td>the fight odds</td><td>a reading: the default engine's gap through a logistic curve, not
+calibrated on matches</td></tr>
+<tr><td>red's likely six</td><td>greedy: each slot the highest pick score; red is never
+solved</td></tr>
+<tr><td>the scale</td><td>an input, frozen before the search: another seed would be another
+objective</td></tr>
+<tr><td>reach</td><td>a record of boards that seat a hero, not a proof that no board seats the
+others</td></tr>
+</table></div>
+<p>Why the plan is greedy, in one example: two phases, and a swap that costs 10 share points.
+Swapping one hero for another gains 8 in the first phase and 12 in the second. The plan keeps the
+first hero in the first phase, since 8 is less than 10, and swaps in the second, for a net of 2;
+swapping in the first phase would net 10. The code says so
+(<a href='%(CODE)s/inference/swaps.py#L40-L45'>swaps.py:40-45</a>).</p>
+<h3 id='the-assumptions'>The assumptions</h3>
+<p>Optimal is relative to these, which the playbook holds as assumptions, each written out on the
+<a href='/registry#the_assumptions'>registry</a>:</p>
+%(ASSUMPTIONS)s
+<p>And to the model's own choices: Blizzard's rates are 5v5 Competitive Role Queue on console,
+read as a proxy for 6v6 Open Queue; synergy and counters are the wiki's, a counter edge derived
+from the kits counting 1 against a wiki edge's 2; before red reveals, only the counter term reads
+red's likely six; and the terms add, under weights set by the owner and a benchmark, never learned
+from match results. Optimal means the exact maximiser of this objective under these assumptions,
+never a proven chance of winning.</p>
+<h3 id='the-evidence'>The evidence</h3>
+<p>The proof is checked three ways. The suite's gate holds the search to a full enumeration of
+every legal six on synthetic boards, on every run in CI
+(<code>test_the_search_reaches_the_enumerated_maximum</code>). A hand-run brute force scores every
+legal six of real boards of the built database and compares the best sixes bit for bit
+(<code>tests/verification/inference/prove_exact.py</code>). And the study checks each claim on
+each of its boards:</p>
+%(CHECKS)s
+<p>The brute force at the study's commit:</p>
+%(BRUTE)s
+%(SEARCH)s
+<p><b>The record.</b> The checks before the study, each in its commit:</p>
+<ul>
+<li>2026-09-28, <a href='%(REPO)s/commit/badfad6'>badfad6</a>: the search before it was exact
+returned a 2-1-3 on Samoa where a 2-2-2 scored higher; the exact search found the brute force's
+six, and matched it bit for bit on six boards of up to 17,217,564 sixes.</li>
+<li>2026-10-03, <a href='%(REPO)s/commit/63b0619'>63b0619</a>: the math audit - no bound cut a
+better six on 126 random branches or 102 boards brute-forced - and
+<a href='%(REPO)s/commit/b014a66'>b014a66</a>, a floor-division interval defect found and fixed,
+now pinned by a test. <a href='%(REPO)s/commit/684bf4d'>684bf4d</a>: with nothing scoring, the
+tie-break seated every hero of King's Row within a quarter of its role's mean over 2,000 seeds -
+no hidden favourite.</li>
+<li>2026-10-04, <a href='%(REPO)s/commit/3fa6c57'>3fa6c57</a>: every bound held on 90,488 sixes
+of 405 random real branches, and 92 boards kept their best six and its rank through the fold;
+<a href='%(REPO)s/commit/083c91f'>083c91f</a>: Junkertown's 13,030,920 legal sixes,
+brute-forced in six slices, matched the search, both counting 39 sixes above its fortieth.</li>
+<li>2026-10-05, at <code>%(COMMIT)s</code>: 14,919,668 sixes brute-forced on seven boards, all
+equal; on 52 real boards the instrumented search accounted for each of 648,158,326 legal sixes,
+dropped in a branch or scored; on 400 random branches no bound fell below any of their 135,663
+sixes; and 168 exact solves turned six rules from 0 to 10, each rule's own value never
+falling.</li>
+</ul>
+<h2 id='hard-coded'>Nothing hard-coded?</h2>
+<p><b>In plain words.</b> The optimiser generalises. The search, the default engine, the scale,
+the swaps and the playbook's reader name no hero, map, stage or ability, and the roster, the maps,
+their modes and their stages all come from the database. The team's size is a parameter. Two
+things are fixed. The roles are three - tank, damage, support - with a cap on tanks, written into
+the code. And the facts layer, which turns the wiki's kits into numbers, is Overwatch by design: it
+holds the constants that define its terms and 18 lists of abilities and weapons the wiki has no
+field for. Those lists are the one real exception to "nothing hard-coded", and they matter.</p>
+<p>The audit of 2026-10-05, at commit <code>%(COMMIT)s</code>, searched <code>db/</code>,
+<code>facts/</code>, <code>inference/</code>, <code>ui/</code>, <code>door/</code> and
+<code>orchestrator.py</code> for every hero, with its slug and some 35 former names, map, stage,
+ability, weapon and perk the database holds: 1,315 hits once 109 false ones were set aside, such as
+Blizzard the company, which is also Mei's ultimate.</p>
+<div class='wide'><table class='numbers'>
+<tr><th>where</th><th>hits</th><th>what they are</th></tr>
+<tr><td>the tuning log</td><td>934</td><td>history, never loaded</td></tr>
+<tr><td>comments and docstrings</td><td>209</td><td>text, in 25 files</td></tr>
+<tr><td>the citation record</td><td>58</td><td>the playbook's sources</td></tr>
+<tr><td>SQL comments, help strings, the math page</td><td>42</td><td>text</td></tr>
+<tr><td>the playbook's files</td><td>20</td><td>18 in prose; 2 in one rule's gate, Nepal's Sanctum,
+a playbook choice the owner can edit</td></tr>
+<tr><td>code literals</td><td>52</td><td>48 keyed on a name, in 9 files, none in
+<code>inference/</code>; 4 the mode name Escort</td></tr>
+</table></div>
+<p>The 48 sit outside the optimiser: 18 lists in <code>facts/</code> read the kits, two in
+<code>db/data/</code> read names in the wiki's prose (a former name, nicknames), and
+<code>orchestrator.py</code> names the board it solves to prove the stack is up. Emptied together,
+the 18 lists move 19 heroes' derived numbers and 61 of the 217 derived counter edges, and the
+optimal open six on 25 of the 30 maps under the shipped playbook - on 8 of 30 under the default
+engine with the limits alone. One example: the rule <code>six-carries-a-save</code> seats Baptiste
+in 18 of the 30 open sixes with Immortality Field on the list of saves, and in 6 without it.</p>
+<div class='wide'><table class='numbers'>
+<tr><th>list</th><th>what it names</th><th>open sixes moved, shipped</th><th>engine alone</th></tr>
+<tr><td>SAVE_TOOLS</td><td>Immortality Field, which the wiki does not tag a save</td><td>15</td>
+<td>0</td></tr>
+<tr><td>CASTER</td><td>eight healing pieces of seven heroes</td><td>8</td><td>0</td></tr>
+<tr><td>FORM_GATED</td><td>a form's weapon: Bastion's Configuration: Assault, Ramattra's Pummel,
+Winston's alternate fire, the pilots' guns, Torbjörn's hammer</td><td>7</td><td>6</td></tr>
+<tr><td>HELD</td><td>five heals held while they last</td><td>6</td><td>0</td></tr>
+<tr><td>TRIGGERED</td><td>Brigitte's Inspire and Rocket Flail</td><td>4</td><td>0</td></tr>
+<tr><td>AIMED</td><td>three heals that must be aimed</td><td>3</td><td>0</td></tr>
+<tr><td>FLAG_FAMILIES</td><td>the words matrix and deflect in an ability's name</td><td>3</td>
+<td>7</td></tr>
+<tr><td>OWN_HEALS, BOOSTS</td><td>Lifeweaver's dash, Lúcio's Amp It Up</td><td>1 each</td>
+<td>0</td></tr>
+<tr><td>the other nine</td><td>Illari's pylon and rifle, Wuyang's stream, Moira's grasp, D.Va's
+mech and the rest</td><td>0</td><td>0</td></tr>
+<tr><td><b>all 18 together</b></td><td></td><td><b>25</b></td><td><b>8</b></td></tr>
+</table></div>
+<p>None is a defect: every name matches the database, and tests on the built database pin their
+effects. Two do nothing today, one is keyed on a word in a name - matrix also matches Baptiste's
+Amplification Matrix, harmlessly - and eight were written down nowhere but in code, which is why
+this page lists them.</p>
+<ul>
+<li><b>A world of invented names.</b> The suite's synthetic World - tanks Anvil, Kite, Mortar and
+Quarry, maps Harbor Gate, Ember Ruins and Salt Flats, every number made up - runs 258 tests across
+26 files, from the metrics and the facts to exact search against full enumeration, the board, the
+scale, the bounds and reach.</li>
+<li><b>Five a side.</b> In a scratch copy with the team's size set to five, one tank at most and a
+one-two-two red, and nothing else in the engine changed, the search matched a full enumeration on
+28 synthetic boards, and all 30 real maps solved as fives.</li>
+<li><b>The playbook is data:</b> each file validated as it loads - known fields, weights within 0
+to %(WEIGHT_MAX)s, whitelisted expressions, every name a registered metric - and the
+<a href='/registry'>registry</a> writes each one's maths out from the code.</li>
+<li><b>No hidden favourite.</b> The tie-break hashes the map, the side and the hero's id; it reads
+no name and no rate.</li>
+</ul>
+<p><b>What another team game needs.</b> The same format - six seats, three roles, a cap on the
+first - needs pulls into the same tables and a playbook of its own, and no change to the engine.
+Another team size or tank cap is three constants. Other roles are some 30 places in the code.
+Another kit vocabulary is the facts layer rewritten, with its range rules in step: a test fails a
+metric without one.</p>
+<h2 id='the-method'>The method</h2>
+<p><b>The boards.</b> Every map both data sources know, four red sixes drawn on each from
+CounterWatch's 6v6 pick rates, and each met at three moments: nothing revealed, one pick per role
+revealed, all six. Blue picks all six; nothing is banned. The maps are split in two halves within
+each mode by a seeded shuffle fixed before any result was seen; the dials were tuned on one half,
+so anything they touch is judged on the other, the <i>test</i> half. Red is drawn afresh for the
+study, so no tuning has seen its boards. Further sets repeat the boards of the earlier benchmark,
+ban the three heroes Countrix fields most, solve on the older capture of the rates, and feed
+CounterWatch's 6v6 rates to the engine, in memory, never stored. The boards are whole maps, as
+CounterWatch's numbers per map are.</p>
+<p><b>The arms.</b> Every arm picks a six on every board from data already held; no site is
+fetched for the study.</p>
+<ul>
+<li><b>Countrix</b>, solved exactly, as shipped and in layers: the default engine alone, the engine
+with the two-of-each-role rule, the playbook alone, and the shipped objective filled slot by
+slot.</li>
+<li><b><a href='https://counterwatch.gg' target='_blank' rel='noopener'>CounterWatch</a></b>'s
+documented team builder, slot by slot on its 6v6 numbers - a reconstruction of its documented
+model, not the button's output - and the same blend solved exactly over every two-two-two
+six.</li>
+<li><b>Tier lists</b>: the top two per role by win rate on Blizzard's rates and on
+CounterWatch's, and the documented scores of two meta trackers,
+<a href='https://herostats.live' target='_blank' rel='noopener'>HeroStats</a> and
+<a href='https://owherostats.com' target='_blank' rel='noopener'>OW Hero Stats</a>, run on
+Blizzard's rates.</li>
+<li><b>Counter pickers</b>: per role, the heroes that best answer red's revealed picks, on the
+wiki's graph and on CounterWatch's duel ratings.</li>
+<li><b>The most picked</b>, the top two per role by pick rate on each source, and <b>random
+sixes</b>, a thousand a board, the 0 of every yardstick.</li>
+</ul>
+<p>Editorial tier lists state no model, and the sites that publish them refuse automated readers,
+so they are left out.</p>
+<p><b>The measures.</b> Each six is placed among its board's random two-two-two sixes - a
+percentile, ties counted half, 50 a random six - on popularity and strength by Blizzard's rates
+and by CounterWatch's, on synergy by the wiki and by CounterWatch's duos, and on counters by the
+wiki and by CounterWatch's matchups and duels, each against red's full six. Two yardsticks score
+a six whole. <i>CounterWatch's yardstick</i> is its documented team prediction - half counters,
+three tenths composition, a fifth map advantage, in win-rate points - as a share from the average
+random six, 0, to the best six it knows, 100, read on its matchups or on its duel ratings.
+<i>Countrix's scale</i> is its own objective, anchored the same way: 0 the average random six,
+100 its optimum. A heuristic's satisfaction runs from 0 to 1.</p>
+<p><b>The statistics.</b> The board is the unit and the map the cluster: a mean over boards, and
+its 95%% range from drawing the maps again with replacement - the range the average would fall in
+if the maps were drawn again. A gap between two arms is taken on the same board. No p-values.</p>
+%(DESIGN)s
+<h2 id='the-results'>The results</h2>
+<p>Each tool is strongest on its own numbers. CounterWatch's arms are scored on CounterWatch's data
+and lead there by construction; Countrix's are scored on Countrix's objective and lead there for
+the same reason. The tier lists, the counter pickers and Countrix read Blizzard's 5v5 console
+rates and the wiki, and are scored on CounterWatch's 6v6 PC numbers, which none of them read.</p>
+<h3 id='landing'>Where each six lands</h3>
+%(SHARES)s
+<h3 id='makeup'>What each six is made of</h3>
+%(PARTS)s
+<h3 id='meta-team'>The meta against the team</h3>
+<p>The question the study set out with: how close Countrix comes to the meta while it optimises
+the team. A six of the meta alone sits far right and low; a six of synergy and counters alone sits
+high and left; the optimiser trades one against the other where its weights say.</p>
+%(SCATTER)s
+<h3 id='rules'>The rules</h3>
+%(RULES)s
+<p id='slider'><b>The Meta slider.</b> Each setting of the slider gives a six, scored on the
+shipped objective and split into the engine's part and the playbook's. The trade runs one way
+(<a href='#what-it-buys'>what the weights buy</a>): the engine's part never falls as the meta
+rises, and the playbook's never rises.</p>
+%(SLIDER)s
+<p id='gaps'><b>Board by board.</b> Countrix as shipped against each arm on the same boards: the
+mean gap with its range, and how often it won, tied and lost.</p>
+%(PAIRED)s
+<h3 id='holds'>Does it hold up</h3>
+<p>The same arms on the other half of the maps, on the earlier boards, with the favourites
+banned, on the older capture of the rates, and with CounterWatch's 6v6 rates fed to the engine in
+memory. The last asks how much of the gap on CounterWatch's yardstick is the optimiser and how much
+the data.</p>
+%(HOLDS)s
+<details class='numbers'><summary>where the results come from</summary>%(PROVENANCE)s</details>
+<h2 id='what-it-shows'>What it shows, and what it does not</h2>
+<ul class='plain'>
+<li>The search is exact: every check above counts its violations, and the count is the
+claim.</li>
+<li>Each yardstick favours its home: read a tool's lead on its own numbers as the yardstick's, not
+the tool's.</li>
+<li>Where a plain tier list or the engine without its rules scores above shipped Countrix on
+CounterWatch's yardstick, the difference is what the playbook's rules cost there. The rules weigh
+what CounterWatch's numbers cannot see - a save, a barrier, healing parity, one playstyle - and the
+rules' table says what each buys and costs.</li>
+<li>The data swap separates the optimiser from its data: the same engine, fed CounterWatch's
+rates, is scored on CounterWatch's yardstick beside its own six.</li>
+<li>It does not show that Countrix wins more games than any tool. No source publishes 6v6 match
+results, and every yardstick here is a model's reading of the numbers it holds.</li>
+</ul>
+<h2 id='the-report'>The report</h2>
+%(REPORT)s
+<p class='legend'>The study runs in a private benchmark repository, which holds CounterWatch's
+data and never publishes it; this page and the report show its results alone.
+<code>docs/ui.md</code> says how the page reads them.</p>
+</article>

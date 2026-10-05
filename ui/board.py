@@ -7,8 +7,9 @@ layer.
 http.server and psycopg, no web framework, no build step. This module is
 the board's server - the roster and facts endpoints, and the handler that
 routes to them, to the engine's routes ui/serve.py answers and to the
-pages ui/pages.py and ui/registry.py render: the board, /math and
-/registry, each rule's math. Every click re-reads the database: the facts
+pages ui/pages.py, ui/registry.py and ui/study.py render: the board, /math,
+/registry, each rule's math, and /study, the proof and the study's
+results. Every click re-reads the database: the facts
 panel is the FactSet for (map, side, red, blue, bans); the comps panel is
 the inference layer's board - red's likely six around its picks, each
 with its pick score, blue's picks filled and its optimal counter to red's,
@@ -38,7 +39,7 @@ from db import psql, web
 from facts import board_facts, tables
 from facts.draft import Query, parse_board
 from facts.roster import roster_of
-from ui import pages, registry, serve
+from ui import pages, registry, serve, study
 
 # --- JSON endpoints ---------------------------------------------------------
 
@@ -97,6 +98,8 @@ class Handler(web.Handler):
                 return self._html(pages.view_math())
             if path == "/registry":
                 return self._html(registry.view_registry())
+            if path == "/study":
+                return self._html(study.view_study())
             if path == "/api/strategies":
                 return self._json(*serve.handle_strategies())
             if path == "/health":

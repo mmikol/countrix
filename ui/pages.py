@@ -1,7 +1,8 @@
 """The board's HTML: the page shell, the math page, and the static files
 they load - the stylesheet, the scripts and the display font. The strategy
 registry, each rule's math, is ui/registry.py's, in the shell page() gives
-the math page, with its own script, registry.js.
+the math page, with its own script, registry.js; the study, the proof and
+the study's results, is ui/study.py's, in the same shell.
 
 The page is a shell over the static files: board.js loads last because it
 calls into comps.js and playbook.js, and TEAM, BANS, TANKS and SWAP_MAX come
@@ -115,6 +116,7 @@ def view_board() -> str:
             "<span class='flash' id='flash'></span></div>"
             "<span class='links'><a class='mathlink' href='/math'>the math</a>"
             "<a class='mathlink' href='/registry'>the registry</a>"
+            "<a class='mathlink' href='/study'>the study</a>"
             "<a class='gh' href='%s' target='_blank' rel='noopener'>%s GitHub</a>"
             "</span>"
             "</header>"

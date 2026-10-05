@@ -98,7 +98,8 @@ the solver reads nothing else.
   on small synthetic boards and fails unless the search returns the true best
   sixes in order, and a fuzz holds every bound to the sixes it covers; on the
   built database a brute force of every legal six on real boards agrees with
-  it bit for bit.
+  it bit for bit. The board's study page writes out the proof, lemma by
+  lemma, beside the study's results.
 - **Deterministic.** A board is the same payload under any hash seed: one
   total order, each six scored in one seat order.
 - **Typed throughout.** mypy checks every source module in CI; records that
@@ -183,7 +184,7 @@ the data current, `/maintain` runs the checks and keeps the docs current.
 - [docs/architecture.md](docs/architecture.md) - the layers, the folders, the settings, the skills, the scope
 - [docs/db.md](docs/db.md) - the data layer: the sources, the schema, the refresh
 - [docs/inference.md](docs/inference.md) - the playbook format, the solver, the tuning loop
-- [docs/ui.md](docs/ui.md) - the board: its pages and endpoints, the math page (the objective, with the code's constants) and the strategy registry (each rule's math, with its own numbers)
+- [docs/ui.md](docs/ui.md) - the board: its pages and endpoints, the math page (the objective, with the code's constants), the strategy registry (each rule's math, with its own numbers) and the study (the proof that the search is exact, and the study's results against the tools people use)
 - [docs/mcp.md](docs/mcp.md) - the two MCP servers and every tool
 - [docs/security.md](docs/security.md) - the threat model and what stands in the way
 

@@ -210,8 +210,9 @@ db <- facts <- inference <- door <- ui.
   same `Objective.ground_key` are one search. Each row's blurb is
   `plan.stage_blurb`, worded from the facts. `BRIEF` leaves it out too
   (`Brief.walk_stages`); test_stage_plan names its brief.
-- **The board** (`ui/board.py`, its pages in `ui/pages.py` and the strategy
-  registry in `ui/registry.py`) serves `/api/facts` and answers
+- **The board** (`ui/board.py`, its pages in `ui/pages.py`, the strategy
+  registry in `ui/registry.py`, and the study in `ui/study.py`, its charts
+  inline SVG from `ui/charts.py`) serves `/api/facts` and answers
   `/api/board`, `/api/strategies` and `/health` with `ui/serve.py`'s
   handlers, all in its own process - the
   compose stack's `ui` container runs the engine.
@@ -302,7 +303,14 @@ db <- facts <- inference <- door <- ui.
   bans and the role caps; any other decision worth pinning is made on the
   server, as the seat badge is (`momentum.badges`). The math
   page renders the code constants it quotes (`view_math` fills them in), so
-  a literal percent in `ui/static/math.html` is written `%%`.
+  a literal percent in `ui/static/math.html` is written `%%`, as it is in
+  `ui/static/study.html`.
+- `ui/static/study.json` is the study's results, the file the private
+  benchmark's study publishes (`countrix-study/1`); one that says
+  `"sample": true` was written to build the page and is said so. The page
+  reads its metrics by id, never a raw rate, and
+  `tests/verification/ui/test_study.py` holds the renderer to the file:
+  every chart drawn, every string escaped, the schema checked.
 - `test_the_search_reaches_the_enumerated_maximum` in
   `tests/verification/inference/test_solver.py` is the regression gate on
   the search: synthetic boards - red revealed, locks, bans, a pair that pays
