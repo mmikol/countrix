@@ -17,7 +17,8 @@ that rule's entry. The math page (ui/static/math.html) gives the general
 forms, and each entry links its form there. The entries sit under the
 tables, hidden from the first paint (ui/static/board.css) for the dialog to
 copy; a noscript style in the page's head shows them where scripts are off,
-and print shows them, so the links scroll to them. ui/board.py serves it;
+board.css where the script fails and a link or the address names one, and
+print shows them, so the links scroll to them. ui/board.py serves it;
 nothing here reads the database, and every string read from a file is
 escaped.
 """
@@ -124,7 +125,8 @@ DIALOG = (
     "<div id='rule_body'></div></dialog>")
 # the entries' box under the tables, which board.css hides from the first paint
 # for the dialog to copy; the page's head shows it where scripts are off, as print
-# does, so every entry stays in reach and the links scroll to it
+# does, and board.css where the script fails and a link or the address names an
+# entry, so every entry stays in reach and the links scroll to it
 ENTRIES = "rule_entries"
 NOSCRIPT = "<noscript><style>.math .entries { display:block; }</style></noscript>"
 
