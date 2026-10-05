@@ -123,10 +123,12 @@ six - past the bans, with red's badge in its title. Red is never
 optimized: it reads no strategy, and only a new map, ban or red pick sends
 it back to *searching*. Every six the panel draws - a seat's cards, an
 alternative, a stage's six - reads tanks, then damage, then supports, as
-the server orders it; red's keeps its picks first within a role, so it
-reads as red's row does. Under a six's cards sit
-the search's numbers (the candidates, every six of the legal shapes its
-answer covers; the seconds; the lean), the default engine's
+the server orders it, with its seat's picks first within a role in the
+order picked and the rest by name (`result.drawn`, red's likely six
+alike), so blue's fill or six reads as blue's row does and red's as red's;
+blue's optimal, which no pick holds, reads by role and name. Under a six's
+cards sit the search's numbers (the candidates, every six of the legal
+shapes its answer covers; the seconds; the lean), the default engine's
 three terms - `base.rates`, `base.synergy`, `base.counters`, a bar each
 with the fact it read, always shown - then the strategies in three tabs -
 *satisfied*, *costing* with the summed cost, *did not read* - under a
@@ -162,17 +164,31 @@ keeps your locked picks, the optimal six before any pick - and red's carry
 its likely six around its picks, each a click from locking, its reasons
 (and for red its pick score) in the tooltip and on the comps tab. A filled
 slot's tooltip is the reason this board gives its hero: blue's from the
-fill or the six, red's from their likely six.
+fill or the six, red's from their likely six. While a board solves, blue's
+open slots keep the board in hand's suggestions around the picks as they
+stand, never a picked hero - the optimal's around a first pick, so one
+taken from its role's first slot stays there, and one from a role's second
+moves to the first, as a role's picks lead it - and red's wait for the
+board that answers red's picks.
 
 **The rows** read tank, damage, support, so a glance tells what each team
 fields: a team's picks and the suggestions in its open slots are drawn
 together (`lineup` in `board.js`), a role's picks first in the order
-picked, solid, then its suggestions in the board's order, dashed; a team
-showing fewer than six keeps its empty slots after them, each numbered by
-its place in the row, as a suggested slot is. Only the drawing moves: the
-picks are kept, saved and sent in the order picked, and a click reads the
-hero a slot shows, never its place - a picked tile clears that hero, a
-suggested one locks it, under the same bans and role caps.
+picked, solid, then its suggestions in the board's order, dashed. Each
+role keeps the slots it holds in the six the board in hand drew for the
+team, its empty ones after its suggestions, so while a board solves a
+pick, a clear or a suggestion withdrawn in one role moves no other role's
+slots, unless it changes how many slots a role holds: a red pick past a
+role's slots, or its clear, shifts red's picks a slot until the board
+lands, since only red's likely six says which role gives a slot up. With
+no board in hand, the empty slots follow the picks. Only an empty slot carries a number,
+counted among the empty slots from 1, so the last says how many stand
+empty: a suggested slot's place would skip around the picks (2, 4, 6) and
+read as an order to pick in, which the board does not give, and the
+dashed tile already marks it open. Only the drawing moves: the picks are
+kept, saved and sent in the order picked, and a click reads the hero a
+slot shows, never its place - a picked tile clears that hero, a suggested
+one locks it, under the same bans and role caps.
 
 **The facts panel** filters by text and by scope and says how many it
 holds beside the filter ("12 of 464 facts" under a filter); the tab

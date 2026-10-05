@@ -199,6 +199,30 @@ def test_the_versus_section_counts_counter_edges_both_ways(synthetic_world):
     assert (alone["coverage"], alone["safe_count"], alone["banproof_coverage"]) == (0, 0, 0)
 
 
+def test_a_pick_named_among_equals_is_the_first_in_seat_order_in_any_order_handed(
+        synthetic_world):
+    """weakest, burst_hero and max_ban_hero each name one pick, and
+    banproof_coverage takes the most-banned pick's answers away: of picks
+    tied there, each reads the first in seat order - by role, then hero id
+    (facts.model.seat_order) - so the same six handed in seat order, as the
+    solver hands it, or in any other, as the board's rows do, names the same
+    picks and counts the same coverage. Needle, Flint, Balm and Tansy tie on
+    the smallest pool, Quarry and Needle on the biggest hit, Kite and Flint
+    on the top ban; Kite alone answers red's Needle, so without Kite one of
+    red's two picks is answered, without Flint both."""
+    w = synthetic_world
+    w.hero("Needle").pool, w.hero("Needle").burst = 225, 150.0
+    w.hero("Kite").ban = w.hero("Flint").ban = 40.0
+    seated = ("Kite", "Quarry", "Needle", "Flint", "Balm", "Tansy")
+    red = _picks(w, "Gale", "Needle")
+    for six in (seated, seated[::-1], ("Tansy", "Flint", "Kite", "Balm", "Needle", "Quarry")):
+        t = team_metrics(w, _picks(w, *six), None, red)
+        assert (t["weakest"], t["pool_min"]) == ("Needle", 225), six
+        assert (t["burst_hero"], t["burst_max"]) == ("Quarry", 150.0), six
+        assert (t["max_ban_hero"], t["max_ban_rate"]) == ("Kite", 40.0), six
+        assert (t["coverage"], t["banproof_coverage"]) == (2, 1), six
+
+
 def test_a_metric_read_as_the_wrong_kind_is_the_callers_error():
     """The readers hand a bag's value on as the kind asked for - a number, a
     name, the names, the synergy pairs, the tally - and a value of another

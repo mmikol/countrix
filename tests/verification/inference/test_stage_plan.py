@@ -3,9 +3,9 @@ enumeration on the synthetic World: each phase of Harbor Gate's route the
 best six reachable from the phase before under the swap cost, each arena of
 Ember Ruins reached from the origin, the chosen stage the origin with the
 phases before it played, two stages on one ground one search, the blurb's
-sentences dropped when they have nothing to say, and the rows on the
-board's payload. Scratch rules on map.objective and map.hazards make the
-stages score apart. No database."""
+sentences dropped when they have nothing to say, the rows on the board's
+payload, each six with blue's picks first within a role. Scratch rules on
+map.objective and map.hazards make the stages score apart. No database."""
 
 import copy
 import dataclasses
@@ -19,7 +19,7 @@ from inference.base import OFF
 from inference.result import StageRules
 from inference.scoring import Candidate, quantized
 from inference.solver import Solver
-from tests.verification.inference import ASSUMPTIONS_ONLY, DEFAULT
+from tests.verification.inference import ASSUMPTIONS_ONLY, DEFAULT, FIXTURE_PLAYBOOK
 from tests.verification.inference.enumeration import netted, plain_seat
 
 COST = 5.0                  # share points of blue's span a hero changed costs
@@ -191,6 +191,26 @@ def test_the_board_carries_the_plan_on_a_staged_map_and_none_elsewhere(synthetic
     off = engine.board(synthetic_world, Draft("Harbor Gate", ("Mortar",), ORIGIN, side="attack"),
                        catalog=staged, brief=dataclasses.replace(brief, walk_stages=False))
     assert off.stages == []
+
+
+def test_a_stages_six_reads_blues_picks_first_in_a_role_as_its_row_does(synthetic_world):
+    """Each stage's six reads as the board draws one of blue's (result.drawn):
+    tanks, then damage, then supports, the picks of blue's it holds first
+    within a role in pick order, then the rest by name - where by hero id
+    Needle would lead Gale and Sorrel Tansy. Ember Ruins's arenas keep the
+    fill, as blue's row draws it; on Harbor Gate's route Gale goes for Rook
+    and Tansy still leads the supports."""
+    fixture = catalog.load(FIXTURE_PLAYBOOK)
+    brief = engine.Brief(base=DEFAULT, swap=COST)
+    arenas = engine.board(synthetic_world, Draft("Ember Ruins", ("Mortar",), ("Tansy", "Gale")),
+                          catalog=fixture, brief=brief)
+    six = ["Anvil", "Kite", "Gale", "Needle", "Tansy", "Sorrel"]
+    assert arenas.fill.blue == six and [r["six"] for r in arenas.stages] == [six] * 3
+    route = engine.board(synthetic_world, Draft("Harbor Gate", ("Mortar",), ("Tansy", "Gale"),
+                                                side="attack"), catalog=fixture, brief=brief)
+    assert [r["six"] for r in route.stages] == [
+        ["Anvil", "Needle", "Rook", "Tansy", "Balm", "Myrrh"]] * 2
+    assert ("Gale", "Rook") in [(s["out"], s["in"]) for s in route.stages[0]["swaps"]]
 
 
 def test_the_swaps_between_stages_meet_their_own_role_first(synthetic_world):

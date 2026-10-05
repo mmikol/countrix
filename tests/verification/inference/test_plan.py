@@ -334,3 +334,19 @@ def test_the_plan_describes_the_six_the_comps_tab_shows(synthetic_world, scratch
     assert "The six is the one you picked." in full.plan and "your 6 picks" in full.plan
     # the default engine off, no term reads red's likely six: the plan names none
     assert "the six counters" not in full.plan and "likely six" not in full.plan
+
+
+def test_who_answers_whom_reads_the_same_whatever_order_blue_picked_in():
+    # a fill or a full six lists blue's picks in the order picked, and the plan
+    # keeps four answers: a tie at the cut once went to the earlier pick
+    from inference import plan
+    red = ["Widowmaker", "Kiriko", "Echo", "Domina", "Ana", "Winston"]
+    met = {
+        "Widowmaker": ["D.Va"], "Echo": ["D.Va"], "Kiriko": ["D.Va"],
+        "Domina": ["Roadhog"], "Winston": ["Roadhog"], "Ana": ["Roadhog"],
+    }
+    reverse = {k: met[k] for k in reversed(list(met))}
+    assert plan._answers(red, met) == plan._answers(red, reverse)
+    assert "D.Va answers Widowmaker" in plan._answers(red, reverse)
+    both = plan._answers(["Echo"], {"Echo": ["Roadhog", "D.Va"]})
+    assert both == plan._answers(["Echo"], {"Echo": ["D.Va", "Roadhog"]})

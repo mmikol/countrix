@@ -311,53 +311,86 @@ function renderFacts() {
 
 /* the two team rows: each team's picks and, in its open slots, the board's
    suggestions, a click from locking. Blue's are the solver's: the optimal six
-   before any pick, then the fill - the best six that keeps the locked ones.
-   Red's are its likely six around its picks: for each open slot the hero with
-   the highest pick score, drawn only for the red picks the board in hand
-   answered. A suggested tile shows the hero alone; its reason and pick score
-   ride in the hover title. Returns each row as drawn (lineup) */
+   before any pick, then the fill - the best six that keeps the locked ones -
+   and while a board solves the board in hand's, around the picks as they
+   stand: the optimal's where it answered no blue pick, so a first pick taken
+   from its role's first slot stays there, and one from a role's second moves
+   to the first, as a role's picks lead it. Red's are its likely six around its picks: for each
+   open slot the hero with the highest pick score, drawn only for the red
+   picks the board in hand answered. A suggested tile shows the hero alone;
+   its reason and pick score ride in the hover title. Each row keeps the
+   shape of the six the board in hand drew for its team (shapeOf). Returns
+   each row as drawn (lineup) */
 function paintRows() {
-  var d = INF;
-  var src = !d || d.error ? null : (st.blue.length ? d.fill : d.blue);
+  var d = INF, ok = !!d && !d.error;
+  var asked = ok && d.current ? d.current.blue || [] : [];   /* the blue picks the board in hand answered */
+  var src = !ok ? null : st.blue.length && asked.length ? d.fill : d.blue;
   var sw = answered() ? d.swaps : null;         /* the swaps' empty slots show the fill's heroes */
   var free = function (p) { return st.blue.indexOf(p.hero) < 0; };
   var open = sw && sw.open && sw.open.length ? sw.open.filter(free)
            : src && src.picks ? src.picks.filter(function (p) { return !p.locked && free(p); }) : [];
   var likely = redAnswered() ? d.expected.picks.filter(function (p) {
     return !p.locked && st.red.indexOf(p.hero) < 0; }) : [];
-  return { blue: paintRow('blue', lineup('blue', open)), red: paintRow('red', lineup('red', likely)) };
+  var six = src || (asked.length ? d.current : null);       /* blue's six in hand: its fill, else its picks */
+  return { blue: paintRow('blue', lineup('blue', open, shapeOf(six))),
+           red: paintRow('red', lineup('red', likely, shapeOf(ok ? d.expected : null))) };
+}
+
+/* the slots each role holds in a six the board in hand drew, in ROLES order:
+   its heroes' roles counted; null with no six in hand */
+function shapeOf(six) {
+  if (!six || !six.picks) return null;
+  return ROLES.map(function (role) { return six.picks.filter(function (p) { return p.role === role; }).length; });
 }
 
 /* a team's six as its row draws it: its picks and the suggestions for its
    open slots together, tanks first, then damage, then supports (ROLES), so a
    glance tells what the team fields. Within a role the team's own picks come
-   first, in pick order, then the suggestions in the board's order; a hero of
-   no known role goes last. Only the drawing moves: st.blue and st.red keep
-   the order picked, which the board is asked in. An entry is a pick, `at`
-   its place among the team's picks, or a suggestion, `p` the board's entry */
-function lineup(team, suggested) {
-  var open = suggested.slice(0, Math.max(0, TEAM - st[team].length));
-  var row = st[team].map(function (name, at) { return { name: name, at: at }; })
-    .concat(open.map(function (p) { return { name: p.hero, p: p }; }));
-  row.forEach(function (x, i) {
-    var h = hero(x.name), r = ROLES.indexOf(h ? h.role : x.p ? x.p.role : '');
-    x.rank = r < 0 ? ROLES.length : r; x.i = i;
-  });
-  return row.sort(function (a, b) { return a.rank - b.rank || a.i - b.i; });
+   first, in pick order, then the suggestions in the board's order, then empty
+   slots (null) up to the role's slots in `shape`, the six in hand's; a hero
+   of no known role goes last. So while a board solves a pick, a clear or a
+   suggestion gone in one role moves no other role's slots, unless it changes
+   how many slots a role holds: a red pick past a role's slots, or its clear,
+   shifts red's picks a slot until the board lands, since only red's likely
+   six says which role gives a slot up. Past six, a role over its slots takes the last
+   empty slots, then the last suggestions. Only the drawing moves: st.blue and
+   st.red keep the order picked, which the board is asked in. An entry is a
+   pick, `at` its place among the team's picks, or a suggestion, `p` the
+   board's entry */
+function lineup(team, suggested, shape) {
+  var rank = function (name, p) {
+    var h = hero(name), r = ROLES.indexOf(h ? h.role : p ? p.role : '');
+    return r < 0 ? ROLES.length : r;
+  };
+  var picks = st[team].map(function (name, at) { return { name: name, at: at }; });
+  var open = suggested.map(function (p) { return { name: p.hero, p: p }; });
+  var row = [];
+  for (var r = 0; r <= ROLES.length; r++) {
+    var mine = picks.filter(function (x) { return rank(x.name) === r; });
+    var room = Math.max(shape && r < ROLES.length ? shape[r] : 0, mine.length);
+    var role = mine.concat(open.filter(function (x) { return rank(x.name, x.p) === r; })).slice(0, room);
+    while (role.length < room) role.push(null);
+    row = row.concat(role);
+  }
+  for (var k = row.length - 1; row.length > TEAM && k >= 0; k--) if (!row[k]) row.splice(k, 1);
+  for (k = row.length - 1; row.length > TEAM && k >= 0; k--) if (row[k].p) row.splice(k, 1);
+  return row;
 }
 
 /* `team`'s slots show `row`: a pick solid, its tooltip the reason this board
-   gives it; a suggestion dashed, a click from locking; then the empty slots.
-   An open slot's number is its place in the row */
+   gives it; a suggestion dashed, a click from locking, with no number - its
+   place would skip around the picks (2, 4, 6) and read as an order the board
+   does not give; an empty slot numbered among the empty slots, 1 up, so the
+   last number counts them */
 function paintRow(team, row) {
-  var slots = el(team + 'slots').children;
+  var slots = el(team + 'slots').children, empty = 0;
   for (var i = 0; i < TEAM; i++) {
     var x = row[i], s = slots[i];
-    if (!x) { s.className = 'slot'; s.removeAttribute('data-h'); s.title = ''; s.innerHTML = "<span class='idx'>" + (i + 1) + '</span>'; continue; }
+    if (!x) { s.className = 'slot'; s.removeAttribute('data-h'); s.title = ''; s.innerHTML = "<span class='idx'>" + (++empty) + '</span>'; continue; }
     var h = hero(x.name) || { name: x.name, portrait: x.p ? x.p.portrait : '' };
     s.className = x.p ? 'slot suggested' : 'slot full'; s.setAttribute('data-h', x.name);
     s.title = x.p ? x.p.why : pickReason(team, x.name);
-    s.innerHTML = portrait(h) + (x.p ? "<span class='idx'>" + (i + 1) + '</span>' : '') + "<span class='nm'>" + esc(x.name) + '</span>';
+    s.innerHTML = portrait(h) + "<span class='nm'>" + esc(x.name) + '</span>';
   }
   return row;
 }

@@ -9,9 +9,10 @@ import re
 
 import pytest
 
-from db import Refusal
-from facts import tables
-from facts.model import Hero, Map
+from db import ROLES, Refusal
+from facts import board_facts, tables
+from facts.draft import Draft
+from facts.model import Hero, Map, by_role, role_rank, seat_order
 from facts.records import Rates
 from facts.team import pair_score
 
@@ -123,3 +124,23 @@ def test_the_models_lookups_and_derivations(synthetic_world):
     assert m.style_top == "poke" and m.style_margin == 1.5
     m.styles["brawl"] = 1.5     # a tie goes to the name
     assert m.style_top == "brawl" and m.style_margin == 0
+
+
+def test_a_role_outside_roles_sorts_last_and_raises_nothing(synthetic_world):
+    """role_rank is the one key by role: ROLES' order, and a role outside
+    ROLES after them all, where ROLES.index would raise. by_role, seat_order
+    and the roster put a hero of a role the code does not know last, and a
+    board whose side holds one still has its facts, that hero's last."""
+    w = synthetic_world
+    w.hero("Gale").role = "flex"
+    assert [role_rank(r) for r in (*ROLES, "flex")] == [0, 1, 2, 3]
+    side = [w.hero(n) for n in ("Gale", "Balm", "Rook", "Anvil")]
+    assert [h.name for h in by_role(side)] == ["Anvil", "Rook", "Balm", "Gale"]
+    assert [h.name for h in sorted(side, key=seat_order)] == ["Anvil", "Rook", "Balm", "Gale"]
+    assert w.heroes_by_role()[-1].name == "Gale"
+    fs = board_facts.generate(w, Draft("Harbor Gate", ("Gale", "Balm", "Rook", "Anvil")))
+    heads = []
+    for f in fs.facts:
+        if f.scope == "hero" and (not heads or heads[-1] != f.subject):
+            heads.append(f.subject)
+    assert heads == ["Anvil", "Rook", "Balm", "Gale"]

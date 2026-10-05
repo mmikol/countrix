@@ -195,11 +195,32 @@ class Resolved(NamedTuple):
     banned: list[Hero]
 
 
+# each role's place in ROLES, which role_rank reads
+_ROLE_RANK = {role: i for i, role in enumerate(ROLES)}
+
+
+def role_rank(role: str) -> int:
+    """A role's place in every order by role: tanks, then damage, then
+    supports (ROLES), and a role outside ROLES after them all, never an
+    error. The one key by role - by_role's, seat_order's, the roster's and
+    each six the board draws."""
+    return _ROLE_RANK.get(role, len(ROLES))
+
+
+def seat_order(h: Hero) -> tuple[int, int]:
+    """A hero's seat in the one order no caller's order moves: by role
+    (role_rank), then by hero id. Every six is scored in it (scoring's
+    Candidate), and a team metric that names one hero of equals names the
+    first in it (facts.team)."""
+    return role_rank(h.role), h.id
+
+
 def by_role(heroes: Iterable[Hero]) -> list[Hero]:
-    """A side's heroes in the order every view shows a six: tanks, then
-    damage, then supports (ROLES), each role's heroes in the order given - a
-    side's picks keep their pick order within a role."""
-    return sorted(heroes, key=lambda h: ROLES.index(h.role))
+    """Heroes by role (role_rank) - tanks, then damage, then supports, then
+    any of a role outside ROLES - each role's heroes in the order given, so
+    a side's picks keep their pick order within a role. The facts take each
+    side in it (board_facts.generate)."""
+    return sorted(heroes, key=lambda h: role_rank(h.role))
 
 
 class World:
@@ -299,7 +320,7 @@ class World:
                         banned=banned)
 
     def heroes_by_role(self) -> list[Hero]:
-        return sorted(self.heroes.values(), key=lambda h: (ROLES.index(h.role), h.name))
+        return sorted(self.heroes.values(), key=lambda h: (role_rank(h.role), h.name))
 
     def maps_sorted(self) -> list[Map]:
         return sorted(self.maps.values(), key=lambda m: m.name)

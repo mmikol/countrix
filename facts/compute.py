@@ -23,7 +23,7 @@ from collections.abc import Sequence
 from typing import Literal, NamedTuple, TypedDict
 
 from facts.draft import EXPECTED_SHAPE, TEAM_SIZE, Side, is_sided
-from facts.model import ROLES, TERRAIN_FEATURES, Hero, Map, World
+from facts.model import TERRAIN_FEATURES, Hero, Map, World, role_rank
 from facts.tables import STAGE_PRIOR_WORDS
 from facts.team import TEAM_METRICS, VERSUS_METRICS, MetricBag, number
 
@@ -172,7 +172,7 @@ def expected_picks(world: World, m: Map | None, *, revealed: Sequence[Hero] = ()
         taken.add(best.id)
         shape[best.role] -= 1
     out = [entry(h, revealed[:i], True) for i, h in enumerate(revealed)]
-    return out + sorted(picked, key=lambda p: (ROLES.index(p["role"]), p["hero"]))
+    return out + sorted(picked, key=lambda p: (role_rank(p["role"]), p["hero"]))
 
 
 def _pick_reason(value: float | None, share: float, on_map: bool, m: Map | None,

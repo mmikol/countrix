@@ -53,6 +53,32 @@ def test_each_side_reads_tank_damage_support_and_the_draft_keeps_the_order_named
     assert (fs.to_dict()["red"], fs.to_dict()["blue"]) == (list(red), list(blue))
 
 
+def test_a_fact_naming_one_pick_of_equals_reads_alike_in_any_order_the_side_is_named(
+        synthetic_world):
+    """The weakest link, the burst ceiling, the availability's most-banned
+    pick and the ban-resilient coverage each name one pick: of picks tied
+    there, the first in seat order (facts.team), so a side named in another
+    order - which the facts take by role, each role in the order named -
+    words them alike. Needle, Flint, Balm and Tansy tie on the smallest
+    pool, Quarry and Needle on the biggest hit, Kite and Flint on the top
+    ban."""
+    w = synthetic_world
+    w.hero("Needle").pool, w.hero("Needle").burst = 225, 150.0
+    w.hero("Kite").ban = w.hero("Flint").ban = 40.0
+    six = ("Kite", "Quarry", "Needle", "Flint", "Balm", "Tansy")
+    keys = ("team.pool_min", "team.burst_max", "team.availability", "team.banproof_coverage")
+    worded = []
+    for blue in (six, six[::-1]):
+        fs = board_facts.generate(w, Draft("Harbor Gate", ("Gale", "Needle"), blue))
+        worded.append([f.text for key in keys for f in fs.find(key, "blue")])
+    assert worded[0] == worded[1] and len(worded[0]) == 4
+    weakest, burst, availability, banproof = worded[0]
+    assert "weakest link: Needle at 225 pool" in weakest
+    assert "burst ceiling: Quarry's 150 in one hit" in burst
+    assert "(Kite at 40% ban)" in availability
+    assert "without Kite (40% ban) still 1/2 answered" in banproof
+
+
 def test_team_facts_appear_per_side_and_matchup_only_with_both(synthetic_world):
     w = synthetic_world
     fs = board_facts.generate(w, Draft("Harbor Gate", ("Mortar", "Gale")))
