@@ -34,6 +34,7 @@ COUNTRIX_NO_DATABASE=1 .venv/bin/python -m pytest -q -rs -p no:cacheprovider --c
 .venv/bin/python -m door.mcp call db_docs         # regenerate every generated doc section (needs the database)
 .venv/bin/python -m ui.board --port 8018          # the board, engine in-process (8017 is the compose board)
 .venv/bin/python orchestrator.py up|status|down   # the Docker stack; a bare orchestrator.py is up
+user-guide/.venv/bin/mkdocs build --strict -f user-guide/mkdocs.yml   # the user guide, in a venv of its own (user-guide/README.md)
 ```
 
 Pulls and `db_rebuild` read the page caches, which keep a page forever;
@@ -269,6 +270,10 @@ db <- facts <- inference <- door <- ui.
   compared with a fresh render. Never edit it by hand; change the source
   (a `@tool` description, strategy frontmatter, a migration comment) and
   regenerate.
+- The user guide (`user-guide/`) builds strict in CI: a page outside its
+  nav, a broken link or a broken anchor fails it. It says what a player
+  sees and types, so a change to either updates its page in the same
+  commit.
 - Adding or renaming an MCP tool: regenerate docs/mcp.md; each house skill
   must still name the tools `MUST_NAME` (tests/qa/test_docs.py) lists;
   tests/verification/door/mcp/test_mcp.py holds the tool set too.

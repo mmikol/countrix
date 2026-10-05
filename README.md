@@ -111,7 +111,8 @@ the solver reads nothing else.
   start. Every port binds to loopback, and every HTTP server refuses a
   foreign Host or Origin.
 - **Tested documentation.** Relative links resolve, every setting is documented,
-  and the generated schema, tool and catalog references match a fresh render.
+  the generated schema, tool and catalog references match a fresh render, and
+  the user guide builds with no warning.
 
 Python 3.12, PostgreSQL 16, psycopg, requests and beautifulsoup4 for the
 scrapers, the standard library's HTTP server with no web framework, plain
@@ -132,6 +133,9 @@ echo COUNTRIX_STRATEGIES=tests/fixtures/playbook >> .env   # the reference playb
 Then open **http://localhost:8017**. The first start builds the image, then the
 database from the sources, about ten minutes at a polite pace; later starts
 reuse the database.
+
+[The user guide](user-guide/README.md) takes a player or a team through
+the board from there, task by task.
 
 The reference playbook is the one the tests prove the solver against. Leave out
 the `echo` line and the board runs the shipped playbook, its rules listed in
@@ -180,6 +184,7 @@ the data current, `/maintain` runs the checks and keeps the docs current.
 
 ## Documentation
 
+- [user-guide/](user-guide/README.md) - the user guide, for a player or a team: installing and starting, the board step by step, its tabs, tuning the playbook, the data, troubleshooting; a MkDocs site, built strict in CI
 - [docs/architecture.md](docs/architecture.md) - the layers, the folders, the settings, the skills, the scope
 - [docs/db.md](docs/db.md) - the data layer: the sources, the schema, the refresh
 - [docs/inference.md](docs/inference.md) - the playbook format, the solver, the tuning loop

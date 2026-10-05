@@ -56,9 +56,10 @@ subscription, and the board never calls a model.
 | `door/` | **THE DOOR** over all three layers - `mcp/`, the MCP server and its tools, under which every write runs; `refresh.py`, the clock that runs the tools daily and weekly | [mcp.md](mcp.md) |
 | `ui/` | **THE BOARD** - the page (map, sides, bans, red and blue rosters) over the facts layer's facts and the inference layer's answer, the math page and the strategy registry, each rule's math: `board.py`, `serve.py`, `pages.py`, `registry.py` and `static/` - the only presentation code | [ui.md](ui.md) |
 | `tests/` | three folders by what a test holds the code to - `qa/`, the house rules; `verification/`, the code against its spec; `validation/`, the engine against recorded maps, empty until they exist - with the synthetic World, the reference playbook, the reach recorder and the hand-run brute force beside them; `tests/__init__.py` maps it | |
+| `user-guide/` | the user guide, for a player or a team, task by task: a MkDocs site with the Material theme - `mkdocs.yml`, the pages in `docs/`, their screenshots in `docs/img/`, and `requirements.txt`, which pins the two for a venv of the guide's own. CI builds it strict; the built site, `site/`, is gitignored | [user-guide/README.md](../user-guide/README.md) |
 | `.claude/skills/` | the skills a Claude Code session runs here, one `SKILL.md` each | [The skills](#the-skills) |
 | `pm/` | `backlog.md`: what is worth doing next, why and at what cost, in payoff order; the maintainer skill keeps it current | |
-| `.github/workflows/` | `ci.yml`: lint, the types (mypy) and the tests that need no built database, held to 78% coverage, on pushes to `main` and on pull requests | |
+| `.github/workflows/` | `ci.yml`: lint, the types (mypy) and the tests that need no built database, held to 78% coverage, and the user guide's strict build, on pushes to `main` and on pull requests | |
 | `.cache-blizzard/` `.cache-wiki/` | the page caches (gitignored): every build after the first costs almost no requests | |
 | `backups/` | the `backup` service's nightly dumps of the stack's database (gitignored, each `0600`), the newest 14 `countrix-YYYY-MM-DD.dump`: the dated rates history a rebuild drops and no source gives back; a `prerebuild-*.dump` taken before `data` rebuilds a schema whose migration failed, which the rotation keeps. `orchestrator.py up` makes the folder | [db.md](db.md#the-nightly-dump) |
 
@@ -124,7 +125,7 @@ read Postgres directly ([mcp.md](mcp.md)).
 | `CLAUDE.md` | what a Claude Code session reads before it changes code: the commands, the layers in brief, what the tests hold a change to, the house rules and style |
 | `SECURITY.md` | the terms - you run it at your own risk, no security commitment from the author - and how to report a vulnerability privately; the measures themselves are in [security.md](security.md) |
 | `LICENSE` | PolyForm Strict 1.0.0: noncommercial use only, no redistribution, no changes or new works; anything else needs a separate license from the author |
-| `.gitignore` `.dockerignore` | the caches, the cluster, the venv, `.env`, `backups/` |
+| `.gitignore` `.dockerignore` | the caches, the cluster, the venvs, `.env`, `backups/`, the user guide's built site; the image leaves the guide out |
 
 ## Deployment
 

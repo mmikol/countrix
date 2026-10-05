@@ -1,0 +1,6 @@
+# The user guide's build, pinned: a new release can add a warning, and the
+# build is strict. The packages they pull in are not pinned. Install into a
+# venv of the guide's own (README.md here); the app's requirements.txt and
+# the image leave both out.
+mkdocs==1.6.1
+mkdocs-material==9.7.7
