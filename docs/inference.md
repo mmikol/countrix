@@ -703,7 +703,15 @@ metrics registry when the catalog loads: the `team`, `enemy`, `matchup`,
 `or`, `not`, `x if c else y`, and `min`, `max`, `abs`, `round`, `len`,
 `int`, `float`, `bool`. A key that is not in the registry, or a
 `params.NAME` not declared under `params:`, is refused at load, so a typo
-never scores silently. A key a section lacks reads 0, and a division,
+never scores silently. Each expression then runs on its probes before any
+board does (`Expr.probes`): every number it reads at 0, at 1 and at each
+number it and the file's `params` hold, and every text key - *(text)* in
+the vocabulary - empty, as a name and as each text it holds, all the
+numbers alike and all the texts alike in one trial. One that fails there,
+a name ordered against a number say, or a `bonus` or `penalty` that
+comes out a name or a list, is refused at load, not by the first board
+its guard holds on; the score keeps its own check for a bonus a probe
+cannot reach. A key a section lacks reads 0, and a division,
 floor division or remainder by zero reads 0 for that operation alone.
 `params:` (an indented block of NAME: number) are the dials an expression
 reads as `params.NAME`. Every key a strategy may reference is in the

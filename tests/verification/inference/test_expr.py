@@ -6,7 +6,7 @@ import re
 
 import pytest
 
-from inference.expr import Expr, ExprError, scope
+from inference.expr import Expr, ExprError, Section, scope
 
 
 def test_expressions_read_dotted_names_and_arithmetic():
@@ -31,6 +31,26 @@ def test_a_division_by_zero_reads_zero_for_that_division_alone():
     # a division nested in each divisor grows the code by one call a level
     nested = Expr("team.x / (" * 30 + "team.y" + ")" * 30)
     assert nested.evaluate(scope(ns)) == 0.0
+
+
+def test_an_expression_is_probed_with_its_numbers_alike_and_its_texts_alike():
+    """Before any board, an expression runs on its probes: every number it
+    reads at 0, at 1, at each one given and at each finite number it holds,
+    every text name empty, as a name and as each string it holds - all its
+    numbers alike and all its texts alike in one trial. params.NAME is the
+    caller's to set; a bool and an infinite constant are no probe."""
+    expr = Expr("team.style_top if map.side == 'attack' and team.tanks >= 2 else params.X")
+    probes = list(expr.probes({"team.style_top", "map.side"}, [3]))
+    assert [(p.number, p.text) for p in probes] == [
+        (n, t) for n in (0, 1, 3, 2) for t in ("", "name", "attack")]
+    trial = probes[-1]
+    assert vars(trial.scope["team"]) == {"style_top": "attack", "tanks": 2}
+    assert vars(trial.scope["map"]) == {"side": "attack"}
+    assert "params" not in dict(trial.scope)
+    trial.scope["params"] = Section({"X": 9})
+    assert expr.evaluate(trial.scope) == "attack"
+    assert expr.evaluate(probes[0].scope) == 0                 # params.X unset reads 0
+    assert {p.number for p in Expr("team.x < 1e999 or True").probes(())} == {0, 1}
 
 
 def test_expressions_refuse_anything_beyond_the_whitelist():

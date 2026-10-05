@@ -6,14 +6,6 @@ keeps it current.
 
 ## Next
 
-- **A text metric is refused as a bonus or penalty.** A strategy with
-  `bonus: map.side` loads as scored, so `add_strategy` writes it, and
-  every board where its guard holds then raises `ExprError` from
-  `scoring._amount`. The catalog keeps text metrics out of a heuristic's
-  `metric:` and not out of an expression. Probe each scored expression at
-  load - each text metric read as empty and as a name, each number as 0
-  and 1 - and refuse one that does not come out a number. Cost: a
-  morning.
 - **Red never reorders the scale's field.** `scale.board_prior` ranks the
   heroes whose sixes fix a seat's scale with three points for each enemy
   a hero answers, less three for each that answers it, read off

@@ -17,8 +17,9 @@ Change it through the door's tools rather than by hand. A tool checks a
 change before it writes anything, keeps the database's copy of the
 playbook in step, and logs the change with its reason in `tuning-log.md`
 beside the rules. A change that would not load - an unknown metric, an
-expression that does not parse, a value out of range - is refused, and
-nothing is written.
+expression that does not parse, a bonus that adds a name where a number
+goes, a value out of range - is refused, and nothing is written. A file
+changed by hand is held to the same checks when the playbook loads.
 
 ## The door
 

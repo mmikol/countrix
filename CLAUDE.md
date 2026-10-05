@@ -116,7 +116,9 @@ db <- facts <- inference <- door <- ui.
   holds and is never weighted; a heuristic is on a metric (`metric:`, form
   heuristic) or scored (`bonus:`/`penalty:` times its weight); then
   assumption, or draft (name, kind and prose only). A key outside the
-  fields, `soft:` among them, is refused. `inference/catalog.py` reads it,
+  fields, `soft:` among them, is refused, and so is an expression that
+  fails on its probes (`Expr.probes`) or a bonus or penalty that comes
+  out text there (`strategy.amount`). `inference/catalog.py` reads it,
   each file parsed by `frontmatter.py` and checked by `strategy.py`
   (`Strategy`, `CatalogError`); one bad file makes `catalog.load` raise
   everywhere. `meta.md` beside the strategy files is no strategy and no

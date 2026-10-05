@@ -258,6 +258,22 @@ def test_a_charge_for_a_rule_broken_takes_a_numeric_penalty_and_soft_is_refused(
         tune.tune("tank-cap", "kind", "constraint", "r", directory=catalog_copy)
 
 
+def test_add_refuses_a_bonus_that_adds_a_name_and_writes_nothing(catalog_copy):
+    """`bonus: map.side` adds a name where the score adds a number: the
+    catalog refuses it on its probes before the file exists, so no board
+    ever reads it, and nothing is written or logged."""
+    with pytest.raises(tune.TuneError, match=r"bonus 'map\.side' - a bonus or penalty is a"
+                                             r" number, got ''"):
+        tune.add("side-bonus", "Side bonus", "heuristic", "The attack pays.",
+                 {"bonus": "map.side"}, "test", directory=catalog_copy)
+    assert not os.path.exists(os.path.join(catalog_copy, "side-bonus.md"))
+    assert not os.path.exists(os.path.join(catalog_copy, "tuning-log.md"))
+    added = tune.add("side-bonus", "Side bonus", "heuristic", "The attack pays.",
+                     {"bonus": "1 if map.side == 'attack' else 0"}, "test",
+                     directory=catalog_copy)
+    assert added["form"] == "scored"
+
+
 def test_a_file_whose_frontmatter_never_closes_is_refused():
     """find() gives -1 for a missing fence, and -1 slices from the tail: the
     edit would have silently rewritten the end of the file."""

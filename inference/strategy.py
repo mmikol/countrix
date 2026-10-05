@@ -12,7 +12,9 @@ Each field keeps one rule, which FIELDS names and checked_value applies: a
 line of text or an expression is one line as the loader splits lines,
 within its length cap; a choice is one of its choices; the weight is a
 finite number within 0..10; a param is NAME: a finite number. A key
-outside FIELDS (and `id`, the filename's) is refused. The loader reads
+outside FIELDS (and `id`, the filename's) is refused. Every expression then
+runs on its probes before any board does (Expr.probes): it must evaluate,
+and a bonus or a penalty must come out a number (amount). The loader reads
 every file through these checks, every writer (inference.tune) checks a
 value by them before a file changes, and the door declares its strategy
 arguments from FIELDS.
@@ -24,7 +26,7 @@ from collections.abc import Iterable, Mapping
 from typing import Literal, NamedTuple, TypedDict
 
 from facts import compute
-from inference.expr import ExprError, Section, compile_expr
+from inference.expr import Expr, ExprError, Section, Value, compile_expr
 from inference.frontmatter import Frontmatter, Scalar
 
 # a strategy's kind, as its frontmatter names it, its form, as its fields make
@@ -93,6 +95,10 @@ FIELDS: dict[str, Field] = {
 }
 # what a constraint never carries: it is a limit that always holds, never weighted
 NOT_A_LIMIT = ("when", "bonus", "penalty", "metric", "direction", "weight")
+# the expression fields, in the order a file and the catalog list them, and
+# the two whose value the score adds or subtracts
+EXPRESSIONS = ("when", "require", "bonus", "penalty")
+AMOUNTS = ("bonus", "penalty")
 # the fields a writer sets one at a time; a dial is params.NAME
 TUNABLE = tuple(field for field in FIELDS if field not in ("name", "params"))
 FIELD_RULE = "field must be one of %s or params.NAME" % ", ".join(TUNABLE)
@@ -115,6 +121,17 @@ def finite_number(value: object) -> float | None:
     except (ValueError, OverflowError):
         return None
     return number if math.isfinite(number) else None
+
+
+def amount(value: Value, source: str) -> float:
+    """A bonus or penalty expression's value, as the score adds it: a
+    number, a bool among them; anything else is the playbook's error, named
+    by its `source`. The catalog runs every bonus and penalty through this
+    on its probes at load, so a file that adds a name or a list is refused
+    before any board reads it."""
+    if isinstance(value, (int, float)):               # a bool is an int
+        return float(value)
+    raise ExprError("%r - a bonus or penalty is a number, got %r" % (source, value))
 
 
 def field_text(value: LineValue) -> str:
@@ -278,6 +295,14 @@ class Strategy:
         self._check_heuristic(known)
         self._check_kind(meta)
         self._check_names(known)
+        self._check_probes()
+
+    def _labelled(self) -> list[tuple[str, Expr]]:
+        """Every expression the file sets, with the field it sits under, in
+        EXPRESSIONS' order."""
+        held = {"when": self.when, "require": self.require, "bonus": self.bonus,
+                "penalty": self.penalty}
+        return [(field, expr) for field in EXPRESSIONS if (expr := held[field]) is not None]
 
     def _check_heuristic(self, known: Mapping[str, str]) -> None:
         if self.kind != "heuristic" or not (self.metric or self.direction):
@@ -312,9 +337,7 @@ class Strategy:
 
     def _check_names(self, known: Mapping[str, str]) -> None:
         """Every name an expression reads is a registered key or a declared param."""
-        for expr in (self.when, self.require, self.bonus, self.penalty):
-            if expr is None:
-                continue
+        for _, expr in self._labelled():
             for name in expr.names:
                 if name.startswith("params."):
                     if name[7:] not in self.params:
@@ -323,6 +346,24 @@ class Strategy:
                 elif name not in known:
                     raise CatalogError("%s: %r is not a registered fact key"
                                        % (self.id, name))
+
+    def _check_probes(self) -> None:
+        """Every expression runs before any board does: on each of its
+        probes, the file's params among the numbers, it evaluates, and a
+        bonus or a penalty comes out a number. A file that adds a name, or
+        orders a name against a number, is refused here, not by the first
+        board its guard holds on."""
+        for field, expr in self._labelled():
+            for probe in expr.probes(compute.TEXT_METRICS, self.params.values()):
+                probe.scope["params"] = self.params_section
+                try:
+                    value = expr.evaluate(probe.scope)
+                    if field in AMOUNTS:
+                        amount(value, expr.source)
+                except ExprError as error:
+                    raise CatalogError("%s: %s %s (every number it reads at %s, every text %r)"
+                                       % (self.id, field, error, field_text(probe.number),
+                                          probe.text)) from error
 
     @property
     def form(self) -> Form:
@@ -353,12 +394,7 @@ class Strategy:
     @property
     def expressions(self) -> str:
         """Every expression the file sets, labelled: "when: ...; require: ..."."""
-        parts = []
-        for label, expr in (("when", self.when), ("require", self.require),
-                            ("bonus", self.bonus), ("penalty", self.penalty)):
-            if expr is not None:
-                parts.append("%s: %s" % (label, expr.source))
-        return "; ".join(parts)
+        return "; ".join("%s: %s" % (field, expr.source) for field, expr in self._labelled())
 
     @property
     def need(self) -> bool:
