@@ -31,7 +31,7 @@ from facts import compute, hero_facts, team_facts
 from facts.compute import TERRAIN_STANDOUT, GroundSource
 from facts.draft import MAX_BANS, Draft, Side, board_side, board_stage, is_sided, opposite
 from facts.factset import FactSet
-from facts.model import TERRAIN_FEATURES, Map, Resolved, World
+from facts.model import TERRAIN_FEATURES, Map, Resolved, World, by_role
 
 
 class TerrainValue(TypedDict):
@@ -76,14 +76,19 @@ def generate(world: World, draft: Draft) -> FactSet:
     match's bans (each team's two and the lobby's - up to five, all
     optional). A banned hero cannot be picked and cannot be recommended;
     every name World.resolve refuses is a Refusal, as is a stage the map
-    does not list. The FactSet's draft holds the resolved names and the
-    side the map keeps."""
+    does not list. The FactSet's draft holds the resolved names, in the
+    order named, and the side the map keeps; the facts take each side tank,
+    damage, support, each role in the order named."""
     board = world.resolve(draft.map_name, draft.red, draft.blue, draft.bans, allow_announced=True)
     side, stage = board_side(board.map, draft.side), board_stage(board.map, draft.stage)
     fs = FactSet(Draft(
         map_name=board.map.name if board.map else None,
         red=tuple(h.name for h in board.red), blue=tuple(h.name for h in board.blue),
         bans=tuple(h.name for h in board.banned), side=side, stage=stage))
+    # the writers read each side as every view shows a six (by_role): its
+    # heroes' facts and each sentence that names them come tank, damage,
+    # support; the draft above keeps the order named
+    board = board._replace(red=by_role(board.red), blue=by_role(board.blue))
     _meta_facts(fs, world)
     if board.banned:
         _ban_facts(fs, world, board)

@@ -8,7 +8,7 @@ facts.records'.
 
 import datetime
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import NamedTuple
 
@@ -193,6 +193,13 @@ class Resolved(NamedTuple):
     red: list[Hero]
     blue: list[Hero]
     banned: list[Hero]
+
+
+def by_role(heroes: Iterable[Hero]) -> list[Hero]:
+    """A side's heroes in the order every view shows a six: tanks, then
+    damage, then supports (ROLES), each role's heroes in the order given - a
+    side's picks keep their pick order within a role."""
+    return sorted(heroes, key=lambda h: ROLES.index(h.role))
 
 
 class World:

@@ -86,13 +86,15 @@ handler, so it never enters the state, and the solver never fields it;
 once Blizzard lists the hero, the tile comes alive on the next refresh.
 
 **The swaps.** Above blue's picks, where the board suggests a swap, the
-incoming hero's portrait sits over the pick it replaces (`swaps.pairs`,
-each at its pick's place), under the board's verdict; a click trades that
-pick in place, and the board solves again. The suggestion is one joint
-answer ([The swaps](inference.md#the-swaps)): taking one leaves the rest
-the board's answer from the new picks, and a half-drafted seat's empty
-slots show the fill's heroes (`swaps.open`), as they do without a swap.
-Nothing is drawn for red.
+incoming hero's portrait sits over the pick it replaces, wherever the row
+draws that pick (`swaps.pairs`, each carrying its pick's place among the
+picks as sent), under the board's verdict, which names the swaps in the
+row's order; a click trades that pick in place, and the board solves
+again. The suggestion is one joint answer
+([The swaps](inference.md#the-swaps)): taking one leaves the rest the
+board's answer from the new picks, and a half-drafted seat's empty slots
+show the fill's heroes (`swaps.open`), as they do without a swap. Nothing
+is drawn for red.
 
 **The stage picker** beside the map lists the map's stages after WHOLE
 MAP, hidden on a map without stages and cleared when the map changes; a
@@ -119,7 +121,10 @@ two-two-two filled slot by slot with the hero of the highest pick score -
 how often a six fields it, plus 2 for each synergy partner already on the
 six - past the bans, with red's badge in its title. Red is never
 optimized: it reads no strategy, and only a new map, ban or red pick sends
-it back to *searching*. Under a six's cards sit
+it back to *searching*. Every six the panel draws - a seat's cards, an
+alternative, a stage's six - reads tanks, then damage, then supports, as
+the server orders it; red's keeps its picks first within a role, so it
+reads as red's row does. Under a six's cards sit
 the search's numbers (the candidates, every six of the legal shapes its
 answer covers; the seconds; the lean), the default engine's
 three terms - `base.rates`, `base.synergy`, `base.counters`, a bar each
@@ -159,9 +164,21 @@ its likely six around its picks, each a click from locking, its reasons
 slot's tooltip is the reason this board gives its hero: blue's from the
 fill or the six, red's from their likely six.
 
+**The rows** read tank, damage, support, so a glance tells what each team
+fields: a team's picks and the suggestions in its open slots are drawn
+together (`lineup` in `board.js`), a role's picks first in the order
+picked, solid, then its suggestions in the board's order, dashed; a team
+showing fewer than six keeps its empty slots after them, each numbered by
+its place in the row, as a suggested slot is. Only the drawing moves: the
+picks are kept, saved and sent in the order picked, and a click reads the
+hero a slot shows, never its place - a picked tile clears that hero, a
+suggested one locks it, under the same bans and role caps.
+
 **The facts panel** filters by text and by scope and says how many it
 holds beside the filter ("12 of 464 facts" under a filter); the tab
-carries no number.
+carries no number. Each side's heroes come tank, damage, support, each
+role in the order picked, as does every fact that lists a side
+(`board_facts.generate`).
 
 **The playbook panel** opens with the meta, the card of `meta.md`: its
 four weights and swap cost, its prose, the Meta slider, which scales the

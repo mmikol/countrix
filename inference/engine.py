@@ -622,8 +622,13 @@ def _likely(
     with the highest pick score, past the bans (compute.expected_picks) - the
     six the board suggests for red. Red is never optimized and its Result
     holds no score: each pick carries how often a six fields it, its pick
-    score and what it rests on. A Result like blue's, from red's side."""
-    likely = compute.expected_picks(world, m, revealed=red_h, banned=bans_h)
+    score and what it rests on. A Result like blue's, from red's side. The
+    six reads as every view shows one (facts.model.by_role): tanks, then
+    damage, then supports, the revealed picks first within a role in the
+    order revealed (`locked` keeps that order), so red's row and its comps
+    tab read alike."""
+    likely = sorted(compute.expected_picks(world, m, revealed=red_h, banned=bans_h),
+                    key=lambda p: ROLES.index(p["role"]))
     return Result(kind="expected", map_name=m.name if m else None, red=list(draft.blue),
                   blue=[p["hero"] for p in likely], locked=[h.name for h in red_h],
                   catalog=catalog, base=base, bans=list(draft.bans),
