@@ -1,0 +1,124 @@
+# The user guide: MkDocs with the Material theme. From the repo root:
+#
+#   user-guide/.venv/bin/mkdocs serve -f user-guide/mkdocs.yml            # http://127.0.0.1:8000
+#   user-guide/.venv/bin/mkdocs build --strict -f user-guide/mkdocs.yml   # the site, in user-guide/site/
+#
+# user-guide/README.md makes the venv. The build is strict: a page left out
+# of the nav, a broken link or a broken anchor fails it, and CI runs it.
+
+site_name: Countrix user guide
+site_description: How a player or a team uses Countrix to pick an Overwatch 2 team, task by task.
+site_author: Miliano Mikol
+# the footer: Blizzard's notice as the board's footer prints it, and the
+# wiki's credit with its licence, each a link, as a credit writes them
+copyright: >-
+  Copyright (c) 2026 Miliano Mikol; Countrix's own code is under the
+  PolyForm Strict License 1.0.0. Overwatch&trade; &copy; 2016 Blizzard
+  Entertainment, Inc. All rights reserved. Overwatch is a trademark or
+  registered trademark of Blizzard Entertainment, Inc. in the U.S. and/or
+  other countries. Countrix is a fan project, not affiliated with or
+  endorsed by Blizzard Entertainment; the rates and the hero text are
+  Blizzard's. Hero kits, maps, terrain, playstyles, synergies and counters
+  come from the <a href="https://overwatch.fandom.com" target="_blank"
+  rel="noopener">Overwatch Wiki</a> at Fandom, written by its contributors
+  and licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/3.0/"
+  target="_blank" rel="noopener">CC BY-NC-SA 3.0</a>; quoted wiki text keeps
+  that licence.
+
+docs_dir: docs
+site_dir: site
+# board.html, not board/: the built site opens from the disk as well as
+# from a server (the offline plugin, below, holds it so too)
+use_directory_urls: false
+# the screenshot list is for whoever takes them, not a page
+exclude_docs: |
+  img/README.md
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+theme:
+  name: material
+  language: en
+  # the system's fonts: the guide loads nothing from another host
+  font: false
+  icon:
+    logo: material/strategy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to the dark palette
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to the light palette
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - toc.follow
+
+extra_css:
+  - css/countrix.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/mmikol/countrix
+      name: Countrix on GitHub
+  # the shim the offline plugin runs the search with from the disk, kept
+  # here: named so, the plugin adds no copy from another host
+  polyfills:
+    - js/iframe-worker.js
+
+plugins:
+  - search
+  # the search and the palette toggle on pages opened from the disk
+  - offline
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Countrix: index.md
+  - Install and start: install.md
+  - The board:
+      - The board, step by step: board.md
+      - The comps tab: comps.md
+      - The facts tab: facts.md
+      - The playbook tab: playbook.md
+  - The pages behind it:
+      - The registry: registry.md
+      - The math page: math.md
+      - The study: study.md
+  - Going further:
+      - Tuning the playbook: tuning.md
+      - The data: data.md
+  - Help:
+      - Troubleshooting: troubleshooting.md
+      - Questions: faq.md
+  - Credits and licences: credits.md

@@ -1,0 +1,34 @@
+/* The board's colours on the guide: its dark header, its gold, its blues
+   (ui/static/board.css). The gold darkens on the light palette, where the
+   board's own would be too faint on white. */
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #161c27;
+  --md-primary-fg-color--light: #2a3240;
+  --md-primary-fg-color--dark: #0d1017;
+  --md-accent-fg-color: #9a5b00;
+  --md-accent-fg-color--transparent: rgba(154, 91, 0, 0.1);
+  --md-typeset-a-color: #1f5fa8;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #161c27;
+  --md-primary-fg-color--light: #2a3240;
+  --md-primary-fg-color--dark: #0d1017;
+  --md-accent-fg-color: #f5a623;
+  --md-accent-fg-color--transparent: rgba(245, 166, 35, 0.1);
+  --md-typeset-a-color: #3ea6ff;
+  --md-default-bg-color: #0d1017;
+}
+
+/* a screenshot sits in a thin frame, so a dark picture keeps its edge on
+   the dark palette */
+.md-typeset img[src^="img/"] {
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 6px;
+}
+
+/* the footer draws a link in its text's colour: the credit's links to the
+   wiki and its licence are underlined to read as links */
+.md-copyright__highlight a {
+  text-decoration: underline;
+}
