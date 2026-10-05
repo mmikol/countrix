@@ -318,9 +318,12 @@ db <- facts <- inference <- door <- ui.
 - `ui/static/study.json` is the study's results, the file the private
   benchmark's harness writes (`countrix-study/1`), copied here when a run
   is published; without it the page says the results are not in place,
-  and no sample ships there. The page reads each part in the shape the
-  harness writes it - `tests/fixtures/study.json` is its file of
-  2026-10-05, trimmed - and its metrics by id, never a raw rate.
+  and no sample ships there. Its `report` is the published report's
+  address, which the harness's `publish` step writes once the report,
+  which renders this same file, is out; the page's last section links
+  it. The page reads each part in the shape the harness writes it -
+  `tests/fixtures/study.json` is its file of 2026-10-05, trimmed - and
+  its metrics by id, never a raw rate.
   `tests/verification/ui/test_study.py` holds the renderer to the fixture
   and to the file in place: every block filled, every chart drawn, every
   string escaped, the schema checked. A change to the harness's shapes

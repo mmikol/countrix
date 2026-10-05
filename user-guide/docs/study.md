@@ -4,8 +4,10 @@ The study asks whether the engine does what it claims: that it truly
 optimizes a team, given its assumptions, and how its sixes compare with
 the tools players use online. Its results are a page on the board -
 open it from the board's header, *the study*, or at
-http://localhost:8017/study. A report sets the same results out with
-every figure; the page's last section, *the report*, says where it is.
+http://localhost:8017/study. A report, *The Study/Proof*, sets the same
+results out with every figure, links the math page and the registry,
+and says how to run the proof and the study again; the page's last
+section, *the report*, links it.
 
 ![The top of the study page: the contents pills, the line that dates the results, and the two questions it asks](img/study.png)
 

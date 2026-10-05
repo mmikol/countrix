@@ -354,7 +354,9 @@ page reads:
 - `rows`: each board's `search`, a list in the order `legend.rows` gives
   it - legal sixes, branches walked, sixes scored in full, seconds, sixes
   tied - the primary set's rows the funnel's dots;
-- `report`, the report's web address, alone or as `{url, title}`.
+- `report`, the report's web address, alone or as `{url, title}`: the
+  harness's `publish` step writes it once the report, which renders this
+  same file, is published, and changes nothing else in the file.
 
 A part the file lacks is a line saying so, never an error, and every
 string read from it is escaped. The charts are `charts.py`'s, from plain

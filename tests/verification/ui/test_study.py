@@ -128,6 +128,13 @@ def test_every_part_of_a_harness_file_fills_its_block(path):
     paired = {end for name in data["meta_agreement"] for end in name.split("|")}
     shared = cells(page, "the meta&#x27;s six")
     assert len(shared) == len(meta & paired) and all("-" not in row for row in shared)
+    # the last section says where the report is: the address the harness's
+    # publish step named, which the guide sends a reader to
+    assert "report" in data, "run the harness's publish step before the file ships"
+    last = page[page.index("id='the-report'"):]
+    assert "<a href='%s' target='_blank' rel='noopener'>%s</a>" % (
+        esc(data["report"]["url"]), esc(data["report"]["title"])) in last
+    assert "names no address" not in page
 
 
 def test_every_chart_is_drawn_beside_a_table_of_its_numbers():
