@@ -121,8 +121,13 @@ def test_every_part_of_a_harness_file_fills_its_block(path):
         assert "<th>%s</th>" % esc(labels(data)[metric]) in steps, metric
     search = figure(page, "search")
     assert "The optimum ties no other six on" in search and "class='faint'" in search
+    assert "open boards - every map and side, nothing picked, revealed or banned" in search
     shipped = next(a["label"] for a in data["arms"] if a["id"] == study.SHIPPED)
     assert [row for row in cells(page, "against") if row[0] == shipped] == []
+    meta = {a["id"] for a in data["arms"] if a["family"] in study.META_FAMILIES}
+    paired = {end for name in data["meta_agreement"] for end in name.split("|")}
+    shared = cells(page, "the meta&#x27;s six")
+    assert len(shared) == len(meta & paired) and all("-" not in row for row in shared)
 
 
 def test_every_chart_is_drawn_beside_a_table_of_its_numbers():
@@ -326,6 +331,51 @@ def test_each_part_is_read_in_the_shape_the_harness_writes(tmp_path):
         if row["set"] == "fresh":
             row["search"] = []
     assert "class='faint'" not in figure(study.view_study(written(tmp_path, data)), "search")
+
+
+def test_the_heroes_shared_set_each_six_against_the_meta_either_way_round(tmp_path):
+    """The heroes shared are the file's pairs, keyed "a|b" in either order:
+    a row for each six of the meta - the most picked and the tier lists -
+    a column for each other six, Countrix as shipped first, a dash where
+    the file holds no pair, and the meta's own sixes' range in the line
+    under it. A pair that is not two arms, or not a number, is left out,
+    and a file with no pair that names the meta says it holds none."""
+    data = sample()
+    data["meta_agreement"] = {
+        "cw_builder_matchup|meta_bz": 0.5, "meta_bz|cx_full": 2.5, "meta_cw|meta_bz": 1.0,
+        "tier_bz|meta_cw": 3.0, "meta_bz|meta_cw|tier_bz": 9.0, "tier_cw|cx_full": "<b>9</b>"}
+    page = study.view_study(written(tmp_path, data))
+    names = {a["id"]: a["label"] for a in data["arms"]}
+    at = page.index("<th>the meta&#x27;s six</th>")
+    head = re.findall(r"<th>(.*?)</th>", page[at:page.index("</tr>", at)])
+    assert head == ["the meta&#x27;s six", esc(names["cx_full"]),
+                    esc(names["cw_builder_matchup"])]
+    rows = {row[0]: row[1:] for row in cells(page, "the meta&#x27;s six")}
+    assert rows == {names["meta_bz"]: ["2.5", "0.5"], names["meta_cw"]: ["-", "-"],
+                    names["tier_bz"]: ["-", "-"]}
+    assert "The meta's own sixes have 1.0 to 3.0 heroes in common." in page
+    assert "9.0" not in page[page.index("id='shared'"):page.index("id='rules'")]
+    data["meta_agreement"] = {"cx_full|cw_builder_matchup": 2.0}
+    assert "holds none of the heroes shared (meta_agreement)" in study.view_study(
+        written(tmp_path, data))
+
+
+def test_the_open_boards_search_is_the_files_or_unsaid(tmp_path):
+    """The search's work on the open boards is read from the file's
+    summary of them, least and most with the median; a file without it
+    leaves the sentence out and the funnel standing."""
+    data = sample()
+    data["proof"]["open_summary"].update(
+        boards=7, nodes={"min": 11.0, "median": 222.0, "max": 3333.0},
+        leaves={"min": 2.0, "median": 5.0, "max": 44.0},
+        search_seconds={"min": 0.0012, "max": 0.25})
+    search = flat(figure(study.view_study(written(tmp_path, data)), "search"))
+    assert ("On the 7 open boards - every map and side, nothing picked, revealed or banned - the"
+            " search walked 11 to 3,333 branches (median 222) and scored 2 to 44 sixes in full"
+            " (median 5), in 0.001 to 0.250 s of search once the scale was set.") in search
+    del data["proof"]["open_summary"]
+    search = figure(study.view_study(written(tmp_path, data)), "search")
+    assert "open boards" not in search and "<svg class='chart" in search
 
 
 def test_the_board_by_board_table_holds_countrix_as_shipped_alone(tmp_path):

@@ -68,6 +68,9 @@ FAMILIES = (
     Family("meta", "the most picked", "f-meta"),
     Family("random", "random sixes", "f-random"))
 EMPHASIS = frozenset({"countrix", "counterwatch"})      # coloured on the scatter, the rest grey
+# the families whose sixes are the meta - the most picked and the tier lists -
+# that the heroes-shared table holds every other six against
+META_FAMILIES = frozenset({"meta", "tier"})
 # the groups of arms the main charts leave out: the sweeps have tables of
 # their own, and an arm on another capture or another source's rates is
 # read under whether the results hold up
@@ -536,6 +539,37 @@ def scatter_figure(results: Mapping[str, Any], where: Where) -> str:
                   "<div class='panels'>%s</div>" % "".join(panels), "".join(tables))
 
 
+def agreement_table(results: Mapping[str, Any], where: Where) -> str:
+    """How close each six comes to the meta, hero by hero: the heroes it
+    has in common with each six of the meta - the most picked and the tier
+    lists - on average over every board of the primary set, beside how many
+    the meta's own sixes have in common. The file keys a pair "a|b"."""
+    held = results.get("meta_agreement")
+    pairs: dict[frozenset[str], float] = {}
+    for name, value in held.items() if isinstance(held, dict) else ():
+        ends, shared = frozenset(str(name).split("|")), number(value)
+        if len(ends) == 2 and shared is not None:
+            pairs[ends] = shared
+    named = [a for a in arms(results) if any(a.id in pair for pair in pairs)]
+    meta = [a for a in named if a.family.key in META_FAMILIES]
+    if not meta:
+        return missing("the heroes shared (meta_agreement)")
+    rank = {f.key: i for i, f in enumerate(FAMILIES)}
+    others = sorted((a for a in named if a.family.key not in META_FAMILIES),
+                    key=lambda a: (a.id != SHIPPED, rank.get(a.family.key, len(rank))))
+    out = table(["the meta's six", *(a.label for a in others)], [
+        [esc(m.label), *(fmt(pairs.get(frozenset((m.id, a.id))), 1) for a in others)]
+        for m in meta]) if others else ""
+    among = sorted(v for pair, v in pairs.items() if pair <= {a.id for a in meta})
+    if not out and not among:
+        return missing("the heroes shared (meta_agreement)")
+    alike = "" if not among else " The meta's own sixes have %s heroes in common." % (
+        fmt(among[0], 1) if len(among) == 1 else "%s to %s" % (
+            fmt(among[0], 1), fmt(among[-1], 1)))
+    return out + ("<p class='legend'>Heroes shared, of six, averaged over every %s board, both"
+                  " halves of the maps.%s</p>" % (esc(where.set), alike))
+
+
 def rules_of(results: Mapping[str, Any]) -> list[tuple[str, dict[str, Any]]]:
     """The file's rules, by id, in its order."""
     held = results.get("rules")
@@ -645,6 +679,26 @@ def row_search(row: Mapping[str, Any], name: str) -> float | None:
     return number(held[at]) if isinstance(held, list) and len(held) > at else None
 
 
+def open_line(results: Mapping[str, Any]) -> str:
+    """The open boards' search in a sentence - every map and side with
+    nothing picked, revealed or banned: the branches it walked and the
+    sixes it scored in full, least to most with the median, and the search's
+    own time once the scale was set; nothing where the file holds none."""
+    held = get(results, "proof", "open_summary")
+    boards = number(get(held, "boards"))
+    walked, scored, timed = (quantiles(get(held, name))
+                             for name in ("nodes", "leaves", "search_seconds"))
+    spread = ("min", "max", "median")
+    if boards is None or not all(set(spread) <= set(q) for q in (walked, scored)):
+        return ""
+    timing = ", in %s to %s s of search once the scale was set" % (
+        seconds(timed["min"]), seconds(timed["max"])) if {"min", "max"} <= set(timed) else ""
+    return (" On the %s open boards - every map and side, nothing picked, revealed or banned -"
+            " the search walked %s to %s branches (median %s) and scored %s to %s sixes in full"
+            " (median %s)%s." % (count(boards), *(count(walked[q]) for q in spread),
+                                 *(count(scored[q]) for q in spread), timing))
+
+
 def search_figure(results: Mapping[str, Any], where: Where) -> str:
     """The search's work on the study's boards: each stage's quantiles from
     the file, and under each bar the boards of the file's rows on the
@@ -683,6 +737,7 @@ def search_figure(results: Mapping[str, Any], where: Where) -> str:
         facts.append(" The optimum ties no other six on %s%% of the boards%s." % (
             fmt(100 * unique, 0), "" if solved is None else ", %s of %s" % (
                 count(round(unique * solved)), count(solved))))
+    facts.append(open_line(results))
     caption = (
         "A log scale: each bar is the median board, its whisker the middle eight boards in ten,"
         " and the faint dots under it the boards. Every six the search does not score sits in"
@@ -958,7 +1013,7 @@ DRIFTED = (
     "<div class='warnbox'><b>Not the board's objective.</b> %s The results below describe the"
     " objective the study measured, not the one the board runs now.</div>")
 RESULT_BLOCKS = ("PROFILE", "CHECKS", "BRUTE", "SEARCH", "DESIGN", "SHARES", "PARTS", "SCATTER",
-                 "RULES", "SLIDER", "PAIRED", "HOLDS", "PROVENANCE")
+                 "AGREEMENT", "RULES", "SLIDER", "PAIRED", "HOLDS", "PROVENANCE")
 
 
 def drift(results: Mapping[str, Any]) -> list[str]:
@@ -1097,6 +1152,7 @@ def blocks(study: Study) -> dict[str, str]:
         "BRUTE": brute_table(results), "SEARCH": search_figure(results, where),
         "DESIGN": design_tables(results), "SHARES": shares_figure(results, where),
         "PARTS": parts_figure(results, where), "SCATTER": scatter_figure(results, where),
+        "AGREEMENT": agreement_table(results, where),
         "RULES": rules_figure(results, linked), "SLIDER": slider_table(results),
         "PAIRED": paired_table(results, where), "HOLDS": holds_table(results, where),
         "PROVENANCE": provenance_table(results)})

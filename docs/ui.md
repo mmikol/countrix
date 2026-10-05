@@ -293,10 +293,12 @@ The prose is `static/study.html`, filled in as the math page is - a
 literal percent in it is written `%%`. The results are
 `static/study.json`, the file the private benchmark repository's harness
 writes in its `countrix-study/1` schema (`study.SCHEMA`), copied there
-when a run is published; until then there is none, and the page says the
-results are not in place. The page reads each part in the shape the
-harness writes it, which `tests/fixtures/study.json` - the harness's file
-of 2026-10-05, trimmed - keeps; `test_study` renders the fixture, and
+whole when a run is published. The run of 2026-10-05 is in place,
+measured at Countrix's 4eaba4a and the benchmark's b79aafc and committed
+there as d647e82; without a file the page says the results are not in
+place. The page reads each part in the shape the harness writes it,
+which `tests/fixtures/study.json` - the harness's file of 2026-10-05,
+trimmed - keeps; `test_study` renders the fixture, and
 the file in place too, so a file whose shapes moved fails there before
 it ships. The count check and the assumptions are the shipped
 playbook's, whatever playbook is in force, and an assumption or a rule
@@ -343,8 +345,12 @@ page reads:
 - `proof`: `theorems`, each `checked` a list of `{method, boards, cases,
   violations}`, `violations` null for the claim that is measured;
   `search`, its stages as quantiles, `boards`, `solves`, `refused` and
-  `unique_optimum`, a share of the boards; `brute_force`, with
+  `unique_optimum`, a share of the boards; `open_summary`, the search's
+  work on the open boards, its stages as quantiles; `brute_force`, with
   `wall_seconds` and `search_seconds`; and `greedy.countrix`;
+- `meta_agreement`, the heroes two sixes share, keyed `a|b`: each six
+  of the meta - the arms of the `meta` and `tier` families - against
+  every other six, and the meta's own sixes against each other;
 - `rows`: each board's `search`, a list in the order `legend.rows` gives
   it - legal sixes, branches walked, sixes scored in full, seconds, sixes
   tied - the primary set's rows the funnel's dots;
