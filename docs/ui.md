@@ -20,22 +20,22 @@ compose stack's `ui` container does. It writes nothing.
 `pages.py` renders the page, a shell over the static files that injects
 only `TEAM` (six), `BANS` (five) and `SWAP_MAX` (the swap cost's ceiling,
 `base.SWAP_RANGE`), and the math page; `registry.py` renders the strategy
-registry in the math page's shell. `board.py` serves them and the JSON
-endpoints behind the host guard `db/web.py` puts on both servers
-([security.md](security.md)); `serve.py` answers the board, the catalog
-and the health for it.
+registry in the math page's shell, with its script. `board.py` serves
+them and the JSON endpoints behind the host guard `db/web.py` puts on
+both servers ([security.md](security.md)); `serve.py` answers the board,
+the catalog and the health for it.
 
 | route | serves |
 | --- | --- |
 | `/` | the board: the map selector, the attack/defense switch (Escort and Hybrid maps), the bans bar, the red and blue rosters grouped by role, and three panels - **comps**, **facts**, **playbook** |
-| `/static/<file>` | `board.css`, `board.js`, `comps.js`, `playbook.js` and `bebas-neue.woff2`, nothing else |
+| `/static/<file>` | `board.css`, `board.js`, `comps.js`, `playbook.js`, `registry.js` and `bebas-neue.woff2`, nothing else |
 | `/api/roster` | the roster `facts/roster.py` builds, which the door's `roster` tool lists too: every hero (role, subrole, health pool, portrait, status, release day) and every map (mode, top style, sided or not, its stages in play order), with the role icons and the patches newer than the rates |
 | `/api/facts?map=&side=&red=&blue=&bans=[&stage=]` | the FactSet for the board as JSON: the facts and their count; a stage the map lists adds the ground in play (`map.ground`) |
 | `/api/board?map=&side=&red=&blue=&bans=[&stage=&weights=&client=]` | the board solved at any step of the draft, every seat on the stage in play (the whole map without one), under the playbook tab's weights: the `board` tool's answer ([mcp.md](mcp.md#the-tools)), from `serve.handle_board`. One board solves at a time; another waits, and answers 429 after a minute (`serve.Admission`); a newer board from the same `client` stops one still solving, which answers 400 (`serve.LATEST`, a lane per client) |
 | `/api/strategies` | the catalog: every constraint, heuristic and assumption with its kind, form, frontmatter and body, from `serve.handle_strategies` |
 | `/health` | the engine's health, from `serve.handle_health`: ok or degraded, the strategies, the drafts pending and the heroes, and the error naming what is out of reach. The ui container's healthcheck and `orchestrator.py` read it |
 | `/math` | `static/math.html` in the page shell, the numbers it quotes filled in by `pages.py` - the default engine's four weights and the swap cost from the playbook's `meta.md`, and from the code `SWAP_MAX`, the counter graph's four constants, `RATE_PICK_HALF`, `COIN_FLIP`, the fight odds' `LOGIT_PER_POINT`, `PARTNER_POINTS`, `REFERENCE_SIZE`, `SCALE_POOL`, `NEED_BUDGET`, the search's `SCORE_PLACES` and `RANK_CAP`, the counter graph's mechanisms, `MAX_TANKS`, `MAX_BANS`, the weight slider's top, and the healing formation's radius and teammates: the equation, how a six is chosen, the scoring function with the default engine under the playbook, the board and how the layers fit |
-| `/registry` | the strategy registry, rendered by `registry.py` on every call from the code the solver runs, so it cannot drift from it: every strategy of the playbook in force, a card each anchored by its id (`/registry#<id>`), grouped as limits, heuristics and assumptions under a table of every rule at a glance. A card says in plain words what its rule does, then gives its formula: its form as the code reads it (a limit; a reward or a need - a heuristic on a metric whose gate the board or the six settles; a scored heuristic; an assumption; a draft), its weight and the most it moves a six, its gate with its params filled in and who settles it, and its term in the math page's notation with its own numbers - a need's share of its guard's budget from `scoring.need_scales`. Then each metric it reads, with the registry's meaning (`facts/team.py`, `facts/compute.py`) and how its range rule aggregates it over the six (`Spec.aggregate` in `inference/ranges.py`), its prose, and its entry and sources in `inference/README.md` - where two rules have held its id, the last entry, the earlier rule's folded away and marked so. Each form links its section of `/math`, which gives the forms in general; the page quotes no rate |
+| `/registry` | the strategy registry, rendered by `registry.py` on every call from the code the solver runs, so it cannot drift from it: every strategy of the playbook in force, a card each anchored by its id (`/registry#<id>`), grouped as limits, heuristics and assumptions under a table of every rule at a glance. A card says in plain words what its rule does, then gives its formula: its form as the code reads it (a limit; a reward or a need - a heuristic on a metric whose gate the board or the six settles; a scored heuristic; an assumption; a draft), its weight and the most it moves a six, its gate with its params filled in and who settles it, and its term in the math page's notation with its own numbers - a need's share of its guard's budget from `scoring.need_scales`. Then each metric it reads, with the registry's meaning (`facts/team.py`, `facts/compute.py`) and how its range rule aggregates it over the six (`Spec.aggregate` in `inference/ranges.py`), its prose, and its entry and sources in `inference/README.md` - where two rules have held its id, the last entry, the earlier rule's folded away and marked so. Where a card's prose or its record names another rule in backticks, or a need lists the needs on its guard, the name links that rule's card. Each form links its section of `/math`, which gives the forms in general; the page quotes no rate. A click on a rule - its row in the table, or a rule a card names - opens its card in a dialog over the list, which stays where it was (*The registry's dialog*, under `static/`) |
 
 The board answers GET alone: any other method is a 501, after the host
 guard.
@@ -54,6 +54,7 @@ static/
   board.js       state, the rosters, the picks, the bans, the fetches, boot
   comps.js       the comps tab: a seat's result and the two seats
   playbook.js    the playbook tab: the groups, the cards, the weight sliders
+  registry.js    the registry's dialog: a click on a rule opens its card over the list
   math.html      the math page's article
 ```
 
@@ -211,8 +212,8 @@ file is untouched. A setting whose heuristic the catalog no longer holds
 is dropped when the playbook loads; the meta's and the swap cost's are
 always kept. Only `tune` changes a file's weight, the meta's and the swap
 cost included. Each card's *its math* links its rule's entry on the
-registry (`/registry#<id>`), the meta's the default engine on the math
-page.
+registry (`/registry#<id>`), which opens over the registry's list, the
+meta's the default engine on the math page.
 
 **The header** pins three pills top-right: *the math*, *the registry*
 beside it, and the repository on GitHub; the header's right padding keeps
@@ -222,6 +223,28 @@ and leaves the weights; each team's box has its own *clear*. Its only
 messages are short-lived flashes - a banned pick, a full team, a refused
 pick. A patch newer than the rates raises the warning box; the rates'
 capture date is a fact.
+
+**The registry's dialog.** `registry.js` opens a rule's card in a
+`<dialog>` over the list when a rule is clicked - its row in the table
+at a glance, or a rule a card names - and the list stays where it was.
+The card goes in as a copy of the server's, so the script writes no
+markup. The address names the open rule: opening one pushes `#<id>`, a
+rule opened from inside the dialog takes the open one's place, and Back
+closes it; Esc, the close button and a click on the backdrop close it
+too and take the hash off without moving the page, and the focus goes
+back to the link that opened it. Arriving at `/registry#<id>` - a card's
+*its math* on the playbook tab, or a shared address - opens the rule
+over the list, and Back from there goes where the reader came from. The
+cards stay on the page under the list, so the contents' group pills
+still reach them, a reader can read every rule straight through, and the
+browser's find and print see them all; the script takes their ids, so
+the browser's own jump to a card never moves the list behind the dialog.
+A click with a modifier stays the browser's - a new tab arrives with the
+rule open - and `/math`, the sources and the contents' pills stay links.
+Without the script the dialog never opens and the links scroll to the
+cards. The dialog is as wide as the article or the screen less 16 px a
+side, whichever is narrower, a long card scrolls inside it under its
+close button, and the page behind holds still while it is open.
 
 `board.css` puts the game's look on a faint diagonal stripe and colours
 the kinds: blue for constraints, green for heuristics, sand for
