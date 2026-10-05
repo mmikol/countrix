@@ -47,8 +47,9 @@ ENTRY_RE = re.compile(r"- `([a-z0-9][a-z0-9-]*)` - (.*)")
 SOURCE_RE = re.compile(r"  - (.+)")
 LINKABLE_RE = re.compile(r"https?://\S+")
 
-# the page's own anchors hold an underscore, which no strategy id does
-# (catalog.ID_RE), so an entry's anchor, its strategy's id, never meets one
+# every id the page writes beside an entry's - its own anchors here, the dialog's
+# in DIALOG - holds an underscore, which no strategy id does (catalog.ID_RE), so
+# an entry's anchor, its strategy's id, never meets one
 TOP, GLANCE = "the_registry", "at_a_glance"
 GROUPS: dict[Kind, tuple[str, str]] = {
     "constraint": ("the_limits", "Limits"),
@@ -101,12 +102,14 @@ SHIPPED_SCORED_BOUND = (
 LABEL_WIDTH, FORMULA_WIDTH = 12, 88
 # the dialog a click on a rule opens its entry in, over the list, and the script
 # that opens it; the script looks up the dialog, its close button and its body by
-# these ids, and reads the entries by theirs
+# these ids, before it reads the entries by theirs, so no entry may hold one of
+# them. The dialog takes the focus itself, so Space scrolls a long entry rather
+# than pressing the close button
 SCRIPT = "registry.js"
 DIALOG = (
-    "<dialog id='rulebox' class='rulebox'><div class='rulebar'>"
-    "<button type='button' id='ruleshut' title='close (Esc)'>close</button></div>"
-    "<div id='rulebody'></div></dialog>")
+    "<dialog id='rule_box' class='rulebox' tabindex='-1'><div class='rulebar'>"
+    "<button type='button' id='rule_shut' title='close (Esc)'>close</button></div>"
+    "<div id='rule_body'></div></dialog>")
 
 
 # --- the citation record ---------------------------------------------------------

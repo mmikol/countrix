@@ -228,23 +228,28 @@ capture date is a fact.
 `<dialog>` over the list when a rule is clicked - its row in the table
 at a glance, or a rule a card names - and the list stays where it was.
 The card goes in as a copy of the server's, so the script writes no
-markup. The address names the open rule: opening one pushes `#<id>`, a
-rule opened from inside the dialog takes the open one's place, and Back
-closes it; Esc, the close button and a click on the backdrop close it
-too and take the hash off without moving the page, and the focus goes
-back to the link that opened it. Arriving at `/registry#<id>` - a card's
-*its math* on the playbook tab, or a shared address - opens the rule
-over the list, and Back from there goes where the reader came from. The
-cards stay on the page under the list, so the contents' group pills
-still reach them, a reader can read every rule straight through, and the
-browser's find and print see them all; the script takes their ids, so
-the browser's own jump to a card never moves the list behind the dialog.
-A click with a modifier stays the browser's - a new tab arrives with the
-rule open - and `/math`, the sources and the contents' pills stay links.
-Without the script the dialog never opens and the links scroll to the
-cards. The dialog is as wide as the article or the screen less 16 px a
-side, whichever is narrower, a long card scrolls inside it under its
-close button, and the page behind holds still while it is open.
+markup. The focus goes to the dialog itself, so Space and the arrow keys
+scroll a long card and Tab reaches the close button. The address names
+the open rule: opening one pushes `#<id>`, a rule opened from inside the
+dialog takes the open one's place, Back closes it, and Forward opens it
+again over the list where the list is now, not where it was when the
+address was last left; Esc, the close button and a click on the backdrop
+close it too and take the hash off without moving the page, and the
+focus goes back to the link that opened it. Arriving at
+`/registry#<id>` - a card's *its math* on the playbook tab, or a shared
+address - opens the rule over the list, and Back from there goes where
+the reader came from. The cards stay on the page under the list, so the
+contents' group pills still reach them, a reader can read every rule
+straight through, and the browser's find and print see them all; the
+script takes their ids, so the browser's own jump to a card never moves
+the list behind the dialog. The dialog's own ids hold an underscore, as
+the contents' anchors do, so no rule's id can take one. A click with a
+modifier stays the browser's - a new tab arrives with the rule open -
+and `/math`, the sources and the contents' pills stay links. Without the
+script the dialog never opens and the links scroll to the cards. The
+dialog is as wide as the article or the screen less 16 px a side,
+whichever is narrower, a long card scrolls inside it under its close
+button, and the page behind holds still while it is open.
 
 `board.css` puts the game's look on a faint diagonal stripe and colours
 the kinds: blue for constraints, green for heuristics, sand for
