@@ -267,6 +267,22 @@ def test_add_strategy_stores_a_charge_with_a_numeric_penalty(catalog_copy, monke
     assert stored.penalty.source == "2" and stored.category == "shape" and stored.weighs
 
 
+def test_add_strategy_refuses_a_bonus_that_adds_a_name(catalog_copy, monkeypatch):
+    """`bonus: map.side` once went through the door and broke every board
+    its rule applied on. The catalog refuses it on its probes before the
+    file exists, so the door writes nothing, mirrors nothing and logs
+    nothing."""
+    monkeypatch.setenv("COUNTRIX_STRATEGIES", catalog_copy)
+    mirrored = []
+    monkeypatch.setattr(catalog, "mirror", lambda cx, cat, directory=None: mirrored.append(cat))
+    with pytest.raises(Refusal, match=r"bonus 'map\.side' - a bonus or penalty is a number"):
+        Offline(dsn="postgresql://nowhere").call(
+            "add_strategy", id="side-bonus", name="Side bonus", kind="heuristic",
+            body="The attack pays.", reason="a test", bonus="map.side")
+    assert not os.path.exists(os.path.join(catalog_copy, "side-bonus.md"))
+    assert not os.path.exists(os.path.join(catalog_copy, "tuning-log.md")) and mirrored == []
+
+
 def test_the_tuning_log_tool_refuses_fewer_than_one_line(catalog_copy, monkeypatch):
     monkeypatch.setenv("COUNTRIX_STRATEGIES", catalog_copy)
     ctx = tools.Context(dsn="postgresql://nowhere")
