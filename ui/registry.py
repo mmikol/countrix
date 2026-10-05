@@ -9,9 +9,12 @@ needs' budget (inference.scoring.need_scales) and the citation record
 An entry says in plain words what its rule does - its form as the code
 reads it, its weight and the most it moves a six, its gate and who settles
 it - then writes its formula with its own numbers, its params filled in,
-each metric it reads, its prose and its sources. The math page
-(ui/static/math.html) gives the general forms, and each entry links its
-form there. ui/board.py serves it; nothing here reads the database, and
+each metric it reads, its prose and its sources; where its text names
+another rule of the playbook, the name links that rule's entry. The math
+page (ui/static/math.html) gives the general forms, and each entry links
+its form there. A click on a rule opens its entry in the page's dialog,
+over the list (ui/static/registry.js); without the script the links scroll
+to the entries. ui/board.py serves it; nothing here reads the database, and
 every string read from a file is escaped.
 """
 
@@ -21,7 +24,7 @@ import re
 import textwrap
 import tokenize
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal, NamedTuple
 from urllib.parse import unquote
@@ -96,6 +99,14 @@ SHIPPED_SCORED_BOUND = (
     " shipped limits, so it too moves a six by its weight at most.")
 # a formula block's columns: the label, then what it is, wrapped to fit the card
 LABEL_WIDTH, FORMULA_WIDTH = 12, 88
+# the dialog a click on a rule opens its entry in, over the list, and the script
+# that opens it; the script looks up the dialog, its close button and its body by
+# these ids, and reads the entries by theirs
+SCRIPT = "registry.js"
+DIALOG = (
+    "<dialog id='rulebox' class='rulebox'><div class='rulebar'>"
+    "<button type='button' id='ruleshut' title='close (Esc)'>close</button></div>"
+    "<div id='rulebody'></div></dialog>")
 
 
 # --- the citation record ---------------------------------------------------------
@@ -223,9 +234,20 @@ def _code(expr: Expr, params: Mapping[str, float]) -> str:
     return "<code>%s</code>" % esc(filled(expr, params))
 
 
-def _marked(text: str) -> str:
-    """Text from a file escaped, its backticked spans as code."""
-    return re.sub(r"`([^`]+)`", r"<code>\1</code>", esc(text))
+def _rule_link(sid: str, html: str) -> str:
+    """`html` as a link to the entry of the rule `sid`: its anchor on this
+    page, which the registry's script opens in the dialog."""
+    return "<a href='#%s'>%s</a>" % (esc(sid), html)
+
+
+def _marked(text: str, rules: Collection[str] = ()) -> str:
+    """Text from a file escaped, its backticked spans as code, and a span that
+    is the id of one of `rules` - the playbook's other rules - a link to that
+    rule's entry. An id is escaped as it stands (catalog.ID_RE)."""
+    def span(match: re.Match[str]) -> str:
+        code = "<code>%s</code>" % match.group(1)
+        return _rule_link(match.group(1), code) if match.group(1) in rules else code
+    return re.sub(r"`([^`]+)`", span, esc(text))
 
 
 def _constant(expr: Expr | None) -> float | None:
@@ -278,11 +300,13 @@ def _metric_words(s: Strategy) -> str:
 
 
 def _budget_words(s: Strategy, book: Needs) -> str:
-    """How the needs' shared budget scales this need: s, its share of it."""
+    """How the needs' shared budget scales this need: s, its share of it,
+    each other need on its guard linked to its entry."""
     mates = book.groups.get(s.id, [s])
     if len(mates) == 1:
         return "its weight, as s is 1: it is the only need on its guard"
-    scale, names = _num(book.scales.get(s.id, 1.0)), _and([esc(m.id) for m in mates])
+    scale = _num(book.scales.get(s.id, 1.0))
+    names = _and([esc(m.id) if m.id == s.id else _rule_link(m.id, esc(m.id)) for m in mates])
     return ("its weight times s = %s: the needs on one guard - here %s - cost %s at most"
             " together, or their largest weight where that is more"
             % (scale, names, _num(scoring.NEED_BUDGET)))
@@ -476,14 +500,15 @@ def _reads_table(s: Strategy) -> str:
             % "".join(rows))
 
 
-def _prose(s: Strategy) -> str:
-    """The rule's prose, less its title line, a paragraph each."""
+def _prose(s: Strategy, rules: Collection[str]) -> str:
+    """The rule's prose, less its title line, a paragraph each, each of
+    `rules` it names in backticks linked to its entry."""
     body = catalog.without_title(s.body).strip()
     paragraphs = [" ".join(p.split()) for p in re.split(r"\n\s*\n", body) if p.strip()]
     if not paragraphs:
         return ""
     return "<div class='lbl'>in the playbook's words</div>%s" % "".join(
-        "<p>%s</p>" % _marked(p) for p in paragraphs)
+        "<p>%s</p>" % _marked(p, rules) for p in paragraphs)
 
 
 def _link(source: str) -> str:
@@ -501,32 +526,36 @@ def _listed(entry: Citation) -> str:
         "<li>%s</li>" % _link(source) for source in entry.sources)
 
 
-def _sources(s: Strategy, record: Mapping[str, Sequence[Citation]]) -> str:
+def _sources(
+        s: Strategy, record: Mapping[str, Sequence[Citation]], rules: Collection[str]) -> str:
     """The rule's entry in the citation record, its line with its sources
-    folded under it. An id two rules have held in turn has an entry for
-    each, the earlier first (citations): the last is this rule's, and each
-    before it is folded away under a label that names it the earlier rule
-    of this id."""
+    folded under it, each of `rules` a line names in backticks linked to its
+    entry. An id two rules have held in turn has an entry for each, the
+    earlier first (citations): the last is this rule's, and each before it
+    is folded away under a label that names it the earlier rule of this id."""
     entries = record.get(s.id, ())
     if not entries:
         return ("<div class='lbl'>sources</div><p>The citation record,"
                 " <code>inference/README.md</code>, holds no entry for it.</p>")
     *earlier, current = entries
-    out = ["<div class='lbl'>sources</div><p>%s</p>" % _marked(current.note)]
+    out = ["<div class='lbl'>sources</div><p>%s</p>" % _marked(current.note, rules)]
     if current.sources:
         out.append("<details><summary>%s</summary>%s</details>" % (
             counted(len(current.sources), "source"), _listed(current)))
     for entry in earlier:
         out.append("<details class='earlier'><summary>the earlier rule of this id, which the"
                    " playbook no longer holds</summary><p>%s</p>%s</details>"
-                   % (_marked(entry.note), _listed(entry) if entry.sources else ""))
+                   % (_marked(entry.note, rules), _listed(entry) if entry.sources else ""))
     return "".join(out)
 
 
-def entry(s: Strategy, book: Needs, record: Mapping[str, Sequence[Citation]]) -> str:
+def entry(
+        s: Strategy, book: Needs, record: Mapping[str, Sequence[Citation]],
+        rules: Collection[str]) -> str:
     """One strategy's card, anchored by its id: its name, id, kind and form,
     then what it does in plain words, its formula, what it reads, its prose
-    and its sources."""
+    and its sources. `rules` are the playbook's ids: each other rule its
+    prose or its record names in backticks links that rule's entry."""
     form = shown_form(s)
     head = [esc(s.id), esc(s.category), form]
     if s.weighs:
@@ -535,10 +564,11 @@ def entry(s: Strategy, book: Needs, record: Mapping[str, Sequence[Citation]]) ->
     if formula:
         formula = "<div class='lbl'>the formula</div><pre class='eq'>%s</pre>" % formula
     bound = "; %s" % BOUND_LINK if s.weighs else ""
+    others = frozenset(rules) - {s.id}
     parts = (
         s.kind, esc(s.id), s.kind, s.kind, esc(s.name), " &middot; ".join(head),
-        _words(s, book), formula, _reads_table(s), FORM_LINKS[form], bound, _prose(s),
-        _sources(s, record))
+        _words(s, book), formula, _reads_table(s), FORM_LINKS[form], bound, _prose(s, others),
+        _sources(s, record, others))
     return ("<div class='hcard %s' id='%s'><span class='kind %s'>%s</span><b>%s</b>"
             "<div class='meta'>%s</div><div class='lbl'>what it does</div>%s%s%s"
             "<p class='legend'>The general form: %s%s.</p>%s%s</div>" % parts)
@@ -567,8 +597,8 @@ def _glance(strategies: Sequence[Strategy], book: Needs) -> str:
     rows = []
     for s in strategies:
         gate = {"none": "none", "board": "the board", "six": "the six"}[settler(s)]
-        rows.append("<tr><td><a href='#%s'>%s</a></td><td>%s</td><td>%s</td><td>%s</td>"
-                    "<td>%s</td></tr>" % (esc(s.id), esc(s.name), shown_form(s),
+        rows.append("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
+                    "<td>%s</td></tr>" % (_rule_link(s.id, esc(s.name)), shown_form(s),
                                           _num(s.weight) if s.weighs else "-", _moves(s, book),
                                           gate if s.kind == "heuristic" else "-"))
     return ("<div class='wide'><table class='glance'><tr><th>rule</th><th>form</th>"
@@ -592,10 +622,11 @@ def _tally(strategies: Sequence[Strategy]) -> str:
 def article(strategies: Sequence[Strategy], record: Mapping[str, Sequence[Citation]],
             weights: BaseWeights, *, playbook: str, shipped: bool) -> str:
     """The registry's article: what it is, the default engine under the
-    rules, every rule at a glance, then an entry per rule grouped by kind.
-    `shipped` says the playbook is the shipped one, of whose scored rules
-    the page says SHIPPED_SCORED_BOUND, as the math page does."""
-    book = needs(strategies)
+    rules, every rule at a glance, then an entry per rule grouped by kind,
+    and last the dialog a click opens an entry in. `shipped` says the
+    playbook is the shipped one, of whose scored rules the page says
+    SHIPPED_SCORED_BOUND, as the math page does."""
+    book, rules = needs(strategies), frozenset(s.id for s in strategies)
     base = ("base(x) = %s &middot; ( %s &middot; rates(x) + %s &middot; synergy(x) + %s &middot;"
             " counters(x) )" % tuple(_num(getattr(weights, f)) for f in
                                       ("meta", "rate", "synergy", "counter")))
@@ -640,16 +671,17 @@ def article(strategies: Sequence[Strategy], record: Mapping[str, Sequence[Citati
         anchor, title = GROUPS[kind]
         these = [s for s in strategies if s.kind == kind]
         out.append("<h2 id='%s'>%s</h2><p>%s</p>" % (anchor, title, intros[kind]))
-        out += [entry(s, book, record) for s in these] or [
+        out += [entry(s, book, record, rules) for s in these] or [
             "<p class='legend'>None in this playbook.</p>"]
-    out.append("</article>")
+    out += [DIALOG, "</article>"]
     return "\n".join(out)
 
 
 def view_registry() -> str:
     """The registry page: the playbook in force, read on every call with
-    its meta.md and the citation record, in the page shell."""
+    its meta.md and the citation record, in the page shell, with the script
+    that opens a rule in the dialog."""
     folder = catalog.strategies_dir()
-    return pages.page("the strategy registry", article(
-        catalog.load(folder), citations(), catalog.engine_weights(folder),
-        playbook=catalog.playbook_name(), shipped=folder == catalog.SHIPPED_DIR))
+    body = article(catalog.load(folder), citations(), catalog.engine_weights(folder),
+                   playbook=catalog.playbook_name(), shipped=folder == catalog.SHIPPED_DIR)
+    return pages.page("the strategy registry", body, scripts=(SCRIPT,))

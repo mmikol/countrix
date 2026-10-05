@@ -56,6 +56,23 @@ header.top .gh:hover { color:var(--text); border-color:var(--muted); }
 .math details { margin:4px 0 0; font-size:12.5px; }
 .math summary { cursor:pointer; color:var(--muted); }
 .math .sources { margin:6px 0 0; padding-left:18px; color:var(--muted); overflow-wrap:anywhere; }
+/* the registry's dialog: a rule's entry over the list, as wide as the article
+   or the screen less 16 px a side, whichever is narrower, and as tall as the
+   entry up to the screen less 16 px top and bottom; a longer entry scrolls
+   inside it under the close button. The page behind holds still while it is
+   open, the scrollbar's room kept so nothing behind it shifts */
+.math .rulebox { width:calc(100% - 32px); max-width:860px; max-height:calc(100% - 32px); padding:0 14px 14px;
+  color:var(--text); background:var(--panel2); border:1px solid var(--line); border-radius:10px;
+  box-shadow:0 18px 60px rgba(0,0,0,.6); overscroll-behavior:contain; }
+.math .rulebox::backdrop { background:rgba(5,7,11,.74); }
+.math .rulebar { position:sticky; top:0; z-index:1; display:flex; justify-content:flex-end; padding:10px 0 8px;
+  background:var(--panel2); }
+.math .rulebar button { font-size:10px; letter-spacing:.14em; text-transform:uppercase; padding:4px 11px;
+  background:transparent; color:var(--muted); border:1px solid var(--line); border-radius:999px; }
+.math .rulebar button:hover { background:transparent; color:var(--gold); border-color:var(--gold); }
+.math .rulebox .hcard { margin:0; }
+html:has(.rulebox) { scrollbar-gutter:stable; }
+html:has(.rulebox[open]) { overflow:hidden; }
 /* a playbook card's link to its rule's math */
 .hcard .reglink { float:right; margin-left:8px; font-size:10px; letter-spacing:.14em; text-transform:uppercase;
   color:var(--muted); border:1px solid var(--line); border-radius:999px; padding:2px 8px; }

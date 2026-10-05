@@ -5,7 +5,8 @@ its gate, bonus and penalty with its params filled in and defines every
 metric they read; a heuristic on a metric names its metric and the
 registry's meaning of it; every metric an entry reads says how its range
 rule aggregates it over the six; a need and a reward are told apart as
-Strategy.need tells them, and a need's budget is the score's; the citation
+Strategy.need tells them, and a need's budget is the score's; a rule an
+entry names links its entry; the citation
 record's last entry for an id is the entry's, an earlier one marked as the
 earlier rule of that id; the page reads the playbook in force - a crafted
 one's drafts counted apart, its gates worded whatever they read, a need at
@@ -149,7 +150,11 @@ def test_a_need_and_a_reward_are_told_apart_as_the_code_tells_them():
     assert scoring.need_scales(rules) == {"solo-escape": 0.75, "solo-control": 0.75}
     escape = card(page, "solo-escape")
     assert "= min( 1, max( 2, 3 ) / 4 ) = 0.75" in escape
-    assert "It costs 0 to 2.25" in escape and "here solo-escape and solo-control" in escape
+    # each other need on the guard links its entry; the entry's own id stays text
+    assert "It costs 0 to 2.25" in escape and (
+        "here solo-escape and <a href='#solo-control'>solo-control</a>") in escape
+    assert "here <a href='#solo-escape'>solo-escape</a> and solo-control" in card(
+        page, "solo-control")
     assert "the six decides it: it reads the six" in escape
     # a need's norm is read over the reference sixes that meet its gate, and with
     # no spread it reads 1, where a reward's reads 0.5 (scoring.normalised)
@@ -276,6 +281,26 @@ def test_the_parser_reads_every_entry_and_source_of_the_record():
 ])
 def test_an_expression_is_written_with_its_params_filled_in(source, params, written):
     assert registry.filled(Expr(source), params) == written
+
+
+def test_a_rule_an_entry_names_links_its_entry():
+    """Where an entry's prose or its line in the record names another rule
+    of the playbook in backticks, the name links that rule's entry, which the
+    registry's script opens in the dialog; the entry's own id and an id the
+    playbook does not hold stay code, and the reference playbook's prose
+    links each rule it names."""
+    rules = [
+        strategy("first", kind="heuristic", weight=1, bonus="min(team.hitscan, 1)",
+                 body="# First\n\nSee `second`, `first` and `gone`."),
+        strategy("second", kind="assumption", body="# Second\n\nThe owner says so.")]
+    entry = card(render(rules, {"first": [registry.Citation("Cites `second`.", ())]}), "first")
+    assert ("See <a href='#second'><code>second</code></a>, <code>first</code> and"
+            " <code>gone</code>.") in entry
+    assert "<p>Cites <a href='#second'><code>second</code></a>.</p>" in entry
+    page = render(catalog.load(FIXTURE_PLAYBOOK))
+    linked = re.findall(r"<a href='#([a-z0-9-]+)'><code>", card(page, "open-queue-tanks"))
+    assert linked == ["under-healed", "squish-limit"]
+    assert all("id='%s'" % sid in page for sid in linked)
 
 
 def test_every_string_from_a_file_is_escaped():

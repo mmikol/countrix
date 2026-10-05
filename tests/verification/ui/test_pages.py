@@ -10,10 +10,12 @@ heuristic's are; the swaps and suggested slots, drawn only for the picks
 the board in hand answered, held while a board solves and never offering a
 picked hero; each team's row, its picks and suggestions drawn together
 tank, damage, support while the picks stay stored as picked, each role
-keeping its slots while a board solves; and a taken swap, checked against
-the bans and the role caps as a pick is. Any other decision worth pinning
-is made on the server, as the seat badge is (momentum.badges), and tested
-there."""
+keeping its slots while a board solves; a taken swap, checked against the
+bans and the role caps as a pick is; and on the registry, the dialog a rule
+opens in - the address that names it, the links that open it and the ones
+that stay links, the focus, and no markup written. Any other decision worth
+pinning is made on the server, as the seat badge is (momentum.badges), and
+tested there."""
 
 import os
 import re
@@ -46,6 +48,11 @@ def scripts():
     """The page's three scripts as one text, in the order the page loads them."""
     return "".join(pages.static_file(name)[0].decode()
                    for name in ("comps.js", "playbook.js", "board.js"))
+
+
+def registry_script():
+    """The registry page's script, which opens a rule in its dialog."""
+    return pages.static_file(registry.SCRIPT)[0].decode()
 
 
 def function(script, name):
@@ -520,3 +527,107 @@ def test_the_registry_is_a_page_in_the_shell_the_math_page_links_and_the_cards_l
     assert "class='reglink' href='\" + href + \"'" in function(script, "mathLink")
     for s in catalog.load():
         assert "<div class='hcard %s' id='%s'>" % (s.kind, s.id) in page, s.id
+
+
+def test_the_registry_loads_its_script_and_holds_the_dialog_it_opens():
+    """The registry loads registry.js after its article, as the board loads
+    its scripts, and holds every element the script looks up by a literal
+    id - the dialog, its close button and its body - inside the article, so
+    an entry in the dialog wears the article's styles. The script reads the
+    entries the server anchors by their ids, each named by its first <b>;
+    no other element on the page is one."""
+    page, script = registry.view_registry(), registry_script()
+    data, ctype = pages.static_file(registry.SCRIPT)
+    assert ctype.startswith("application/javascript") and b"function show" in data
+    assert page.endswith("</main><script src='/static/%s'></script>" % registry.SCRIPT)
+    ids = set(re.findall(r"\bel\('([^']+)'\)", script))
+    assert ids == {"rulebox", "ruleshut", "rulebody"}
+    article = page[page.index("<article class='math'>"):page.index("</article>")]
+    assert article.rstrip().endswith(registry.DIALOG)
+    assert [i for i in sorted(ids) if "id='%s'" % i not in registry.DIALOG] == []
+    assert "<dialog id='rulebox' class='rulebox'>" in registry.DIALOG
+    assert "<button type='button' id='ruleshut'" in registry.DIALOG
+    assert "document.querySelectorAll('.hcard[id]')" in function(script, "start")
+    assert "copy.querySelector('b')" in function(script, "show")
+    strategies = catalog.load()
+    assert re.findall(r"class='hcard[^']*' id='([^']+)'", page) == [s.id for s in strategies]
+    for s in strategies:
+        entry = page[page.index("id='%s'>" % s.id):]
+        assert entry.index("<b>") == entry.index("<b>%s</b>" % pages.esc(s.name)), s.id
+
+
+def test_the_registry_script_keeps_the_address_and_the_dialog_in_step():
+    """The address names the open rule. A click pushes its hash and a rule
+    opened inside the dialog replaces it, so one Back closes it; the dialog
+    follows Back, Forward and a hash typed in; closing it any way takes the
+    hash away - back to the entry before the one the page pushed, or cleared
+    in place where the page arrived with it. A hash names a rule only where
+    it is an entry's id, decoded with care and looked up where no prototype
+    key answers. The entries give their ids up to the script before it reads
+    the hash the page arrived with, so the browser's jump to that entry finds
+    nothing and the list stays where it was."""
+    script = registry_script()
+    rule = function(script, "rule")
+    assert "var RULES = Object.create(null);" in script
+    assert "try { id = decodeURIComponent(id); } catch (e) { return null; }" in rule
+    assert "return RULES[id] ? id : null;" in rule
+    opened = function(script, "openRule")
+    assert "history.pushState({ pushed: true }, '', '#' + id);" in opened
+    assert "if (box.open) { history.replaceState(history.state, '', '#' + id);" in opened
+    closed = function(script, "afterClose")
+    assert "if (history.state && history.state.pushed) history.back();" in closed
+    assert "else history.replaceState(null, '', location.pathname + location.search);" in closed
+    sync = function(script, "sync")
+    assert "var id = rule(location.hash);" in sync and "else if (box.open) box.close();" in sync
+    start = function(script, "start")
+    for event in ("popstate", "hashchange"):
+        assert "window.addEventListener('%s', sync);" % event in start, event
+    assert "box.addEventListener('close', afterClose);" in start
+    assert start.index("card.removeAttribute('id');") < start.rindex("sync();")
+    assert script.rstrip().endswith("if (box && box.showModal) start();")
+
+
+def test_a_plain_click_on_a_rule_opens_it_and_every_other_link_stays_a_link():
+    """Only a plain click on a link whose hash is an entry's id opens the
+    dialog: a click with a modifier stays the browser's, and /math, the
+    sources and a section's anchor stay links. Every in-page link the
+    registry writes is a rule's or one of the page's own anchors, which hold
+    an underscore no rule's id can. Esc closes the dialog natively, the close
+    button and a press and release on the backdrop close it, and the focus
+    goes into it on opening and back to the link that opened it on closing,
+    without moving the page."""
+    script, page = registry_script(), registry.view_registry()
+    start = function(script, "start")
+    assert ("e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey"
+            " || e.altKey") in start
+    assert "e.target.closest('a[href^=\"#\"]')" in start
+    assert "rule(link.getAttribute('href'))" in start
+    assert start.index("if (!id) return;") < start.index("e.preventDefault();")
+    assert "shut.addEventListener('click', function () { box.close(); });" in start
+    assert "pressed = outside(e);" in start and "if (pressed && outside(e)) box.close();" in start
+    assert "e.target === box" in function(script, "outside")
+    show = function(script, "show")
+    assert "if (!box.open) box.showModal();" in show and "shut.focus();" in show
+    assert "openedBy = link;" in function(script, "openRule")
+    assert "if (openedBy) openedBy.focus({ preventScroll: true });" in function(
+        script, "afterClose")
+    rules = {s.id for s in catalog.load()}
+    own = {registry.TOP, registry.GLANCE, *(a for a, _ in registry.GROUPS.values())}
+    hrefs = set(re.findall(r"href='#([^']+)'", page))
+    assert hrefs - rules == own and not own & rules
+    assert all("_" in anchor for anchor in own)
+
+
+def test_the_registry_script_writes_no_markup():
+    """An entry enters the dialog as a copy of the server's node, which the
+    server escaped; the one text the script sets, the dialog's name, it sets
+    as an attribute's text. It parses no string as HTML, so nothing it reads
+    from the address or the page can become markup."""
+    script = registry_script()
+    for sink in ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write",
+                 "createContextualFragment", "DOMParser", "eval(", "Function("):
+        assert sink not in script, sink
+    show = function(script, "show")
+    assert "RULES[id].cloneNode(true)" in show and "pane.replaceChildren(copy);" in show
+    assert "box.setAttribute('aria-label', name ? name.textContent : id);" in show
+    assert script.count("setAttribute(") == 1

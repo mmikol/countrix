@@ -1,7 +1,7 @@
 """The board's HTML: the page shell, the math page, and the static files
 they load - the stylesheet, the scripts and the display font. The strategy
 registry, each rule's math, is ui/registry.py's, in the shell page() gives
-the math page.
+the math page, with its own script, registry.js.
 
 The page is a shell over the static files: board.js loads last because it
 calls into comps.js and playbook.js, and TEAM, BANS and SWAP_MAX come from
@@ -15,6 +15,7 @@ route's handler.
 
 import html
 import os
+from collections.abc import Sequence
 from typing import NamedTuple
 
 from db.data.wiki import terrain
@@ -140,12 +141,15 @@ def view_board() -> str:
     return shell % (REPO_URL, GITHUB_MARK, TEAM_SIZE, MAX_BANS, MAX_TANKS, base.SWAP_RANGE[1])
 
 
-def page(title: str, body: str) -> str:
+def page(title: str, body: str, scripts: Sequence[str] = ()) -> str:
     """A page in the shell the math, registry and error pages share: the
-    stylesheet, the title, and a header that links back to the board."""
+    stylesheet, the title, a header that links back to the board, and after
+    the body the scripts under ui/static it loads - the registry's, which
+    opens a rule in a dialog."""
     return (HEAD + "<title>%s</title>"
             "<main><header class='top'><h1><a href='/'>Counter <span>Utility Matrix</span></a></h1>"
-            "</header>%s</main>" % (esc(title), body))
+            "</header>%s</main>%s" % (esc(title), body, "".join(
+                "<script src='/static/%s'></script>" % esc(name) for name in scripts)))
 
 
 def _article(name: str) -> str:
