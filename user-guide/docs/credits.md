@@ -8,6 +8,13 @@ noncommercial use only, no redistribution, no changes or new works;
 anything else needs a separate written licence from the author. It
 covers Countrix's own work, not the material below.
 
+The playbook is the exception. Anyone may change the files of the
+playbook - `inference/strategies/`, its rules and the weights in
+`meta.md` - for their own noncommercial use, as
+[NOTICE](https://github.com/mmikol/countrix/blob/main/NOTICE) grants;
+the rest of Countrix stays under PolyForm Strict.
+[Tuning the playbook](tuning.md) says how.
+
 ## Blizzard Entertainment
 
 Overwatch&trade; &copy; 2016 Blizzard Entertainment, Inc. All rights

@@ -81,4 +81,8 @@ crossed with every other. The math page opens with it.
 Countrix's code is free for noncommercial use under the PolyForm Strict
 License 1.0.0, which allows no redistribution, no changes and no new
 works; anything else needs a separate written licence from the author.
+The playbook is the exception: anyone may change the files of the
+playbook - `inference/strategies/`, its rules and the weights in
+`meta.md` - for their own noncommercial use, through `/tune`,
+`/strategy` or the door's tools ([tuning the playbook](tuning.md)).
 [Credits and licences](credits.md) has the rest.

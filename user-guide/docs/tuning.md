@@ -8,12 +8,17 @@ There are two ways to change how Countrix scores:
 
 The playbook is the folder `inference/strategies/`: one markdown file a
 rule, and `meta.md`, which holds the default engine's weights and the
-swap cost. Change it through the door's tools, never by hand. A tool
-checks a change before it writes anything, keeps the database's copy of
-the playbook in step, and logs the change with its reason in
-`tuning-log.md` beside the rules. A change that would not load - an
-unknown metric, an expression that does not parse, a value out of range
-- is refused, and nothing is written.
+swap cost. It is yours to change: anyone may change the files of the
+playbook, its rules and the weights in `meta.md`, for their own
+noncommercial use. The rest of Countrix stays under PolyForm Strict
+([credits and licences](credits.md#countrix)).
+
+Change it through the door's tools rather than by hand. A tool checks a
+change before it writes anything, keeps the database's copy of the
+playbook in step, and logs the change with its reason in `tuning-log.md`
+beside the rules. A change that would not load - an unknown metric, an
+expression that does not parse, a value out of range - is refused, and
+nothing is written.
 
 ## The door
 

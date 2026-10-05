@@ -199,8 +199,15 @@ the data current, `/maintain` runs the checks and keeps the docs current.
 Copyright (c) 2026 Miliano Mikol. The [PolyForm Strict License 1.0.0](LICENSE)
 covers Countrix's own code and text: noncommercial use only, no
 redistribution, no changes or new works; anything else needs a separate
-written license. It covers none of the third-party material
-[NOTICE](NOTICE) lists, each under its own terms:
+written license.
+
+**The playbook is yours to change.** Beyond PolyForm Strict, anyone may
+change the files of the playbook - `inference/strategies/`, its rules and
+the weights in `meta.md` - for their own noncommercial use, as
+[NOTICE](NOTICE) grants. The rest of Countrix stays under PolyForm Strict.
+
+PolyForm Strict covers none of the third-party material NOTICE lists,
+each under its own terms:
 
 - **The Overwatch Wiki's text.** Hero kits, maps, terrain, playstyles,
   synergies and counters come from the [Overwatch Wiki](https://overwatch.fandom.com)

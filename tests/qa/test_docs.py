@@ -328,6 +328,20 @@ def test_the_notice_states_the_third_party_terms_and_names_files_that_exist():
     assert not missing, missing
 
 
+def test_the_playbooks_grant_reads_the_same_wherever_the_licence_is_told():
+    """The owner's grant of 2026-10-05 - anyone may change the playbook's
+    files, its rules and meta.md's weights, for their own noncommercial
+    use, the rest of Countrix staying under PolyForm Strict - stands in
+    NOTICE, the README's licence and the guide's pages on the licence and
+    on tuning."""
+    for parts in (("NOTICE",), ("README.md",), ("user-guide", "docs", "credits.md"),
+                  ("user-guide", "docs", "faq.md"), ("user-guide", "docs", "tuning.md")):
+        flat = " ".join(_read(*parts).replace("`", "").split()).lower()
+        for phrase in ("anyone may change the files of the playbook", "inference/strategies/",
+                       "meta.md", "for their own noncommercial use", "polyform strict"):
+            assert phrase in flat, (os.path.join(*parts), phrase)
+
+
 def _maps(doc, entry):
     """Whether a package docstring has a map line for the entry: indented,
     the name (a module without .py, a folder with or without its slash),

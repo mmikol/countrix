@@ -384,6 +384,11 @@ db <- facts <- inference <- door <- ui.
   material under its fan-site permission. A new file that quotes the wiki
   gets its line there, with the articles it quotes; every page's footer
   carries the Overwatch notice and the wiki's credit (`pages.FOOTER`).
+  NOTICE also carries the owner's grant of 2026-10-05, which the README's
+  licence and the guide repeat: anyone may change the playbook's files -
+  `inference/strategies/`, its rules and `meta.md`'s weights - for their
+  own noncommercial use; the rest stays under PolyForm Strict. A session
+  still changes the playbook only through the door.
 - A pull matches a hero or map name against the database through
   `db.data.normalizer` - `index` and `name_key`, or `hero_key` where a former
   name can appear - never by `.lower()`.

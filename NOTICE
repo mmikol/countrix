@@ -5,6 +5,12 @@ The PolyForm Strict License 1.0.0 in LICENSE covers Countrix's own code
 and text only. It covers none of the third-party material below, and no
 term of it restricts what that material's own licence grants.
 
+The playbook. In addition to the PolyForm Strict License, the licensor
+grants that anyone may change the files of the playbook -
+inference/strategies/, its rules and the weights in meta.md - for their
+own noncommercial use. The rest of Countrix stays under the PolyForm
+Strict License 1.0.0 alone.
+
 
 1. The Overwatch Wiki's text - CC BY-NC-SA 3.0
 
