@@ -8,7 +8,7 @@ blue's swaps read off them. Both render as JSON-ready data (to_dict: a ResultRec
 BoardRecord) and as text (rendered).
 """
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Literal, NotRequired, TypedDict
 
@@ -16,7 +16,7 @@ from facts.board_facts import GroundValue
 from facts.draft import TEAM_SIZE, Seat, Side
 from facts.factset import Fact, FactSet
 from facts.hero_facts import RateValue
-from facts.model import ROLES, TERRAIN_FEATURES
+from facts.model import TERRAIN_FEATURES, Hero, role_rank
 from facts.records import Snapshot
 from facts.team import SPECIALIST_DELTA, text
 from inference import base as base_module
@@ -269,6 +269,17 @@ def not_allowed(rules: list[str]) -> str:
     return "%s: no six that keeps these picks meets the playbook's limits" % NOT_ALLOWED
 
 
+def drawn(heroes: Iterable[Hero], picks: Sequence[str] = ()) -> list[Hero]:
+    """A six of blue's as the board draws it - its cards, an alternative, a
+    stage's six - and as blue's row reads (board.js lineup): by role
+    (facts.model.role_rank), tanks, then damage, then supports; within a
+    role blue's own picks (`picks`, as sent) first in pick order, then the
+    rest by name - as red's likely six reads around red's picks. The
+    optimal, which no pick holds, reads by role and name."""
+    first = {name: at for at, name in enumerate(picks)}
+    return sorted(heroes, key=lambda h: (role_rank(h.role), first.get(h.name, len(first)), h.name))
+
+
 # what each kind of result is, as its rendered heading names it
 HEADINGS: dict[ResultKind, str] = {
     "infer": "optimal comp", "evaluate": "evaluation", "current": "current comp",
@@ -395,11 +406,14 @@ class Result:
         return ("unscored on this board - the optimal six scores %.2f, not above the floor"
                 " of %.2f, so no comp is a share of it" % (best, floor))
 
-    def record_candidate(self, cand: Candidate, fs: FactSet, considered: int) -> None:
+    def record_candidate(self, cand: Candidate, fs: FactSet, considered: int,
+                         picks: Sequence[str] = ()) -> None:
         """Write a scored candidate onto the result: its score, breakdown and
         breaches, the board's facts, how many sixes the search considered, the
-        six's lean, and a pick per hero with the facts that justify it. Each
-        contribution cites the board fact that states its metric."""
+        six's lean, and a pick per hero with the facts that justify it, in the
+        order the board draws the six (drawn) - `picks`, blue's own as sent,
+        first within a role. Each contribution cites the board fact that
+        states its metric."""
         if cand.ns is None:
             raise RuntimeError("record_candidate() takes a scored candidate: hydrate() a slim one")
         self.score = cand.score
@@ -410,7 +424,7 @@ class Result:
         team = cand.ns["team"]
         self.playstyle = text(team["style_lean"]) or text(team["style_top"])
         locked = set(self.locked)
-        for h in sorted(cand.heroes, key=lambda h: (ROLES.index(h.role), h.name)):
+        for h in drawn(cand.heroes, picks):
             why, evidence = _reasons(fs, h.name, h.name in locked)
             self.picks.append(Pick(hero=h.name, role=h.role, subrole=h.subrole,
                                    portrait=h.portrait, locked=h.name in locked, why=why,

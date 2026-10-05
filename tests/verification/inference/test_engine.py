@@ -3,9 +3,10 @@ weights it is given, the Meta slider leaving a held six's fight odds where
 they are and moving them only with the six it chooses, the shapes and the
 queue's tank limit, an empty catalog kept as the caller's, a limit red's
 reveal already breaks and blue's picks may not, the share read from the
-seat's floor, the likely six, a full six on control, every seat of a board
-on the stage it names, the page's boards superseding one another, and the
-healing floor on top of the default engine.
+seat's floor, the likely six, each six read by role with its seat's picks
+first, a full six on control, every seat of a board on the stage it names,
+the page's boards superseding one another, and the healing floor on top of
+the default engine.
 Every board is the synthetic World's but the last two, King's Row and
 Samoa on the built database. test_board_gate holds the lobby's limits on every door."""
 
@@ -13,14 +14,14 @@ import dataclasses
 
 import pytest
 
-from db import Refusal
+from db import ROLES, Refusal
 from facts import compute
 from facts.draft import MAX_TANKS, Draft
 from facts.records import MapRate
 from facts.team import team_metrics
-from inference import catalog, engine
+from inference import catalog, engine, plan
 from inference.base import META, OFF
-from inference.result import Momentum
+from inference.result import Momentum, Pick, Result
 from tests.verification.inference import (
     ASSUMPTIONS_ONLY,
     BRIEF,
@@ -440,6 +441,71 @@ def test_reds_likely_six_reads_tank_damage_support_its_picks_first_in_a_role(syn
     assert "  %s - on " % ", ".join(six) in b.expected.rendered()
     assert "Their 3 picks so far (Mortar, Gale, Balm)" in b.plan
     assert "The six keeps your picks (Anvil, Sorrel) and fills the rest." in b.plan
+
+
+def leads(world, six, picks):
+    """Whether `six` reads tank, damage, support with the `picks` it holds
+    first within each role, in pick order."""
+    roles = [world.hero(n).role for n in six]
+    for r in ROLES:
+        held = [n for n in picks if n in six and world.hero(n).role == r]
+        if [n for n in six if world.hero(n).role == r][:len(held)] != held:
+            return False
+    return roles == sorted(roles, key=ROLES.index)
+
+
+def test_blues_fill_and_six_read_its_picks_first_in_a_role_as_its_row_does(synthetic_world):
+    """Blue's fill and its six read as blue's row draws them (result.drawn):
+    tanks, then damage, then supports, blue's picks first within a role in
+    pick order, then the rest by name - the six, its cards and its
+    alternatives - so a pick sits where the row draws it. Blue picked a
+    support, then a damage: by name Needle and Balm would lead Rook and
+    Sorrel. The optimal, which no pick holds, reads by role and name, and
+    the current comp's `blue` keeps the picks as sent, which the page reads
+    back (answered)."""
+    world = synthetic_world
+    red, picks = ("Gale", "Balm", "Mortar"), ("Sorrel", "Rook")
+    b = engine.board(world, Draft("Harbor Gate", red, picks), catalog=ASSUMPTIONS_ONLY,
+                     brief=BRIEF)
+    assert b.fill.blue == [p["hero"] for p in b.fill.picks] == [
+        "Anvil", "Rook", "Needle", "Sorrel", "Balm", "Tansy"]
+    assert b.fill.locked == list(picks)
+    assert b.fill.alternatives and all(leads(world, a["blue"], picks)
+                                       for a in b.fill.alternatives)
+    assert b.current.blue == list(picks)
+    assert [p["hero"] for p in b.current.picks] == ["Rook", "Sorrel"]
+    assert b.blue.blue == [p["hero"] for p in b.blue.picks] == [
+        "Anvil", "Kite", "Needle", "Rook", "Balm", "Tansy"]
+    full = ("Tansy", "Rook", "Kite", "Mortar", "Balm", "Gale")
+    b = engine.board(world, Draft("Harbor Gate", red, full), catalog=ASSUMPTIONS_ONLY,
+                     brief=BRIEF)
+    assert b.current.kind == "evaluate" and b.current.blue == list(full)
+    assert [p["hero"] for p in b.current.picks] == [
+        "Kite", "Mortar", "Rook", "Gale", "Tansy", "Balm"]
+    assert b.current.alternatives and all(leads(world, a["blue"], full)
+                                          for a in b.current.alternatives)
+    assert b.current.alternatives[0]["blue"] == [
+        "Kite", "Anvil", "Rook", "Needle", "Tansy", "Balm"]
+
+
+def test_reds_likely_six_and_blues_picks_read_a_role_outside_roles_last(
+        synthetic_world, monkeypatch):
+    """Red's likely six (engine._likely) and the plan's list of blue's picks
+    (plan._yours) order by facts.model.role_rank, the one key by role: a hero
+    of a role outside ROLES reads last, where ROLES.index would raise."""
+    world = synthetic_world
+    named = (("Gale", "flex"), ("Balm", "support"), ("Anvil", "tank"))
+    likely = [compute.ExpectedPick(hero=name, role=role, rate=1.0, locked=name == "Gale",
+                                   on_six=1.0, score=1.0, why="") for name, role in named]
+    monkeypatch.setattr(compute, "expected_picks", lambda *args, **kwargs: likely)
+    red = engine._likely(world, world.map("Harbor Gate"), [world.hero("Gale")], [],
+                         Draft("Harbor Gate", ("Gale",)), ASSUMPTIONS_ONLY, DEFAULT)
+    assert red.blue == ["Anvil", "Balm", "Gale"] and red.locked == ["Gale"]
+    six = Result(kind="fill", map_name=None, red=[], blue=[], locked=["Gale", "Anvil"],
+                 catalog=ASSUMPTIONS_ONLY, base=DEFAULT, picks=[
+                     Pick(hero="Gale", role="flex", locked=True, why="", evidence=[]),
+                     Pick(hero="Anvil", role="tank", locked=True, why="", evidence=[])])
+    assert plan._yours(six) == ["Anvil", "Gale"]
 
 
 def test_board_ranks_a_full_six_and_ignores_sides_on_control(synthetic_world):

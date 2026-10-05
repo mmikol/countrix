@@ -37,7 +37,7 @@ from facts.draft import (
     check_tanks,
 )
 from facts.factset import FactSet
-from facts.model import ROLES, Hero, Map, Resolved, World
+from facts.model import Hero, Map, Resolved, World, role_rank
 from inference import catalog as catalog_module
 from inference import supersede, swaps
 from inference.base import LOGIT_PER_POINT, OFF, SWAP, BaseWeights
@@ -53,6 +53,7 @@ from inference.result import (
     StageRow,
     StageSwap,
     Swaps,
+    drawn,
     not_allowed,
 )
 from inference.scoring import Candidate, Objective
@@ -140,8 +141,10 @@ def swap_in_force(brief: Brief) -> float:
     return catalog_module.swap_cost() if brief.swap is None else brief.swap
 
 
-def _order(heroes: Iterable[Hero]) -> list[str]:
-    return [h.name for h in sorted(heroes, key=lambda h: (ROLES.index(h.role), h.name))]
+def _order(heroes: Iterable[Hero], picks: Sequence[str] = ()) -> list[str]:
+    """A six's names as the board draws it (result.drawn): by role, blue's
+    own `picks` first within a role in pick order, then by name."""
+    return [h.name for h in drawn(heroes, picks)]
 
 
 def _board_facts(world: World, result: Result, side: Side) -> FactSet:
@@ -217,19 +220,21 @@ def _optimal(
     seated = _seat_board(world, draft)
     m, red_h, blue_h, bans_h = seated.board
     _check_teams(red_h, blue_h)
-    result = seated.result(kind, catalog=catalog, base=base, blue=[],
-                           locked=[h.name for h in blue_h])
+    picks = [h.name for h in blue_h]
+    result = seated.result(kind, catalog=catalog, base=base, blue=[], locked=picks)
     solver = Solver(world, m, red=red_h, locked=blue_h, banned=bans_h, side=seated.side,
                     stage=seated.stage, catalog=catalog, base=base, check=check)
     if scale_of is not None:
         solver.adopt_scale(scale_of)
     solved = solver.solve(top=max(top, 1) + 1)
     best = solved.ranked[0]
-    result.blue = _order(best.heroes)
+    # the six and its runners-up as the board draws them: the locked picks
+    # first within a role, in pick order (a fill's; the optimal holds none)
+    result.blue = _order(best.heroes, picks)
     fs = _board_facts(world, result, seated.side)
-    result.record_candidate(best, fs, solver.considered)
+    result.record_candidate(best, fs, solver.considered, picks)
     result.tied = solver.ties(solved)
-    result.alternatives = [Alternative(blue=_order(c.heroes), score=round(c.score, 3),
+    result.alternatives = [Alternative(blue=_order(c.heroes, picks), score=round(c.score, 3),
                                        normalized=None)
                            for c in solved.ranked[1:top + 1]]
     optimal = _Optimal(result, solver, solved)
@@ -249,13 +254,15 @@ def _evaluated(
     seated = _seat_board(world, draft)
     red_h, blue_h = seated.board.red, seated.board.blue
     _check_teams(red_h, blue_h)
-    result = seated.result("evaluate", catalog=catalog, base=base,
-                           blue=[h.name for h in blue_h], locked=[])
+    picks = [h.name for h in blue_h]
+    # `blue` keeps the picks as sent, which the page reads back (answered);
+    # the cards and the alternatives read as the board draws a six
+    result = seated.result("evaluate", catalog=catalog, base=base, blue=picks, locked=[])
     evaluated = evaluate_comp(optimal.solved, blue_h)
     fs = _board_facts(world, result, seated.side)
-    result.record_candidate(evaluated.target, fs, evaluated.solver.considered)
+    result.record_candidate(evaluated.target, fs, evaluated.solver.considered, picks)
     result.rank, result.outranked = evaluated.rank, evaluated.outranked
-    result.alternatives = [Alternative(blue=_order(c.heroes), score=round(c.score, 3),
+    result.alternatives = [Alternative(blue=_order(c.heroes, picks), score=round(c.score, 3),
                                        normalized=None)
                            for c in evaluated.field[:3]]
     result.scale_to(optimal.span)
@@ -289,7 +296,7 @@ def _current(
         cand = solver.prepare(Candidate(blue_h))
         solver.score(cand)
         result.record_candidate(cand, _board_facts(world, result, seated.side),
-                                solver.considered)
+                                solver.considered, picks)
     result.scale_to(optimal.span)
     if barred is not None:
         result.bar(barred)
@@ -508,7 +515,7 @@ class _Pass:
         elif not full and fill is not None:
             keeper = self.world.resolve(None, (), fill.blue).blue
         kept = Swaps(status="keep", stage=draft.stage, cost=cost,
-                     six=_order(keeper) if keeper is not None else [],
+                     six=_order(keeper, [h.name for h in picks]) if keeper is not None else [],
                      pairs=[], open=swaps.open_slots(
                          [p for p in fill.picks if not p["locked"]] if fill is not None else []),
                      before=before, after=before,
@@ -553,6 +560,7 @@ class _Pass:
         if m is None or not m.stages or not origin:
             return []
         six = self.world.resolve(None, (), tuple(origin)).blue
+        picks = [h.name for h in self.world.resolve(None, (), draft.blue).blue]
         taken = None
         if suggested is not None and suggested["status"] in ("suggested", "keep"):
             taken = swaps.Taken(
@@ -564,7 +572,7 @@ class _Pass:
             raw = cost = 0.0
         self.watch.check()
         return swaps.chain(swaps.ChainStart(plain=blue.solver, chosen=draft.stage, origin=six,
-                                            raw=raw, cost=cost, taken=taken))
+                                            raw=raw, cost=cost, taken=taken, picks=picks))
 
 
 def _scored(world: World, draft: Draft, optimal: _Optimal, cand: Candidate,
@@ -573,11 +581,11 @@ def _scored(world: World, draft: Draft, optimal: _Optimal, cand: Candidate,
     as a Result on the optimal's span: its picks, their reasons and its
     breakdown - `locked`, the picks it keeps, marked."""
     seated = _seat_board(world, draft)
+    kept = [name for name in locked if name in set(draft.blue)]
     result = seated.result("evaluate", catalog=catalog, base=base,
-                           blue=_order(seated.board.blue),
-                           locked=[name for name in locked if name in set(draft.blue)])
+                           blue=_order(seated.board.blue, kept), locked=kept)
     result.record_candidate(cand, _board_facts(world, result, seated.side),
-                            optimal.solver.considered)
+                            optimal.solver.considered, kept)
     result.scale_to(optimal.span)
     return result
 
@@ -628,7 +636,7 @@ def _likely(
     order revealed (`locked` keeps that order), so red's row and its comps
     tab read alike."""
     likely = sorted(compute.expected_picks(world, m, revealed=red_h, banned=bans_h),
-                    key=lambda p: ROLES.index(p["role"]))
+                    key=lambda p: role_rank(p["role"]))
     return Result(kind="expected", map_name=m.name if m else None, red=list(draft.blue),
                   blue=[p["hero"] for p in likely], locked=[h.name for h in red_h],
                   catalog=catalog, base=base, bans=list(draft.bans),

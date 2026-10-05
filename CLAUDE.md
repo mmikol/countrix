@@ -296,9 +296,11 @@ db <- facts <- inference <- door <- ui.
   `board.css` class is used. A decision only the client can make is pinned
   in the script's source - the stale-reply guard, the HTML escape, the meta
   and swap-cost weights never pruned, the swaps and suggested slots drawn
-  only for the picks the board in hand answered, a taken swap checked
-  against the bans and the role caps; any other decision worth pinning is
-  made on the server, as the seat badge is (`momentum.badges`). The math
+  only for the picks the board in hand answered, each team's row drawn
+  tank, damage, support while the picks stay stored as picked, each role
+  keeping its slots while a board solves, a taken swap checked against the
+  bans and the role caps; any other decision worth pinning is made on the
+  server, as the seat badge is (`momentum.badges`). The math
   page renders the code constants it quotes (`view_math` fills them in), so
   a literal percent in `ui/static/math.html` is written `%%`.
 - `test_the_search_reaches_the_enumerated_maximum` in

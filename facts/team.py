@@ -14,11 +14,11 @@ readers narrow a value where one kind is read.
 
 import statistics
 from collections import Counter, OrderedDict
-from collections.abc import Collection, Iterable
+from collections.abc import Collection, Iterable, Sequence
 from typing import NamedTuple
 
 from facts.draft import EXPECTED_SHAPE, TEAM_SIZE
-from facts.model import SQUISHY_POOL, Hero, Map, World
+from facts.model import SQUISHY_POOL, Hero, Map, World, seat_order
 
 SPECIALIST_DELTA = 2.5
 RANK_SENSITIVE = 6.0
@@ -237,6 +237,16 @@ def _mean(values: Iterable[float | None]) -> float:
     return sum(known) / len(known) if known else 0.0
 
 
+def _named(heroes: Sequence[Hero], values: Sequence[float], best: float) -> Hero:
+    """The pick a metric names for `best`, one of `values` (a value per pick,
+    in the picks' order): where several picks hold it, the first in seat
+    order - by role, then hero id (facts.model.seat_order) - never the first
+    as handed, so the order a caller hands a team in, the board's or a
+    six's, cannot change whom a fact names."""
+    tied = [h for h, v in zip(heroes, values, strict=True) if v == best]
+    return tied[0] if len(tied) == 1 else min(tied, key=seat_order)
+
+
 # the registry's sections, one helper each: _bag merges them in the registry's order
 SECTIONS = frozenset({
     "shape", "durability", "damage", "sustain", "tools", "cohesion", "meta", "on_map",
@@ -251,8 +261,10 @@ def _bag(
     """The `wanted` sections' keys for these picks. The
     map's section reads the meta's, and the meta and versus sections the
     most-banned pick: max_ban_* name it and banproof_coverage takes its
-    answers away; with no ban rate on the team it is the first pick."""
-    top_ban = max(heroes, key=lambda h: h.ban or 0) if heroes else None
+    answers away; of picks banned alike, none banned at all included, it is
+    the first in seat order (_named)."""
+    bans = [h.ban or 0 for h in heroes]
+    top_ban = _named(heroes, bans, max(bans)) if heroes else None
     # the whole bag, which every leaf of the search reads, tests no section
     every = wanted is SECTIONS
     meta = _meta(heroes, m, top_ban) if every or "meta" in wanted or "on_map" in wanted else {}
@@ -340,14 +352,17 @@ def shape_flags(tanks: int, damage: int, supports: int) -> list[str]:
 
 
 def _durability(heroes: list[Hero]) -> MetricBag:
-    """The pools, the armor and shields in them, and the picks focus fire finds."""
+    """The pools, the armor and shields in them, and the picks focus fire
+    finds; of picks whose pools tie at the smallest, the weakest is the
+    first in seat order (_named)."""
     pools = [h.pool for h in heroes]
     pool_total = sum(pools) + sum(h.form_armor for h in heroes)
     armor_total = sum(h.armor + h.form_armor for h in heroes)
     shield_total = sum(h.shield for h in heroes)
     squishies = [h.name for h in heroes if h.pool <= SQUISHY_POOL]
-    return {"pool_total": pool_total, "pool_min": min(pools) if pools else 0,
-            "weakest": min(heroes, key=lambda h: h.pool).name if heroes else "",
+    pool_min = min(pools) if pools else 0
+    return {"pool_total": pool_total, "pool_min": pool_min,
+            "weakest": _named(heroes, pools, pool_min).name if heroes else "",
             "armor_total": armor_total,
             "armor_share": armor_total / pool_total if pool_total else 0.0,
             "shield_total": shield_total,
@@ -357,8 +372,11 @@ def _durability(heroes: list[Hero]) -> MetricBag:
 
 
 def _damage(heroes: list[Hero]) -> MetricBag:
-    """Sustained and burst damage, the ultimates, the weapon kinds and the reach."""
-    burst = max(heroes, key=lambda h: h.burst) if heroes else None
+    """Sustained and burst damage, the ultimates, the weapon kinds and the
+    reach; of picks whose biggest hits tie, the burst hero is the first in
+    seat order (_named)."""
+    bursts = [h.burst for h in heroes]
+    burst = _named(heroes, bursts, max(bursts)) if heroes else None
     ranges = [h.max_range for h in heroes if h.max_range is not None]
     return {"dps_floor": sum(h.dps for h in heroes),
             "dps_count": sum(1 for h in heroes if h.dps),

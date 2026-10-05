@@ -135,10 +135,11 @@ def test_an_announced_hero_is_described_but_never_picked(synthetic_world):
 @pytest.mark.parametrize("base", [OFF, DEFAULT], ids=["base-off", "base-on"])
 def test_the_fill_is_the_optimal_whenever_the_optimal_holds_every_lock(synthetic_world, base):
     """Locking a hero of the optimal six leaves the optimal six the best one
-    that keeps the lock, so the fill must find it again. With the default
-    engine off, under a playbook that scores nothing every six scores zero
-    and only the tie-break tells them apart; with it on, the same playbook
-    scores by the engine."""
+    that keeps the lock, so the fill must find it again - the same six, the
+    lock first within its role, as the board draws a six around a pick. With
+    the default engine off, under a playbook that scores nothing every six
+    scores zero and only the tie-break tells them apart; with it on, the
+    same playbook scores by the engine."""
     from inference import engine
     world = synthetic_world
     assert not any(s.weighs for s in ASSUMPTIONS_ONLY)
@@ -147,7 +148,9 @@ def test_the_fill_is_the_optimal_whenever_the_optimal_holds_every_lock(synthetic
         for hero in best.blue:
             fill = engine.infer(world, Draft(map_name, blue=(hero,)), catalog=ASSUMPTIONS_ONLY,
                                 base=base)
-            assert fill.blue == best.blue, (map_name, hero, fill.blue)
+            assert sorted(fill.blue) == sorted(best.blue), (map_name, hero, fill.blue)
+            role = world.hero(hero).role
+            assert next(n for n in fill.blue if world.hero(n).role == role) == hero, fill.blue
 
 
 def test_a_seat_is_timed_from_when_its_search_began(

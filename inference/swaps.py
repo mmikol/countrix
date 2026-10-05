@@ -55,7 +55,7 @@ from typing import NamedTuple
 
 from facts import compute
 from facts.board_facts import GroundValue
-from facts.model import Hero, Map, by_role
+from facts.model import Hero, Map, by_role, seat_order
 from facts.team import text
 from inference import base, plan
 from inference.base import OFF
@@ -69,8 +69,9 @@ from inference.result import (
     StageRules,
     StageSwap,
     SwapPair,
+    drawn,
 )
-from inference.scoring import Candidate, Objective, quantized, seat_order
+from inference.scoring import Candidate, Objective, quantized
 from inference.solver import Infeasible, Solver, Unbounded
 
 
@@ -134,12 +135,12 @@ def paired(picks: Sequence[Hero], six: Sequence[Hero], target: Result) -> list[S
     supports, each role in pick order - so the verdict names them as the
     row reads."""
     place = {h.name: at for at, h in enumerate(picks)}
-    drawn = {h.name: i for i, h in enumerate(by_role(picks))}
+    shown = {h.name: i for i, h in enumerate(by_role(picks))}
     told = {p["hero"]: p for p in target.picks}
     return sorted((SwapPair({"out": s["out"], "in": s["in"], "at": place[s["out"]],
                              "portrait": told[s["in"]].get("portrait"),
                              "why": told[s["in"]]["why"]})
-                   for s in moved(picks, six)), key=lambda pair: drawn[pair["out"]])
+                   for s in moved(picks, six)), key=lambda pair: shown[pair["out"]])
 
 
 def open_slots(picks: Sequence[Pick]) -> list[OpenSlot]:
@@ -290,20 +291,25 @@ class ChainStart(NamedTuple):
     """What the stage plan is walked from: blue's optimal's Solver, whose
     board and scale every stage shares; the board's chosen stage; the
     origin - the six the comps tab shows; the raw cost and the cost in share
-    points; and the board's swap answer on the chosen stage - a swap
+    points; the board's swap answer on the chosen stage - a swap
     suggested, or the picks kept under the cost - None where it gave
-    neither: it searched none."""
+    neither: it searched none; and blue's picks as sent, which lead their
+    role in each row's six."""
     plain: Solver
     chosen: str
     origin: Sequence[Hero]
     raw: float
     cost: float
     taken: Taken | None = None
+    picks: Sequence[str] = ()
 
 
 def chain(p: ChainStart, memo: Memo | None = None) -> list[StageRow]:
     """The plan stage by stage (the module's docstring): a row a stage of
-    the map, in play order; none on a map without stages."""
+    the map, in play order; none on a map without stages. Each row's six
+    reads as the board draws one of blue's (result.drawn): by role, the
+    picks of blue's it holds first within a role, in pick order, then by
+    name."""
     m = p.plain.m
     if m is None:
         return []
@@ -327,10 +333,9 @@ def chain(p: ChainStart, memo: Memo | None = None) -> list[StageRow]:
             rules = ruled(gates_on(p.plain, name), whole)
             # the board's own swap answer on this stage, one answer with the
             # swaps above the picks; where it gave none, the origin
-            played_six = sorted(p.taken.six if p.taken is not None else p.origin,
-                                key=seat_order)
+            played_six = p.taken.six if p.taken is not None else p.origin
             taken = list(p.taken.swaps) if p.taken is not None else []
-            rows.append(_row(m, name, kind, current=True, six=[h.name for h in played_six],
+            rows.append(_row(m, name, kind, current=True, six=_as_drawn(played_six, p.picks),
                              swaps=taken, rules=rules, blurb=plan.stage_blurb(
                                  m, name, index, rules, taken, [], p.cost,
                                  outcome="origin" if p.taken is None else "solved")))
@@ -349,7 +354,7 @@ def chain(p: ChainStart, memo: Memo | None = None) -> list[StageRow]:
         heroes = got.six.heroes
         swaps = moved(reference, heroes)
         turned = lean(got.six)
-        rows.append(_row(m, name, kind, six=[h.name for h in heroes], swaps=swaps, rules=rules,
+        rows.append(_row(m, name, kind, six=_as_drawn(heroes, p.picks), swaps=swaps, rules=rules,
                          blurb=plan.stage_blurb(
                              m, name, index, rules, swaps,
                              gains_on(got.reference, got.six, titles), p.cost,
@@ -357,6 +362,11 @@ def chain(p: ChainStart, memo: Memo | None = None) -> list[StageRow]:
         if kind == "phase":
             previous = heroes
     return rows
+
+
+def _as_drawn(six: Sequence[Hero], picks: Sequence[str]) -> list[str]:
+    """A stage's six by name, as the board draws one of blue's (result.drawn)."""
+    return [h.name for h in drawn(six, picks)]
 
 
 def _row(

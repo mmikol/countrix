@@ -14,7 +14,7 @@ from facts import compute
 from facts.board_facts import StageTerrainValue, TerrainValue
 from facts.draft import TEAM_SIZE, Side
 from facts.factset import FactSet
-from facts.model import ROLES, Hero, Map, World, by_role
+from facts.model import Hero, Map, World, by_role, role_rank
 from facts.team import team_metrics, text
 from facts.team_facts import counted
 from inference import base
@@ -273,11 +273,12 @@ def plan(
 
 def _yours(six: Result) -> list[str]:
     """Blue's own picks in the six: a fill's locks, a full six's heroes, and
-    none in the optimal, which blue's picks never constrain - tank, damage,
-    support, as every view shows a six (by_role), each role in pick order."""
+    none in the optimal, which blue's picks never constrain - by role
+    (role_rank), tank, damage, support, each role in pick order, as the
+    six's cards draw them."""
     picks = six.locked if six.kind == "fill" else six.blue if six.kind == "evaluate" else []
-    rank = {p["hero"]: ROLES.index(p["role"]) for p in six.picks}
-    return sorted(picks, key=lambda name: rank.get(name, len(ROLES)))
+    role = {p["hero"]: p["role"] for p in six.picks}
+    return sorted(picks, key=lambda name: role_rank(role.get(name, "")))
 
 
 def _keeps(six: Result, yours: Sequence[str]) -> str | None:
@@ -403,11 +404,12 @@ def _answered(six: Result) -> dict[str, list[str]]:
 
 
 def _answers(names: Sequence[str], answered: Mapping[str, Sequence[str]]) -> str:
-    """Who in the six answers each of red's picks, most answered first, and
-    the picks nobody answers."""
+    """Who in the six answers each of red's picks, most answered first, then
+    in red's order, each pick's answerers by name - so the order blue picked
+    its six in changes no word - and the picks nobody answers."""
     out = ""
-    pairs = sorted(((k, v) for k, v in answered.items() if k in names),
-                   key=lambda kv: -len(kv[1]))
+    pairs = sorted(((k, sorted(v)) for k, v in answered.items() if k in names),
+                   key=lambda kv: (-len(kv[1]), names.index(kv[0])))
     if pairs:
         out += " " + _sentence("; ".join(
             "%s answer%s %s" % (_and(v), "" if len(v) > 1 else "s", k) for k, v in pairs[:4]))

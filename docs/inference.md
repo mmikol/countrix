@@ -324,7 +324,12 @@ pick rate with a tank's doubled for a six's two tank seats, plus
 is how often a six fields those heroes on average. Red has no share.
 The board shows that six as it shows every six, tanks, then damage, then
 supports, red's picks first within a role in the order revealed; its
-`locked` keeps that order.
+`locked` keeps that order. Blue's sixes read the same way around blue's
+picks (`result.drawn`): the fill - and `infer` around locked picks - a
+full six's cards, their alternatives and each stage's six put the picks
+they hold first within a role in pick order and the rest by name, as
+blue's row does; the optimal, which no pick holds, reads by role and
+name, and the current comp's `blue` keeps the picks as sent.
 The fight odds compare the two sides another way (`plan.fight_odds`):
 blue's six and red's likely six on one scale, the default engine alone
 against red's six, each counter between them counted once, no playbook
@@ -570,7 +575,11 @@ and each open role's largest, exact because the draws are whole numbers -
 settles which of them lead. Each six is scored in one seat order - tanks,
 then damage, then supports, each by hero id - so its score is a function
 of its heroes to the last bit, and a board is the same payload under any
-hash seed.
+hash seed. A team metric that names one pick of equals - the weakest, the
+burst hero, the most-banned pick, whose answers `team.banproof_coverage`
+takes away - names the first in that order however its picks are handed
+(`facts.model.seat_order`), so the facts, which take each side by role in
+pick order, name the pick the search read.
 
 An optimal six reports how many legal sixes share its rounded score,
 itself among them (`Solver.ties`): read off the search's best K where a

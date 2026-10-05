@@ -42,7 +42,7 @@ from typing import Literal, NamedTuple, NotRequired, TypedDict
 
 from facts import compute, counters
 from facts.draft import Side
-from facts.model import ROLES, Hero, Map, World, by_role
+from facts.model import Hero, Map, World, by_role, seat_order
 from facts.team import NUMBER_TYPES, MetricBag, MetricValue, number, team_metrics
 from inference.base import COUNTERS, RATES, READS, SYNERGY, Base, BaseWeights, Terms
 from inference.expr import Expr, ExprError, Scope, Value, scope
@@ -203,22 +203,14 @@ class Contribution(TypedDict):
 type SixKey = tuple[int, ...]
 
 
-# a role's place in the seat order a six is scored in
-ROLE_ORDER = {role: i for i, role in enumerate(ROLES)}
-
-
-def seat_order(h: Hero) -> tuple[int, int]:
-    """A pick's seat in the order every six is scored in: by role, then by
-    hero id."""
-    return ROLE_ORDER.get(h.role, len(ROLES)), h.id
-
-
 class Candidate:
     """One six on its way through the search: its heroes in seat order, and
     once prepared and scored its namespace, limit breaches, raw values, base
     terms, score, tie-break and breakdown. A slim one keeps only the
-    verdict. The seat order makes a six's score a function of its heroes:
-    sums over the picks, pairs and the first of equals all read one order."""
+    verdict. The seat order (facts.model.seat_order) makes a six's score a
+    function of its heroes: sums over the picks and pairs read one order,
+    and the team metrics take the first of equals in it whatever the order
+    handed."""
 
     __slots__ = (
         "contributions",

@@ -9,10 +9,11 @@ the HTML escape; the meta and swap-cost weights, never pruned as a stale
 heuristic's are; the swaps and suggested slots, drawn only for the picks
 the board in hand answered, held while a board solves and never offering a
 picked hero; each team's row, its picks and suggestions drawn together
-tank, damage, support while the picks stay stored as picked; and a taken
-swap, checked against the bans and the role caps as a pick is. Any other
-decision worth pinning is made on the server, as the seat badge is
-(momentum.badges), and tested there."""
+tank, damage, support while the picks stay stored as picked, each role
+keeping its slots while a board solves; and a taken swap, checked against
+the bans and the role caps as a pick is. Any other decision worth pinning
+is made on the server, as the seat badge is (momentum.badges), and tested
+there."""
 
 import os
 import re
@@ -293,36 +294,57 @@ def test_the_swap_row_and_the_slots_it_fills_follow_the_picks_the_board_answered
 
 def test_each_team_row_reads_tank_damage_support_and_a_click_names_its_hero():
     """Both team rows are drawn through one ordering, lineup: a team's picks
-    and the suggestions for its open slots together - the suggestions cut to
-    the open slots in the board's order - sorted by role in the server's
-    ROLES order, a pick before a suggestion within a role (the picks are
-    listed first and the tie goes to the place in that list), the picks in
-    pick order. The stored picks are never sorted, so the board is asked in
-    the order picked. A slot's place names no pick: a click reads the hero
-    the slot shows, and a swap sits over its pick wherever the row draws it,
-    the drawn pick whose place among the picks is the pair's `at`."""
+    and the suggestions for its open slots together, role by role in the
+    server's ROLES order, a role's picks first in pick order, then its
+    suggestions in the board's order, then empty slots up to the slots the
+    role holds in the six the board in hand drew (shapeOf), the picks never
+    cut. So while a board solves a pick or a clear in one role moves no other
+    role's slots unless it changes how many a role holds - a red pick past a
+    role's slots, or its clear, shifts red's picks a slot until the board
+    lands - and blue's first
+    pick is drawn among the optimal's suggestions, the board in hand's when
+    it answered no blue pick, and red's picks keep their places while red's
+    suggestions wait for the board that answers them. The stored picks are
+    never sorted, so the board is asked in the order picked. A slot's place
+    names no pick: a click reads the hero the slot shows, and a swap sits
+    over its pick wherever the row draws it, the drawn pick whose place
+    among the picks is the pair's `at`. Only an empty slot carries a number,
+    counted among the empty slots."""
     script = scripts()
     roles = re.search(r"var ROLES = \[([^\]]*)\];", script).group(1)
     assert re.findall(r"'([a-z]+)'", roles) == list(ROLES)
     order = function(script, "lineup")
-    assert "suggested.slice(0, Math.max(0, TEAM - st[team].length))" in order
-    assert "st[team].map(function (name, at) { return { name: name, at: at }; })" in order
-    assert ".concat(open.map(function (p) { return { name: p.hero, p: p }; }))" in order
-    assert "ROLES.indexOf(h ? h.role : x.p ? x.p.role : '')" in order
-    assert "x.rank = r < 0 ? ROLES.length : r; x.i = i;" in order
-    assert "return row.sort(function (a, b) { return a.rank - b.rank || a.i - b.i; });" in order
+    assert "var picks = st[team].map(function (name, at) { return { name: name, at: at }; });" \
+        in order
+    assert "var open = suggested.map(function (p) { return { name: p.hero, p: p }; });" in order
+    assert "r = ROLES.indexOf(h ? h.role : p ? p.role : '');" in order
+    assert "return r < 0 ? ROLES.length : r;" in order
+    assert "for (var r = 0; r <= ROLES.length; r++) {" in order
+    assert "var room = Math.max(shape && r < ROLES.length ? shape[r] : 0, mine.length);" in order
+    assert "mine.concat(open.filter(function (x) { return rank(x.name, x.p) === r; }))" \
+        ".slice(0, room);" in order
+    assert "while (role.length < room) role.push(null);" in order
+    # past six, a role over its slots takes the last empty slots, then the
+    # last suggestions - never a pick
+    assert "row.length > TEAM && k >= 0; k--) if (!row[k]) row.splice(k, 1);" in order
+    assert "row.length > TEAM && k >= 0; k--) if (row[k].p) row.splice(k, 1);" in order
+    shape = function(script, "shapeOf")
+    assert "six.picks.filter(function (p) { return p.role === role; }).length" in shape
     rows = function(script, "paintRows")
-    assert "paintRow('blue', lineup('blue', open))" in rows
-    assert "paintRow('red', lineup('red', likely))" in rows
+    assert "st.blue.length && asked.length ? d.fill : d.blue;" in rows
+    assert "var six = src || (asked.length ? d.current : null);" in rows
+    assert "paintRow('blue', lineup('blue', open, shapeOf(six)))" in rows
+    assert "paintRow('red', lineup('red', likely, shapeOf(ok ? d.expected : null)))" in rows
     paint = function(script, "paint")
     assert "var rows = paintRows();" in paint and "paintSwaps(rows.blue);" in paint
     assert not re.search(r"st(\.blue|\.red|\[team\])\.sort\(", script)
     # each slot draws its entry's hero, a pick solid and a suggestion dashed,
-    # and only an open slot carries a number, its place in the row
+    # with no number; an empty slot counts among the empty slots
     row = function(script, "paintRow")
     assert "s.className = x.p ? 'slot suggested' : 'slot full'; s.setAttribute('data-h', x.name);" \
         in row
-    assert "s.removeAttribute('data-h')" in row and "(i + 1)" in row
+    assert "s.removeAttribute('data-h')" in row and "(++empty)" in row
+    assert row.count("class='idx'") == 1 and "(i + 1)" not in row
     # a click reads data-h, never a slot's place
     assert not re.search(r"data-i\b", script)
     assert "var hit = near('[data-h][data-team]');" in script
