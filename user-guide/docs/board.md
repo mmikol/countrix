@@ -180,6 +180,8 @@ team alone. The board keeps the map, the stage, the side, the bans, the
 picks, the weights and the open tab in your browser, so a reload
 mid-game loses nothing.
 
-The pills at the top right link the pages behind the board, such as
-[the math page](math.md) and [the registry](registry.md), and the
-repository on GitHub.
+The pills at the top right link the pages behind the board -
+[the math page](math.md), [the registry](registry.md) and
+[the study](study.md) - and the repository on GitHub. Every page closes
+with Blizzard's notice for Overwatch and the wiki's credit
+([credits and licences](credits.md)).

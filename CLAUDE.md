@@ -423,9 +423,11 @@ db <- facts <- inference <- door <- ui.
 - Prose in docs, comments, skills and commits is terse, declarative, present
   tense and ASCII, with a spaced hyphen where a dash would go. Headings name
   things with the definite article ("The files"). Non-ASCII is kept to math
-  notation, the middle-dot separator, accented hero names and the board's
-  glyphs (the ban cross, the ellipsis). `.claude/skills/desloppify/SKILL.md`
-  is the tool's own text: leave it as `update-skill` writes it.
+  notation, the middle-dot separator, accented hero names, the board's
+  glyphs (the ban cross, the ellipsis) and the legal notices' trademark and
+  copyright signs, which the footer, NOTICE, the README and the user guide
+  print alike. `.claude/skills/desloppify/SKILL.md` is the tool's own text:
+  leave it as `update-skill` writes it.
 - Commit subjects state the outcome as a sentence, no type prefix, no period
   ("The scale holds still under bans"). The body says why, in prose wrapped
   near 72 columns, with measured numbers such as the test count.

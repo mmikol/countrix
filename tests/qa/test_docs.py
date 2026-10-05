@@ -7,6 +7,7 @@ sections db_docs generates match what the code generates today. Pure,
 except the schema check."""
 
 import ast
+import html
 import json
 import os
 import re
@@ -16,6 +17,7 @@ import subprocess
 import pytest
 
 from db import ROOT
+from ui import pages
 
 DOCS = os.path.join(ROOT, "docs")
 SKILLS = os.path.join(ROOT, ".claude", "skills")
@@ -319,13 +321,34 @@ def test_the_notice_states_the_third_party_terms_and_names_files_that_exist():
     flat = " ".join(notice.split())
     for phrase in ("CC BY-NC-SA 3.0", "https://creativecommons.org/licenses/by-nc-sa/3.0/",
                    "https://overwatch.fandom.com", "SIL Open Font License 1.1",
-                   "Overwatch(TM) (c) 2016 Blizzard Entertainment, Inc. All rights reserved.",
+                   "Overwatch\u2122 \u00a9 2016 Blizzard Entertainment, Inc. All rights reserved.",
                    "not affiliated with or endorsed by Blizzard"):
         assert phrase in flat, phrase
     named = re.findall(r"^ +((?:tests|ui|db|docs)/\S+)$", notice, re.M)
     assert len(named) >= 10, named
     missing = [path for path in named if not os.path.exists(os.path.join(ROOT, path))]
     assert not missing, missing
+
+
+def test_every_place_prints_the_same_notices_with_the_copyright_sign():
+    """Blizzard's Overwatch notice reads the same, its trademark and
+    copyright signs included, in every page's footer, NOTICE, the README,
+    the guide's credits and the guide's footer; the owner's copyright line
+    reads the same in all but the board's footer, which prints none.
+    Entities and markup are read as the page shows them."""
+    blizzard = ("Overwatch\u2122 \u00a9 2016 Blizzard Entertainment, Inc. All rights reserved."
+                " Overwatch is a trademark or registered trademark of Blizzard Entertainment,"
+                " Inc. in the U.S. and/or other countries.")
+    owner = "Copyright \u00a9 2026 Miliano Mikol"
+    sources = {
+        "the footer": pages.FOOTER, "NOTICE": _read("NOTICE"), "README.md": _read("README.md"),
+        "credits.md": _read("user-guide", "docs", "credits.md"),
+        "mkdocs.yml": _read("user-guide", "mkdocs.yml")}
+    for name, source in sources.items():
+        text = " ".join(html.unescape(re.sub(r"<[^>]+>", " ", source)).split())
+        assert blizzard in text, name
+        assert (owner in text) == (name != "the footer"), name
+        assert "(c)" not in text and "(TM)" not in text, name
 
 
 def test_the_playbooks_grant_reads_the_same_wherever_the_licence_is_told():

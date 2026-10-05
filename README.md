@@ -196,7 +196,7 @@ the data current, `/maintain` runs the checks and keeps the docs current.
 
 ## License
 
-Copyright (c) 2026 Miliano Mikol. The [PolyForm Strict License 1.0.0](LICENSE)
+Copyright © 2026 Miliano Mikol. The [PolyForm Strict License 1.0.0](LICENSE)
 covers Countrix's own code and text: noncommercial use only, no
 redistribution, no changes or new works; anything else needs a separate
 written license.
@@ -227,7 +227,7 @@ each under its own terms:
   CounterWatch's 6v6 data, which the study measures against, stays in a
   private benchmark repository.
 
-Overwatch(TM) (c) 2016 Blizzard Entertainment, Inc. All rights reserved.
+Overwatch™ © 2016 Blizzard Entertainment, Inc. All rights reserved.
 Overwatch is a trademark or registered trademark of Blizzard Entertainment,
 Inc. in the U.S. and/or other countries. Countrix is a fan project, not
 affiliated with or endorsed by Blizzard Entertainment.

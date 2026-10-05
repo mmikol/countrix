@@ -2,7 +2,7 @@
 
 ## Countrix
 
-Copyright (c) 2026 Miliano Mikol. Countrix's code is under the
+Copyright © 2026 Miliano Mikol. Countrix's code is under the
 [PolyForm Strict License 1.0.0](https://polyformproject.org/licenses/strict/1.0.0):
 noncommercial use only, no redistribution, no changes or new works;
 anything else needs a separate written licence from the author. It
@@ -17,14 +17,15 @@ the rest of Countrix stays under PolyForm Strict.
 
 ## Blizzard Entertainment
 
-Overwatch&trade; &copy; 2016 Blizzard Entertainment, Inc. All rights
+Overwatch™ © 2016 Blizzard Entertainment, Inc. All rights
 reserved. Overwatch is a trademark or registered trademark of Blizzard
 Entertainment, Inc. in the U.S. and/or other countries.
 
 Countrix is a fan project, not affiliated with or endorsed by Blizzard
-Entertainment. The game, its hero names, portraits, role icons and
-ability text, and the win, pick and ban rates on its site are
-Blizzard's. The board loads the portraits and role icons from
+Entertainment. Every page of the board, and of this guide, closes with
+this notice and the wiki's credit. The game, its hero names, portraits,
+role icons and ability text, and the win, pick and ban rates on its site
+are Blizzard's. The board loads the portraits and role icons from
 Blizzard's own servers. Blizzard's website terms grant the rates for
 personal use.
 
@@ -40,7 +41,7 @@ short excerpts in the repository's tests - keeps that licence.
 
 ## Bebas Neue
 
-The board's display face, Bebas Neue, is copyright &copy; 2010 by
+The board's display face, Bebas Neue, is copyright © 2010 by
 Dharma Type, under the SIL Open Font License 1.1. Its licence travels
 with the font, in
 [ui/static/OFL.txt](https://github.com/mmikol/countrix/blob/main/ui/static/OFL.txt).
@@ -51,5 +52,5 @@ The guide is built with [MkDocs](https://www.mkdocs.org) (BSD-2-Clause)
 and [Material for MkDocs](https://squidfunk.github.io/mkdocs-material/)
 (MIT). Its search runs from pages opened straight from the disk through
 [iframe-worker](https://github.com/squidfunk/iframe-worker)'s shim,
-copyright (c) 2020-2022 Martin Donath, MIT, which the guide carries with
+copyright © 2020-2022 Martin Donath, MIT, which the guide carries with
 its licence in `js/iframe-worker.js`.

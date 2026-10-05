@@ -17,6 +17,11 @@ WARNING: *WARNING: blue Reinhardt is answered by red Pharah*.
 The first fact, F1, is the rates' capture: when Blizzard's rates were
 taken, under which patch, and for which queue, platform and region.
 
+A line under the list credits the Overwatch Wiki, whose kits, maps,
+terrain, playstyles, synergies and counters the facts quote, and its
+licence, CC BY-NC-SA 3.0; the rates are Blizzard's
+([credits and licences](credits.md)).
+
 The facts come in groups, each under a heading: *meta* (the rates'
 capture), *bans*, *map*, each hero of each team (*blue · Ana*), each
 team (*blue team*), and *matchup*, the two teams set against each
