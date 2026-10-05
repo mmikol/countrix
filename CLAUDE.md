@@ -306,11 +306,15 @@ db <- facts <- inference <- door <- ui.
   a literal percent in `ui/static/math.html` is written `%%`, as it is in
   `ui/static/study.html`.
 - `ui/static/study.json` is the study's results, the file the private
-  benchmark's study publishes (`countrix-study/1`); one that says
-  `"sample": true` was written to build the page and is said so. The page
-  reads its metrics by id, never a raw rate, and
-  `tests/verification/ui/test_study.py` holds the renderer to the file:
-  every chart drawn, every string escaped, the schema checked.
+  benchmark's harness writes (`countrix-study/1`), copied here when a run
+  is published; without it the page says the results are not in place,
+  and no sample ships there. The page reads each part in the shape the
+  harness writes it - `tests/fixtures/study.json` is its file of
+  2026-10-05, trimmed - and its metrics by id, never a raw rate.
+  `tests/verification/ui/test_study.py` holds the renderer to the fixture
+  and to the file in place: every block filled, every chart drawn, every
+  string escaped, the schema checked. A change to the harness's shapes
+  changes `ui/study.py` and the fixture together.
 - `test_the_search_reaches_the_enumerated_maximum` in
   `tests/verification/inference/test_solver.py` is the regression gate on
   the search: synthetic boards - red revealed, locks, bans, a pair that pays

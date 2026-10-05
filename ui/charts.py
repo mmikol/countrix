@@ -305,8 +305,9 @@ class HeatColumn(NamedTuple):
 
 
 class HeatRow(NamedTuple):
-    """A row: its label and the address it links, and per column a share
-    for the cell's fill and a share for its dot, with the cell's tooltip."""
+    """A row: its label and the address it links - none where empty - and
+    per column a share for the cell's fill and a share for its dot, with
+    the cell's tooltip."""
     label: str
     href: str
     cells: tuple[tuple[float, float], ...]
@@ -333,8 +334,8 @@ def heatmap(rows: Sequence[HeatRow], columns: Sequence[HeatColumn], name: str) -
                 line(at[0], top - 9, at[-1] + cell, top - 9, "ref")]
     for i, row in enumerate(rows):
         y = top + i * step
-        out.append("<a href='%s'>%s</a>" % (esc(row.href), text(
-            label - 8, y + cell - 3, cut(row.label, 38), "lab", "end")))
+        name = text(label - 8, y + cell - 3, cut(row.label, 38), "lab", "end")
+        out.append("<a href='%s'>%s</a>" % (esc(row.href), name) if row.href else name)
         for xx, (fill, dot), tip in zip(xs, row.cells, row.tips, strict=True):
             marks = ["<rect x='%.1f' y='%.1f' width='%.0f' height='%.0f' class='cell0'/>"
                      % (xx, y, cell, cell)]
@@ -372,7 +373,8 @@ POWERS = ("1", "10", "100", "1k", "10k", "100k", "1M", "10M", "100M", "1G")
 
 def funnel(stages: Sequence[Stage], heading: str) -> str:
     """A bar a stage on a log scale from 1: the median, its whisker and each
-    value a faint dot under it, the median written at the bar's end."""
+    value a faint dot under it - one dot where values fall on one spot -
+    the median written at the bar's end."""
     biggest = max(max([*s.quantiles.values(), *s.each, 1.0]) for s in stages)
     powers = max(1, math.ceil(math.log10(max(biggest, 10.0))))
     left, right, top = 118.0, PANEL - 64.0, 44.0
@@ -392,8 +394,8 @@ def funnel(stages: Sequence[Stage], heading: str) -> str:
         out += [text(left - 8, cy + 4, stage.label, "lab", "end"),
                 "<rect x='%.1f' y='%.1f' width='%.1f' height='14' class='bar'/>"
                 % (left, cy - 7, max(1.0, at(median) - left))]
-        out += ["<circle cx='%.1f' cy='%.1f' r='2.2' class='faint'/>" % (at(v), cy + 12)
-                for v in stage.each]
+        out += ["<circle cx='%s' cy='%.1f' r='2.2' class='faint'/>" % (spot, cy + 12)
+                for spot in dict.fromkeys("%.1f" % at(v) for v in stage.each)]
         if "p10" in stage.quantiles and "p90" in stage.quantiles:
             out.append(line(at(stage.quantiles["p10"]), cy, at(stage.quantiles["p90"]), cy,
                             "whisk"))

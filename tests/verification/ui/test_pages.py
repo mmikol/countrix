@@ -42,7 +42,7 @@ from inference.result import (
 )
 from inference.scoring import Contribution
 from inference.strategy import WEIGHT_RANGE, StrategyRecord
-from tests.verification.inference import BRIEF, FIXTURE_PLAYBOOK
+from tests.verification.inference import BRIEF, FIXTURE_PLAYBOOK, FIXTURES
 from ui import board, pages, registry, serve, study
 
 
@@ -733,10 +733,12 @@ def test_the_registry_hides_its_entries_but_without_scripts_and_in_print():
 
 def test_the_study_is_a_page_in_the_shell_its_contents_land_on_and_the_header_links():
     """/study is ui/study.py's page in the shell the math page has, with no
-    script: its contents' links land on ids the page holds, with the
-    results file and without one, and its links into the board's other
-    pages name the math page's and the registry's own anchors."""
-    with_results, without = study.view_study(), study.view_study("/nowhere/study.json")
+    script: its contents' links land on ids the page holds, with a results
+    file (the fixture, in the harness's shapes) and without one, and its
+    links into the board's other pages name the math page's and the
+    registry's own anchors."""
+    with_results = study.view_study(os.path.join(FIXTURES, "study.json"))
+    without = study.view_study("/nowhere/study.json")
     for page in (with_results, without):
         assert page.startswith(pages.HEAD) and "<script" not in page
         toc = page[page.index("<nav class='toc'>"):page.index("</nav>")]

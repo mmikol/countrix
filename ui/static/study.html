@@ -29,8 +29,8 @@ other side and keep the playbook's rules? The first is answered by a proof, chec
 force. The second is answered by a study: Countrix's teams beside the kinds of tool people use
 online - CounterWatch's team builder, tier lists built from the rates, counter pickers and the
 most-picked heroes - every tool's six scored on the same boards, on Countrix's own scale and on
-CounterWatch's 6v6 numbers, which Countrix never reads. A section between them asks whether
-anything in the engine is written for Overwatch alone.</p>
+CounterWatch's 6v6 numbers, which Countrix as shipped never reads. A section between them asks
+whether anything in the engine is written for Overwatch alone.</p>
 <h2 id='plain-words'>In plain words</h2>
 <ul class='plain'>
 <li><b>One formula scores every team.</b> Countrix scores each team of six with the same formula.
@@ -46,7 +46,7 @@ the teams that share the picks made so far. For each branch it works out a safe 
 number no team in the branch can beat. Once that number falls below the teams already kept, the
 whole branch is dropped. Every drop rests on arithmetic, never on a hunch.</li>
 <li><b>How much work that takes.</b> On an open board the search scores a few dozen teams in full
-and proves that none of the others can place, in hundredths of a second
+at most and proves that none of the others can place, in hundredths of a second
 (<a href='#the-evidence'>the evidence</a>).</li>
 <li><b>It never guesses.</b> If it cannot prove its answer within its budget - %(NODE_BUDGET)s
 branches or %(SCORE_BUDGET)s teams scored in full - it refuses. If no team is allowed, it proves
@@ -161,7 +161,7 @@ is listed; a six that breaks one is never offered
 are exactly the legal leaves reached.</li>
 </ol>
 <p><b>The count check.</b> On the roster the proof was checked on, on 2026-10-05 - %(TANKS)s
-tanks, %(DAMAGE)s damage and %(SUPPORTS)s supports released - the shapes the playbook in force
+tanks, %(DAMAGE)s damage and %(SUPPORTS)s supports released - the shapes the shipped playbook
 allows hold these sixes, and the walk's <i>considered</i> equalled the sum on every open
 board:</p>
 %(SHAPES)s
@@ -316,8 +316,9 @@ first hero in the first phase, since 8 is less than 10, and swaps in the second,
 swapping in the first phase would net 10. The code says so
 (<a href='%(CODE)s/inference/swaps.py#L40-L45'>swaps.py:40-45</a>).</p>
 <h3 id='the-assumptions'>The assumptions</h3>
-<p>Optimal is relative to these, which the playbook holds as assumptions, each written out on the
-<a href='/registry#the_assumptions'>registry</a>:</p>
+<p>Optimal is relative to these, the assumptions the shipped playbook holds - the one the evidence
+and the study read - each written out on the <a href='/registry#the_assumptions'>registry</a>
+while the board runs that playbook:</p>
 %(ASSUMPTIONS)s
 <p>And to the model's own choices: Blizzard's rates are 5v5 Competitive Role Queue on console,
 read as a proxy for 6v6 Open Queue; synergy and counters are the wiki's, a counter edge derived
@@ -433,12 +434,13 @@ metric without one.</p>
 <p><b>The boards.</b> Every map both data sources know, four red sixes drawn on each from
 CounterWatch's 6v6 pick rates, and each met at three moments: nothing revealed, one pick per role
 revealed, all six. Blue picks all six; nothing is banned. The maps are split in two halves within
-each mode by a seeded shuffle fixed before any result was seen; the dials were tuned on one half,
-so anything they touch is judged on the other, the <i>test</i> half. Red is drawn afresh for the
-study, so no tuning has seen its boards. Further sets repeat the boards of the earlier benchmark,
-ban the three heroes Countrix fields most, solve on the older capture of the rates, and feed
-CounterWatch's 6v6 rates to the engine, in memory, never stored. The boards are whole maps, as
-CounterWatch's numbers per map are.</p>
+each mode by a seeded shuffle fixed before any result was seen, and the results are read on the
+<i>test</i> half. It is no clean hold-out: the synergy and counter dials were halved on 2026-10-04
+with both halves' results in view, so the train half against the test half is no clean check of
+generalization. Red is drawn afresh for the study, so no tuning has seen its boards. Further sets
+repeat the boards of the earlier benchmark, ban the three heroes Countrix fields most, solve on the
+older capture of the rates, and feed CounterWatch's 6v6 rates to the engine, in memory, never
+stored. The boards are whole maps, as CounterWatch's numbers per map are.</p>
 <p><b>The arms.</b> Every arm picks a six on every board from data already held; no site is
 fetched for the study.</p>
 <ul>
@@ -475,10 +477,13 @@ its 95%% range from drawing the maps again with replacement - the range the aver
 if the maps were drawn again. A gap between two arms is taken on the same board. No p-values.</p>
 %(DESIGN)s
 <h2 id='the-results'>The results</h2>
-<p>Each tool is strongest on its own numbers. CounterWatch's arms are scored on CounterWatch's data
-and lead there by construction; Countrix's are scored on Countrix's objective and lead there for
-the same reason. The tier lists, the counter pickers and Countrix read Blizzard's 5v5 console
-rates and the wiki, and are scored on CounterWatch's 6v6 PC numbers, which none of them read.</p>
+<p>Each tool is strongest on its own numbers: CounterWatch's builder is scored on CounterWatch's
+data and leads there by construction, and Countrix on its own objective, for the same reason. The
+arms table above says what each arm reads. Countrix, the tier list and the most picked on
+Blizzard's rates, HeroStats' and OW Hero Stats' scores and the wiki's counter picker read
+Blizzard's 5v5 console rates and the wiki, and play away on CounterWatch's 6v6 PC numbers;
+CounterWatch's tier list, its counter picker and its most picked read CounterWatch's data, and
+play at home there, as its builder does.</p>
 <h3 id='landing'>Where each six lands</h3>
 %(SHARES)s
 <h3 id='makeup'>What each six is made of</h3>
@@ -511,10 +516,13 @@ the data.</p>
 claim.</li>
 <li>Each yardstick favours its home: read a tool's lead on its own numbers as the yardstick's, not
 the tool's.</li>
-<li>Where a plain tier list or the engine without its rules scores above shipped Countrix on
-CounterWatch's yardstick, the difference is what the playbook's rules cost there. The rules weigh
-what CounterWatch's numbers cannot see - a save, a barrier, healing parity, one playstyle - and the
-rules' table says what each buys and costs.</li>
+<li>The layers read what the rules cost on CounterWatch's yardstick: where the default engine
+alone scores above Countrix as shipped there, the gap is what the playbook's heuristics cost, and
+where the engine with only the two-of-each-role rule does, what the others cost; the board-by-board
+table gives each gap with its range. A tier list's lead is not the rules' cost: it differs from
+Countrix in more than the rules, reading the rates alone, with none of the engine's synergy and
+counter terms. The rules weigh what CounterWatch's numbers cannot see - a save, a barrier, healing
+parity, one playstyle - and the rules' table says what each buys and costs.</li>
 <li>The data swap separates the optimiser from its data: the same engine, fed CounterWatch's
 rates, is scored on CounterWatch's yardstick beside its own six.</li>
 <li>It does not show that Countrix wins more games than any tool. No source publishes 6v6 match

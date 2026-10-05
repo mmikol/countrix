@@ -3,19 +3,24 @@ objective allows, the audit of what the code fixes and what it reads from
 the data, and the study's results - Countrix's teams beside the tools
 people use, on the same boards - rendered on every call. The prose is
 ui/static/study.html, the code's constants filled in from their modules as
-the math page's are; the results are read from the file the benchmark
-publishes, ui/static/study.json, in the countrix-study/1 schema (SCHEMA),
-and ui/charts.py draws each chart, beside a table of its numbers.
+the math page's are; the results are read from the file the benchmark's
+harness writes, in the countrix-study/1 schema (SCHEMA), once it is in
+place at ui/static/study.json, and ui/charts.py draws each chart, beside a
+table of its numbers.
 
 The page computes no result: each number it shows of the study is the
 file's. It reads the metrics by their ids, each a percentile among a
 board's random sixes, a share of a yardstick or a satisfaction, so a raw
-rate a file carried by mistake is never drawn. A file that is missing,
-unreadable or of another schema leaves the proof and the audit standing
-and says so where the results would be; a file that says it is a sample
-(`"sample": true`) says so above everything. Every string read from the
-file is escaped. ui/board.py serves the page; nothing here reads the
-database.
+rate a file carried by mistake is never drawn, and it reads each part of
+the file in the shape the harness writes it (tests/fixtures/study.json
+keeps those shapes). A file that is missing, unreadable or of another
+schema leaves the proof and the audit standing and says so where the
+results would be; a file that says it is a sample (`"sample": true`), or
+was measured under another playbook or other engine weights than the
+board runs, says so above everything. The count check and the
+assumptions are the shipped playbook's, the one the proof and the study
+read. Every string read from the file is escaped. ui/board.py serves the
+page; nothing here reads the database.
 """
 
 import json
@@ -26,7 +31,7 @@ from collections.abc import Iterator, Mapping, Sequence
 from typing import Any, NamedTuple
 
 from facts.draft import MAX_TANKS, TEAM_SIZE
-from inference import bounds, catalog, ranges, scale, scoring, solver, strategy
+from inference import base, bounds, catalog, ranges, scale, scoring, solver, strategy
 from inference.shapes import legal_shapes
 from ui import charts, pages
 from ui.charts import Stat
@@ -93,13 +98,21 @@ TEAM_PANELS = (
     ("On Blizzard's rates and the wiki", "pct_str_bz", "team_wiki"),
     ("On CounterWatch's 6v6 numbers", "pct_str_cw", "team_cw"))
 RULES_KEPT = "sat_mean"
+OWN_KEPT = "own_satisfaction"               # a rule's own satisfaction, in its `without`
 HEADLINE = (*YARDSTICK, *OWN_SCALE, "pct_str_bz", "team_wiki", RULES_KEPT)
+PAIRED = (*YARDSTICK, *OWN_SCALE)           # the gaps the board-by-board table gives
+# the Meta slider's columns: the engine's and the playbook's parts, then the
+# aggregates each step's six holds
+SLIDER = ("engine_part", "playbook_part", *YARDSTICK, RULES_KEPT, "pct_str_bz", "is_222")
 LABELS = {
     "y_matchup": "CounterWatch's yardstick, matchups",
     "y_rating": "CounterWatch's yardstick, duels", "cx_rel": "Countrix's scale",
     "pct_str_bz": "strength, Blizzard", "pct_str_cw": "strength, CounterWatch",
     "team_wiki": "team edge, wiki", "team_cw": "team edge, CounterWatch",
-    RULES_KEPT: "rules kept"}
+    RULES_KEPT: "rules kept", OWN_KEPT: "the rule's own satisfaction",
+    "is_222": "two of each role", "engine_part": "the engine's part",
+    "playbook_part": "the playbook's part"}
+FRACTION = "0-1"                            # the unit of a metric that runs from 0 to 1
 
 # a score's parts as the stacked bars draw them: Countrix's three terms and
 # its rules together, and CounterWatch's three parts in the colour of the
@@ -112,8 +125,13 @@ COUNTRIX_PARTS = (("base.rates", charts.Part("win rates", "p1")),
 YARDSTICK_PARTS = (("map", charts.Part("map advantage", "p1")),
                    ("composition", charts.Part("composition", "p2")),
                    ("counter", charts.Part("counters", "p3")))
-SEARCH_STAGES = (("legal", "considered", "legal sixes"), ("nodes", "nodes", "branches walked"),
-                 ("leaves", "leaves", "scored in full"))
+SEARCH_STAGES = (("legal", "legal sixes"), ("nodes", "branches walked"),
+                 ("leaves", "scored in full"))
+SEARCH_SECONDS = ("seconds", "seconds, the whole solve")
+# a row's search, as the file's legend.rows gives it: legal sixes, branches
+# walked, sixes scored in full, seconds, sixes tied
+ROW_SEARCH = ("legal", "nodes", "leaves", "seconds", "tied")
+QUANTILES = ("min", "p10", "median", "p90", "max")
 
 
 # --- the results file ---------------------------------------------------------------------
@@ -130,7 +148,8 @@ def read_study(path: str = RESULTS_PATH) -> Study:
     JSON or holds no object, or one of another schema."""
     shown = RESULTS_NAME if path == RESULTS_PATH else os.path.basename(path)
     if not os.path.isfile(path):
-        return Study(None, "The study has not been run: there is no results file, %s." % shown)
+        return Study(None, "The study's results are not in place: there is no results file,"
+                     " %s." % shown)
     try:
         with open(path, encoding="utf-8") as handle:
             data = json.load(handle)
@@ -243,6 +262,15 @@ def label(results: Mapping[str, Any], metric: str) -> str:
     return known.label if known is not None else LABELS.get(metric, metric)
 
 
+def places(results: Mapping[str, Any], metric: str, extra: int = 0) -> int:
+    """The decimals a metric is written to: two for one that runs from 0
+    to 1, a satisfaction or a share of boards, one for a percentile or a
+    share of a scale; `extra` more for a small gap."""
+    known = metrics(results).get(metric)
+    fraction = metric == OWN_KEPT or (known is not None and known.unit == FRACTION)
+    return (2 if fraction else 1) + extra
+
+
 class Where(NamedTuple):
     """Where a chart reads the aggregates: a set of boards and a slice of it."""
     set: str
@@ -310,6 +338,12 @@ def count(value: Any) -> str:
     return format(round(out), ",") if out == round(out) else fmt(out, 3)
 
 
+def seconds(value: Any) -> str:
+    """A time in seconds: to a tenth from 1 s up, to a thousandth below."""
+    out = number(value)
+    return "-" if out is None else fmt(out, 1 if abs(out) >= 1 else 3)
+
+
 def stat_html(s: Stat | None, places: int = 1) -> str:
     """A Stat as a table writes it: the mean, its range in brackets."""
     if s is None:
@@ -360,7 +394,7 @@ def missing(what: str) -> str:
 
 def where_words(where: Where) -> str:
     """The boards a chart reads, in words."""
-    half = {"test": "maps held out of any tuning", "train": "maps the dials were tuned on",
+    half = {"test": "test-half maps", "train": "train-half maps",
             "all": "maps"}.get(where.slice, "%s slice" % where.slice)
     return "%s boards on the %s" % (esc(where.set), esc(half))
 
@@ -404,22 +438,15 @@ def shares_figure(results: Mapping[str, Any], where: Where) -> str:
 
 def parts_of(
         results: Mapping[str, Any], where: Where, arm: str, scale_id: str) -> dict[str, float]:
-    """An arm's parts of one score: the file's parts where it holds them,
-    else the aggregates' part.* or ypart_<reading>.* metrics."""
+    """An arm's parts of one score, as the file's parts[set][slice][arm]
+    holds them: each part's mean, by name; none where the file holds
+    none."""
     held = get(results, "parts", where.set, where.slice, arm, scale_id)
     out: dict[str, float] = {}
-    if isinstance(held, dict):
-        for name, value in held.items():
-            mean = stat(value)
-            if mean is not None:
-                out[str(name)] = mean.mean
-        return out
-    prefix = "part." if scale_id == "countrix" else "ypart_%s." % scale_id.split("_", 1)[-1]
-    row = get(results, "aggregates", where.set, where.slice, arm)
-    for name, value in row.items() if isinstance(row, dict) else ():
+    for name, value in held.items() if isinstance(held, dict) else ():
         mean = stat(value)
-        if str(name).startswith(prefix) and mean is not None:
-            out[str(name)[len(prefix):]] = mean.mean
+        if mean is not None:
+            out[str(name)] = mean.mean
     return out
 
 
@@ -457,7 +484,7 @@ def parts_figure(results: Mapping[str, Any], where: Where) -> str:
             ["arm", *(p.label for _, p in shown), "sum"],
             [[esc(r.label), *(fmt(v) for v in r.values), fmt(sum(r.values))] for r in rows])))
     if not panels:
-        return missing("the parts of each score (parts, or the part.* metrics)")
+        return missing("the parts of each score (parts)")
     legend = key([(p.css, "sq", "%s, or %s" % (p.label, q.label)) for (_, p), (_, q)
                   in zip(COUNTRIX_PARTS, YARDSTICK_PARTS, strict=False)]
                  + [(COUNTRIX_PARTS[-1][1].css, "sq", COUNTRIX_PARTS[-1][1].label)])
@@ -518,7 +545,7 @@ def rules_of(results: Mapping[str, Any]) -> list[tuple[str, dict[str, Any]]]:
 
 def map_columns(results: Mapping[str, Any]) -> list[charts.HeatColumn]:
     """The design's maps as the heatmap's columns, by mode then name, a map
-    of the held-out half marked."""
+    of the test half marked."""
     maps = get(results, "design", "maps")
     listed = [
         (plain(m.get("mode")), plain(m.get("name")), plain(m.get("half")) == "test")
@@ -535,10 +562,19 @@ def share(value: Any) -> str:
     return "%s, %s%%" % (count(boards) if boards is not None else "-", fmt(100 * part, 0))
 
 
-def rules_figure(results: Mapping[str, Any]) -> str:
+def entry(rid: str, name: str, linked: frozenset[str]) -> str:
+    """A rule's name, linked to its registry entry where the playbook in
+    force holds the rule - the registry lists that playbook's alone."""
+    if rid not in linked:
+        return esc(name)
+    return "<a href='/registry#%s'>%s</a>" % (esc(rid), esc(name))
+
+
+def rules_figure(results: Mapping[str, Any], linked: frozenset[str]) -> str:
     """The rules: where each applies and where it changes Countrix's six,
     map by map; then a row a rule - how often it applies and moves the six,
-    how well each six keeps it, and what leaving it out does."""
+    how well each six keeps it, its mean satisfaction, and what leaving it
+    out does, Countrix as shipped less the six without the rule."""
     rules, columns = rules_of(results), map_columns(results)
     if not rules:
         return missing("the rules (rules)")
@@ -555,14 +591,15 @@ def rules_figure(results: Mapping[str, Any]) -> str:
                 tips.append("%s on %s - applies on %.0f%% of its boards; leaving it out changes"
                             " the six on %.0f%%" % (name, column.name, 100 * applies,
                                                    100 * moves))
-            rows.append(charts.HeatRow(name, "/registry#%s" % rid, tuple(cells), tuple(tips)))
+            rows.append(charts.HeatRow(name, "/registry#%s" % rid if rid in linked else "",
+                                       tuple(cells), tuple(tips)))
         caption = ("A row a heuristic and a column a map, grouped by mode; a bar under a map marks"
-                   " the half held out of any tuning. A cell's blue is the share of the map's"
-                   " boards where the rule applies to Countrix's six, its dot the share where"
-                   " leaving the rule out changes the six. A rule's name opens its entry on the"
-                   " registry. %s" % key([("", "sq cellkey", "applies"),
-                                          ("", "movedkey", "moves the six"),
-                                          ("", "testkey", "a held-out map")]))
+                   " the test half. A cell's blue is the share of the map's boards where the rule"
+                   " applies to Countrix's six, its dot the share where leaving the rule out"
+                   " changes the six. A rule's name opens its entry on the registry where the"
+                   " playbook in force holds it. %s" % key([
+                       ("", "sq cellkey", "applies"), ("", "movedkey", "moves the six"),
+                       ("", "testkey", "a test-half map")]))
         numbers = table(["rule", *(c.name for c in columns)], [
             [esc(row.label), *(fmt(100 * applies, 0) for applies, _ in row.cells)]
             for row in rows])
@@ -582,12 +619,15 @@ def rules_figure(results: Mapping[str, Any]) -> str:
     body = []
     for rid, r in rules:
         body.append([
-            "<a href='/registry#%s'>%s</a>" % (esc(rid), esc(plain(r.get("name")) or rid)),
+            entry(rid, plain(r.get("name")) or rid, linked),
             esc(plain(r.get("form"))), fmt(number(r.get("weight")), 2),
             share(r.get("applies")), share(r.get("moves")),
-            *(fmt(number(get(r, "satisfaction", a)), 2) for a in kept_by),
-            *(stat_html(stat(get(r, "without", m))) for m in without)])
-    out.append(table(head, body))
+            *(stat_html(stat(get(r, "satisfaction", a)), 2) for a in kept_by),
+            *(stat_html(stat(get(r, "without", m)), places(results, m, 1)) for m in without)])
+    out.append(table(head, body) + (
+        "<p class='legend'>Kept by: each six's mean satisfaction of the rule, 0 to 1. Left out:"
+        " Countrix as shipped less the six it picks with the rule's weight at 0, board by board,"
+        " with its range; a gain the rule brings is above 0.</p>" if kept_by or without else ""))
     return "".join(out)
 
 
@@ -597,70 +637,140 @@ def quantiles(value: Any) -> dict[str, float]:
             if q is not None} if isinstance(value, dict) else {}
 
 
-def search_figure(results: Mapping[str, Any]) -> str:
+def row_search(row: Mapping[str, Any], name: str) -> float | None:
+    """A board row's count of one stage of its search, read from the list
+    the row holds in ROW_SEARCH's order."""
+    held = row.get("search")
+    at = ROW_SEARCH.index(name)
+    return number(held[at]) if isinstance(held, list) and len(held) > at else None
+
+
+def search_figure(results: Mapping[str, Any], where: Where) -> str:
     """The search's work on the study's boards: each stage's quantiles from
-    the file, and each board of its rows a faint dot."""
+    the file, and under each bar the boards of the file's rows on the
+    primary set, a faint dot each."""
     search = get(results, "proof", "search")
     if not isinstance(search, dict):
         return missing("the search's counts (proof.search)")
     rows = results.get("rows")
-    boards = [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
+    rows = rows if isinstance(rows, list) else []
+    boards = [r for r in rows if isinstance(r, dict) and r.get("set") == where.set]
     stages = []
-    for name, per_board, words in SEARCH_STAGES:
+    for name, words in SEARCH_STAGES:
         q = quantiles(search.get(name))
         if "median" in q:
-            each = tuple(v for v in (number(get(b, "search", per_board)) for b in boards)
-                         if v is not None)
+            each = tuple(v for v in (row_search(b, name) for b in boards) if v is not None)
             stages.append(charts.Stage(words, q, each))
     if not stages:
         return missing("the search's counts (proof.search)")
     stages.append(charts.Stage("the answer", {"median": 1.0}, ()))
-    numbers = table(["stage", "min", "p10", "median", "p90", "max"], [
-        [esc(words), *(count(get(search, name, q)) for q in ("min", "p10", "median", "p90", "max"))]
-        for name, words in (*((n, w) for n, _, w in SEARCH_STAGES), ("seconds", "seconds"))
-        if isinstance(search.get(name), dict)])
+    body = [[esc(words), *(count(get(search, name, q)) for q in QUANTILES)]
+            for name, words in SEARCH_STAGES if isinstance(search.get(name), dict)]
+    name, words = SEARCH_SECONDS
+    if isinstance(search.get(name), dict):
+        body.append([esc(words), *(seconds(get(search, name, q)) for q in QUANTILES)])
     facts = []
-    if number(search.get("refused")) is not None:
-        facts.append(" Searches refused past their budget: %s." % count(search.get("refused")))
-    if number(search.get("unique_optimum")) is not None:
-        facts.append(" Boards whose optimum no other six ties: %s."
-                     % count(search.get("unique_optimum")))
+    solved = number(search.get("boards"))
+    if solved is not None:
+        facts.append(" Each count is one board's search, %s boards in all." % count(solved))
+    refused = number(search.get("refused"))
+    if refused is not None:
+        every = number(search.get("solves"))
+        facts.append(" Searches refused past their budget: %s%s." % (
+            count(refused), "" if every is None else " of the study's %s" % count(every)))
+    unique = number(search.get("unique_optimum"))
+    if unique is not None:
+        facts.append(" The optimum ties no other six on %s%% of the boards%s." % (
+            fmt(100 * unique, 0), "" if solved is None else ", %s of %s" % (
+                count(round(unique * solved)), count(solved))))
     caption = (
         "A log scale: each bar is the median board, its whisker the middle eight boards in ten,"
-        " and each faint dot a board of the file's rows. Every six the search does not score"
-        " sits in a branch whose bound proves it cannot place.%s" % "".join(facts))
+        " and the faint dots under it the boards. Every six the search does not score sits in"
+        " a branch whose bound proves it cannot place; the seconds are the whole solve, its"
+        " scale and its facts included.%s" % "".join(facts))
     return figure("search", "What the search walks and scores", caption,
-                  charts.funnel(stages, "One search, stage by stage"), numbers)
+                  charts.funnel(stages, "One search, stage by stage"),
+                  table(["stage", *QUANTILES], body))
 
 
 # --- the tables -------------------------------------------------------------------------------
 
+def violations(check: Mapping[str, Any]) -> str:
+    """A check's violations: a count, or, where the file holds none for a
+    claim that is measured rather than checked, the word."""
+    if "violations" in check and check["violations"] is None:
+        return "measured"
+    return count(check.get("violations"))
+
+
 def checks_table(results: Mapping[str, Any]) -> str:
-    """Each claim the study checks, how, on how many cases, and how many
-    broke it."""
+    """Each claim the study checks, each way it checks it - a theorem's
+    `checked` lists them - on how many boards and cases, and how many broke
+    it; then what filling slot by slot costs, the claim that is measured."""
     theorems = get(results, "proof", "theorems")
     rows = [t for t in theorems if isinstance(t, dict)] if isinstance(theorems, list) else []
     if not rows:
         return missing("the theorems' checks (proof.theorems)")
-    return table(["", "the claim", "checked by", "boards", "cases", "violations"], [[
-        esc(plain(t.get("id"))), esc(plain(t.get("statement"))),
-        esc(plain(get(t, "checked", "method"))), count(get(t, "checked", "boards")),
-        count(get(t, "checked", "cases")), count(get(t, "checked", "violations"))]
-        for t in rows])
+    body = []
+    for t in rows:
+        held = t.get("checked")
+        ways = [c for c in held if isinstance(c, dict)] if isinstance(held, list) else []
+        for i, check in enumerate(ways or [{}]):
+            skipped = number(check.get("skipped"))
+            why = plain(check.get("skipped_why"))
+            method = plain(check.get("method")) + (
+                "; %s skipped: %s" % (format(round(skipped), ","), why) if skipped else "")
+            body.append([
+                esc(plain(t.get("id"))) if i == 0 else "",
+                esc(plain(t.get("statement"))) if i == 0 else "", esc(method) or "-",
+                count(check.get("boards")), count(check.get("cases")), violations(check)])
+    return table(["", "the claim", "checked by", "boards", "cases", "violations"],
+                 body) + greedy_line(results)
+
+
+def greedy_line(results: Mapping[str, Any]) -> str:
+    """The measured claim's numbers: how far short of the exact six a fill
+    slot by slot lands on Countrix's own objective, and how often it lands
+    on the same six."""
+    greedy = get(results, "proof", "greedy", "countrix")
+    mean, worst = number(get(greedy, "mean")), number(get(greedy, "gap", "max"))
+    if mean is None:
+        return ""
+    same, boards = number(get(greedy, "same")), number(get(greedy, "boards"))
+    return ("<p class='legend'>Filled slot by slot, Countrix's own objective lands %s %s short of"
+            " the exact six on average%s%s.</p>" % (
+                fmt(mean, 2), esc(plain(get(greedy, "unit")) or "points"),
+                "" if worst is None else ", %s at worst" % fmt(worst, 2),
+                "" if same is None or boards is None else ", and on the same six on %s of %s"
+                " boards" % (count(same), count(boards))))
+
+
+def commit_text(value: Any) -> str:
+    """A commit as a table writes it: a hash shortened to seven, anything
+    else escaped as it stands."""
+    text = plain(value)
+    return text[:7] if re.fullmatch(r"[0-9a-f]{7,40}", text) else esc(text) or "-"
 
 
 def brute_table(results: Mapping[str, Any]) -> str:
-    """The brute force: each board, its legal sixes, whether the search's
-    best sixes matched it bit for bit, its time and the commit."""
+    """The brute force: each board - its map and side - its legal sixes,
+    whether the search's best sixes matched it bit for bit, the brute
+    force's time against the search's, and the commit."""
     runs = get(results, "proof", "brute_force")
     rows = [r for r in runs if isinstance(r, dict)] if isinstance(runs, list) else []
     if not rows:
         return missing("the brute force (proof.brute_force)")
     matched = {True: "yes", False: "no"}
-    return table(["board", "legal sixes", "matched", "seconds", "commit"], [[
-        esc(plain(r.get("board"))), count(r.get("legal")),
-        matched[r["matched"]] if isinstance(r.get("matched"), bool) else "-",
-        count(r.get("seconds")), esc(plain(r.get("commit")))] for r in rows])
+    body = []
+    for r in rows:
+        board = ", ".join(w for w in (plain(r.get("map")), plain(r.get("side"))) if w)
+        body.append([
+            esc(board or plain(r.get("board"))), count(r.get("legal")),
+            matched[r["matched"]] if isinstance(r.get("matched"), bool) else "-",
+            seconds(r.get("wall_seconds")), seconds(r.get("search_seconds")),
+            commit_text(r.get("commit"))])
+    return table(["board", "legal sixes", "matched", "brute force, seconds", "search, seconds",
+                  "commit"], body)
 
 
 def source_link(name: str) -> str:
@@ -732,41 +842,60 @@ def profile_table(results: Mapping[str, Any], where: Where) -> str:
 
 def slider_table(results: Mapping[str, Any]) -> str:
     """The Meta slider: each setting's six, scored on the shipped
-    objective - its engine part and its playbook part - with its yardstick
-    shares and the rules it keeps; and how many steps broke the trade."""
+    objective - its engine part and its playbook part, numbers - with its
+    yardstick shares, the rules it keeps, its strength and its shape, each
+    an aggregate with its range; and how many steps broke the trade."""
     per_mu = get(results, "slider", "per_mu")
     rows = [r for r in per_mu if isinstance(r, dict)] if isinstance(per_mu, list) else []
     if not rows:
         return missing("the Meta slider's steps (slider.per_mu)")
-    words = {
-        "engine_part": "the engine's part", "playbook_part": "the playbook's part",
-        "shape_222": "two of each role"}
-    names = [n for n in ("engine_part", "playbook_part", "y_matchup", "y_rating", RULES_KEPT,
-                         "pct_str_bz", "shape_222") if any(number(r.get(n)) is not None
-                                                           for r in rows)]
-    out = table(["meta", *(words.get(n) or label(results, n) for n in names)],
-                [[fmt(number(r.get("mu")), 2), *(fmt(number(r.get(n)), 2) for n in names)]
-                 for r in rows])
+    names = [n for n in SLIDER if any(stat(r.get(n)) is not None for r in rows)]
+    body = []
+    for r in rows:
+        mu = fmt(number(r.get("mu")), 2) + (", as shipped" if r.get("arm") == SHIPPED else "")
+        body.append([mu, *(stat_html(stat(r.get(n)), places(results, n)) for n in names)])
+    out = table(["meta", *(label(results, n) for n in names)], body)
+    notes = []
+    boards, scored_on = number(get(results, "slider", "boards")), plain(
+        get(results, "slider", "scored_on"))
+    if boards is not None:
+        notes.append("Each setting's six over %s boards." % count(boards))
+    if scored_on:
+        notes.append("%s." % esc(scored_on[0].upper() + scored_on[1:]))
     broke = get(results, "slider", "violations")
     if number(broke) is not None:
-        out += "<p class='legend'>%s steps checked; %s went against the trade.</p>" % (
-            count(get(results, "slider", "steps")), count(broke))
-    return out
+        notes.append("%s steps checked; %s went against the trade." % (
+            count(get(results, "slider", "steps")), count(broke)))
+    return out + ("<p class='legend'>%s</p>" % " ".join(notes) if notes else "")
 
 
 def paired_table(results: Mapping[str, Any], where: Where) -> str:
     """Countrix as shipped against each arm, board by board on the same
-    boards: the mean gap and its range, and its wins, ties and losses."""
+    boards, on each yardstick and on its own scale: the mean gap and its
+    range, and how often it won, tied and lost. The file's other pairs -
+    another capture's or another source's Countrix against its reference -
+    are read under whether the results hold up, not here."""
     paired = results.get("paired")
-    rows = [p for p in paired if isinstance(p, dict) and p.get("set") == where.set
-            and p.get("slice") == where.slice] if isinstance(paired, list) else []
-    if not rows:
+    held = {(plain(p.get("b")), plain(p.get("metric"))): p for p in paired
+            if isinstance(p, dict) and p.get("set") == where.set
+            and p.get("slice") == where.slice and p.get("a") == SHIPPED
+            } if isinstance(paired, list) else {}
+    shown = [m for m in PAIRED if any(metric == m for _, metric in held)]
+    if not shown:
         return missing("the board-by-board gaps (paired)")
     names = {a.id: a.label for a in arms(results)}
-    return table(["against", "on", "the gap", "wins", "ties", "losses"], [[
-        esc(names.get(plain(p.get("b")), plain(p.get("b")))),
-        esc(label(results, plain(p.get("metric")))), stat_html(stat(p.get("gap"))),
-        count(p.get("wins")), count(p.get("ties")), count(p.get("losses"))] for p in rows])
+    against = list(dict.fromkeys([*(a.id for a in shown_arms(results, where)),
+                                  *(b for b, _ in held)]))
+
+    def cell(pair: Mapping[str, Any] | None) -> str:
+        if pair is None:
+            return "-"
+        return "%s<br><span class='rng'>won %s, tied %s, lost %s</span>" % (
+            stat_html(stat(pair.get("gap"))), count(pair.get("wins")), count(pair.get("ties")),
+            count(pair.get("losses")))
+    return table(["against", *(label(results, m) for m in shown)], [
+        [esc(names.get(b, b)), *(cell(held.get((b, m))) for m in shown)]
+        for b in against if any((b, m) in held for m in shown)])
 
 
 def holds_table(results: Mapping[str, Any], where: Where) -> str:
@@ -788,7 +917,8 @@ def holds_table(results: Mapping[str, Any], where: Where) -> str:
                 if followed and any(s is not None for s in stats):
                     body.append(["%s, %s" % (esc(set_name), esc(slice_name)),
                                  esc(arm.label if arm is not None else arm_id),
-                                 *(stat_html(s) for s in stats)])
+                                 *(stat_html(s, places(results, m))
+                                   for s, m in zip(stats, HEADLINE, strict=True))])
     if not body:
         return missing("another set of boards")
     return table(["boards", "arm", *(label(results, m) for m in HEADLINE)], body)
@@ -820,13 +950,47 @@ def provenance_table(results: Mapping[str, Any]) -> str:
 
 NONE_YET = ("<p class='legend'>Nothing yet: the study's results file is not in place - see the top"
             " of the page.</p>")
+SAMPLE = (
+    "<div class='warnbox'><b>A sample.</b> The numbers in this page's results were written to"
+    " build the page, not measured: no board was solved for them. The study's own results file"
+    " replaces them.</div>")
+DRIFTED = (
+    "<div class='warnbox'><b>Not the board's objective.</b> %s The results below describe the"
+    " objective the study measured, not the one the board runs now.</div>")
 RESULT_BLOCKS = ("PROFILE", "CHECKS", "BRUTE", "SEARCH", "DESIGN", "SHARES", "PARTS", "SCATTER",
                  "RULES", "SLIDER", "PAIRED", "HOLDS", "PROVENANCE")
 
 
+def drift(results: Mapping[str, Any]) -> list[str]:
+    """What the board runs and the study did not measure, a line each: the
+    playbook in force, where its digest does not open with the one the
+    file records, and the default engine in force, where its stamp - the
+    weights and the constants its terms count by - is not the file's.
+    Nothing where the file records neither."""
+    out = []
+    measured = plain(get(results, "provenance", "countrix", "playbook_digest"))
+    in_force = catalog.playbook_digest()
+    if measured and not in_force.startswith(measured):
+        out.append("The playbook in force, %s, is not the one the study measured: its digest"
+                   " opens %s, the study's %s." % (
+                       esc(catalog.playbook_name()), in_force[:12], esc(measured[:12])))
+    recorded = get(results, "provenance", "countrix", "base_stamp")
+    if isinstance(recorded, dict):
+        stamp: Mapping[str, Any] = base.stamp(catalog.engine_weights()) or {}
+        moved = ["%s %s, the study's %s" % (esc(name), esc(plain(stamp.get(name)) or "none"),
+                                            esc(plain(recorded.get(name)) or "none"))
+                 for name in dict.fromkeys([*recorded, *stamp])
+                 if stamp.get(name) != recorded.get(name)]
+        if moved:
+            out.append("The default engine in force is not the one the study measured: %s."
+                       % "; ".join(moved))
+    return out
+
+
 def status(study: Study) -> str:
     """What the page reads: why there are no results, or the file's
-    vintage, under a sample's warning where the file is one."""
+    vintage - under a sample's warning where the file is one, and a warning
+    where the board runs another objective than the study measured."""
     results = study.results
     if results is None:
         return "<div class='warnbox'>%s</div>" % esc(study.note)
@@ -834,14 +998,16 @@ def status(study: Study) -> str:
         ("generated", ("generated",)), ("Countrix at", ("provenance", "countrix", "commit")),
         ("the benchmark at", ("provenance", "benchmark", "commit")))
     vintage = [
-        "%s %s" % (words, esc(plain(get(results, *path)))) for words, path in named
-        if plain(get(results, *path))]
-    line = "<p class='legend'>The results: %s.</p>" % "; ".join(vintage) if vintage else ""
+        "%s %s" % (words, commit_text(get(results, *path)) if path[-1] == "commit"
+                   else esc(plain(get(results, *path))))
+        for words, path in named if plain(get(results, *path))]
+    out = "<p class='legend'>The results: %s.</p>" % "; ".join(vintage) if vintage else ""
+    moved = drift(results)
+    if moved:
+        out = DRIFTED % " ".join(moved) + out
     if results.get("sample") is True:
-        return ("<div class='warnbox'><b>A sample.</b> The numbers in this page's results were"
-                " written to build the page, not measured: no board was solved for them. The"
-                " study's own results file replaces them.</div>" + line)
-    return line
+        out = SAMPLE + out
+    return out
 
 
 def report(results: Mapping[str, Any] | None) -> str:
@@ -860,24 +1026,32 @@ def report(results: Mapping[str, Any] | None) -> str:
             " address for it yet.</p>")
 
 
-def assumptions_table() -> str:
-    """The playbook's assumptions, each linked to its registry entry, with
-    the first sentence of its prose."""
+def registry_ids() -> frozenset[str]:
+    """The ids the registry holds: the playbook in force's."""
+    return frozenset(s.id for s in catalog.load())
+
+
+def assumptions_table(shipped: Sequence[strategy.Strategy], linked: frozenset[str]) -> str:
+    """The shipped playbook's assumptions - the ones the proof and the study
+    read - each with the first sentence of its prose and linked to its
+    registry entry where the playbook in force holds it."""
     rows = []
-    for s in catalog.load():
+    for s in shipped:
         if s.kind == "assumption":
             prose = " ".join(catalog.without_title(s.body).split())
             first = re.split(r"(?<=[.!?])\s", prose, maxsplit=1)[0] if prose else ""
-            rows.append(["<a href='/registry#%s'>%s</a>" % (esc(s.id), esc(s.name)), esc(first)])
+            rows.append([entry(s.id, s.name, linked), esc(first)])
     return table(["assumption", "what it says"], rows) if rows else ""
 
 
-def shapes_table() -> str:
-    """The count check: the sixes of each shape the playbook in force
-    allows, on the roster the proof was checked on, and their sum."""
+def shapes_table(shipped: Sequence[strategy.Strategy]) -> str:
+    """The count check: the sixes of each shape the shipped playbook
+    allows, on the roster the proof was checked on, and their sum - the
+    count the walk considered on every open board that day, whatever
+    playbook the board runs now."""
     tanks, damage, supports = PROOF_ROSTER
     rows, total = [], 0
-    for shape in legal_shapes(catalog.load()):
+    for shape in legal_shapes(shipped):
         sixes = (math.comb(tanks, shape.tanks) * math.comb(damage, shape.damage)
                  * math.comb(supports, shape.supports))
         total += sixes
@@ -909,9 +1083,10 @@ def blocks(study: Study) -> dict[str, str]:
     """Each block of the article: the ones the results fill, NONE_YET each
     where there are none, and the ones that need none."""
     results = study.results
+    shipped, linked = catalog.load(catalog.SHIPPED_DIR), registry_ids()
     out = {
-        "STATUS": status(study), "REPORT": report(results), "SHAPES": shapes_table(),
-        "ASSUMPTIONS": assumptions_table()}
+        "STATUS": status(study), "REPORT": report(results), "SHAPES": shapes_table(shipped),
+        "ASSUMPTIONS": assumptions_table(shipped, linked)}
     where = None if results is None else primary(results)
     if results is None or where is None:
         out.update(dict.fromkeys(RESULT_BLOCKS, NONE_YET if results is None
@@ -919,10 +1094,10 @@ def blocks(study: Study) -> dict[str, str]:
         return out
     out.update({
         "PROFILE": profile_table(results, where), "CHECKS": checks_table(results),
-        "BRUTE": brute_table(results), "SEARCH": search_figure(results),
+        "BRUTE": brute_table(results), "SEARCH": search_figure(results, where),
         "DESIGN": design_tables(results), "SHARES": shares_figure(results, where),
         "PARTS": parts_figure(results, where), "SCATTER": scatter_figure(results, where),
-        "RULES": rules_figure(results), "SLIDER": slider_table(results),
+        "RULES": rules_figure(results, linked), "SLIDER": slider_table(results),
         "PAIRED": paired_table(results, where), "HOLDS": holds_table(results, where),
         "PROVENANCE": provenance_table(results)})
     return out

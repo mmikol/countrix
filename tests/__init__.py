@@ -14,5 +14,7 @@
                    the reference playbook
     synthetic.py   a World built by hand, so a test works out its expected
                    values with no database
-    fixtures/      the reference playbook and the reach record
+    fixtures/      the reference playbook, the reach record and the study's
+                   results file of 2026-10-05, trimmed, in the shapes the
+                   benchmark's harness writes
 """

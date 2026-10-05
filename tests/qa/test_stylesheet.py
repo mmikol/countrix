@@ -2,9 +2,14 @@
 the scripts, the shell, the math page, the strategy registry or the study
 names."""
 
+import os
 import re
 
+from db import ROOT
 from ui import pages, registry, study
+
+# the study's results in the harness's shapes, which draw the charts' classes
+STUDY = os.path.join(ROOT, "tests", "fixtures", "study.json")
 
 
 def test_every_stylesheet_class_is_used_by_the_page():
@@ -30,6 +35,6 @@ def test_every_stylesheet_class_is_used_by_the_page():
     names = re.findall(r"<script src='/static/([\w.-]+\.js)'>", shell)
     assert names, "the shell loads no script"
     sources = "".join(pages.static_file(name)[0].decode() for name in names)
-    sources += shell + pages.view_math() + registry.view_registry() + study.view_study()
+    sources += shell + pages.view_math() + registry.view_registry() + study.view_study(STUDY)
     assert len(classes) > 50
     assert [c for c in classes if not re.search(r"\b%s\b" % re.escape(c), sources)] == []

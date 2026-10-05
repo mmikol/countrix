@@ -39,7 +39,7 @@ and the health for it.
 | `/health` | the engine's health, from `serve.handle_health`: ok or degraded, the strategies, the drafts pending and the heroes, and the error naming what is out of reach. The ui container's healthcheck and `orchestrator.py` read it |
 | `/math` | `static/math.html` in the page shell, the numbers it quotes filled in by `pages.py` - the default engine's four weights and the swap cost from the playbook's `meta.md`, and from the code `SWAP_MAX`, the counter graph's four constants, `RATE_PICK_HALF`, `COIN_FLIP`, the fight odds' `LOGIT_PER_POINT`, `PARTNER_POINTS`, the stage terrain's `STAGE_PRIOR_WORDS`, `STAGE_MENTIONS` and `STAGE_MIN_WORDS`, `REFERENCE_SIZE`, `SCALE_POOL`, `NEED_BUDGET`, the search's `SCORE_PLACES`, `RANK_CAP` and `FOLD_COUNTS`, the counter graph's mechanisms, `MAX_TANKS`, `MAX_BANS`, the weight slider's top, and the healing formation's radius and teammates: the equation, how a six is chosen, the scoring function with the default engine under the playbook, the board and how the layers fit |
 | `/registry` | the strategy registry, rendered by `registry.py` on every call from the code the solver runs, so it cannot drift from it: every strategy of the playbook in force, a row each in its kind's table - limits, heuristics and assumptions, each under its heading, a row giving the rule's form and the most it moves a six, and a heuristic's weight and who settles its gate - and a card each, anchored by its id (`/registry#<id>`). A card says in plain words what its rule does, then gives its formula: its form as the code reads it (a limit; a reward or a need - a heuristic on a metric whose gate the board or the six settles; a scored heuristic; an assumption; a draft), its weight and the most it moves a six, its gate with its params filled in and who settles it, and its term in the math page's notation with its own numbers - a need's share of its guard's budget from `scoring.need_scales`. Then each metric it reads, with the registry's meaning (`facts/team.py`, `facts/compute.py`) and how its range rule aggregates it over the six (`Spec.aggregate` in `inference/ranges.py`), its prose, and its entry and sources in `inference/README.md` - where two rules have held its id, the last entry, the earlier rule's folded away and marked so. Where a card's prose or its record names another rule in backticks, or a need lists the needs on its guard, the name links that rule's card. Each form links its section of `/math`, which gives the forms in general; the page quotes no rate. The cards sit under the tables, hidden, and a click on a rule - its row in a table, or a rule a card names - opens its card in a dialog over the page, which stays where it was (*The registry's dialog*, under `static/`) |
-| `/study` | the study, rendered by `study.py` on every call: `static/study.html` in the page shell, the code's constants it quotes filled in from their modules - the search's budgets and caps, `SCORE_PLACES`, `SLACK`, `FOLD_COUNTS`, `MEMO_CAP`, `MAX_TANKS`, the weight slider's top - beside the shapes' count check and the playbook's assumptions, read from the playbook in force; and the study's results from `static/study.json`, each chart drawn as inline SVG by `charts.py` with a table of its numbers under it (*The study page*, below). It writes nothing and reads no database |
+| `/study` | the study, rendered by `study.py` on every call: `static/study.html` in the page shell, the code's constants it quotes filled in from their modules - the search's budgets and caps, `SCORE_PLACES`, `SLACK`, `FOLD_COUNTS`, `MEMO_CAP`, `MAX_TANKS`, the weight slider's top - beside the shapes' count check and the playbook's assumptions, read from the shipped playbook, the one the proof and the study read, whatever playbook is in force; and the study's results from `static/study.json` once a run is published there, each chart drawn as inline SVG by `charts.py` with a table of its numbers under it (*The study page*, below). It writes nothing and reads no database |
 
 The board answers GET alone: any other method is a 501, after the host
 guard.
@@ -61,7 +61,6 @@ static/
   registry.js    the registry's dialog: a click on a rule opens its card over the page
   math.html      the math page's article
   study.html     the study page's article
-  study.json     the study's results, the benchmark's countrix-study/1 file the page reads
 ```
 
 `board.js` loads last, since it calls the other two. It keeps the map, the
@@ -292,38 +291,64 @@ Overwatch alone. Plain words open each part; the exact argument follows.
 
 The prose is `static/study.html`, filled in as the math page is - a
 literal percent in it is written `%%`. The results are
-`static/study.json`, the file the private benchmark repository's study
-publishes in its `countrix-study/1` schema (`study.SCHEMA`); dropping a
-new file in its place needs no code change. The page reads:
+`static/study.json`, the file the private benchmark repository's harness
+writes in its `countrix-study/1` schema (`study.SCHEMA`), copied there
+when a run is published; until then there is none, and the page says the
+results are not in place. The page reads each part in the shape the
+harness writes it, which `tests/fixtures/study.json` - the harness's file
+of 2026-10-05, trimmed - keeps; `test_study` renders the fixture, and
+the file in place too, so a file whose shapes moved fails there before
+it ships. The count check and the assumptions are the shipped
+playbook's, whatever playbook is in force, and an assumption or a rule
+links its registry entry only where the playbook in force holds it. The
+page reads:
 
 - `schema`, which must be `countrix-study/1`; another schema, a file
   that is not JSON or holds no object, or no file at all leaves the proof
   and the audit standing and says why where the results would be, every
   results block a line that there is nothing yet;
 - `sample`: `true` marks a file written to build the page, not measured,
-  and the page says so above everything - the file the repository ships
-  is one until the study's own results replace it;
+  and the page says so above everything; none ships;
 - `generated` and `provenance` (the commits, the data and their dates),
-  `generalization` and `usage`, shown field by field;
+  `generalization` and `usage`, shown field by field. Where the board's
+  playbook in force has another digest than
+  `provenance.countrix.playbook_digest`, or its default engine another
+  stamp (`base.stamp`) than `provenance.countrix.base_stamp`, a warning
+  above the results says so;
 - `design`: `sets` (each with `boards`, `primary` and `seed`), `maps`
   (`name`, `mode`, `half`) for the rules' heatmap;
 - `arms`, by id or as a list with ids: `label`, `family`, `group`,
   `sources`, `model`. The groups `generalization`, `sweep_mu` and
   `sweep_rule` stay out of the main charts, and a source that names a
   tool's site links it;
-- `metrics`, by id or as a list: `label`, `family`, `source`, `unit`;
+- `metrics`, by id or as a list: `label`, `family`, `source`, `unit`, a
+  `0-1` unit written to two places;
 - `aggregates[set][slice][arm][metric]` as `{mean, lo, hi, n}`, read at
   the primary set's `test` slice, else `all`. The page reads the metrics
   by id - `y_matchup`, `y_rating`, `cx_rel`, the `pct_*` percentiles,
   `team_wiki`, `team_cw` and `sat_mean` - each a share of a yardstick, a
   percentile among a board's random sixes or a satisfaction, never a raw
   rate;
-- `parts[set][slice][arm]` - `countrix`, `cw_matchup` - or, without
-  them, the aggregates' `part.*` and `ypart_matchup.*` metrics;
-- `paired`, `rules` (with `by_map`, `satisfaction` and `without`),
-  `slider` (`per_mu`, `steps`, `violations`), `proof` (`theorems`,
-  `search` as quantiles, `brute_force`), `rows` (each board's `search`)
-  and `report`, the report's web address, alone or as `{url, title}`.
+- `parts[set][slice][arm]`: `countrix` and `cw_matchup`, each a mean by
+  part;
+- `paired`: Countrix as shipped's pairs (`a` the shipped arm) on the
+  primary slice, on the yardsticks and its own scale; another
+  capture's or another source's Countrix is read under whether the
+  results hold up;
+- `rules`, with `by_map`, `satisfaction` as `{mean, n}` by arm and
+  `without` as `{mean, lo, hi, n}` by metric;
+- `slider`: `per_mu`, each step's `engine_part` and `playbook_part`
+  numbers and its metrics as `{mean, lo, hi, n}`, and `boards`,
+  `scored_on`, `steps` and `violations`;
+- `proof`: `theorems`, each `checked` a list of `{method, boards, cases,
+  violations}`, `violations` null for the claim that is measured;
+  `search`, its stages as quantiles, `boards`, `solves`, `refused` and
+  `unique_optimum`, a share of the boards; `brute_force`, with
+  `wall_seconds` and `search_seconds`; and `greedy.countrix`;
+- `rows`: each board's `search`, a list in the order `legend.rows` gives
+  it - legal sixes, branches walked, sixes scored in full, seconds, sixes
+  tied - the primary set's rows the funnel's dots;
+- `report`, the report's web address, alone or as `{url, title}`.
 
 A part the file lacks is a line saying so, never an error, and every
 string read from it is escaped. The charts are `charts.py`'s, from plain
