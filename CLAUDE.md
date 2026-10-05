@@ -363,10 +363,10 @@ db <- facts <- inference <- door <- ui.
   out of the repo. Nothing public - a doc example, the math page, the
   registry - shows a rate figure or text derived from one, except what the
   owner opened on 2026-10-05: the study's results, its page and its report,
-  and the README's screenshots of the board, which show the numbers they
-  compute. CounterWatch's 6v6 data, which the study measures against, stays
-  in the private benchmark repository; only the study's results are
-  published.
+  and the screenshots of the board in the README and the user guide, which
+  show the numbers the board computes. CounterWatch's 6v6 data, which the
+  study measures against, stays in the private benchmark repository; only
+  the study's results are published.
 - NOTICE lists the third-party material and its terms: the Overwatch
   Wiki's text under CC BY-NC-SA 3.0, Bebas Neue under the OFL, Blizzard's
   material under its fan-site permission. A new file that quotes the wiki
