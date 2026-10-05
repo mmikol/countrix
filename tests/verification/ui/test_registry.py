@@ -482,3 +482,19 @@ def test_the_page_links_only_anchors_it_or_the_math_page_holds():
     assert {"function", "chosen", "equation", "base-weights", "healing-floor"} <= linked
     for anchor in linked | {target for target, _ in registry.DERIVED.values()}:
         assert "id='%s'" % anchor in math, anchor
+
+
+def test_a_limits_row_shows_what_it_requires_and_an_assumptions_row_its_name():
+    """A limit's form and effect are every limit's, so its row says what it
+    requires, its params filled in; an assumption scores nothing, so its row
+    is its name alone."""
+    page = render([
+        strategy("few-supports", kind="constraint", require="team.supports <= params.MOST",
+                 params={"MOST": 3}),
+        strategy("a-belief", kind="assumption"),
+    ])
+    row = page[page.index("href='#few-supports'"):]
+    row = row[:row.index("</tr>")]
+    assert "<code>" in row and "team.supports &lt;= 3" in row and "params" not in row
+    belief = page[page.index("href='#a-belief'"):]
+    assert "<td>" not in belief[:belief.index("</tr>")]
