@@ -47,9 +47,10 @@ objective). Its weights live in `inference/strategies/meta.md`, and
 - **meta** scales the whole engine: 0 is the playbook alone, 1 the
   engine as calibrated, 2 twice as loud against the playbook's rules.
 - **rate**, **synergy** and **counter** weigh the three terms under it:
-  rate 1 puts its term in win-rate points, and synergy and counter are
-  set so that each term spreads a typical board's sixes about half as far
-  as the rates do (docs/inference.md, Why the weights are the
+  rate 1 puts its term in win-rate points, and synergy and counter were
+  set so that each term spread a typical board's sixes about half as far
+  as the rates do, then halved against 6v6 results, so each now spreads
+  them about a quarter as far (docs/inference.md, Why the weights are the
   playbook's); measure again before quoting the rule.
 - **swap** is the swap cost, in share points of blue's span, 0..50: what
   a swap of one of blue's picks must gain before the board suggests it,

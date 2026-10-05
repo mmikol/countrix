@@ -351,8 +351,19 @@ db <- facts <- inference <- door <- ui.
   (`CARGO_POLICY`), and 0.5 s an article, asked for once
   (`ARTICLE_POLICY`). No third source, no API keys.
 - Blizzard's rates page licenses its win, pick and ban rates for personal
-  use only. Nothing public - a README image, a doc example, a published page -
-  shows a rate figure or text derived from one.
+  use only: the caches, the database and any table copied out of it stay
+  out of the repo. Nothing public - a doc example, the math page, the
+  registry - shows a rate figure or text derived from one, except what the
+  owner opened on 2026-10-05: the study's results, its page and its report,
+  and the README's screenshots of the board, which show the numbers they
+  compute. CounterWatch's 6v6 data, which the study measures against, stays
+  in the private benchmark repository; only the study's results are
+  published.
+- NOTICE lists the third-party material and its terms: the Overwatch
+  Wiki's text under CC BY-NC-SA 3.0, Bebas Neue under the OFL, Blizzard's
+  material under its fan-site permission. A new file that quotes the wiki
+  gets its line there, with the articles it quotes; every page's footer
+  carries the Overwatch notice and the wiki's credit (`pages.FOOTER`).
 - A pull matches a hero or map name against the database through
   `db.data.normalizer` - `index` and `name_key`, or `hero_key` where a former
   name can appear - never by `.lower()`.

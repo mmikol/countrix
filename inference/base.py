@@ -63,11 +63,13 @@ half the rate term's, measured over the reference sample
 maps, each board's other side its likely six, the side the term reads
 until one is revealed; then both were halved against 6v6 results, so each
 range is now about a quarter of the rate term's. The rates are 5v5, and on
-a private benchmark against CounterWatch's public 6v6 numbers, kept out of
-the repo, sixes picked with both terms at half that weight scored a little
-better on most of the maps held out of the tuning. meta.md holds the
-values, tuning-log.md beside it their history, and docs/inference.md (Why
-the weights are the playbook's) the measurements behind them. The rate
+a private benchmark against CounterWatch's public 6v6 numbers, whose data
+stays in the private benchmark repository, sixes picked with both terms at
+half that weight scored a little better on most of the maps held out of
+the tuning; by the owner's decision of 2026-10-05 the study's results, its
+page and its report, are published, and that data is not. meta.md holds
+the values, tuning-log.md beside it their history, and docs/inference.md
+(Why the weights are the playbook's) the measurements behind them. The rate
 term's own range reads Blizzard's rates, which are licensed for personal
 use, so its figures stay out of the repo. At meta 1 each term's weight is
 the file's exactly (1.0 x w is w in floating point). OFF is meta 0 with

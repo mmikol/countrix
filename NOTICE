@@ -1,0 +1,139 @@
+Countrix
+Copyright (c) 2026 Miliano Mikol
+
+The PolyForm Strict License 1.0.0 in LICENSE covers Countrix's own code
+and text only. It covers none of the third-party material below, and no
+term of it restricts what that material's own licence grants.
+
+
+1. The Overwatch Wiki's text - CC BY-NC-SA 3.0
+
+Hero kits, maps, terrain, playstyles, synergies and counters come from the
+Overwatch Wiki at Fandom, https://overwatch.fandom.com, written by its
+contributors and licensed under the Creative Commons
+Attribution-NonCommercial-ShareAlike 3.0 Unported License (CC BY-NC-SA 3.0),
+https://creativecommons.org/licenses/by-nc-sa/3.0/. Quoted wiki text keeps
+that licence wherever it appears here, and an adaptation of it carries the
+same licence.
+
+In the form Fandom asks for: this repository uses material from the
+articles named below on the Overwatch Wiki at Fandom, and that material is
+licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 3.0
+License. Each article's authors are listed in its history, the article's
+address followed by ?action=history.
+
+The test files that quote the wiki, and the articles each quotes:
+
+  tests/verification/db/__init__.py
+      https://overwatch.fandom.com/wiki/Hybrid
+  tests/verification/db/test_pull_stores.py
+      https://overwatch.fandom.com/wiki/Maps
+      https://overwatch.fandom.com/wiki/King's_Row
+  tests/verification/db/test_transforms.py
+      https://overwatch.fandom.com/wiki/Havana
+  tests/verification/db/wiki/test_six_a_side.py
+      https://overwatch.fandom.com/wiki/Junker_Queen
+      https://overwatch.fandom.com/wiki/Reinhardt
+      https://overwatch.fandom.com/wiki/Zarya
+      https://overwatch.fandom.com/wiki/Zenyatta
+      https://overwatch.fandom.com/wiki/Hazard
+      https://overwatch.fandom.com/wiki/Mei
+  tests/verification/db/wiki/test_strategy_sections.py
+      https://overwatch.fandom.com/wiki/Ana
+      https://overwatch.fandom.com/wiki/Pharah
+      https://overwatch.fandom.com/wiki/Doomfist
+      https://overwatch.fandom.com/wiki/Junker_Queen
+      https://overwatch.fandom.com/wiki/Genji
+      https://overwatch.fandom.com/wiki/Roadhog
+      https://overwatch.fandom.com/wiki/Vendetta
+  tests/verification/db/wiki/test_wiki_heroes.py
+      https://overwatch.fandom.com/wiki/Doctrine
+      https://overwatch.fandom.com/wiki/Mizuki
+  tests/verification/db/wiki/test_wiki_kit_store.py
+  tests/verification/db/wiki/test_wiki_kits_pull.py
+      https://overwatch.fandom.com/wiki/Reinhardt
+  tests/verification/db/wiki/test_wiki_matchups.py
+      https://overwatch.fandom.com/wiki/Doomfist
+      https://overwatch.fandom.com/wiki/Pharah
+      https://overwatch.fandom.com/wiki/Mauga
+      https://overwatch.fandom.com/wiki/Juno
+      https://overwatch.fandom.com/wiki/Winston
+      https://overwatch.fandom.com/wiki/Widowmaker
+      https://overwatch.fandom.com/wiki/Junker_Queen
+      https://overwatch.fandom.com/wiki/Emre
+      https://overwatch.fandom.com/wiki/Wrecking_Ball
+      https://overwatch.fandom.com/wiki/Jetpack_Cat
+      https://overwatch.fandom.com/wiki/Ashe
+      https://overwatch.fandom.com/wiki/Roadhog
+  tests/verification/db/wiki/test_wiki_relations.py
+      https://overwatch.fandom.com/wiki/Juno
+      https://overwatch.fandom.com/wiki/Mauga
+      https://overwatch.fandom.com/wiki/Ana
+      https://overwatch.fandom.com/wiki/Anran
+      https://overwatch.fandom.com/wiki/Genji
+      https://overwatch.fandom.com/wiki/Sigma
+      https://overwatch.fandom.com/wiki/Junker_Queen
+      https://overwatch.fandom.com/wiki/Bastion
+      https://overwatch.fandom.com/wiki/Ramattra
+  tests/verification/db/wiki/test_wiki_terrain.py
+      https://overwatch.fandom.com/wiki/Ilios
+      https://overwatch.fandom.com/wiki/Eichenwalde
+      https://overwatch.fandom.com/wiki/King's_Row
+      https://overwatch.fandom.com/wiki/New_Junk_City
+  tests/verification/db/wiki/test_wiki_terrain_lexicon.py
+      https://overwatch.fandom.com/wiki/Ilios
+      https://overwatch.fandom.com/wiki/New_Queen_Street
+      https://overwatch.fandom.com/wiki/Circuit_Royal
+      https://overwatch.fandom.com/wiki/Dorado
+  tests/verification/facts/test_kit.py
+  tests/verification/facts/test_scalars_healing.py
+      rows of the wiki's Abilities table (Cargo) for Zenyatta, Wuyang,
+      Junker Queen and Mauga:
+      https://overwatch.fandom.com/wiki/Special:CargoTables/Abilities
+  tests/verification/facts/test_kit_format.py
+      https://overwatch.fandom.com/wiki/Wrecking_Ball
+      https://overwatch.fandom.com/wiki/Reinhardt
+
+Shorter quotations sit in docs/architecture.md and docs/inference.md, on
+the math page (ui/static/math.html), and in the docstrings of
+db/data/wiki/maps.py and db/data/wiki/strategy_sections.py. The board
+quotes the wiki's text from the database a local pull builds, and its
+facts tab and every page's footer credit the wiki and its licence. The
+page caches the pulls fill (.cache-wiki/) are never committed.
+
+
+2. Bebas Neue - SIL Open Font License 1.1
+
+ui/static/bebas-neue.woff2 is Bebas Neue Regular by Dharma Type, under the
+SIL Open Font License 1.1, whose text travels beside it in
+ui/static/OFL.txt.
+
+
+3. Blizzard Entertainment's material - Blizzard's fan-site permission
+
+Hero and map names, the portraits and role icons the board loads from
+Blizzard's servers, Blizzard's hero text and its win, pick and ban rates
+are Blizzard Entertainment's. Countrix uses them under the permission
+Blizzard's Legal FAQ grants fan sites - home, noncommercial and personal
+use, the material unaltered and its notices kept -
+https://www.blizzard.com/en-us/legal/c1ae32ac-7ff9-4ac3-a03b-fc04b8697010/blizzard-legal-faq.
+Blizzard's rates page licenses the rates for personal use only: they are
+pulled into a local database and never committed. By the owner's decision
+of 2026-10-05, the study's results and the screenshots of the board show
+numbers the board and the study compute from them.
+
+Overwatch(TM) (c) 2016 Blizzard Entertainment, Inc. All rights reserved.
+Overwatch is a trademark or registered trademark of Blizzard
+Entertainment, Inc. in the U.S. and/or other countries.
+
+Countrix is a fan project, not affiliated with or endorsed by Blizzard
+Entertainment or Fandom.
+
+
+4. CounterWatch's 6v6 numbers
+
+The study measures Countrix's teams against CounterWatch's public 6v6
+numbers, https://counterwatch.gg, whose terms grant personal,
+noncommercial use. Its data stays in a private benchmark repository; this
+one holds at most the study's results, which credit CounterWatch where
+they name it.

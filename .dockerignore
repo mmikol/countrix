@@ -15,4 +15,5 @@ __pycache__
 .DS_Store
 .claude
 .desloppify
+HANDOFF.md
 scorecard.png

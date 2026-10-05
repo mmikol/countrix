@@ -18,12 +18,13 @@ compose stack's `ui` container does. It writes nothing.
 ## `board.py`, `serve.py`, `pages.py` and `registry.py` - the pages and their endpoints
 
 `pages.py` renders the page, a shell over the static files that injects
-only `TEAM` (six), `BANS` (five) and `SWAP_MAX` (the swap cost's ceiling,
-`base.SWAP_RANGE`), and the math page; `registry.py` renders the strategy
-registry in the math page's shell, with its script. `board.py` serves
-them and the JSON endpoints behind the host guard `db/web.py` puts on
-both servers ([security.md](security.md)); `serve.py` answers the board,
-the catalog and the health for it.
+only `TEAM` (six), `BANS` (five), `TANKS` (the queue's two) and
+`SWAP_MAX` (the swap cost's ceiling, `base.SWAP_RANGE`), and the math
+page; `registry.py` renders the strategy registry in the math page's
+shell, with its script. `board.py` serves them and the JSON endpoints
+behind the host guard `db/web.py` puts on both servers
+([security.md](security.md)); `serve.py` answers the board, the catalog
+and the health for it.
 
 | route | serves |
 | --- | --- |
@@ -34,7 +35,7 @@ the catalog and the health for it.
 | `/api/board?map=&side=&red=&blue=&bans=[&stage=&weights=&client=]` | the board solved at any step of the draft, every seat on the stage in play (the whole map without one), under the playbook tab's weights: the `board` tool's answer ([mcp.md](mcp.md#the-tools)), from `serve.handle_board`. One board solves at a time; another waits, and answers 429 after a minute (`serve.Admission`); a newer board from the same `client` stops one still solving, which answers 400 (`serve.LATEST`, a lane per client) |
 | `/api/strategies` | the catalog: every constraint, heuristic and assumption with its kind, form, frontmatter and body, from `serve.handle_strategies` |
 | `/health` | the engine's health, from `serve.handle_health`: ok or degraded, the strategies, the drafts pending and the heroes, and the error naming what is out of reach. The ui container's healthcheck and `orchestrator.py` read it |
-| `/math` | `static/math.html` in the page shell, the numbers it quotes filled in by `pages.py` - the default engine's four weights and the swap cost from the playbook's `meta.md`, and from the code `SWAP_MAX`, the counter graph's four constants, `RATE_PICK_HALF`, `COIN_FLIP`, the fight odds' `LOGIT_PER_POINT`, `PARTNER_POINTS`, `REFERENCE_SIZE`, `SCALE_POOL`, `NEED_BUDGET`, the search's `SCORE_PLACES` and `RANK_CAP`, the counter graph's mechanisms, `MAX_TANKS`, `MAX_BANS`, the weight slider's top, and the healing formation's radius and teammates: the equation, how a six is chosen, the scoring function with the default engine under the playbook, the board and how the layers fit |
+| `/math` | `static/math.html` in the page shell, the numbers it quotes filled in by `pages.py` - the default engine's four weights and the swap cost from the playbook's `meta.md`, and from the code `SWAP_MAX`, the counter graph's four constants, `RATE_PICK_HALF`, `COIN_FLIP`, the fight odds' `LOGIT_PER_POINT`, `PARTNER_POINTS`, the stage terrain's `STAGE_PRIOR_WORDS`, `STAGE_MENTIONS` and `STAGE_MIN_WORDS`, `REFERENCE_SIZE`, `SCALE_POOL`, `NEED_BUDGET`, the search's `SCORE_PLACES`, `RANK_CAP` and `FOLD_COUNTS`, the counter graph's mechanisms, `MAX_TANKS`, `MAX_BANS`, the weight slider's top, and the healing formation's radius and teammates: the equation, how a six is chosen, the scoring function with the default engine under the playbook, the board and how the layers fit |
 | `/registry` | the strategy registry, rendered by `registry.py` on every call from the code the solver runs, so it cannot drift from it: every strategy of the playbook in force, a row each in its kind's table - limits, heuristics and assumptions, each under its heading, a row giving the rule's form and the most it moves a six, and a heuristic's weight and who settles its gate - and a card each, anchored by its id (`/registry#<id>`). A card says in plain words what its rule does, then gives its formula: its form as the code reads it (a limit; a reward or a need - a heuristic on a metric whose gate the board or the six settles; a scored heuristic; an assumption; a draft), its weight and the most it moves a six, its gate with its params filled in and who settles it, and its term in the math page's notation with its own numbers - a need's share of its guard's budget from `scoring.need_scales`. Then each metric it reads, with the registry's meaning (`facts/team.py`, `facts/compute.py`) and how its range rule aggregates it over the six (`Spec.aggregate` in `inference/ranges.py`), its prose, and its entry and sources in `inference/README.md` - where two rules have held its id, the last entry, the earlier rule's folded away and marked so. Where a card's prose or its record names another rule in backticks, or a need lists the needs on its guard, the name links that rule's card. Each form links its section of `/math`, which gives the forms in general; the page quotes no rate. The cards sit under the tables, hidden, and a click on a rule - its row in a table, or a rule a card names - opens its card in a dialog over the page, which stays where it was (*The registry's dialog*, under `static/`) |
 
 The board answers GET alone: any other method is a 501, after the host
@@ -156,7 +157,7 @@ share; where the optimal scores no higher than the floor, as every six
 does when a caller turns the engine off under a playbook that scores
 nothing, it reads *unscored*, the engine's reason in the tooltip. Red's
 badge is how often a six fields the heroes of its likely six, on average
-(*24% avg pick*), since red has no share. The engine
+(*N% avg pick*), since red has no share. The engine
 words each badge (`momentum.badges`, a label and a tip); the page only
 shows it.
 
@@ -214,6 +215,15 @@ always kept. Only `tune` changes a file's weight, the meta's and the swap
 cost included. Each card's *its math* links its rule's entry on the
 registry (`/registry#<id>`), which opens over the registry's tables, the
 meta's the default engine on the math page.
+
+**The footer** closes every page - the board, `/math`, `/registry` and
+the error pages (`pages.FOOTER`): Blizzard's Overwatch notice, as its
+Legal FAQ asks a fan site to carry it, the line that Countrix is a fan
+project not affiliated with or endorsed by Blizzard, and the Overwatch
+Wiki's credit and licence, CC BY-NC-SA 3.0, with a link to `NOTICE`,
+which lists the third-party material and its terms. The facts panel
+credits the wiki again under its table, since its facts quote the
+wiki's words.
 
 **The header** pins three pills top-right: *the math*, *the registry*
 beside it, and the repository on GitHub; the header's right padding keeps

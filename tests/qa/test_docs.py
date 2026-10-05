@@ -309,6 +309,25 @@ def test_the_overview_names_everything_at_the_root():
     assert not missing, missing
 
 
+def test_the_notice_states_the_third_party_terms_and_names_files_that_exist():
+    """NOTICE lists the third-party material and its terms - the Overwatch
+    Wiki's licence with its address, the font's, Blizzard's notice for
+    Overwatch and the line that Countrix is not Blizzard's - and names each
+    file that quotes the wiki. Every file it names exists, so a test file
+    renamed or removed fails here until NOTICE follows it."""
+    notice = _read("NOTICE")
+    flat = " ".join(notice.split())
+    for phrase in ("CC BY-NC-SA 3.0", "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+                   "https://overwatch.fandom.com", "SIL Open Font License 1.1",
+                   "Overwatch(TM) (c) 2016 Blizzard Entertainment, Inc. All rights reserved.",
+                   "not affiliated with or endorsed by Blizzard"):
+        assert phrase in flat, phrase
+    named = re.findall(r"^ +((?:tests|ui|db|docs)/\S+)$", notice, re.M)
+    assert len(named) >= 10, named
+    missing = [path for path in named if not os.path.exists(os.path.join(ROOT, path))]
+    assert not missing, missing
+
+
 def _maps(doc, entry):
     """Whether a package docstring has a map line for the entry: indented,
     the name (a module without .py, a folder with or without its slash),

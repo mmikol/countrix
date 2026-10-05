@@ -33,8 +33,8 @@ out their rate phrases.*
   ([how a six is chosen](docs/inference.md#how-a-six-is-chosen)). The
   space is every six of the released roster, each set of heroes once, at
   most two tanks, and the playbook's constraints prune it, weighing
-  nothing: about 13 million legal sixes today, fewer with bans or
-  locks. A default engine, the meta, scores every six left on its win
+  nothing: 13,030,920 legal sixes on an open board on the roster of
+  2026-10-05, fewer with bans or locks. A default engine, the meta, scores every six left on its win
   rates on the map trusted by pick rate, the wiki's synergies and its
   counters to the other side - the wiki's, and answers derived from the
   kits where the wiki says nothing - and one meta weight scales it. The
@@ -189,8 +189,31 @@ the data current, `/maintain` runs the checks and keeps the docs current.
 
 ## License
 
-Copyright (c) 2026 Miliano Mikol. [PolyForm Strict License 1.0.0](LICENSE):
-noncommercial use only, no redistribution, no changes or new works; anything
-else needs a separate written license. The game data, hero portraits and
-artwork belong to Blizzard Entertainment and the Overwatch wiki's contributors.
-Countrix is a fan project, not affiliated with or endorsed by Blizzard.
+Copyright (c) 2026 Miliano Mikol. The [PolyForm Strict License 1.0.0](LICENSE)
+covers Countrix's own code and text: noncommercial use only, no
+redistribution, no changes or new works; anything else needs a separate
+written license. It covers none of the third-party material
+[NOTICE](NOTICE) lists, each under its own terms:
+
+- **The Overwatch Wiki's text.** Hero kits, maps, terrain, playstyles,
+  synergies and counters come from the [Overwatch Wiki](https://overwatch.fandom.com)
+  at Fandom, written by its contributors and licensed under
+  [CC BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/).
+  Quoted wiki text - in the tests, the docs and the board's facts - keeps
+  that licence; NOTICE names each file that quotes it and the articles.
+- **Bebas Neue**, the display face, by Dharma Type under the
+  [SIL Open Font License 1.1](ui/static/OFL.txt).
+- **Blizzard's material.** Hero and map names, portraits, role icons,
+  Blizzard's hero text and its win, pick and ban rates, used under
+  [Blizzard's fan-site permission](https://www.blizzard.com/en-us/legal/c1ae32ac-7ff9-4ac3-a03b-fc04b8697010/blizzard-legal-faq)
+  for home, noncommercial and personal use. The rates are licensed for
+  personal use only: they are pulled into a local database and never
+  committed. By the owner's decision of 2026-10-05, the study's results and
+  the screenshots of the board show numbers computed from them, and
+  CounterWatch's 6v6 data, which the study measures against, stays in a
+  private benchmark repository.
+
+Overwatch(TM) (c) 2016 Blizzard Entertainment, Inc. All rights reserved.
+Overwatch is a trademark or registered trademark of Blizzard Entertainment,
+Inc. in the U.S. and/or other countries. Countrix is a fan project, not
+affiliated with or endorsed by Blizzard Entertainment.

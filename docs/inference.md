@@ -47,16 +47,17 @@ COMP   = the legal six of highest score, exactly; the next best after it, in ord
 1. **The space.** A six is a set, held grouped as tanks, damage and
    supports. It keeps the locked picks, leaves out the banned and the
    unreleased, and fields at most two tanks, the queue's own limit.
-   Today's 53 released heroes - 15 tanks, 24 damage, 14 supports - make
-   22,957,480 sixes, and 18,040,386 of them field two tanks or fewer.
+   On 2026-10-05 the 53 released heroes - 15 tanks, 24 damage, 14
+   supports - made 22,957,480 sixes, and 18,040,386 of them field two
+   tanks or fewer.
 2. **The limits prune.** A limit removes every six that breaks it and
    adds nothing to one that keeps it. The shipped limits - at most three
    supports, at least one tank and at least one support
    (`at-most-three-supports`, `six-fields-a-tank`,
-   `six-fields-a-support`) - leave 13,030,920 legal sixes on an open
-   board, and a ban or a locked pick leaves fewer. Blue's own comp that
-   breaks a limit is not allowed; red's revealed picks are facts, never
-   ruled out ([The share](#the-share)).
+   `six-fields-a-support`) - left 13,030,920 legal sixes on an open
+   board that day, and a ban or a locked pick leaves fewer. Blue's own
+   comp that breaks a limit is not allowed; red's revealed picks are
+   facts, never ruled out ([The share](#the-share)).
 3. **The meta scores.** The default engine scores every legal six on its
    win rates, synergies and counters, and `meta.md`'s `meta` scales it
    ([The objective](#the-objective)).
@@ -228,17 +229,19 @@ median range is 41 - the wiki's edges at 2 and the kit's fill at 1 - so
 counter weighed 0.05; the synergy score's is 8.1, each unwritten cell
 read at the written cells' claim share, so synergy weighed 0.26.
 
-A 6v6 benchmark then halved both, to 0.13 and 0.025, so each term's range
-is now about a quarter of the rate term's. The rates are 5v5 Role Queue,
-and the game the engine solves is 6v6, which neither Blizzard nor the
-wiki measures. On a private benchmark against CounterWatch's public 6v6
-numbers - PC players' matches, kept out of this repository and off the
-board - sixes picked with both weights halved scored a little better on
-most of the maps held out of the tuning, under both of its readings of a
+A 6v6 benchmark then halved both, to 0.13 and 0.025, so each term's
+range is now about a quarter of the rate term's. The rates are 5v5 Role
+Queue, and the game the engine solves is 6v6, which neither Blizzard nor
+the wiki measures. On a private benchmark against CounterWatch's public
+6v6 numbers - PC players' matches, whose data stays in the private
+benchmark repository; by the owner's decision of 2026-10-05 the study's
+results are published, its page and its report, and that data is not -
+sixes picked with both weights halved scored a little better on most of
+the maps held out of the tuning, under both of its readings of a
 counter: the win rate of one hero against another, and its duel rating.
 Turning both off scored no better on average and far less evenly, and
-would leave the engine blind to red's picks. `tuning-log.md` records each
-setting and its reason.
+would leave the engine blind to red's picks. `tuning-log.md` records
+each setting and its reason.
 
 ### Why an unwritten synergy pair is not zero
 
@@ -924,7 +927,7 @@ with three 7%.
 
 `meta.md`: meta 1 x (rate 1, synergy 0.13, counter 0.025); swap cost 10 - the default engine's weights, which the tune tool changes (id `meta`)
 
-The default engine scores every six before the playbook's rules do: each pick's win rate on the map, trusted by its pick rate (rate), the wiki's synergy scores among the six, a cell no article writes at the written cells' claim share (synergy), and the counter graph against the other side (counter). The meta scales the three together - 0 is the playbook alone, 1 the engine as calibrated - and the board's Meta slider sets it for a session without touching this file. Rate is 1, so its term is in win-rate points. Synergy and counter were set so that each term spread a typical board's sixes about half as far as the rates do - synergy set again once a blank cell read at the written cells' claim share - and were then halved against 6v6 results: the rates are 5v5, and on a private benchmark against CounterWatch's public 6v6 numbers, kept out of this repository, sixes picked with both terms at half that weight scored a little better on most of the maps held out of the tuning. The swap cost, in share points of blue's span, is what a swap of one of blue's picks must gain before the board suggests it - the stand-in for the ultimate charge and the walk a swap costs - and what each hero changed between two stages of the plan costs; at 10 a board with blue's six drafted is offered one or two; a board's own swap weight sets it for a session without touching this file, and 0 suggests the optimal six outright.
+The default engine scores every six before the playbook's rules do: each pick's win rate on the map, trusted by its pick rate (rate), the wiki's synergy scores among the six, a cell no article writes at the written cells' claim share (synergy), and the counter graph against the other side (counter). The meta scales the three together - 0 is the playbook alone, 1 the engine as calibrated - and the board's Meta slider sets it for a session without touching this file. Rate is 1, so its term is in win-rate points. Synergy and counter were set so that each term spread a typical board's sixes about half as far as the rates do - synergy set again once a blank cell read at the written cells' claim share - and were then halved against 6v6 results: the rates are 5v5, and on a private benchmark against CounterWatch's public 6v6 numbers, whose data stays in the private benchmark repository while the study publishes its results (the owner's decision of 2026-10-05), sixes picked with both terms at half that weight scored a little better on most of the maps held out of the tuning. The swap cost, in share points of blue's span, is what a swap of one of blue's picks must gain before the board suggests it - the stand-in for the ultimate charge and the walk a swap costs - and what each hero changed between two stages of the plan costs; at 10 a board with blue's six drafted is offered one or two; a board's own swap weight sets it for a session without touching this file, and 0 suggests the optimal six outright.
 
 #### Constraints
 

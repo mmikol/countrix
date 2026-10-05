@@ -123,8 +123,9 @@ read Postgres directly ([mcp.md](mcp.md)).
 | `pyproject.toml` | ruff's rules (line length 100; outside the tests, an import sits in the module's import block); mypy's, which hold every function in `db`, `facts`, `inference`, `door`, `ui` and `orchestrator.py` to full annotations; pytest's test paths and the `invariant` marker for tests that need a built database; the coverage bar, 75% where a database exists |
 | `CLAUDE.md` | what a Claude Code session reads before it changes code: the commands, the layers in brief, what the tests hold a change to, the house rules and style |
 | `SECURITY.md` | the terms - you run it at your own risk, no security commitment from the author - and how to report a vulnerability privately; the measures themselves are in [security.md](security.md) |
-| `LICENSE` | PolyForm Strict 1.0.0: noncommercial use only, no redistribution, no changes or new works; anything else needs a separate license from the author |
-| `.gitignore` `.dockerignore` | the caches, the cluster, the venv, `.env`, `backups/` |
+| `LICENSE` | PolyForm Strict 1.0.0, over Countrix's own code and text: noncommercial use only, no redistribution, no changes or new works; anything else needs a separate license from the author |
+| `NOTICE` | the third-party material and its terms, none of it under `LICENSE`: the Overwatch Wiki's text under CC BY-NC-SA 3.0, with Fandom's form of credit and each file that quotes it, with the articles; Bebas Neue under the SIL OFL 1.1; Blizzard's material under its fan-site permission, with the Overwatch notice; CounterWatch's numbers, whose data stays in the private benchmark repository |
+| `.gitignore` `.dockerignore` | the caches, the cluster, the venv, `.env`, `backups/`; the image leaves out `HANDOFF.md`, the session's private notes, too |
 
 ## Deployment
 
