@@ -416,6 +416,32 @@ def test_blue_counters_the_likely_six_until_red_reveals_a_pick(synthetic_world):
     assert revealed.expected.blue == around and revealed.expected.locked == ["Mortar"]
 
 
+def test_reds_likely_six_reads_tank_damage_support_its_picks_first_in_a_role(synthetic_world):
+    """Red's likely six reads as every view shows a six (facts.model.by_role):
+    tanks, then damage, then supports, red's revealed picks first within a
+    role in the order revealed and its likeliest heroes after them - the six
+    red's row and the comps tab draw, and its text renders. What red revealed
+    stays as sent (`locked`), and a revealed pick's score still counts only
+    the picks revealed before it. The plan names each side's picks the same
+    way, blue's in pick order within a role."""
+    world = synthetic_world
+    red = ("Gale", "Balm", "Mortar")                         # a damage, a support, a tank
+    b = engine.board(world, Draft("Harbor Gate", red, ("Sorrel", "Anvil")),
+                     catalog=ASSUMPTIONS_ONLY, brief=BRIEF)
+    six = ["Mortar", "Anvil", "Gale", "Needle", "Balm", "Myrrh"]
+    assert b.expected.blue == [p["hero"] for p in b.expected.picks] == six
+    assert [p["locked"] for p in b.expected.picks] == [True, False] * 3
+    assert b.expected.locked == list(red)
+    likely = compute.expected_picks(world, world.map("Harbor Gate"),
+                                    revealed=[world.hero(n) for n in red])
+    assert [p["hero"] for p in likely][:3] == list(red)      # computed in the order revealed
+    assert {p["hero"]: p["pick_score"] for p in b.expected.picks} == {
+        p["hero"]: p["score"] for p in likely}
+    assert "  %s - on " % ", ".join(six) in b.expected.rendered()
+    assert "Their 3 picks so far (Mortar, Gale, Balm)" in b.plan
+    assert "The six keeps your picks (Anvil, Sorrel) and fills the rest." in b.plan
+
+
 def test_board_ranks_a_full_six_and_ignores_sides_on_control(synthetic_world):
     """A full six on a control map is ranked among every legal six - the
     optimal's third alternative is fourth - and the side a caller names

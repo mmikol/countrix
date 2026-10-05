@@ -322,6 +322,9 @@ the hero of the highest pick score - how often a six fields it, its
 pick rate with a tank's doubled for a six's two tank seats, plus
 `PARTNER_POINTS` for each partner already on the six - and red's badge
 is how often a six fields those heroes on average. Red has no share.
+The board shows that six as it shows every six, tanks, then damage, then
+supports, red's picks first within a role in the order revealed; its
+`locked` keeps that order.
 The fight odds compare the two sides another way (`plan.fight_odds`):
 blue's six and red's likely six on one scale, the default engine alone
 against red's six, each counter between them counted once, no playbook
@@ -389,10 +392,13 @@ that breaks a limit, picks no six completes) the target is the cheapest
 way back to an allowed six, and the verdict says so. Each dropped pick
 is paired with an incoming hero of its own role where the target has
 one, then with whichever is left, and carries its place among the picks
-as sent (`at`), so the page draws the incoming portrait over that slot
-and decides nothing; a half-drafted seat's empty slots show the fill's
-heroes (`open`), whether or not a swap is suggested, as the rest of the
-board does.
+as sent (`at`), so the page draws the incoming portrait over that pick
+wherever its row draws it and decides no swap; the pairs come in the
+order the board draws the picks they drop - tanks, then damage, then
+supports, each role in pick order (`facts.model.by_role`) - so the
+verdict names them as the row reads. A half-drafted seat's empty slots
+show the fill's heroes (`open`), whether or not a swap is suggested, as
+the rest of the board does.
 
 **Why joint.** Each pick's best single swap, taken alone, can conflict:
 two tanks in for one slot, one hero taken twice, or a union of bests

@@ -14,7 +14,7 @@ from facts import compute
 from facts.board_facts import StageTerrainValue, TerrainValue
 from facts.draft import TEAM_SIZE, Side
 from facts.factset import FactSet
-from facts.model import Hero, Map, World
+from facts.model import ROLES, Hero, Map, World, by_role
 from facts.team import team_metrics, text
 from facts.team_facts import counted
 from inference import base
@@ -273,10 +273,11 @@ def plan(
 
 def _yours(six: Result) -> list[str]:
     """Blue's own picks in the six: a fill's locks, a full six's heroes, and
-    none in the optimal, which blue's picks never constrain."""
-    if six.kind == "fill":
-        return list(six.locked)
-    return list(six.blue) if six.kind == "evaluate" else []
+    none in the optimal, which blue's picks never constrain - tank, damage,
+    support, as every view shows a six (by_role), each role in pick order."""
+    picks = six.locked if six.kind == "fill" else six.blue if six.kind == "evaluate" else []
+    rank = {p["hero"]: ROLES.index(p["role"]) for p in six.picks}
+    return sorted(picks, key=lambda name: rank.get(name, len(ROLES)))
 
 
 def _keeps(six: Result, yours: Sequence[str]) -> str | None:
@@ -351,14 +352,16 @@ def _them(
         blue_r: Result) -> str | None:
     """What red's picks mean: their lean against the six's, and which picks
     of the six answer which of theirs - read off the hero.vs_answers facts
-    the picks cite. With nothing revealed, their likely six (_unrevealed)."""
+    the picks cite - red's picks named tank, damage, support (by_role). With
+    nothing revealed, their likely six (_unrevealed)."""
     if not red_h:
         return _unrevealed(blue_r)
     n = len(red_h)
     theirs = team_metrics(world, red_h, m, [])
     red_lean = text(theirs["style_lean"]) or text(theirs["style_top"])
+    named = [h.name for h in by_role(red_h)]          # tank, damage, support, as drawn
     them = "Their %s%s (%s)" % (counted(n), " so far" if n < TEAM_SIZE else "",
-                                ", ".join(h.name for h in red_h))
+                                ", ".join(named))
     s = "s" if n == 1 else ""
     if red_lean in THEIR_LEAN and red_lean == lean:
         them += " lean%s %s too: %s." % (s, red_lean, SAME_LEAN[red_lean])
@@ -366,7 +369,7 @@ def _them(
         them += " lean%s %s: %s." % (s, red_lean, THEIR_LEAN[red_lean])
     else:
         them += " show%s no lean yet." % s
-    return them + _answers([h.name for h in red_h], _answered(blue_r))
+    return them + _answers(named, _answered(blue_r))
 
 
 def _unrevealed(six: Result) -> str | None:

@@ -53,9 +53,12 @@ function rosterHTML(team) {
   return cols;
 }
 
+/* a team's six slots, empty until paint draws its row: a slot carries its
+   team, and data-h, the hero it shows, which is all a click reads - the row
+   is drawn in role order, so a slot's place names no pick */
 function buildTeam(team) {
   var slots = '';
-  for (var i = 0; i < TEAM; i++) slots += "<div class='slot' data-team='" + team + "' data-i='" + i + "'></div>";
+  for (var i = 0; i < TEAM; i++) slots += "<div class='slot' data-team='" + team + "'></div>";
   el(team + 'slots').innerHTML = slots;
   el(team + 'roster').innerHTML = rosterHTML(team);
 }
@@ -142,15 +145,9 @@ function pickReason(team, name) {
 function paint() {
   if (!ROSTER) return;                  /* the slots and rosters are built when the roster loads */
   paintBans();
+  var rows = paintRows();
   ['red', 'blue'].forEach(function (team) {
     var other = team === 'red' ? 'blue' : 'red';
-    var slots = el(team + 'slots').children;
-    for (var i = 0; i < TEAM; i++) {
-      var name = st[team][i], s = slots[i];
-      if (name) { var h = hero(name); s.className = 'slot full'; s.setAttribute('data-h', name);
-        s.title = pickReason(team, name); s.innerHTML = portrait(h) + "<span class='nm'>" + esc(name) + '</span>'; }
-      else { s.className = 'slot'; s.removeAttribute('data-h'); s.title = ''; s.innerHTML = "<span class='idx'>" + (i + 1) + '</span>'; }
-    }
     var have = roleCounts(team), capped = {}, caps = {};
     ROLES.forEach(function (role) { caps[role] = roleCap(team, role); capped[role] = caps[role] !== null && have[role] >= caps[role]; });
     var tiles = el(team + 'roster').querySelectorAll('.tile[data-h]');   /* the announced card keeps its own class */
@@ -160,8 +157,7 @@ function paint() {
         (st.bans.indexOf(n) >= 0 ? ' banned' : '') + (!on && hh && capped[hh.role] ? ' capped' : '');
     }
   });
-  paintSuggestions();
-  paintSwaps();
+  paintSwaps(rows.blue);
   el('mapsel').value = st.map;
   var m = currentMap();
   paintStagePicker(m);
@@ -313,42 +309,66 @@ function renderFacts() {
   el('factsn').textContent = shown === total ? commas(total) + ' facts' : commas(shown) + ' of ' + commas(total) + ' facts';
 }
 
-/* the empty slots carry the board's suggestions, and a click locks one. Blue's
-   are the solver's: the optimal six before any pick, then the fill - the best
-   six that keeps the locked ones. Red's are its likely six around its picks:
-   for each open slot the hero with the highest pick score, drawn only for the
-   red picks the board in hand answered. The tile shows the hero alone; its
-   reason and pick score ride in the hover title */
-function paintSuggestions() {
+/* the two team rows: each team's picks and, in its open slots, the board's
+   suggestions, a click from locking. Blue's are the solver's: the optimal six
+   before any pick, then the fill - the best six that keeps the locked ones.
+   Red's are its likely six around its picks: for each open slot the hero with
+   the highest pick score, drawn only for the red picks the board in hand
+   answered. A suggested tile shows the hero alone; its reason and pick score
+   ride in the hover title. Returns each row as drawn (lineup) */
+function paintRows() {
   var d = INF;
   var src = !d || d.error ? null : (st.blue.length ? d.fill : d.blue);
   var sw = answered() ? d.swaps : null;         /* the swaps' empty slots show the fill's heroes */
   var free = function (p) { return st.blue.indexOf(p.hero) < 0; };
   var open = sw && sw.open && sw.open.length ? sw.open.filter(free)
            : src && src.picks ? src.picks.filter(function (p) { return !p.locked && free(p); }) : [];
-  suggest('blue', open);
   var likely = redAnswered() ? d.expected.picks.filter(function (p) {
     return !p.locked && st.red.indexOf(p.hero) < 0; }) : [];
-  suggest('red', likely);
+  return { blue: paintRow('blue', lineup('blue', open)), red: paintRow('red', lineup('red', likely)) };
 }
 
-/* `team`'s empty slots, in order, show `picks` */
-function suggest(team, picks) {
+/* a team's six as its row draws it: its picks and the suggestions for its
+   open slots together, tanks first, then damage, then supports (ROLES), so a
+   glance tells what the team fields. Within a role the team's own picks come
+   first, in pick order, then the suggestions in the board's order; a hero of
+   no known role goes last. Only the drawing moves: st.blue and st.red keep
+   the order picked, which the board is asked in. An entry is a pick, `at`
+   its place among the team's picks, or a suggestion, `p` the board's entry */
+function lineup(team, suggested) {
+  var open = suggested.slice(0, Math.max(0, TEAM - st[team].length));
+  var row = st[team].map(function (name, at) { return { name: name, at: at }; })
+    .concat(open.map(function (p) { return { name: p.hero, p: p }; }));
+  row.forEach(function (x, i) {
+    var h = hero(x.name), r = ROLES.indexOf(h ? h.role : x.p ? x.p.role : '');
+    x.rank = r < 0 ? ROLES.length : r; x.i = i;
+  });
+  return row.sort(function (a, b) { return a.rank - b.rank || a.i - b.i; });
+}
+
+/* `team`'s slots show `row`: a pick solid, its tooltip the reason this board
+   gives it; a suggestion dashed, a click from locking; then the empty slots.
+   An open slot's number is its place in the row */
+function paintRow(team, row) {
   var slots = el(team + 'slots').children;
-  for (var i = st[team].length, k = 0; i < TEAM; i++) {
-    var s = slots[i], p = picks[k++];
-    if (!p) continue;
-    var h = hero(p.hero) || { name: p.hero, portrait: p.portrait };
-    s.className = 'slot suggested'; s.setAttribute('data-h', p.hero); s.title = p.why;
-    s.innerHTML = portrait(h) + "<span class='idx'>" + (i + 1) + "</span><span class='nm'>" + esc(p.hero) + '</span>';
+  for (var i = 0; i < TEAM; i++) {
+    var x = row[i], s = slots[i];
+    if (!x) { s.className = 'slot'; s.removeAttribute('data-h'); s.title = ''; s.innerHTML = "<span class='idx'>" + (i + 1) + '</span>'; continue; }
+    var h = hero(x.name) || { name: x.name, portrait: x.p ? x.p.portrait : '' };
+    s.className = x.p ? 'slot suggested' : 'slot full'; s.setAttribute('data-h', x.name);
+    s.title = x.p ? x.p.why : pickReason(team, x.name);
+    s.innerHTML = portrait(h) + (x.p ? "<span class='idx'>" + (i + 1) + '</span>' : '') + "<span class='nm'>" + esc(x.name) + '</span>';
   }
+  return row;
 }
 
 /* the swaps above blue's picks: the board's one joint answer (swaps) - the
-   incoming hero's portrait over the pick it replaces, a click takes that swap,
-   and the caption is the board's verdict. Taking one leaves the rest the
-   board's answer from the new picks. Nothing is drawn for red */
-function paintSwaps() {
+   incoming hero's portrait over the pick it replaces, wherever blue's row
+   (`row`, lineup) draws that pick: the entry whose place among the picks is
+   the pair's `at`. A click takes that swap, and the caption is the board's
+   verdict. Taking one leaves the rest the board's answer from the new picks.
+   Nothing is drawn for red */
+function paintSwaps(row) {
   var d = INF, sw = answered() ? d.swaps : null, box = el('blueswaps');
   var pairs = sw && sw.pairs ? sw.pairs : [];
   if (!pairs.length) {                   /* a kept six says nothing */
@@ -357,7 +377,7 @@ function paintSwaps() {
   }
   var cells = '';
   for (var i = 0; i < TEAM; i++) {
-    var p = pairs.filter(function (x) { return x.at === i; })[0];
+    var x = row[i], p = x && !x.p ? pairs.filter(function (y) { return y.at === x.at; })[0] : null;
     if (!p) { cells += "<div class='swapcell'></div>"; continue; }
     var h = hero(p.in) || { name: p.in, portrait: p.portrait };
     cells += "<div class='swapcell' data-swap-in=\"" + esc(p.in) + "\" data-swap-out=\"" + esc(p.out) +

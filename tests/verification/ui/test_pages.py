@@ -8,9 +8,11 @@ only the client can make are pinned in the script: the stale-reply guard;
 the HTML escape; the meta and swap-cost weights, never pruned as a stale
 heuristic's are; the swaps and suggested slots, drawn only for the picks
 the board in hand answered, held while a board solves and never offering a
-picked hero; and a taken swap, checked against the bans and the role caps
-as a pick is. Any other decision worth pinning is made on the server, as
-the seat badge is (momentum.badges), and tested there."""
+picked hero; each team's row, its picks and suggestions drawn together
+tank, damage, support while the picks stay stored as picked; and a taken
+swap, checked against the bans and the role caps as a pick is. Any other
+decision worth pinning is made on the server, as the seat badge is
+(momentum.badges), and tested there."""
 
 import os
 import re
@@ -20,6 +22,7 @@ import pytest
 from db.data.wiki import terrain
 from facts import board_facts, compute, tables
 from facts.draft import TEAM_SIZE, Draft
+from facts.model import ROLES
 from facts.records import Patch
 from inference import base, bounds, catalog, engine, plan, scale, scoring, solver
 from inference.result import (
@@ -203,7 +206,7 @@ def test_the_scripts_read_payload_keys_the_server_writes(synthetic_world, monkey
         solved)
     read("pairs open verdict", Swaps.__annotations__)
     read("out in at portrait why", SwapPair.__annotations__)
-    read("hero portrait why", OpenSlot.__annotations__)
+    read("hero role portrait why", OpenSlot.__annotations__)
     read("stage kind current played six swaps blurb solved", StageRow.__annotations__)
     read(
         "picks contributions alternatives considered seconds playstyle cited tie blue",
@@ -275,7 +278,7 @@ def test_the_swap_row_and_the_slots_it_fills_follow_the_picks_the_board_answered
     role caps as a pick is."""
     script = scripts()
     assert "answered() ? d.swaps : null" in function(script, "paintSwaps")
-    suggest = function(script, "paintSuggestions")
+    suggest = function(script, "paintRows")
     assert "answered() ? d.swaps : null" in suggest and "sw.open.filter(free)" in suggest
     assert "redAnswered() ? d.expected.picks" in suggest and "st.red.indexOf(p.hero)" in suggest
     assert "d.current.blue" in function(script, "answered")
@@ -286,6 +289,45 @@ def test_the_swap_row_and_the_slots_it_fills_follow_the_picks_the_board_answered
     # the playbook's limits are blue's: red meets the queue's tank limit alone
     assert "if (team === 'red') return role === 'tank' ? TANKS : null;" in function(
         script, "roleCap")
+
+
+def test_each_team_row_reads_tank_damage_support_and_a_click_names_its_hero():
+    """Both team rows are drawn through one ordering, lineup: a team's picks
+    and the suggestions for its open slots together - the suggestions cut to
+    the open slots in the board's order - sorted by role in the server's
+    ROLES order, a pick before a suggestion within a role (the picks are
+    listed first and the tie goes to the place in that list), the picks in
+    pick order. The stored picks are never sorted, so the board is asked in
+    the order picked. A slot's place names no pick: a click reads the hero
+    the slot shows, and a swap sits over its pick wherever the row draws it,
+    the drawn pick whose place among the picks is the pair's `at`."""
+    script = scripts()
+    roles = re.search(r"var ROLES = \[([^\]]*)\];", script).group(1)
+    assert re.findall(r"'([a-z]+)'", roles) == list(ROLES)
+    order = function(script, "lineup")
+    assert "suggested.slice(0, Math.max(0, TEAM - st[team].length))" in order
+    assert "st[team].map(function (name, at) { return { name: name, at: at }; })" in order
+    assert ".concat(open.map(function (p) { return { name: p.hero, p: p }; }))" in order
+    assert "ROLES.indexOf(h ? h.role : x.p ? x.p.role : '')" in order
+    assert "x.rank = r < 0 ? ROLES.length : r; x.i = i;" in order
+    assert "return row.sort(function (a, b) { return a.rank - b.rank || a.i - b.i; });" in order
+    rows = function(script, "paintRows")
+    assert "paintRow('blue', lineup('blue', open))" in rows
+    assert "paintRow('red', lineup('red', likely))" in rows
+    paint = function(script, "paint")
+    assert "var rows = paintRows();" in paint and "paintSwaps(rows.blue);" in paint
+    assert not re.search(r"st(\.blue|\.red|\[team\])\.sort\(", script)
+    # each slot draws its entry's hero, a pick solid and a suggestion dashed,
+    # and only an open slot carries a number, its place in the row
+    row = function(script, "paintRow")
+    assert "s.className = x.p ? 'slot suggested' : 'slot full'; s.setAttribute('data-h', x.name);" \
+        in row
+    assert "s.removeAttribute('data-h')" in row and "(i + 1)" in row
+    # a click reads data-h, never a slot's place
+    assert not re.search(r"data-i\b", script)
+    assert "var hit = near('[data-h][data-team]');" in script
+    assert "name = hit.getAttribute('data-h')" in script
+    assert "y.at === x.at" in function(script, "paintSwaps")
 
 
 def test_a_reply_to_an_older_request_is_dropped_and_its_board_cancelled():

@@ -19,9 +19,9 @@ dropped costing the swap cost.
     paired      the swaps: each pick the target drops matched to an incoming
                 hero of its role, then any left to the incoming heroes left,
                 both sides in seat order, as the stage plan's swaps are
-                (moved); its place among the picks as sent. A half-drafted
-                seat's empty slots show the fill's heroes, as the rest of the
-                board does
+                (moved); its place among the picks as sent, the pairs in the
+                order the board draws the picks. A half-drafted seat's empty
+                slots show the fill's heroes, as the rest of the board does
     verdict     the swaps in words
     chain       the plan stage by stage (below)
 
@@ -55,7 +55,7 @@ from typing import NamedTuple
 
 from facts import compute
 from facts.board_facts import GroundValue
-from facts.model import Hero, Map
+from facts.model import Hero, Map, by_role
 from facts.team import text
 from inference import base, plan
 from inference.base import OFF
@@ -128,14 +128,18 @@ def search(
 def paired(picks: Sequence[Hero], six: Sequence[Hero], target: Result) -> list[SwapPair]:
     """The swaps from `picks` to `six`, matched as the stage plan's are
     (moved): both sides in seat order. Each carries the dropped pick's place
-    among the picks as sent (`at`), the order the pairs come in, and the
-    incoming hero's portrait and reason off `target`, the six scored."""
+    among the picks as sent (`at`), and the incoming hero's portrait and
+    reason off `target`, the six scored. The pairs come in the order the
+    board draws the picks they drop (by_role) - tanks, then damage, then
+    supports, each role in pick order - so the verdict names them as the
+    row reads."""
     place = {h.name: at for at, h in enumerate(picks)}
+    drawn = {h.name: i for i, h in enumerate(by_role(picks))}
     told = {p["hero"]: p for p in target.picks}
     return sorted((SwapPair({"out": s["out"], "in": s["in"], "at": place[s["out"]],
                              "portrait": told[s["in"]].get("portrait"),
                              "why": told[s["in"]]["why"]})
-                   for s in moved(picks, six)), key=lambda pair: pair["at"])
+                   for s in moved(picks, six)), key=lambda pair: drawn[pair["out"]])
 
 
 def open_slots(picks: Sequence[Pick]) -> list[OpenSlot]:

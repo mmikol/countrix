@@ -139,6 +139,20 @@ def test_the_pairs_match_a_role_and_one_swap_taken_leaves_the_rest(synthetic_wor
         (p["out"], p["in"], p["at"]) for p in rest]
 
 
+def test_the_pairs_come_in_the_order_the_row_draws_the_picks_they_drop(synthetic_world):
+    """The pairs come as the board draws blue's picks (by_role): tanks, then
+    damage, then supports, each role in pick order - so the verdict names
+    them as the row reads - and each still carries its pick's place among
+    the picks as sent. Blue picked a support before a damage here, and the
+    damage's swap comes first."""
+    draft = Draft("Salt Flats", ("Anvil", "Rook"), ("Myrrh", "Rook", "Kite", "Needle"))
+    s = engine.board(synthetic_world, draft, catalog=catalog.load(FIXTURE_PLAYBOOK),
+                     brief=engine.Brief(base=DEFAULT, swap=0.0)).swaps
+    assert [(p["out"], p["in"], p["at"]) for p in s["pairs"]] == [
+        ("Rook", "Gale", 1), ("Myrrh", "Sorrel", 0)]
+    assert s["verdict"].startswith("swap Rook for Gale, Myrrh for Sorrel: ")
+
+
 def test_the_keep_term_is_never_a_term_of_a_payload_and_the_share_is_the_evaluations(
         synthetic_world):
     """The keep term ranks the search and nothing else: no payload, fact or

@@ -19,6 +19,7 @@ from db import ROOT
 from facts import compute, counters
 from facts.draft import Draft
 from facts.factset import FactSet
+from facts.model import by_role
 from facts.records import DerivedEdge, Fired, MapRate
 from inference import base, catalog, engine, scoring
 from inference.base import OFF
@@ -97,8 +98,9 @@ def test_the_synergy_and_counter_terms_read_the_wikis_pairs_and_edges(synthetic_
     """Synergy is team.synergy_score (Anvil+Balm 2, Needle+Tansy 2). The
     counter term reads six of red's heroes - its locked picks first, then its
     likeliest heroes for the rest - and counts the graph's weight each way
-    against them. Each term is its weight times its raw value, and the score
-    their sum."""
+    against them; its breakdown names them as every view shows a six, tank,
+    damage, support, the picks first within a role. Each term is its weight
+    times its raw value, and the score their sum."""
     w = synthetic_world
     objective, cand = prepared(w, "Harbor Gate", ("Mortar", "Gale"), SIX)
     team = cand.ns["team"]
@@ -122,7 +124,9 @@ def test_the_synergy_and_counter_terms_read_the_wikis_pairs_and_edges(synthetic_
         assert c["raw"] == pytest.approx(raw) and c["weight"] == weight
         assert c["weighted"] == pytest.approx(weight * raw)
     assert cand.score == pytest.approx(sum(c["weighted"] for c in cand.contributions))
-    assert terms[base.COUNTERS]["against"] == likely
+    named = terms[base.COUNTERS]["against"]
+    assert named == [h.name for h in by_role(against.heroes)]
+    assert named == ["Mortar", "Anvil", "Gale", "Needle", "Balm", "Myrrh"]
 
 
 def test_off_adds_nothing_and_the_playbook_scores_alone(synthetic_world):
@@ -158,12 +162,14 @@ def test_the_counters_read_the_likely_six_until_the_other_side_locks_a_pick(synt
     assert cand.ns["team"]["net_edges"] == 0 and cand.ns["enemy"]["size"] == 0
     assert objective.static["enemy"] == scoring.team_metrics(w, [], w.map("Harbor Gate"), ())
     # a reveal replaces one likely hero: red's pick leads, its likeliest heroes
-    # fill the rest, and the term still reads six
-    _, locked = prepared(w, "Harbor Gate", ("Gale",), SIX, banned=("Needle",))
+    # fill the rest, and the term still reads six, named tank, damage, support
+    objective, locked = prepared(w, "Harbor Gate", ("Gale",), SIX, banned=("Needle",))
     around = [p["hero"] for p in compute.expected_picks(
         w, w.map("Harbor Gate"), revealed=heroes(w, ("Gale",)), banned=heroes(w, ("Needle",)))]
+    assert [h.name for h in objective.engine.opponent.heroes] == around and around[0] == "Gale"
     [c] = [c for c in locked.contributions if c["id"] == base.COUNTERS]
-    assert c["against"] == around and around[0] == "Gale" and len(around) == 6
+    assert c["against"] == ["Anvil", "Kite", "Gale", "Flint", "Balm", "Sorrel"]
+    assert sorted(c["against"]) == sorted(around) and len(around) == 6
     assert c["likely"] is True and c["revealed"] == 1
     # red's picks are its picks, whichever heroes they are: six that match the
     # likely six are read as picks, not as a guess

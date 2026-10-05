@@ -42,7 +42,7 @@ from typing import Literal, NamedTuple, NotRequired, TypedDict
 
 from facts import compute, counters
 from facts.draft import Side
-from facts.model import ROLES, Hero, Map, World
+from facts.model import ROLES, Hero, Map, World, by_role
 from facts.team import NUMBER_TYPES, MetricBag, MetricValue, number, team_metrics
 from inference.base import COUNTERS, RATES, READS, SYNERGY, Base, BaseWeights, Terms
 from inference.expr import Expr, ExprError, Scope, Value, scope
@@ -283,7 +283,8 @@ def draw(seed: str, hero_id: int) -> float:
 
 def _score_base(engine: Base, cand: Candidate, out: list[Contribution] | None) -> float:
     """The default engine's value; with `out`, a breakdown term per part, the
-    counter term naming the side it read and the edges each way."""
+    counter term naming the side it read - tank, damage, support, as every
+    view shows a six (by_role) - and the edges each way."""
     terms = cand.terms
     if terms is None:
         raise RuntimeError("score() takes a prepared candidate: its base terms are unset")
@@ -294,7 +295,7 @@ def _score_base(engine: Base, cand: Candidate, out: list[Contribution] | None) -
             out.append({"id": key, "kind": "base", "form": "base", "applies": bool(weight),
                         "raw": raw, "weight": weight, "weighted": weight * raw,
                         "metric": READS[key]})
-        out[-1].update({"against": [h.name for h in engine.opponent.heroes],
+        out[-1].update({"against": [h.name for h in by_role(engine.opponent.heroes)],
                         "likely": engine.opponent.likely,
                         "revealed": engine.opponent.revealed, "answers": terms.answers,
                         "exposures": terms.exposures,
