@@ -10,15 +10,16 @@ covers Countrix's own work, not the material below.
 
 ## Blizzard Entertainment
 
-Overwatch&trade; &reg;2016 Blizzard Entertainment, Inc. All rights
+Overwatch&trade; &copy; 2016 Blizzard Entertainment, Inc. All rights
 reserved. Overwatch is a trademark or registered trademark of Blizzard
 Entertainment, Inc. in the U.S. and/or other countries.
 
-Countrix is a fan project, not affiliated with or endorsed by Blizzard.
-The game, its hero names, portraits, role icons and ability text, and
-the win, pick and ban rates on its site are Blizzard's. The board loads
-the portraits and role icons from Blizzard's own servers. Blizzard's
-website terms grant the rates for personal use.
+Countrix is a fan project, not affiliated with or endorsed by Blizzard
+Entertainment. The game, its hero names, portraits, role icons and
+ability text, and the win, pick and ban rates on its site are
+Blizzard's. The board loads the portraits and role icons from
+Blizzard's own servers. Blizzard's website terms grant the rates for
+personal use.
 
 ## The Overwatch Wiki
 

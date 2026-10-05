@@ -11,12 +11,12 @@ them. There is no tracker, no third-party dataset and no API key.
 
 ## The rates
 
-Blizzard's rates are Competitive Role Queue on console in the Americas:
-the page offers no Open Queue. Countrix reads them as the nearest
-numbers to 6v6 Open Queue anyone publishes, and the facts say so. Each
-capture is kept as a dated snapshot, and the facts compare the newest
-with the ones before. Blizzard's website terms grant the rates for
-personal use.
+Blizzard's rates are Competitive Role Queue on console in the Americas,
+and the facts say so: Blizzard's page offers no Open Queue. Countrix
+reads them as the nearest numbers to 6v6 Open Queue that Blizzard
+publishes, since it reads only Blizzard and the wiki. Each capture is
+kept as a dated snapshot, and the facts compare the newest with the ones
+before. Blizzard's website terms grant the rates for personal use.
 
 ## How fresh it is
 
@@ -63,10 +63,11 @@ almost no requests. `{"refresh": true}` fetches the pages again:
 .venv/bin/python -m door.mcp call db_status                        # the database's state, counts and snapshots
 ```
 
-With the stack up, put `./docker-db` in front to reach its database.
-The pulls keep a polite pace: a rates page every 5 seconds, a wiki page
-every half second to 2 seconds. The board shows a refresh on the next
-click, with no restart.
+With the stack up, put `./docker-db` in front to reach its database; it
+reads `POSTGRES_PASSWORD` from the shell, not from `.env`
+([the settings](install.md#the-settings)). The pulls keep a polite
+pace: a rates page every 5 seconds, a wiki page every half second to 2
+seconds. The board shows a refresh on the next click, with no restart.
 
 In Claude Code the house skills do it for you:
 

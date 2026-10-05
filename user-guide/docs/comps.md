@@ -64,6 +64,7 @@ so only a new map, a ban or a red pick changes it.
 
     The filter box narrows the bars by name or reason. Hover a bar for
     one sentence on why it paid, charged or did not count.
+
 - **The alternatives.** The next best sixes of the whole legal space, in
   order.
 

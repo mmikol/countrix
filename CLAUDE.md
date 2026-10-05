@@ -273,7 +273,10 @@ db <- facts <- inference <- door <- ui.
 - The user guide (`user-guide/`) builds strict in CI: a page outside its
   nav, a broken link or a broken anchor fails it. It says what a player
   sees and types, so a change to either updates its page in the same
-  commit.
+  commit. Its screenshots of the board show the numbers the board
+  computes: the owner opened them on 2026-10-05, an exception to the
+  rates rule under House rules. Its text shows no rate figure or text
+  derived from one.
 - Adding or renaming an MCP tool: regenerate docs/mcp.md; each house skill
   must still name the tools `MUST_NAME` (tests/qa/test_docs.py) lists;
   tests/verification/door/mcp/test_mcp.py holds the tool set too.

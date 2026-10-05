@@ -72,13 +72,18 @@ Enter red's picks as they reveal and blue's as your team locks them in.
 Over each roster sits the team's row of six slots. The row reads tank,
 then damage, then support, so a glance tells what each team fields.
 Within a role the team's picks come first, solid, in the order picked;
-then the board's suggestions, dashed; then the empty slots, numbered
-from 1, so the last number says how many stand empty.
+then the board's suggestions for the open slots, dashed. Once the board
+answers, every slot holds a hero.
 
 Only the drawing follows the roles. The picks stay stored, and are
 sent to the board, in the order you made them.
 
-![The two teams' rows: blue's picks solid, the suggestions dashed, the empty slots numbered](img/board-picks.png)
+An open slot stands empty, numbered from 1, only while the board has no
+answer for it: before its first answer, after a request fails, and on
+red's row for the moment a board solves a new red pick. The last number
+says how many stand empty.
+
+![The two teams' rows: each team's picks solid, the suggestions in its open slots dashed](img/board-picks.png)
 
 ## 7. Use the suggestions
 
@@ -101,9 +106,10 @@ swap costs something - the walk back, the ultimate charge lost - so the
 board suggests one only when its gain beats the swap cost. Where a swap
 pays, the incoming hero's portrait sits above the pick it would replace,
 under a caption that names the swaps and blue's share before and after:
-*swap Zarya for Doomfist: 74 -> 85 / 100 of the optimal, at a cost of
-10 / 100 a swap*. Click the portrait to take that swap, and the board
-solves again.
+*swap Zarya for Doomfist: N -> M / 100 of the optimal, at a cost of
+10 / 100 a swap*, where N is your six's share now - your picks filled,
+while you still draft - and M its share after the swap. Click the
+portrait to take that swap, and the board solves again.
 
 The swaps are one joint answer: after you take one, the rest are the
 board's answer from your new picks. Where no swap pays, nothing shows

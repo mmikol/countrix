@@ -36,13 +36,14 @@ key and no fee.
     its assumptions. Countrix does not promise that it wins.
 
 - The badge over your team (*80 / 100*, say) places your six between
-  the weakest of a sample of sixes, 0, and the best six for this draft,
-  100. It is not a chance of winning.
+  the weakest of a sample of sixes, 0, and the best six for this
+  draft, 100. It is not a chance of winning.
 - The fight odds split 100 between the two sixes as the model reads the
   gap between their scores. No match results stand behind the split.
 - The rates are Blizzard's Competitive Role Queue, five a side, on
   console in the Americas. Countrix plays 6v6 Open Queue, six a side,
-  and reads them as the nearest numbers anyone publishes.
+  and reads them as the nearest numbers Blizzard publishes; Countrix
+  reads only Blizzard and the wiki.
 - Every player is assumed to play optimally. Countrix knows nothing of
   your hero pools, your comfort picks or your comms.
 - The other team is never optimized. Countrix reads their likely six

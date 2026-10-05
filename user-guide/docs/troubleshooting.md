@@ -61,6 +61,12 @@ The verdict names what failed. The usual fixes:
 
 - a stale bind mount after the folder moved: run
   `docker compose up -d --force-recreate`, as the verdict says;
+- *no strategies directory at ...*, with the stale bind mount's advice
+  under it, while `.env` sets `COUNTRIX_STRATEGIES` to a full path: the
+  containers cannot see a folder named so, and `--force-recreate` does
+  not help. Name a folder inside the `countrix` folder, relative to it,
+  or delete the line, then run `orchestrator.py up` again
+  ([another playbook](tuning.md#another-playbook));
 - a schema behind the migrations: the `data` container migrates it on
   its own; wait, then run `.venv/bin/python orchestrator.py status`
   again;

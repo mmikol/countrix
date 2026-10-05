@@ -2,8 +2,9 @@
 
 The study asks whether the engine does what it claims: that it truly
 optimizes a team, given its assumptions, and how its sixes compare with
-the tools players use online. Its results are a page on the board, at
-http://localhost:8017/study, and a report.
+the tools players use online. Its results are a page on the board -
+open it from the board's header, *the study*, or at
+http://localhost:8017/study - and a report the page links.
 
 ![The top of the study page](img/study.png)
 
@@ -11,6 +12,9 @@ What the study shows:
 
 - **The proof.** That the search returns the best legal six for its own
   score, given the assumptions, and the checks that hold it to that.
+- **Nothing hard-coded?** Which parts of the code name a hero, a map or
+  an ability, and what is fixed for Overwatch: the three roles, and the
+  facts that read the wiki's kits.
 - **The meta.** How close its sixes come to what players pick and to
   what wins, by Blizzard's numbers and by CounterWatch's 6v6 numbers.
 - **Synergy and counters.** How much of each its sixes carry, by the

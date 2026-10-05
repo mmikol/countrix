@@ -65,9 +65,11 @@ nightly backup of the database into `backups/`, the newest 14 kept.
     It deletes the database's volume, and with it the dated history of
     the rates, which no source gives back.
 
-The README's quick start adds a line that points the board at the
-reference playbook, the one the tests prove the solver against. This
-guide describes the shipped playbook: leave that line out.
+This guide describes the shipped playbook, which the stack runs unless
+`.env` sets `COUNTRIX_STRATEGIES`. The README's note on the reference
+playbook, the one the tests prove the solver against, adds that line;
+to come back to the shipped playbook, delete the line from `.env` and
+run `orchestrator.py up` again.
 
 ## Without Docker
 
@@ -92,11 +94,12 @@ All are optional.
 | setting | what it does |
 | --- | --- |
 | `COUNTRIX_MCP_TOKEN` | a token the door asks for over HTTP; unset, it asks for none |
-| `POSTGRES_PASSWORD` | the database's password; `overwatch` when unset |
+| `POSTGRES_PASSWORD` | the database's password; `overwatch` when unset. Set it before the first start: the database takes it only when its volume is made. `./docker-db` reads it from the shell, not from `.env`, so set it in the shell too |
 | `COUNTRIX_REFRESH_AT` | the refresher's daily time, `05:00` when unset |
 | `COUNTRIX_BACKUP_AT` | the nightly backup's time, `04:30` when unset |
 | `TZ` | the time zone of those two times; UTC when unset |
 | `COUNTRIX_UID`, `COUNTRIX_GID` | on Linux, the user and group that own the checkout, when they are not 1000 |
 
-`COUNTRIX_STRATEGIES` names another playbook folder; [tuning the
-playbook](tuning.md#another-playbook) has it.
+`COUNTRIX_STRATEGIES` names another playbook folder. With the stack, the
+folder must sit inside the `countrix` folder, and the stack cannot tune
+it; [tuning the playbook](tuning.md#another-playbook) has it.

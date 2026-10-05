@@ -9,12 +9,21 @@
 site_name: Countrix user guide
 site_description: How a player or a team uses Countrix to pick an Overwatch 2 team, task by task.
 site_author: Miliano Mikol
+# the footer: Blizzard's notice as the board's footer prints it, and the
+# wiki's credit with its licence, each a link, as a credit writes them
 copyright: >-
-  Copyright (c) 2026 Miliano Mikol. Countrix is a fan project, not affiliated
-  with or endorsed by Blizzard. Overwatch&trade; &reg;2016 Blizzard
+  Copyright (c) 2026 Miliano Mikol; Countrix's own code is under the
+  PolyForm Strict License 1.0.0. Overwatch&trade; &copy; 2016 Blizzard
   Entertainment, Inc. All rights reserved. Overwatch is a trademark or
   registered trademark of Blizzard Entertainment, Inc. in the U.S. and/or
-  other countries. Game data from the Overwatch Wiki, CC BY-NC-SA 3.0.
+  other countries. Countrix is a fan project, not affiliated with or
+  endorsed by Blizzard Entertainment; the rates and the hero text are
+  Blizzard's. Hero kits, maps, terrain, playstyles, synergies and counters
+  come from the <a href="https://overwatch.fandom.com" target="_blank"
+  rel="noopener">Overwatch Wiki</a> at Fandom, written by its contributors
+  and licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/3.0/"
+  target="_blank" rel="noopener">CC BY-NC-SA 3.0</a>; quoted wiki text keeps
+  that licence.
 
 docs_dir: docs
 site_dir: site

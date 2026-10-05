@@ -26,3 +26,9 @@
   border: 1px solid var(--md-default-fg-color--lightest);
   border-radius: 6px;
 }
+
+/* the footer draws a link in its text's colour: the credit's links to the
+   wiki and its licence are underlined to read as links */
+.md-copyright__highlight a {
+  text-decoration: underline;
+}

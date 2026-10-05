@@ -126,20 +126,21 @@ v2 and Python 3.12.
 ```bash
 git clone https://github.com/mmikol/countrix.git && cd countrix
 python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
-echo COUNTRIX_STRATEGIES=tests/fixtures/playbook >> .env   # the reference playbook
 .venv/bin/python orchestrator.py up
 ```
 
 Then open **http://localhost:8017**. The first start builds the image, then the
 database from the sources, about ten minutes at a polite pace; later starts
-reuse the database.
+reuse the database. The board runs the shipped playbook, its rules listed in
+[the catalog](docs/inference.md#the-catalog), on top of the default engine.
 
 [The user guide](user-guide/README.md) takes a player or a team through
 the board from there, task by task.
 
-The reference playbook is the one the tests prove the solver against. Leave out
-the `echo` line and the board runs the shipped playbook, its rules listed in
-[the catalog](docs/inference.md#the-catalog), on top of the default engine.
+The tests prove the solver against a reference playbook,
+`tests/fixtures/playbook`. `echo COUNTRIX_STRATEGIES=tests/fixtures/playbook >> .env`
+before `up` puts the stack on it instead. The stack reads that folder from
+its image, so `/tune` and `/strategy` cannot change it there.
 
 | | |
 | --- | --- |

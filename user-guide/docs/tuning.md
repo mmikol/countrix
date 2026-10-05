@@ -71,8 +71,10 @@ The tools run without Claude Code too:
 ```
 
 With the stack up, put `./docker-db` in front to reach its database:
-`./docker-db .venv/bin/python -m door.mcp call tune '...'`. The board
-reads the files on every request, so the next click shows the change.
+`./docker-db .venv/bin/python -m door.mcp call tune '...'`; it reads
+`POSTGRES_PASSWORD` from the shell, not from `.env`
+([the settings](install.md#the-settings)). The board reads the files on
+every request, so the next click shows the change.
 
 What `tune` takes:
 
@@ -91,8 +93,19 @@ A change lands in your checkout: the rule's file or `meta.md`,
 
 ## Another playbook
 
-`COUNTRIX_STRATEGIES` points Countrix at another playbook folder,
-relative to the `countrix` folder or absolute. The folder must hold a
-`meta.md`; `tune` with the id `meta` seeds one from the shipped file.
-The repository carries one other playbook, `tests/fixtures/playbook`,
-the reference the tests prove the solver against.
+`COUNTRIX_STRATEGIES` points Countrix at another playbook folder. The
+folder must hold a `meta.md`; `tune` with the id `meta` seeds one from
+the shipped file. The repository carries one other playbook,
+`tests/fixtures/playbook`, the reference the tests prove the solver
+against.
+
+- **Without Docker**, set it in the shell that starts the board or the
+  tools: `COUNTRIX_STRATEGIES=my-playbook .venv/bin/python -m ui.board`.
+  The folder is named relative to the `countrix` folder or by its full
+  path, and the tools tune it where it is.
+- **With the Docker stack**, set it in `.env`, and keep the folder
+  inside the `countrix` folder, named relative to it. The image that
+  `orchestrator.py up` builds carries a copy of the folder, and the
+  containers read that copy: run `up` again after the folder changes.
+  The copy is read-only, so the stack's tools cannot tune it. A full
+  path works without Docker only: the containers cannot see it.
