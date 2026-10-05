@@ -61,11 +61,13 @@ GROUPS: dict[Kind, tuple[str, str]] = {
     "constraint": ("the_limits", "Limits"),
     "heuristic": ("the_heuristics", "Heuristics"),
     "assumption": ("the_assumptions", "Assumptions")}
-# the columns of a kind's table: a weight and a gate are a heuristic's alone
+# the columns of a kind's table: a limit's is what it requires, which differs
+# from limit to limit where its form and its effect do not; a weight and a gate
+# are a heuristic's alone; an assumption scores nothing, so its name is all
 COLUMNS: dict[Kind, tuple[str, ...]] = {
-    "constraint": ("rule", "form", "moves a six by"),
+    "constraint": ("rule", "requires"),
     "heuristic": ("rule", "form", "weight", "moves a six by", "gate settled by"),
-    "assumption": ("rule", "form", "moves a six by")}
+    "assumption": ("rule",)}
 
 # a strategy's form as this page names it: a heuristic on a metric is a
 # reward or a need, by who settles its gate (Strategy.need)
@@ -615,13 +617,16 @@ def _moves(s: Strategy, book: Needs) -> str:
 
 def _glance(kind: Kind, these: Sequence[Strategy], book: Needs) -> str:
     """A kind's rules at a glance, a row each, its name linked to its entry:
-    its form and the most it moves a six, and a heuristic's weight and who
-    settles its gate (COLUMNS); a line saying none where the kind has none."""
+    a limit's requirement, its params filled in; a heuristic's form, weight,
+    the most it moves a six and who settles its gate (COLUMNS); a line saying
+    none where the kind has none."""
     if not these:
         return "<p class='legend'>None in this playbook.</p>"
     rows = []
     for s in these:
         cells = {"rule": _rule_link(s.id, esc(s.name)), "form": shown_form(s),
+                 "requires": ("draft" if shown_form(s) == "draft" else
+                              _code(s.require, s.params) if s.require is not None else "-"),
                  "weight": _num(s.weight) if s.weighs else "-", "moves a six by": _moves(s, book),
                  "gate settled by": SETTLERS[settler(s)]}
         rows.append("<tr>%s</tr>" % "".join("<td>%s</td>" % cells[c] for c in COLUMNS[kind]))
