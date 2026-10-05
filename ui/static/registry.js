@@ -18,6 +18,10 @@ var RULES = Object.create(null);   /* each rule's entry by its id; no prototype 
 var shown = null;                  /* the id of the rule the dialog shows */
 var openedBy = null;               /* the link that opened the dialog, which gets the focus back */
 var pressed = false;               /* a press began on the backdrop */
+var openedAt = 0;                  /* when the dialog last opened, in ms */
+/* a double-click's second press, which lands on the backdrop the first
+   press's dialog put under it, comes within this many ms */
+var SECOND_PRESS = 500;
 
 /* the rule an address's hash or a link's href names, or null: only an
    entry's id, so the page's own anchors - the contents, the groups - stay
@@ -38,7 +42,7 @@ function show(id) {
   pane.replaceChildren(copy);
   box.setAttribute('aria-label', name ? name.textContent : id);
   shown = id;
-  if (!box.open) box.showModal();
+  if (!box.open) { box.showModal(); openedAt = performance.now(); }
   box.scrollTop = 0;
   box.focus();
 }
@@ -114,8 +118,11 @@ function start() {
   });
   shut.addEventListener('click', function () { box.close(); });
   /* a press and its release on the backdrop close it; a selection dragged
-     out of the entry does not */
-  box.addEventListener('pointerdown', function (e) { pressed = outside(e); });
+     out of the entry does not, nor the second press of the double-click
+     that opened it */
+  box.addEventListener('pointerdown', function (e) {
+    pressed = outside(e) && performance.now() - openedAt > SECOND_PRESS;
+  });
   box.addEventListener('click', function (e) {
     if (pressed && outside(e)) box.close();
     pressed = false;

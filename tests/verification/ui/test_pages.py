@@ -615,12 +615,13 @@ def test_a_plain_click_on_a_rule_opens_it_and_every_other_link_stays_a_link():
     assert "rule(link.getAttribute('href'))" in start
     assert start.index("if (!id) return;") < start.index("e.preventDefault();")
     assert "shut.addEventListener('click', function () { box.close(); });" in start
-    assert "pressed = outside(e);" in start and "if (pressed && outside(e)) box.close();" in start
+    assert "pressed = outside(e) && performance.now() - openedAt > SECOND_PRESS;" in start
+    assert "if (pressed && outside(e)) box.close();" in start
     assert "e.target === box" in function(script, "outside")
     show = function(script, "show")
-    assert "if (!box.open) box.showModal();" in show
+    assert "if (!box.open) { box.showModal(); openedAt = performance.now(); }" in show
     # the dialog takes the focus itself, whichever rule it shows
-    assert show.index("if (!box.open) box.showModal();") < show.index("box.focus();")
+    assert show.index("box.showModal(); openedAt") < show.index("box.focus();")
     assert "<dialog id='rule_box' class='rulebox' tabindex='-1'>" in registry.DIALOG
     assert "shut.focus" not in script
     assert "openedBy = link;" in function(script, "openRule")
