@@ -7,7 +7,7 @@ open it from the board's header, *the study*, or at
 http://localhost:8017/study. A report sets the same results out with
 every figure; the page's last section, *the report*, says where it is.
 
-![The top of the study page](img/study.png)
+![The top of the study page: the contents pills, the line that dates the results, and the two questions it asks](img/study.png)
 
 What the study shows:
 

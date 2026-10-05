@@ -83,7 +83,7 @@ answer for it: before its first answer, after a request fails, and on
 red's row for the moment a board solves a new red pick. The last number
 says how many stand empty.
 
-![The two teams' rows: each team's picks solid, the suggestions in its open slots dashed](img/board-picks.png)
+![The bans bar open, its five slots over every hero's portrait, then the two teams' rows: each team's picks solid, the suggestions in its open slots dashed](img/board-picks.png)
 
 ## 7. Use the suggestions
 

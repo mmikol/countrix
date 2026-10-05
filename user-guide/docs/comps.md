@@ -4,7 +4,7 @@ The comps tab is the board's answer in full: the game plan, the plan
 stage by stage, and each team's six with every reason and every score
 behind it.
 
-![The comps tab: the game plan on top, blue's seat on the left with its cards and score bars, red's likely six on the right](img/comps-tab.png)
+![The comps tab: the game plan and the plan stage by stage on top, blue's seat on the left with its cards and score bars, red's likely six on the right](img/comps-tab.png)
 
 ## The game plan
 

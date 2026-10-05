@@ -12,14 +12,14 @@ gives cites a fact.
 
 ![The board: King's Row, blue on attack, Widowmaker banned](docs/img/board.jpg)
 
-*King's Row, blue on attack, two picks a side, Widowmaker banned. The solver
-fills blue's six around Ana and Reinhardt, and red's dashed tiles are its
-likely six; blue's badge is its six as a share of the best six it could field
-here. The pictures run the shipped playbook with the default engine off, so no
-number in them reads Blizzard's win rates, which Blizzard licenses for personal
-use only: where the fight odds would be, the strip shows the engine's verdict,
-red's badge - how often its heroes are picked - is hidden, and the cards leave
-out their rate phrases.*
+*King's Row, blue on attack, two picks a side, Widowmaker banned, on the
+shipped playbook. The solver fills blue's six around Ana and Reinhardt - the
+dashed tiles - and red's dashed tiles are its likely six. Blue's badge is its
+six as a share of the best six it could field here, red's how often a six
+fields its heroes, and the fight odds split 100 between the two sixes on the
+default engine alone: the model's reading of the gap between their scores,
+not a chance of winning. The pictures show the numbers the board computes
+from Blizzard's rates, by the owner's decision ([the licence](#license)).*
 
 ## What it does
 
@@ -54,15 +54,19 @@ out their rate phrases.*
   tune the playbook. The solver is arithmetic; the board
   never calls a model.
 
-![Each pick with its reasons and the facts behind them](docs/img/reasons.jpg)
+![Blue's six, each pick with its reasons and the facts behind them](docs/img/reasons.jpg)
 
-*Why these six: each pick's reasons, each cited to a numbered fact.*
+*Why these six: Ana and Reinhardt, locked, and the four the solver filled in,
+each with its reasons - who it answers and pairs with, its win rate on the
+map, the style it fits, who answers it - and the numbered facts they cite.*
 
-![The score breakdown, one bar per strategy](docs/img/breakdown.jpg)
+![The score breakdown: the default engine's three bars, then one bar per rule](docs/img/breakdown.jpg)
 
-*How they scored: one bar per strategy, each with the fact it read. A limit
-that holds adds nothing; what a six gives up shows under costing. The count over
-the bars is the space the exact search covered.*
+*How they scored: the default engine's three bars - the six's win rates on the
+map, its synergy and its counters - then a bar per rule of the playbook under
+three tabs, satisfied, costing and did not read, all on one scale, each with
+the fact it read. A limit that holds adds nothing; what a six gives up shows
+under costing. The count over the bars is the space the exact search covered.*
 
 ## How it works
 

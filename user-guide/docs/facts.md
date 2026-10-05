@@ -4,7 +4,7 @@ The facts tab lists every fact the database holds about the draft,
 numbered F1, F2, ... in the order the board writes them. Every reason on
 the board cites one of them, so this is where a reason's evidence is.
 
-![The facts tab: the filter box, the scope chips, the count, and the numbered facts grouped by subject](img/facts-tab.png)
+![The facts tab filtered on "answered", the team chip off: the filter box, the scope chips, the count, and the numbered facts grouped by subject](img/facts-tab.png)
 
 ## A fact
 

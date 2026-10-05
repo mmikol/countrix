@@ -45,7 +45,7 @@ its entry opens over the page:
 - its prose, from its file;
 - its sources, from the playbook's citation record.
 
-![A rule's entry open in the registry's dialog over the tables](img/registry-dialog.png)
+![A rule's entry, Heal at the other side's rate, open in the registry's dialog over the tables](img/registry-dialog.png)
 
 The page behind stays where it was. The address names the open rule -
 `/registry#heal-rate` - so you can bookmark it or send it; opening that
