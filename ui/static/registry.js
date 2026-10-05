@@ -1,17 +1,19 @@
 /* the strategy registry's dialog: a click on a rule - its row in the table at
    a glance, or a rule an entry names - opens the rule's entry in the page's
-   dialog (#rulebox) over the list, which stays where it was. An entry goes in
+   dialog (#rule_box) over the list, which stays where it was. An entry goes in
    as a copy of the server's node, so the script writes no markup and escapes
    nothing: the one text it sets, the dialog's name, it sets as text.
    The address names the open rule, /registry#<id>: opening one pushes its
-   hash, a rule opened from inside the dialog takes the open one's place, and
-   Back closes it; Esc, the close button and the backdrop close it too and
-   take the hash away, and nothing moves the page. Arriving at /registry#<id>
-   - the playbook tab's 'its math', a shared address - opens it over the list.
+   hash, a rule opened from inside the dialog takes the open one's place,
+   Back closes it and Forward opens it again over the list where it is now;
+   Esc, the close button and the backdrop close it too and take the hash
+   away, and nothing moves the page. Arriving at /registry#<id> - the
+   playbook tab's 'its math', a shared address - opens it over the list.
    Without the script the links scroll to the entries, as the server anchors
-   them. */
+   them. The dialog's ids hold an underscore, as the page's own anchors do, so
+   no rule's id is one and a lookup never finds an entry in its place. */
 var el = function (id) { return document.getElementById(id); };
-var box = el('rulebox'), shut = el('ruleshut'), pane = el('rulebody');
+var box = el('rule_box'), shut = el('rule_shut'), pane = el('rule_body');
 var RULES = Object.create(null);   /* each rule's entry by its id; no prototype key names one */
 var shown = null;                  /* the id of the rule the dialog shows */
 var openedBy = null;               /* the link that opened the dialog, which gets the focus back */
@@ -27,9 +29,10 @@ function rule(hash) {
 }
 
 /* the dialog shows the rule's entry from its top, named for a reader that
-   reads it aloud, and the focus goes into it - to the close button, its
-   first control - whether it opened or another rule took the open one's
-   place */
+   reads it aloud, and the focus goes to the dialog itself, whether it opened
+   or another rule took the open one's place: Space and the arrow keys
+   scroll the entry, and Tab reaches the close button, which Space would
+   press */
 function show(id) {
   var copy = RULES[id].cloneNode(true), name = copy.querySelector('b');
   pane.replaceChildren(copy);
@@ -37,7 +40,7 @@ function show(id) {
   shown = id;
   if (!box.open) box.showModal();
   box.scrollTop = 0;
-  shut.focus();
+  box.focus();
 }
 
 /* a click on a link to a rule: the dialog opens over the list and the
@@ -56,6 +59,17 @@ function sync() {
   var id = rule(location.hash);
   if (id) { if (!box.open || id !== shown) show(id); }
   else if (box.open) box.close();
+}
+
+/* Back or Forward: the dialog follows the address, and where it shows a rule
+   the list stays where it is. The browser puts back the scroll the address
+   had when it was last left only after this handler, which would move the
+   list behind the dialog, so the list goes back a frame later, before that
+   frame is drawn */
+function traversed() {
+  var x = window.scrollX, y = window.scrollY;
+  sync();
+  if (box.open) requestAnimationFrame(function () { window.scrollTo(x, y); });
 }
 
 /* however the dialog closed - Esc, the close button, the backdrop, Back -
@@ -107,7 +121,7 @@ function start() {
     pressed = false;
   });
   box.addEventListener('close', afterClose);
-  window.addEventListener('popstate', sync);
+  window.addEventListener('popstate', traversed);
   window.addEventListener('hashchange', sync);
   sync();
 }

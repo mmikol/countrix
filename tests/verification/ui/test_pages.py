@@ -12,10 +12,10 @@ picked hero; each team's row, its picks and suggestions drawn together
 tank, damage, support while the picks stay stored as picked, each role
 keeping its slots while a board solves; a taken swap, checked against the
 bans and the role caps as a pick is; and on the registry, the dialog a rule
-opens in - the address that names it, the links that open it and the ones
-that stay links, the focus, and no markup written. Any other decision worth
-pinning is made on the server, as the seat badge is (momentum.badges), and
-tested there."""
+opens in - the address that names it, the list held still on Back and
+Forward, the links that open it and the ones that stay links, the focus,
+and no markup written. Any other decision worth pinning is made on the
+server, as the seat badge is (momentum.badges), and tested there."""
 
 import os
 import re
@@ -541,12 +541,12 @@ def test_the_registry_loads_its_script_and_holds_the_dialog_it_opens():
     assert ctype.startswith("application/javascript") and b"function show" in data
     assert page.endswith("</main><script src='/static/%s'></script>" % registry.SCRIPT)
     ids = set(re.findall(r"\bel\('([^']+)'\)", script))
-    assert ids == {"rulebox", "ruleshut", "rulebody"}
+    assert ids == {"rule_box", "rule_shut", "rule_body"}
     article = page[page.index("<article class='math'>"):page.index("</article>")]
     assert article.rstrip().endswith(registry.DIALOG)
     assert [i for i in sorted(ids) if "id='%s'" % i not in registry.DIALOG] == []
-    assert "<dialog id='rulebox' class='rulebox'>" in registry.DIALOG
-    assert "<button type='button' id='ruleshut'" in registry.DIALOG
+    assert registry.DIALOG.startswith("<dialog id='rule_box' class='rulebox'")
+    assert "<button type='button' id='rule_shut'" in registry.DIALOG
     assert "document.querySelectorAll('.hcard[id]')" in function(script, "start")
     assert "copy.querySelector('b')" in function(script, "show")
     strategies = catalog.load()
@@ -561,11 +561,15 @@ def test_the_registry_script_keeps_the_address_and_the_dialog_in_step():
     opened inside the dialog replaces it, so one Back closes it; the dialog
     follows Back, Forward and a hash typed in; closing it any way takes the
     hash away - back to the entry before the one the page pushed, or cleared
-    in place where the page arrived with it. A hash names a rule only where
-    it is an entry's id, decoded with care and looked up where no prototype
-    key answers. The entries give their ids up to the script before it reads
-    the hash the page arrived with, so the browser's jump to that entry finds
-    nothing and the list stays where it was."""
+    in place where the page arrived with it. Back or Forward onto a rule
+    leaves the list where it is: the browser puts back the scroll that
+    address had when it was last left, after the popstate handler, so the
+    handler puts the list back a frame later, before the frame is drawn. A
+    hash names a rule only where it is an entry's id, decoded with care and
+    looked up where no prototype key answers. The entries give their ids up
+    to the script before it reads the hash the page arrived with, so the
+    browser's jump to that entry finds nothing and the list stays where it
+    was."""
     script = registry_script()
     rule = function(script, "rule")
     assert "var RULES = Object.create(null);" in script
@@ -579,9 +583,13 @@ def test_the_registry_script_keeps_the_address_and_the_dialog_in_step():
     assert "else history.replaceState(null, '', location.pathname + location.search);" in closed
     sync = function(script, "sync")
     assert "var id = rule(location.hash);" in sync and "else if (box.open) box.close();" in sync
+    traversed = function(script, "traversed")
+    assert traversed.index("var x = window.scrollX, y = window.scrollY;") < traversed.index(
+        "sync();") < traversed.index(
+        "if (box.open) requestAnimationFrame(function () { window.scrollTo(x, y); });")
     start = function(script, "start")
-    for event in ("popstate", "hashchange"):
-        assert "window.addEventListener('%s', sync);" % event in start, event
+    assert "window.addEventListener('popstate', traversed);" in start
+    assert "window.addEventListener('hashchange', sync);" in start
     assert "box.addEventListener('close', afterClose);" in start
     assert start.index("card.removeAttribute('id');") < start.rindex("sync();")
     assert script.rstrip().endswith("if (box && box.showModal) start();")
@@ -592,10 +600,13 @@ def test_a_plain_click_on_a_rule_opens_it_and_every_other_link_stays_a_link():
     dialog: a click with a modifier stays the browser's, and /math, the
     sources and a section's anchor stay links. Every in-page link the
     registry writes is a rule's or one of the page's own anchors, which hold
-    an underscore no rule's id can. Esc closes the dialog natively, the close
-    button and a press and release on the backdrop close it, and the focus
-    goes into it on opening and back to the link that opened it on closing,
-    without moving the page."""
+    an underscore no rule's id can, as every other id the page writes does,
+    the dialog's among them, so the script's lookups never find an entry.
+    Esc closes the dialog natively, the close button and a press and release
+    on the backdrop close it, and the focus goes to the dialog itself on
+    opening - on the close button, Space, the browser's page down, would
+    press it - and back to the link that opened it on closing, without
+    moving the page."""
     script, page = registry_script(), registry.view_registry()
     start = function(script, "start")
     assert ("e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey"
@@ -607,7 +618,11 @@ def test_a_plain_click_on_a_rule_opens_it_and_every_other_link_stays_a_link():
     assert "pressed = outside(e);" in start and "if (pressed && outside(e)) box.close();" in start
     assert "e.target === box" in function(script, "outside")
     show = function(script, "show")
-    assert "if (!box.open) box.showModal();" in show and "shut.focus();" in show
+    assert "if (!box.open) box.showModal();" in show
+    # the dialog takes the focus itself, whichever rule it shows
+    assert show.index("if (!box.open) box.showModal();") < show.index("box.focus();")
+    assert "<dialog id='rule_box' class='rulebox' tabindex='-1'>" in registry.DIALOG
+    assert "shut.focus" not in script
     assert "openedBy = link;" in function(script, "openRule")
     assert "if (openedBy) openedBy.focus({ preventScroll: true });" in function(
         script, "afterClose")
@@ -615,7 +630,9 @@ def test_a_plain_click_on_a_rule_opens_it_and_every_other_link_stays_a_link():
     own = {registry.TOP, registry.GLANCE, *(a for a, _ in registry.GROUPS.values())}
     hrefs = set(re.findall(r"href='#([^']+)'", page))
     assert hrefs - rules == own and not own & rules
-    assert all("_" in anchor for anchor in own)
+    others = set(re.findall(r"\sid=['\"]([^'\"]+)['\"]", page)) - rules
+    assert others == own | set(re.findall(r"\bel\('([^']+)'\)", script))
+    assert all("_" in i and not catalog.ID_RE.fullmatch(i) for i in others)
 
 
 def test_the_registry_script_writes_no_markup():
