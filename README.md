@@ -186,7 +186,7 @@ the data current, `/maintain` runs the checks and keeps the docs current.
 
 ## Documentation
 
-- [user-guide/](user-guide/README.md) - the user guide, for a player or a team: installing and starting, the board step by step, its tabs, tuning the playbook, the data, troubleshooting; a MkDocs site, built strict in CI
+- [user-guide/](user-guide/README.md) - the user guide, for a player or a team: installing and starting, the board step by step, its tabs, the registry, the math page and the study, tuning the playbook, the data, troubleshooting; a MkDocs site, built strict in CI
 - [docs/architecture.md](docs/architecture.md) - the layers, the folders, the settings, the skills, the scope
 - [docs/db.md](docs/db.md) - the data layer: the sources, the schema, the refresh
 - [docs/inference.md](docs/inference.md) - the playbook format, the solver, the tuning loop

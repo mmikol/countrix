@@ -141,5 +141,6 @@ Entertainment or Fandom.
 The study measures Countrix's teams against CounterWatch's public 6v6
 numbers, https://counterwatch.gg, whose terms grant personal,
 noncommercial use. Its data stays in a private benchmark repository; this
-one holds at most the study's results, which credit CounterWatch where
-they name it.
+one holds only the study's results - ui/static/study.json, and the trimmed
+copy the tests read, tests/fixtures/study.json - which credit CounterWatch
+where they name it.
