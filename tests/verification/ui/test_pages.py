@@ -14,10 +14,10 @@ keeping its slots while a board solves; a taken swap, checked against the
 bans and the role caps as a pick is; and on the registry, the dialog a rule
 opens in - the address that names it, the page held still on Back and
 Forward, the links that open it and the ones that stay links, the focus,
-no markup written, and the entries it copies, hidden but where scripts or
-the dialog are missing and in print. Any other decision worth pinning is
-made on the server, as the seat badge is (momentum.badges), and tested
-there."""
+no markup written, and the entries it copies, hidden but where scripts are
+off, the script fails or the dialog is missing, and in print. Any other
+decision worth pinning is made on the server, as the seat badge is
+(momentum.badges), and tested there."""
 
 import os
 import re
@@ -664,10 +664,13 @@ def test_the_registry_hides_its_entries_but_without_scripts_and_in_print():
     paint: board.css, which the head loads before anything is drawn, hides
     it, for the dialog to copy. Where scripts are off, the noscript style in
     the head, after the stylesheet, shows it, as the script does in a browser
-    without the dialog, so the links scroll to the entries; print shows it
-    too, without the dialog, which Chrome would print over every page, and
-    without the dialog's hold on the page's scroll - each rule after the
-    screen rule it overrides."""
+    without the dialog, so the links scroll to the entries. Where the script
+    fails to load or to run, the entries keep their ids, and board.css shows
+    the box once a link or the address makes one the page's target; the rule
+    asks for the id the script takes, so it never matches once the script
+    has run. Print shows it too, without the dialog, which Chrome would print
+    over every page, and without the dialog's hold on the page's scroll -
+    each rule after the screen rule it overrides."""
     page, script = registry.view_registry(), registry_script()
     css = pages.static_file("board.css")[0].decode()
     head, body = page[:page.index("<main>")], page[page.index("<main>"):]
@@ -678,6 +681,11 @@ def test_the_registry_hides_its_entries_but_without_scripts_and_in_print():
     assert "<noscript" not in body and "<div id='%s' class='entries'>" % registry.ENTRIES in body
     # hidden on screen by a rule of its own, outside any @media block
     assert "\n.math .entries { display:none; }\n" in css
+    # shown for the entry a link or the address targets while it keeps the id start() takes
+    target = "\n.math .entries:has(.hcard[id]:target) { display:block; }\n"
+    assert css.index("\n.math .entries { display:none; }\n") < css.index(target) < css.index(
+        "@media print {")
+    assert "card.removeAttribute('id');" in function(script, "start")
     printed = css[css.index("@media print {"):]
     printed = printed[:printed.index("\n}") + 2]
     for rule in (".math .entries { display:block; }", ".math .rulebox { display:none; }",

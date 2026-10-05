@@ -40,8 +40,11 @@ header.top .gh:hover { color:var(--text); border-color:var(--muted); }
    card per rule, each section of a card under a small label. The cards sit in a
    box under the tables, hidden from the first paint for the dialog to copy
    (registry.js); the page's noscript style shows the box where scripts are off,
-   and print shows it (below) */
+   and print shows it (below). Where the script fails to load or to run, the box
+   shows once a link or the address names a card, which keeps its id; the rule
+   asks for the id the script takes, so it never matches once the script runs */
 .math .entries { display:none; }
+.math .entries:has(.hcard[id]:target) { display:block; }
 .math .hcard { margin:12px 0; padding:12px 16px 14px; scroll-margin-top:12px; }
 .math .hcard p { font-size:13.5px; line-height:1.6; }
 .math .hcard p.legend { color:var(--muted); font-size:12px; }

@@ -10,10 +10,13 @@
    Esc, the close button and the backdrop close it too and take the hash
    away, and nothing moves the page. Arriving at /registry#<id> - the
    playbook tab's 'its math', a shared address - opens it over the page.
-   Without the script, or without the dialog, the entries show under the
-   tables and the links scroll to them, as the server anchors them. The ids
-   the script looks up hold an underscore, as the page's own anchors do, so
-   no rule's id is one and a lookup never finds an entry in its place. */
+   Where scripts are off, or the dialog is missing, the entries show under
+   the tables and the links scroll to them, as the server anchors them; where
+   this script fails to load or to run, the entries keep their ids, and a
+   link or an address that names one shows them (board.css) and scrolls to
+   it. The ids the script looks up hold an underscore, as the page's own
+   anchors do, so no rule's id is one and a lookup never finds an entry in
+   its place. */
 var el = function (id) { return document.getElementById(id); };
 var box = el('rule_box'), shut = el('rule_shut'), pane = el('rule_body'), entries = el('rule_entries');
 var RULES = Object.create(null);   /* each rule's entry by its id; no prototype key names one */
@@ -136,6 +139,6 @@ function start() {
   sync();
 }
 /* a browser without the dialog shows the entries under the tables, as a page
-   without the script does, and the links scroll to them */
+   does where scripts are off, and the links scroll to them */
 if (box && box.showModal) start();
 else if (entries) entries.style.display = 'block';

@@ -246,13 +246,17 @@ dialog's copy never repeats one and the browser's own jump to a card
 finds none. The dialog's own ids and the box's hold an underscore, as
 the contents' anchors do, so no rule's id can take one. A click with a
 modifier stays the browser's - a new tab arrives with the rule open -
-and `/math`, the sources and the contents' pills stay links. Without the
-script a `<noscript>` style in the page's head shows the box, as the
-script does in a browser without the dialog, and the links scroll to the
-cards; print shows every card too, and no dialog over the pages. The
-dialog is as wide as the article or the screen less 16 px a side,
-whichever is narrower, a long card scrolls inside it under its close
-button, and the page behind holds still while it is open.
+and `/math`, the sources and the contents' pills stay links. Where
+scripts are off, a `<noscript>` style in the page's head shows the box,
+as the script does in a browser without the dialog, and the links scroll
+to the cards. Where the script fails to load or to run, the cards keep
+their ids, so a link or an address that names one makes it the page's
+target, and `board.css` shows the box for it and the browser scrolls to
+it; the rule asks for the id the script takes, so it never matches once
+the script has run. Print shows every card too, and no dialog over the
+pages. The dialog is as wide as the article or the screen less 16 px a
+side, whichever is narrower, a long card scrolls inside it under its
+close button, and the page behind holds still while it is open.
 
 `board.css` puts the game's look on a faint diagonal stripe and colours
 the kinds: blue for constraints, green for heuristics, sand for
