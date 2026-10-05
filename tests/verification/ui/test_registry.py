@@ -1,6 +1,7 @@
 """The strategy registry, held to the code it is rendered from: every
-strategy of a playbook has an entry anchored by its id, filed under its
-kind and linked from the table at a glance; a scored rule's entry writes
+strategy of a playbook has an entry anchored by its id in the box of
+entries the page hides, and a row in its kind's table under its kind's
+heading, which links it; a scored rule's entry writes
 its gate, bonus and penalty with its params filled in and defines every
 metric they read; a heuristic on a metric names its metric and the
 registry's meaning of it; every metric an entry reads says how its range
@@ -46,31 +47,44 @@ def render(strategies, record=None, shipped=False):
 
 
 def card(page, sid):
-    """One entry's card: from its anchor to the next card or group."""
+    """One entry's card: from its anchor to the next card or the dialog."""
     start = page.index("id='%s'" % sid)
-    ends = [i for i in (page.find("<div class='hcard", start), page.find("<h2", start)) if i > 0]
+    ends = [i for i in (page.find("<div class='hcard", start), page.find("<dialog", start))
+            if i > 0]
     return page[start:min(ends, default=len(page))]
 
 
 def test_every_strategy_of_the_reference_playbook_has_an_entry_anchored_by_its_id():
-    """One card a strategy, in the catalog's order, each under its kind's
-    heading and a link from the table at a glance."""
+    """One card a strategy, anchored by its id, in the catalog's order, all
+    in the entries' box after the tables, which the page hides for the
+    dialog to copy; and a row a strategy in its kind's table, under its
+    kind's heading, the rule's name a link to its card. The weight and the
+    gate are a heuristic's columns alone; a kind with no rule says so."""
     strategies = catalog.load(FIXTURE_PLAYBOOK)
     page = render(strategies)
     ids = re.findall(r"<div class='hcard \w+' id='([a-z0-9-]+)'>", page)
     assert ids == [s.id for s in strategies]
-    glance = page[page.index("id='%s'" % registry.GLANCE):page.index("<div class='hcard")]
-    assert re.findall(r"<a href='#([a-z0-9-]+)'>", glance) == ids
-    # in its own box that scrolls sideways, so a phone's page never does
-    assert "<div class='wide'><table class='glance'>" in glance
-    groups = [page.index("id='%s'" % registry.GROUPS[kind][0]) for kind in catalog.KINDS]
-    for s in strategies:
-        at = page.index("id='%s'" % s.id)
-        kind = catalog.KINDS.index(s.kind)
-        assert groups[kind] < at and all(at < g for g in groups[kind + 1:]), s.id
-    # the page's own anchors hold an underscore, which no strategy id can
-    assert not any(catalog.ID_RE.fullmatch(anchor) for anchor, _ in registry.GROUPS.values())
-    assert not catalog.ID_RE.fullmatch(registry.GLANCE)
+    box = page.index("<div id='%s' class='entries'><h2>The entries</h2>" % registry.ENTRIES)
+    assert re.findall(r"<div class='hcard \w+' id='([a-z0-9-]+)'>", page[box:]) == ids
+    assert page.index("<div class='hcard") > box
+    # the tables, each under its kind's heading, before the box
+    heads = [page.index("<h2 id='%s'>%s</h2>" % registry.GROUPS[kind]) for kind in catalog.KINDS]
+    assert heads == sorted(heads) and heads[-1] < box
+    for kind, start, end in zip(catalog.KINDS, heads, [*heads[1:], box], strict=True):
+        table, these = page[start:end], [s.id for s in strategies if s.kind == kind]
+        assert these, kind
+        assert re.findall(r"<a href='#([a-z0-9-]+)'>", table) == these, kind
+        assert re.findall(r"<th>([^<]+)</th>", table) == list(registry.COLUMNS[kind]), kind
+        assert table.count("<tr>") == len(these) + 1, kind
+        # in its own box that scrolls sideways, so a phone's page never does
+        assert "<div class='wide'><table class='glance'>" in table, kind
+    assert "weight" not in registry.COLUMNS["constraint"] + registry.COLUMNS["assumption"]
+    alone = render([strategy("given", kind="assumption")])
+    limits = alone[alone.index("id='the_limits'"):alone.index("id='the_heuristics'")]
+    assert "None in this playbook." in limits and "<table" not in limits
+    # the page's own anchors and the box's id hold an underscore, which no strategy id can
+    for anchor in (registry.TOP, registry.ENTRIES, *(a for a, _ in registry.GROUPS.values())):
+        assert not catalog.ID_RE.fullmatch(anchor), anchor
 
 
 def test_a_scored_rules_entry_writes_its_bonus_and_penalty_with_its_params_filled_in():
@@ -457,8 +471,8 @@ def test_the_shipped_scored_rules_keep_the_bound_on_the_built_roster(world):
 
 
 def test_the_page_links_only_anchors_it_or_the_math_page_holds():
-    """The table of contents and the table at a glance resolve on the page;
-    each form's link and each derived metric's resolve on the math page."""
+    """The table of contents and each kind's table resolve on the page; each
+    form's link and each derived metric's resolve on the math page."""
     page = render([*catalog.load(FIXTURE_PLAYBOOK), strategy(
         "heal-bar", kind="heuristic", weight=2, penalty="matchup.heal_shortfall")])
     for anchor in set(re.findall(r"href='#([^']+)'", page)):

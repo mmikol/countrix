@@ -36,8 +36,12 @@ header.top .gh:hover { color:var(--text); border-color:var(--muted); }
 .math .toc a:hover { border-color:var(--gold); color:var(--gold); }
 .math .eq { background:#0b0e14; border:1px solid var(--line); border-radius:8px; padding:12px 14px; overflow-x:auto; font-size:13px; }
 .math code { background:#0b0e14; padding:1px 5px; border-radius:4px; }
-/* the strategy registry: the math page's article, a card per rule, each
-   section of a card under a small label */
+/* the strategy registry: the math page's article, a table of rules a kind, and a
+   card per rule, each section of a card under a small label. The cards sit in a
+   box under the tables, hidden from the first paint for the dialog to copy
+   (registry.js); the page's noscript style shows the box where scripts are off,
+   and print shows it (below) */
+.math .entries { display:none; }
 .math .hcard { margin:12px 0; padding:12px 16px 14px; scroll-margin-top:12px; }
 .math .hcard p { font-size:13.5px; line-height:1.6; }
 .math .hcard p.legend { color:var(--muted); font-size:12px; }
@@ -47,6 +51,9 @@ header.top .gh:hover { color:var(--text); border-color:var(--muted); }
 .math .glance th, .math .reads th { text-align:left; font-weight:400; font-size:10px; letter-spacing:.14em;
   text-transform:uppercase; color:var(--muted); padding:4px 10px 4px 0; border-bottom:1px solid var(--line); }
 .math .glance td, .math .reads td { padding:5px 10px 5px 0; border-bottom:1px solid #202733; vertical-align:top; color:#c9d0db; }
+/* past a phone's width each kind's table gives its rules the same share, so the
+   forms line up down the page; on a phone the names take what they need */
+@media (min-width:701px) { .math .glance th:first-child { width:36%; } }
 /* a table wider than its card or the page scrolls sideways in its own box: the
    card never cuts it off, and the page never scrolls sideways for it */
 .math .wide { overflow-x:auto; }
@@ -56,7 +63,7 @@ header.top .gh:hover { color:var(--text); border-color:var(--muted); }
 .math details { margin:4px 0 0; font-size:12.5px; }
 .math summary { cursor:pointer; color:var(--muted); }
 .math .sources { margin:6px 0 0; padding-left:18px; color:var(--muted); overflow-wrap:anywhere; }
-/* the registry's dialog: a rule's entry over the list, as wide as the article
+/* the registry's dialog: a rule's entry over the page, as wide as the article
    or the screen less 16 px a side, whichever is narrower, and as tall as the
    entry up to the screen less 16 px top and bottom; a longer entry scrolls
    inside it under the close button. The page behind holds still while it is
@@ -73,6 +80,13 @@ header.top .gh:hover { color:var(--text); border-color:var(--muted); }
 .math .rulebox .hcard { margin:0; }
 html:has(.rulebox) { scrollbar-gutter:stable; }
 html:has(.rulebox[open]) { overflow:hidden; }
+/* the registry in print: every card, and no dialog - Chrome would print an open
+   one over every page - nor its hold on the page's scroll */
+@media print {
+  .math .entries { display:block; }
+  .math .rulebox { display:none; }
+  html:has(.rulebox[open]) { overflow:visible; }
+}
 /* a playbook card's link to its rule's math */
 .hcard .reglink { float:right; margin-left:8px; font-size:10px; letter-spacing:.14em; text-transform:uppercase;
   color:var(--muted); border:1px solid var(--line); border-radius:999px; padding:2px 8px; }
