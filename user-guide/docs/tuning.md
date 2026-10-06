@@ -47,7 +47,7 @@ and type a skill's name, or say what you want in your own words.
 - `/comp` asks for a comp in chat: *comp for King's Row, they have
   Zarya and Pharah, I'm on Ana*. It runs the board's own search and
   answers with six picks, a line of why for each, and the facts they
-  cite. Follow-ups - *what if they swap to Pharah?*, *we're on the
+  cite. Follow-ups - *what if they swap Zarya for Sigma?*, *we're on the
   second point now* - run it again.
 - `/tune` changes how something scores: *it keeps ignoring the
   counters*. It makes the smallest change that does it - a rule's
