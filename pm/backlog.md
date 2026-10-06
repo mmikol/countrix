@@ -213,6 +213,15 @@ keeps it current.
   door's pulls, `sync_all`, `db_rebuild`, `db_migrate` and
   `load_authored`, with the callers told to wait on it, serialises every
   writer whichever process it runs in. Cost: half a day.
+- **A stuck seat names only the limits it cannot mend.** Where the fill's
+  search proves no six keeps blue's picks, `engine._barred` names every
+  limit the picks break as they stand (`_broken`), mendable ones too:
+  blue Ana, Mercy, Kiriko and Moira on Ilios read "breaks Never more than
+  three supports, A six always fields a tank", though the two open slots
+  could still take a tank. Name only the limits the bound's intervals
+  prove false on every completion of every shape that seats the picks
+  (`Bound._parts` reads them so), and say `not_allowed([])` where none is
+  named. The end-to-end run of 2026-10-05 found it. Cost: half a day.
 
 ## Fact engine: more dependent variables
 
