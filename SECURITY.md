@@ -13,5 +13,4 @@ assurance that it is enough for you.
 
 Report a vulnerability privately, as a GitHub private vulnerability
 report from the repository's
-[Security tab](https://github.com/mmikol/countrix/security) or as a
-direct message.
+[Security tab](https://github.com/mmikol/countrix/security).
