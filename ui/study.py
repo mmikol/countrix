@@ -534,7 +534,7 @@ def scatter_figure(results: Mapping[str, Any], where: Where) -> str:
         "Across, the six's strength on the meta - its heroes' win rates - placed among the"
         " board's random sixes; up, its team edge, the mean of its synergy and its counters"
         " placed the same way. 50 is a random six on either axis, and a six up and to the right"
-        " is strong on the meta and carries a team. On the %s. %s" % (where_words(where), legend))
+        " is strong on both. On the %s. %s" % (where_words(where), legend))
     return figure("meta-and-team", "The meta against the team", caption,
                   "<div class='panels'>%s</div>" % "".join(panels), "".join(tables))
 
@@ -1003,15 +1003,13 @@ def provenance_table(results: Mapping[str, Any]) -> str:
 
 # --- the page ---------------------------------------------------------------------------------
 
-NONE_YET = ("<p class='legend'>Nothing yet: the study's results file is not in place - see the top"
-            " of the page.</p>")
+NONE_YET = "<p class='legend'>No results: the top of the page says why.</p>"
 SAMPLE = (
-    "<div class='warnbox'><b>A sample.</b> The numbers in this page's results were written to"
-    " build the page, not measured: no board was solved for them. The study's own results file"
-    " replaces them.</div>")
+    "<div class='warnbox'><b>A sample.</b> These results were written to build the page; no"
+    " board was solved for them. The study's own results file replaces them.</div>")
 DRIFTED = (
     "<div class='warnbox'><b>Not the board's objective.</b> %s The results below describe the"
-    " objective the study measured, not the one the board runs now.</div>")
+    " objective the study measured.</div>")
 RESULT_BLOCKS = ("PROFILE", "CHECKS", "BRUTE", "SEARCH", "DESIGN", "SHARES", "PARTS", "SCATTER",
                  "AGREEMENT", "RULES", "SLIDER", "PAIRED", "HOLDS", "PROVENANCE")
 

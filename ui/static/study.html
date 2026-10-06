@@ -6,74 +6,67 @@
 <a class='sub' href='#the-theorem'>the theorem</a>
 <a class='sub' href='#the-lemmas'>the lemmas</a>
 <a class='sub' href='#what-it-buys'>what the weights buy</a>
-<a class='sub' href='#exact-or-not'>exact, a reading, or greedy</a>
+<a class='sub' href='#exact-or-not'>what is exact</a>
 <a class='sub' href='#the-assumptions'>the assumptions</a>
 <a class='sub' href='#the-evidence'>the evidence</a>
-<a href='#hard-coded'>nothing hard-coded?</a>
+<a href='#hard-coded'>what is hard-coded</a>
 <a href='#the-method'>the method</a>
 <a href='#the-results'>the results</a>
 <a class='sub' href='#landing'>where each six lands</a>
 <a class='sub' href='#makeup'>what each six is made of</a>
 <a class='sub' href='#meta-team'>the meta against the team</a>
 <a class='sub' href='#rules'>the rules</a>
-<a class='sub' href='#holds'>does it hold up</a>
+<a class='sub' href='#holds'>how it holds up</a>
 <a href='#what-it-shows'>what it shows</a>
 <a href='#the-report'>the report</a>
 </nav>
 <h2 id='the-study'>The study</h2>
 %(STATUS)s
-<p>Countrix picks a team of six with one formula and one search. This page asks two questions
-of them. Does the search return the best team its formula allows, or a good guess? And how close
-do its teams come to what players pick and to what wins, while they carry synergy, answer the
-other side and keep the playbook's rules? The first is answered by a proof, checked against brute
-force. The second is answered by a study: Countrix's teams beside the kinds of tool people use
-online - CounterWatch's team builder, tier lists built from the rates, counter pickers and the
+<p>Countrix picks a six - a team of six heroes - with one formula and one search. This page
+asks two things of them: whether the search returns the best six its formula allows, and how
+close its sixes come to what players pick and to what wins while they carry synergy, answer the
+other side and keep the playbook's rules. A proof answers the first, and a brute force checks it.
+A study answers the second: Countrix's sixes beside the kinds of tool people use online -
+CounterWatch's team builder, tier lists built from the rates, counter pickers and the
 most-picked heroes - every tool's six scored on the same boards, on Countrix's own scale and on
-CounterWatch's 6v6 numbers, which Countrix as shipped never reads. A section between them asks
-whether anything in the engine is written for Overwatch alone.</p>
+CounterWatch's 6v6 numbers, which Countrix as shipped never reads. A section between them lists
+what in the code is written for Overwatch alone.</p>
 <h2 id='plain-words'>In plain words</h2>
-<ul class='plain'>
-<li><b>One formula scores every team.</b> Countrix scores each team of six with the same formula.
-The <a href='/math#default-engine'>default engine</a> comes first: each pick's win rate on the
-map, the wiki's synergy among the six, and its counters to the other side. The playbook's
-heuristics then add to that score or take from it, and its limits decide which teams are allowed
-at all.</li>
-<li><b>The claim.</b> For any board and any playbook, the team Countrix calls optimal is the
-highest-scoring allowed team of all of them - not a good guess, the best. On a board with nothing
-picked or banned that is the best of over thirteen million teams (the count check below).</li>
-<li><b>How it knows without scoring them all.</b> The search groups the teams into branches: all
-the teams that share the picks made so far. For each branch it works out a safe overestimate, a
-number no team in the branch can beat. Once that number falls below the teams already kept, the
-whole branch is dropped. Every drop rests on arithmetic, never on a hunch.</li>
-<li><b>How much work that takes.</b> On an open board the search scores a few dozen teams in full
-at most and proves that none of the others can place, in hundredths of a second
-(<a href='#the-evidence'>the evidence</a>).</li>
-<li><b>It never guesses.</b> If it cannot prove its answer within its budget - %(NODE_BUDGET)s
-branches or %(SCORE_BUDGET)s teams scored in full - it refuses. If no team is allowed, it proves
-that too.</li>
-<li><b>It is repeatable.</b> The same board, playbook and weights give the same team in any
-process. Two scores that agree to %(SCORE_PLACES)s decimal places are a tie, settled by a fixed
-number per hero: a hash of the map, the side and the hero, which never reads a hero's rates or
-name.</li>
-<li><b>The check.</b> A brute force scores every allowed team of a real board, one by one, for
-minutes; the search answers in hundredths of a second; and the two agree on the best teams to the
-last bit (<a href='#the-evidence'>the evidence</a>).</li>
-<li><b>What optimal means.</b> Best under the scoring formula, given the playbook's assumptions -
-players play their heroes well, Open Queue 6v6, console rates and the rest
+<p>One formula scores every six. The <a href='/math#default-engine'>default engine</a> comes
+first: each pick's win rate on the map, the wiki's synergy among the six, and its counters to the
+other side. The playbook's heuristics add to that score or take from it, and its limits decide
+which sixes are allowed at all.</p>
+<p>For any board and any playbook, the six Countrix calls optimal is the highest-scoring allowed
+six. On a board with nothing picked or banned, that is the best of over thirteen million (the
+count check below). The search does not score them all. It groups the sixes into branches, each
+holding the sixes that share the picks made so far, and works out for each branch an
+overestimate no six in it can beat; once that falls below the sixes already kept, the whole
+branch is dropped. On an open board it scores a few dozen sixes in full at most and proves that
+none of the others can place (<a href='#the-evidence'>the evidence</a>). If it cannot prove its
+answer within its budget -
+%(NODE_BUDGET)s branches or %(SCORE_BUDGET)s sixes scored in full - it refuses, and if no six is
+allowed, it proves that too.</p>
+<p>The same board, playbook and weights give the same six in any process. Two scores that agree
+to %(SCORE_PLACES)s decimal places are a tie, settled by a fixed number per hero: a hash of the
+map, the side and the hero, which never reads a hero's rates or name. A brute force that scores
+every allowed six of a real board, one by one, takes minutes; the search takes hundredths of a
+second, and the two agree on the best sixes to the last bit
+(<a href='#the-evidence'>the evidence</a>).</p>
+<p>Optimal means best under the scoring formula, given the playbook's assumptions - players play
+their heroes well, Open Queue 6v6, console rates and the rest
 (<a href='#the-assumptions'>the assumptions</a>). It is not a proven chance of winning. Four
-things on the board are readings around the optimum, not more optimising: the 0 to 100 share,
-the fight odds, red's likely six, and the plan stage by stage, which takes one stage at a time
-(<a href='#exact-or-not'>exact, a reading, or greedy</a>).</li>
-<li><b>Against the tools.</b> The table below is the study's answer in numbers: each tool's six
-placed among a board's random sixes - 50 is a random six, 100 beats them all - on the meta, its
-popularity and strength, and on the team, its synergy and counters, by Blizzard's rates and the
-wiki and by CounterWatch's 6v6 numbers; and the share of the playbook's rules each six keeps. The
-charts follow (<a href='#the-results'>the results</a>).</li>
-</ul>
+things on the board are not exact answers: the 0 to 100 share and the fight odds are readings,
+and red's likely six and the plan stage by stage are greedy, built a slot or a stage at a time
+(<a href='#exact-or-not'>what is exact</a>).</p>
+<p>The table below places each tool's six among a board's random sixes - 50 is a random six, 100
+beats them all - on the meta, its popularity and strength, and on the team, its synergy and
+counters, by Blizzard's rates and the wiki and by CounterWatch's 6v6 numbers, and gives the share
+of the playbook's rules each six keeps. The charts are in
+<a href='#the-results'>the results</a>.</p>
 %(PROFILE)s
 <h2 id='the-proof'>The proof</h2>
-<p>What follows proves that the search returns the best legal sixes of its objective, in order,
-or refuses. Each step names the code it rests on, and each link opens those lines at commit
+<p>The search returns the best legal sixes of its objective, in order, or refuses. Each step of
+the proof names the code it rests on, and each link opens those lines at commit
 <code>%(COMMIT)s</code>, where the proof read them. The <a href='/math#argmax'>math page</a>
 states the search in brief; this is the argument in full.</p>
 <p id='the-setting'><b>The setting.</b> Every quantity is the one the code computes.</p>
@@ -110,26 +103,26 @@ scores;</li>
 scored in full (<a href='%(CODE)s/inference/solver.py#L47-L48'>solver.py:47-48</a>) - or
 <code>Superseded</code>, a newer board from the same page, and returns nothing.</li>
 </ol>
-<p>It never returns any other list. So the six it returns first, x1, is <i>optimal</i>: for every
-legal six y, round(score(y), %(SCORE_PLACES)s) &le; round(score(x1), %(SCORE_PLACES)s), and among
-the sixes tied there x1 holds the largest draw sum, then the names first in order. Two more
-things follow.</p>
+<p>So the six it returns first, x1, is <i>optimal</i>: for every legal six y,
+round(score(y), %(SCORE_PLACES)s) &le; round(score(x1), %(SCORE_PLACES)s), and among the sixes
+tied there x1 holds the largest draw sum, then the names first in order.</p>
 <ul>
 <li><b>Determinism.</b> The answer depends on the World, the board, the playbook and the weights
 alone: the scale is drawn from a string seed of the map and the side, the draws are hashes, and
 the walk's order - the roots by their bounds, the candidates in walk order - changes how fast the
 answer is found, never the answer.</li>
-<li><b>The other exact answers ride the same walk.</b> A full six's rank counts the sixes above
-it, exactly up to %(RANK_CAP)s; the tie count is exact up to %(RANK_CAP)s within %(TIE_BUDGET)s
-sixes scored and reads "at least" past either; the fill is the theorem with blue's picks locked;
-the swap target is the theorem with the keep term; and each stage of the plan is exact given the
-six it starts from (<a href='%(CODE)s/inference/solver.py#L260-L285'>solver.py:260-285</a>,
+<li><b>The other exact answers come from the same walk.</b> A full six's rank counts the sixes
+above it, exactly up to %(RANK_CAP)s; the tie count is exact up to %(RANK_CAP)s within
+%(TIE_BUDGET)s sixes scored and reads "at least" past either; the fill is the theorem with blue's
+picks locked; the swap target is the theorem with the keep term; and each stage of the plan is
+exact given the six it starts from
+(<a href='%(CODE)s/inference/solver.py#L260-L285'>solver.py:260-285</a>,
 <a href='%(CODE)s/inference/swaps.py#L195-L211'>swaps.py:195-211</a>).</li>
 </ul>
 <h3 id='the-lemmas'>The lemmas</h3>
-<p>Three lemmas carry the proof: the walk reaches every candidate six once; every bound it asks
-of a branch is at least every legal six in it; and a branch is dropped only when the sixes
-already kept beat everything in it. Each opens below.</p>
+<p>The proof rests on three lemmas: the walk reaches every candidate six once; every bound it
+asks of a branch is at least every legal six in it; and a branch is dropped only when the sixes
+already kept beat everything in it.</p>
 <details class='proof'><summary><b>Lemma 1.</b> The walk covers every candidate six exactly
 once.</summary>
 <ol>
@@ -260,18 +253,17 @@ none, a stage reads unsolved, a tie count reads "at least" and a rank reads unra
 </ol>
 </details>
 <h3 id='what-it-buys'>What the weights buy</h3>
-<p>Exactness has a consequence a good guess lacks: each weight pulls the six the way it says.</p>
+<p>Because the search is exact, each weight pulls the six the way it says.</p>
 <ul>
 <li><b>Turning a rule up never makes the optimal six worse on that rule.</b> Write score = F +
 w &middot; g for one rule of weight w, F free of w. Where w' &gt; w, the two optimal sixes x and
 x' satisfy F(x) + w &middot; g(x) &ge; F(x') + w &middot; g(x') and F(x') + w' &middot; g(x')
 &ge; F(x) + w' &middot; g(x); added, they give (w' &minus; w)(g(x') &minus; g(x)) &ge; 0, up to
-ties at %(SCORE_PLACES)s places. It needs F to hold still as w moves, and it does: the scale
-reads the sample's metrics, never a weight. Two needs on one guard share a budget, so raising one
-rescales the other; every shipped need sits alone on its guard.</li>
-<li><b>The Meta slider trades in one direction.</b> The same argument with the meta and the
-engine's part: raising the meta never lowers the optimal six's engine part and never raises its
-playbook part.</li>
+ties at %(SCORE_PLACES)s places. It needs F to hold still as w moves. F holds still because the
+scale reads the sample's metrics, never a weight. Two needs on one guard share a budget, so
+raising one rescales the other; every shipped need sits alone on its guard.</li>
+<li><b>Raising the meta never lowers the optimal six's engine part and never raises its playbook
+part.</b> The same argument shows it, with the meta and the engine's part.</li>
 <li><b>With no rule scoring</b>, scaling the meta moves no six, and raising one hero's win rate
 raises every six that holds it alike, so a hero in the optimal six stays there.</li>
 </ul>
@@ -280,14 +272,14 @@ the suite holds the first and the third on its synthetic boards
 (<code>tests/verification/inference/test_stages.py</code>).</p>
 <p><b>What the proof leans on.</b> IEEE-754 doubles rounded to nearest, which is monotone, with
 Python's round() monotone and math.fsum exact before its one rounding. The range rules matching
-the metrics' definitions: this one link is held by tests rather than derived -
+the metrics' definitions: tests hold this one link, and the proof does not derive it -
 <code>test_bounds</code> checks every metric on every completion of random branches, and the
 brute force checks real boards - so a metric changed without its rule could break exactness.
 Every weight within [0, %(WEIGHT_MAX)s], every exponent whole from 0 to 8, and hero names unique.
 Finite scores, which the World's finite numbers give. And the slack, %(SLACK)s a unit of
 magnitude, about two orders above the rounding of the few dozen operations it covers: a standard
-error bound, not a machine-checked one.</p>
-<h3 id='exact-or-not'>Exact, a reading, or greedy</h3>
+error bound that no machine has checked.</p>
+<h3 id='exact-or-not'>What is exact</h3>
 <div class='wide'><table class='numbers'>
 <tr><th>on the board</th><th>what it is</th></tr>
 <tr><td>blue's optimal six and the alternatives after it</td><td>exact: the theorem</td></tr>
@@ -310,22 +302,21 @@ objective</td></tr>
 <tr><td>reach</td><td>a record of boards that seat a hero, not a proof that no board seats the
 others</td></tr>
 </table></div>
-<p>Why the plan is greedy, in one example: two phases, and a swap that costs 10 share points.
-Swapping one hero for another gains 8 in the first phase and 12 in the second. The plan keeps the
-first hero in the first phase, since 8 is less than 10, and swaps in the second, for a net of 2;
-swapping in the first phase would net 10. The code says so
+<p>What the greedy plan gives up, in one example: two phases, and a swap that costs 10 share
+points. Swapping one hero for another gains 8 in the first phase and 12 in the second. The plan
+keeps the first hero in the first phase, since 8 is less than 10, and swaps in the second, for a
+net of 2; swapping in the first phase would net 10. The code says so
 (<a href='%(CODE)s/inference/swaps.py#L40-L45'>swaps.py:40-45</a>).</p>
 <h3 id='the-assumptions'>The assumptions</h3>
-<p>Optimal is relative to these, the assumptions the shipped playbook holds - the one the evidence
-and the study read - each written out on the <a href='/registry#the_assumptions'>registry</a>
-while the board runs that playbook:</p>
+<p>Optimal is relative to the assumptions of the shipped playbook, the one the evidence and the
+study read; the <a href='/registry#the_assumptions'>registry</a> writes each out while the board
+runs that playbook:</p>
 %(ASSUMPTIONS)s
-<p>And to the model's own choices: Blizzard's rates are 5v5 Competitive Role Queue on console,
-read as a proxy for 6v6 Open Queue; synergy and counters are the wiki's, a counter edge derived
-from the kits counting 1 against a wiki edge's 2; before red reveals, only the counter term reads
-red's likely six; and the terms add, under weights set by the owner and a benchmark, never learned
-from match results. Optimal means the exact maximiser of this objective under these assumptions,
-never a proven chance of winning.</p>
+<p>It is relative to the model's own choices too: Blizzard's rates are 5v5 Competitive Role Queue
+on console, read as a proxy for 6v6 Open Queue; synergy and counters are the wiki's, a counter
+edge derived from the kits counting 1 against a wiki edge's 2; before red reveals, only the
+counter term reads red's likely six; and the terms add, under weights set by the owner and a
+benchmark, never learned from match results.</p>
 <h3 id='the-evidence'>The evidence</h3>
 <p>The proof is checked three ways. The suite's gate holds the search to a full enumeration of
 every legal six on synthetic boards, on every run in CI
@@ -346,8 +337,8 @@ six, and matched it bit for bit on six boards of up to 17,217,564 sixes.</li>
 better six on 126 random branches or 102 boards brute-forced - and
 <a href='%(REPO)s/commit/b014a66'>b014a66</a>, a floor-division interval defect found and fixed,
 now pinned by a test. <a href='%(REPO)s/commit/684bf4d'>684bf4d</a>: with nothing scoring, the
-tie-break seated every hero of King's Row within a quarter of its role's mean over 2,000 seeds -
-no hidden favourite.</li>
+tie-break favoured no hero, seating every hero of King's Row within a quarter of its role's mean
+over 2,000 seeds.</li>
 <li>2026-10-04, <a href='%(REPO)s/commit/3fa6c57'>3fa6c57</a>: every bound held on 90,488 sixes
 of 405 random real branches, and 92 boards kept their best six and its rank through the fold;
 <a href='%(REPO)s/commit/083c91f'>083c91f</a>: Junkertown's 13,030,920 legal sixes,
@@ -358,14 +349,14 @@ dropped in a branch or scored; on 400 random branches no bound fell below any of
 sixes; and 168 exact solves turned six rules from 0 to 10, each rule's own value never
 falling.</li>
 </ul>
-<h2 id='hard-coded'>Nothing hard-coded?</h2>
-<p><b>In plain words.</b> The optimiser generalises. The search, the default engine, the scale,
-the swaps and the playbook's reader name no hero, map, stage or ability, and the roster, the maps,
-their modes and their stages all come from the database. The team's size is a parameter. Two
-things are fixed. The roles are three - tank, damage, support - with a cap on tanks, written into
-the code. And the facts layer, which turns the wiki's kits into numbers, is Overwatch by design: it
-holds the constants that define its terms and 18 lists of abilities and weapons the wiki has no
-field for. Those lists are the one real exception to "nothing hard-coded", and they matter.</p>
+<h2 id='hard-coded'>What is hard-coded</h2>
+<p>The search, the default engine, the scale, the swaps and the playbook's reader name no hero,
+map, stage or ability; the roster, the maps, their modes and their stages come from the
+database, and the team's size is a parameter. Two things are fixed. The roles are three - tank,
+damage, support - with a cap on tanks, written into the code. And the facts layer, which turns
+the wiki's kits into numbers, is Overwatch by design: it holds the constants that define its terms
+and 18 lists of abilities and weapons the wiki has no field for. Those lists are the one real
+exception to "nothing hard-coded", and they change results.</p>
 <p>The audit of 2026-10-05, at commit <code>%(COMMIT)s</code>, searched <code>db/</code>,
 <code>facts/</code>, <code>inference/</code>, <code>ui/</code>, <code>door/</code> and
 <code>orchestrator.py</code> for every hero, with its slug and some 35 former names, map, stage,
@@ -409,38 +400,34 @@ mech and the rest</td><td>0</td><td>0</td></tr>
 </table></div>
 <p>None is a defect: every name matches the database, and tests on the built database pin their
 effects. Two do nothing today, one is keyed on a word in a name - matrix also matches Baptiste's
-Amplification Matrix, harmlessly - and eight were written down nowhere but in code, which is why
-this page lists them.</p>
-<ul>
-<li><b>A world of invented names.</b> The suite's synthetic World - tanks Anvil, Kite, Mortar and
-Quarry, maps Harbor Gate, Ember Ruins and Salt Flats, every number made up - runs 258 tests across
-26 files, from the metrics and the facts to exact search against full enumeration, the board, the
-scale, the bounds and reach.</li>
-<li><b>Five a side.</b> In a scratch copy with the team's size set to five, one tank at most and a
-one-two-two red, and nothing else in the engine changed, the search matched a full enumeration on
-28 synthetic boards, and all 30 real maps solved as fives.</li>
-<li><b>The playbook is data:</b> each file validated as it loads - known fields, weights within 0
-to %(WEIGHT_MAX)s, whitelisted expressions, every name a registered metric - and the
-<a href='/registry'>registry</a> writes each one's maths out from the code.</li>
-<li><b>No hidden favourite.</b> The tie-break hashes the map, the side and the hero's id; it reads
-no name and no rate.</li>
-</ul>
-<p><b>What another team game needs.</b> The same format - six seats, three roles, a cap on the
-first - needs pulls into the same tables and a playbook of its own, and no change to the engine.
-Another team size or tank cap is three constants. Other roles are some 30 places in the code.
-Another kit vocabulary is the facts layer rewritten, with its range rules in step: a test fails a
-metric without one.</p>
+Amplification Matrix, harmlessly - and eight are written down nowhere but in the code and on this
+page.</p>
+<p>The optimiser generalises. The suite's synthetic World - tanks Anvil, Kite, Mortar and
+Quarry, maps Harbor Gate, Ember Ruins and Salt Flats, every number made up - runs 258 tests
+across 26 files, from the metrics and the facts to exact search against full enumeration, the
+board, the scale, the bounds and reach. In a scratch copy with the team's size set to five, one
+tank at most and a one-two-two red, and nothing else in the engine changed, the search matched a
+full enumeration on 28 synthetic boards, and all 30 real maps solved as fives. The playbook is
+data: each file is validated as it loads - known fields, weights within 0 to %(WEIGHT_MAX)s,
+whitelisted expressions, every name a registered metric - and the
+<a href='/registry'>registry</a> writes each one's maths out from the code. The tie-break hashes
+the map, the side and the hero's id, and reads no name and no rate.</p>
+<p>Another team game in the same format - six seats, three roles, a cap on the first - needs
+pulls into the same tables and a playbook of its own, and no change to the engine. Another team
+size or tank cap is three constants. Other roles are some 30 places in the code. Another kit
+vocabulary is the facts layer rewritten, with its range rules in step: a test fails a metric
+without one.</p>
 <h2 id='the-method'>The method</h2>
 <p><b>The boards.</b> Every map both data sources know, four red sixes drawn on each from
 CounterWatch's 6v6 pick rates, and each met at three moments: nothing revealed, one pick per role
 revealed, all six. Blue picks all six; nothing is banned. The maps are split in two halves within
 each mode by a seeded shuffle fixed before any result was seen, and the results are read on the
-<i>test</i> half. It is no clean hold-out: the synergy and counter dials were halved on 2026-10-04
-with both halves' results in view, so the train half against the test half is no clean check of
-generalization. Red is drawn afresh for the study, so no tuning has seen its boards. Further sets
-repeat the boards of the earlier benchmark, ban the three heroes Countrix fields most, solve on the
-older capture of the rates, and feed CounterWatch's 6v6 rates to the engine, in memory, never
-stored. The boards are whole maps, as CounterWatch's numbers per map are.</p>
+test half. It is no clean hold-out: the synergy and counter dials were halved on 2026-10-04 with
+both halves' results in view. Red is drawn afresh for the study, so no tuning has seen its
+boards. Further sets repeat the boards of the earlier benchmark, ban the three heroes Countrix
+fields most, solve on the older capture of the rates, and feed CounterWatch's 6v6 rates to the
+engine, in memory, never stored. The boards are whole maps, as CounterWatch's numbers per map
+are.</p>
 <p><b>The arms.</b> Every arm picks a six on every board from data already held; no site is
 fetched for the study.</p>
 <ul>
@@ -473,25 +460,26 @@ random six, 0, to the best six it knows, 100, read on its matchups or on its due
 <i>Countrix's scale</i> is its own objective, anchored the same way: 0 the average random six,
 100 its optimum. A heuristic's satisfaction runs from 0 to 1.</p>
 <p><b>The statistics.</b> The board is the unit and the map the cluster: a mean over boards, and
-its 95%% range from drawing the maps again with replacement - the range the average would fall in
-if the maps were drawn again. A gap between two arms is taken on the same board. No p-values.</p>
+the 95%% range it would fall in if the maps were drawn again, found by redrawing them with
+replacement. A gap between two arms is taken on the same board. No p-values.</p>
 %(DESIGN)s
 <h2 id='the-results'>The results</h2>
-<p>Each tool is strongest on its own numbers: CounterWatch's builder is scored on CounterWatch's
-data and leads there by construction, and Countrix on its own objective, for the same reason. The
-arms table above says what each arm reads. Countrix, the tier list and the most picked on
-Blizzard's rates, HeroStats' and OW Hero Stats' scores and the wiki's counter picker read
-Blizzard's 5v5 console rates and the wiki, and play away on CounterWatch's 6v6 PC numbers;
-CounterWatch's tier list, its counter picker and its most picked read CounterWatch's data, and
-play at home there, as its builder does.</p>
+<p>Each tool is strongest on its own numbers: CounterWatch's builder leads on CounterWatch's
+data by construction, and Countrix on its own objective for the same reason. The arms table above
+says what each arm reads. Countrix, the tier list and the most picked on Blizzard's rates,
+HeroStats' and OW Hero Stats' scores and the wiki's counter picker read Blizzard's 5v5 console
+rates and the wiki, and are scored on CounterWatch's 6v6 PC numbers without reading them;
+CounterWatch's tier list, its counter picker and its most picked read CounterWatch's data, as its
+builder does.</p>
 <h3 id='landing'>Where each six lands</h3>
 %(SHARES)s
 <h3 id='makeup'>What each six is made of</h3>
 %(PARTS)s
 <h3 id='meta-team'>The meta against the team</h3>
-<p>The question the study set out with: how close Countrix comes to the meta while it optimises
-the team. A six of the meta alone sits far right and low; a six of synergy and counters alone sits
-high and left; the optimiser trades one against the other where its weights say.</p>
+<p>The chart shows how close Countrix comes to the meta while it optimises the team, the question
+the study set out with. A six of the meta alone sits far right and low; a six of synergy and
+counters alone sits high and left; the optimiser trades one against the other where its weights
+say.</p>
 %(SCATTER)s
 <p id='shared'><b>Heroes shared.</b> The same question hero by hero: how many heroes each six
 has in common with each six of the meta - the most picked and the tier lists - beside how many
@@ -507,26 +495,27 @@ rises, and the playbook's never rises.</p>
 <p id='gaps'><b>Board by board.</b> Countrix as shipped against each arm on the same boards: the
 mean gap with its range, and how often it won, tied and lost.</p>
 %(PAIRED)s
-<h3 id='holds'>Does it hold up</h3>
-<p>The same arms on the other half of the maps, on the earlier boards, with the favourites
-banned, on the older capture of the rates, and with CounterWatch's 6v6 rates fed to the engine in
-memory. The last asks how much of the gap on CounterWatch's yardstick is the optimiser and how much
-the data.</p>
+<h3 id='holds'>How it holds up</h3>
+<p>The same arms on the other half of the maps, on the earlier boards, with the three heroes
+Countrix fields most banned, on the older capture of the rates, and with CounterWatch's 6v6 rates
+fed to the engine in memory. The last asks how much of the gap on CounterWatch's yardstick is the
+optimiser and how much the data.</p>
 %(HOLDS)s
 <details class='numbers'><summary>where the results come from</summary>%(PROVENANCE)s</details>
-<h2 id='what-it-shows'>What it shows, and what it does not</h2>
+<h2 id='what-it-shows'>What it shows</h2>
 <ul class='plain'>
-<li>The search is exact: every check above counts its violations, and the count is the
-claim.</li>
-<li>Each yardstick favours its home: read a tool's lead on its own numbers as the yardstick's, not
-the tool's.</li>
-<li>The layers read what the rules cost on CounterWatch's yardstick: where the default engine
-alone scores above Countrix as shipped there, the gap is what the playbook's heuristics cost, and
-where the engine with only the two-of-each-role rule does, what the others cost; the board-by-board
-table gives each gap with its range. A tier list's lead is not the rules' cost: it differs from
-Countrix in more than the rules, reading the rates alone, with none of the engine's synergy and
-counter terms. The rules weigh what CounterWatch's numbers cannot see - a save, a barrier, healing
-parity, one playstyle - and the rules' table says what each buys and costs.</li>
+<li>The search is exact: each check above counts its violations, and those counts are the
+evidence.</li>
+<li>Each yardstick favours its own tool, so read a tool's lead on its own numbers as the
+yardstick's.</li>
+<li>The layers measure what the rules cost on CounterWatch's yardstick. Where the default engine
+alone scores above Countrix as shipped there, the gap is what the playbook's heuristics cost;
+where the engine with only the two-of-each-role rule does, the gap is what the other rules cost.
+The board-by-board table gives each gap with its range. A tier list's lead is not the rules'
+cost: it differs from Countrix in more than the rules, reading the rates alone, with none of the
+engine's synergy and counter terms. The rules weigh what CounterWatch's numbers cannot see - a
+save, a barrier, healing parity, one playstyle - and the rules' table says what each buys and
+costs.</li>
 <li>The data swap separates the optimiser from its data: the same engine, fed CounterWatch's
 rates, is scored on CounterWatch's yardstick beside its own six.</li>
 <li>It does not show that Countrix wins more games than any tool. No source publishes 6v6 match
