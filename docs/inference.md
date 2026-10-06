@@ -494,13 +494,14 @@ arena to an enumeration on the synthetic World.
 `inference/solver.py` returns the best sixes of the whole legal space:
 every six of released, unbanned heroes that holds the locked picks, each
 once, at most two tanks and every limit kept - 13,030,920 on an open board
-under the shipped playbook. It walks that space by branch and bound. Each
-legal shape is filled role by role, a role's picks at rising places of its
-walk order, and a branch - the picks so far and the candidates each open
-role has left - is dropped only where its bound proves that no six in it
-can enter the best K. The answer is the enumeration's own, in the full
-rank order, whatever order the walk takes; no hero is left out of any
-role, and the alternatives are the next best sixes in that order.
+under the shipped playbook on the roster of 2026-10-05. It walks that
+space by branch and bound. Each legal shape is filled role by role, a
+role's picks at rising places of its walk order, and a branch - the picks
+so far and the candidates each open role has left - is dropped only where
+its bound proves that no six in it can enter the best K. The answer is the
+enumeration's own, in the full rank order, whatever order the walk takes;
+no hero is left out of any role, and the alternatives are the next best
+sixes in that order.
 
 The bound (`inference/bounds.py`) adds up, in the score's own order:
 
