@@ -34,6 +34,7 @@ COUNTRIX_NO_DATABASE=1 .venv/bin/python -m pytest -q -rs -p no:cacheprovider --c
 .venv/bin/python -m door.mcp call db_docs         # regenerate every generated doc section (needs the database)
 .venv/bin/python -m ui.board --port 8018          # the board, engine in-process (8017 is the compose board)
 .venv/bin/python orchestrator.py up|status|down   # the Docker stack; a bare orchestrator.py is up
+user-guide/.venv/bin/mkdocs build --strict -f user-guide/mkdocs.yml   # the user guide, in a venv of its own (user-guide/README.md)
 ```
 
 Pulls and `db_rebuild` read the page caches, which keep a page forever;
@@ -115,7 +116,9 @@ db <- facts <- inference <- door <- ui.
   holds and is never weighted; a heuristic is on a metric (`metric:`, form
   heuristic) or scored (`bonus:`/`penalty:` times its weight); then
   assumption, or draft (name, kind and prose only). A key outside the
-  fields, `soft:` among them, is refused. `inference/catalog.py` reads it,
+  fields, `soft:` among them, is refused, and so is an expression that
+  fails on its probes (`Expr.probes`) or a bonus or penalty that comes
+  out text there (`strategy.amount`). `inference/catalog.py` reads it,
   each file parsed by `frontmatter.py` and checked by `strategy.py`
   (`Strategy`, `CatalogError`); one bad file makes `catalog.load` raise
   everywhere. `meta.md` beside the strategy files is no strategy and no
@@ -210,8 +213,9 @@ db <- facts <- inference <- door <- ui.
   same `Objective.ground_key` are one search. Each row's blurb is
   `plan.stage_blurb`, worded from the facts. `BRIEF` leaves it out too
   (`Brief.walk_stages`); test_stage_plan names its brief.
-- **The board** (`ui/board.py`, its pages in `ui/pages.py` and the strategy
-  registry in `ui/registry.py`) serves `/api/facts` and answers
+- **The board** (`ui/board.py`, its pages in `ui/pages.py`, the strategy
+  registry in `ui/registry.py`, and the study in `ui/study.py`, its charts
+  inline SVG from `ui/charts.py`) serves `/api/facts` and answers
   `/api/board`, `/api/strategies` and `/health` with `ui/serve.py`'s
   handlers, all in its own process - the
   compose stack's `ui` container runs the engine.
@@ -269,6 +273,13 @@ db <- facts <- inference <- door <- ui.
   compared with a fresh render. Never edit it by hand; change the source
   (a `@tool` description, strategy frontmatter, a migration comment) and
   regenerate.
+- The user guide (`user-guide/`) builds strict in CI: a page outside its
+  nav, a broken link or a broken anchor fails it. It says what a player
+  sees and types, so a change to either updates its page in the same
+  commit. Its screenshots of the board show the numbers the board
+  computes: the owner opened them on 2026-10-05, an exception to the
+  rates rule under House rules. Its text shows no rate figure or text
+  derived from one.
 - Adding or renaming an MCP tool: regenerate docs/mcp.md; each house skill
   must still name the tools `MUST_NAME` (tests/qa/test_docs.py) lists;
   tests/verification/door/mcp/test_mcp.py holds the tool set too.
@@ -302,7 +313,21 @@ db <- facts <- inference <- door <- ui.
   bans and the role caps; any other decision worth pinning is made on the
   server, as the seat badge is (`momentum.badges`). The math
   page renders the code constants it quotes (`view_math` fills them in), so
-  a literal percent in `ui/static/math.html` is written `%%`.
+  a literal percent in `ui/static/math.html` is written `%%`, as it is in
+  `ui/static/study.html`.
+- `ui/static/study.json` is the study's results, the file the private
+  benchmark's harness writes (`countrix-study/1`), copied here when a run
+  is published; without it the page says the results are not in place,
+  and no sample ships there. Its `report` is the published report's
+  address, which the harness's `publish` step writes once the report,
+  which renders this same file, is out; the page's last section links
+  it. The page reads each part in the shape the harness writes it -
+  `tests/fixtures/study.json` is its file of 2026-10-05, trimmed - and
+  its metrics by id, never a raw rate.
+  `tests/verification/ui/test_study.py` holds the renderer to the fixture
+  and to the file in place: every block filled, every chart drawn, every
+  string escaped, the schema checked. A change to the harness's shapes
+  changes `ui/study.py` and the fixture together.
 - `test_the_search_reaches_the_enumerated_maximum` in
   `tests/verification/inference/test_solver.py` is the regression gate on
   the search: synthetic boards - red revealed, locks, bans, a pair that pays
@@ -351,8 +376,24 @@ db <- facts <- inference <- door <- ui.
   (`CARGO_POLICY`), and 0.5 s an article, asked for once
   (`ARTICLE_POLICY`). No third source, no API keys.
 - Blizzard's rates page licenses its win, pick and ban rates for personal
-  use only. Nothing public - a README image, a doc example, a published page -
-  shows a rate figure or text derived from one.
+  use only: the caches, the database and any table copied out of it stay
+  out of the repo. Nothing public - a doc example, the math page, the
+  registry - shows a rate figure or text derived from one, except what the
+  owner opened on 2026-10-05: the study's results, its page and its report,
+  and the screenshots of the board in the README and the user guide, which
+  show the numbers the board computes. CounterWatch's 6v6 data, which the
+  study measures against, stays in the private benchmark repository; only
+  the study's results are published.
+- NOTICE lists the third-party material and its terms: the Overwatch
+  Wiki's text under CC BY-NC-SA 3.0, Bebas Neue under the OFL, Blizzard's
+  material under its fan-site permission. A new file that quotes the wiki
+  gets its line there, with the articles it quotes; every page's footer
+  carries the Overwatch notice and the wiki's credit (`pages.FOOTER`).
+  NOTICE also carries the owner's grant of 2026-10-05, which the README's
+  licence and the guide repeat: anyone may change the playbook's files -
+  `inference/strategies/`, its rules and `meta.md`'s weights - for their
+  own noncommercial use; the rest stays under PolyForm Strict. A session
+  still changes the playbook only through the door.
 - A pull matches a hero or map name against the database through
   `db.data.normalizer` - `index` and `name_key`, or `hero_key` where a former
   name can appear - never by `.lower()`.
@@ -387,9 +428,11 @@ db <- facts <- inference <- door <- ui.
 - Prose in docs, comments, skills and commits is terse, declarative, present
   tense and ASCII, with a spaced hyphen where a dash would go. Headings name
   things with the definite article ("The files"). Non-ASCII is kept to math
-  notation, the middle-dot separator, accented hero names and the board's
-  glyphs (the ban cross, the ellipsis). `.claude/skills/desloppify/SKILL.md`
-  is the tool's own text: leave it as `update-skill` writes it.
+  notation, the middle-dot separator, accented hero names, the board's
+  glyphs (the ban cross, the ellipsis) and the legal notices' trademark and
+  copyright signs, which the footer, NOTICE, the README and the user guide
+  print alike. `.claude/skills/desloppify/SKILL.md` is the tool's own text:
+  leave it as `update-skill` writes it.
 - Commit subjects state the outcome as a sentence, no type prefix, no period
   ("The scale holds still under bans"). The body says why, in prose wrapped
   near 72 columns, with measured numbers such as the test count.

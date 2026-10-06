@@ -70,8 +70,9 @@ question is allowed.
 1. **Read the vocabulary.** The `metrics` tool lists every key a strategy
    may reference with its meaning: `team.*` for our side, `enemy.*` for
    the same numbers on the red side, `matchup.*` for the two compared,
-   `map.*`, `world.*` - and which are text (usable in a `when`, never as
-   a heuristic's metric).
+   `map.*`, `world.*` - and which are text (compared in a `when` or an
+   `x if c else y`, never a heuristic's metric or what a bonus or
+   penalty adds).
 2. **Read the catalog.** `strategies` shows every existing file with its
    form and expressions. Name the nearest existing strategy and say how
    the new one differs; if one already says it, say so and offer `/tune`
@@ -123,12 +124,13 @@ question is allowed.
 1. **Store it:** `add_strategy` with `id`, `name`, `kind`, `category`,
    `body` (the standardized prose), the inferred fields, and a `reason`
    that quotes the sentence of the prose each field follows from. A key
-   that is not in the vocabulary or an expression that does not parse is
-   refused and nothing is written - fix and call again. For a file the
-   colleague dropped in with only a name, a kind and prose (the catalog
-   shows it as a *draft*), use `infer_strategy` instead, with the inferred
-   frontmatter and a `reason`; the draft keeps its prose, and a kind
-   change goes through `tune` with field `kind`.
+   that is not in the vocabulary, an expression that does not parse or
+   fails on the catalog's probes, or a bonus or penalty that comes out
+   text, is refused and nothing is written - fix and call again. For a
+   file the colleague dropped in with only a name, a kind and prose (the
+   catalog shows it as a *draft*), use `infer_strategy` instead, with the
+   inferred frontmatter and a `reason`; the draft keeps its prose, and a
+   kind change goes through `tune` with field `kind`.
 2. **Show the effect:** run `board` (or `infer`) for the board the user is
    on, or a representative one (King's Row against a heal-heavy red,
    say), and point at the new line in the breakdown: its weighted

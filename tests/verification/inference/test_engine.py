@@ -622,9 +622,10 @@ def test_the_healing_floor_takes_kings_row_off_one_support(world, tmp_path):
 @pytest.mark.invariant
 def test_the_search_proves_real_boards_scoring_few_sixes_in_full(world):
     """On the built database the bound is tight enough that the exact search
-    proves a seat's best sixes out of 17 million legal ones while scoring
-    a few dozen in full - Samoa against five revealed picks, and King's
-    Row with nothing revealed - and the whole space is what it covered. The
+    proves a seat's best sixes out of every legal one while scoring a few
+    dozen in full: Samoa against five revealed picks, and King's Row with
+    nothing revealed, each 13,030,920 legal sixes under the shipped limits
+    on the roster of 2026-10-05, and the whole space is what it covered. The
     ceilings are two orders of magnitude over what the boards take, so a
     data refresh moves the counts and not the verdict; a bound gone slack
     fails it."""

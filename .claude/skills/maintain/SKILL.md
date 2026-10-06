@@ -46,7 +46,12 @@ change only what a check or the user points at, and leave a report.
    skills; `docs/db.md` and `docs/inference.md` for their layers (`facts/`
    has its package docstring, and no doc); `docs/ui.md`, `docs/mcp.md`,
    `docs/security.md`. A new skill gets a row in `docs/architecture.md`'s
-   skills table and in `tests/qa/test_docs.py`'s MUST_NAME map.
+   skills table and in `tests/qa/test_docs.py`'s MUST_NAME map. The user
+   guide, `user-guide/docs/`, says what a player sees on the board and
+   the commands they type: after a change to either, make its page say
+   what is true now, and run
+   `user-guide/.venv/bin/mkdocs build --strict -f user-guide/mkdocs.yml`
+   as CI does (user-guide/README.md makes the venv).
 
 3. **Nothing stale.** Grep the tree for names that no longer exist: old
    module paths, renamed tools, renamed folders, old counts ("42 tables",

@@ -19,7 +19,8 @@ The playbook, which imports nothing from the search:
                   per strategy id, shipped or removed, with the threads a
                   rule was drawn from or the user's word for an assumption
     frontmatter   the dialect a strategy file's frontmatter is written in
-    expr          the safe expression language the frontmatter uses
+    expr          the safe expression language the frontmatter uses, and the
+                  probes the catalog runs each expression on at load
     strategy      one strategy: its fields, its kind and form, and the rules
                   every file keeps
     catalog       reads the playbook's files into strategies, orders, mirrors

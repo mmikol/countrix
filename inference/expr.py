@@ -12,12 +12,16 @@ candidate is a native expression, not a tree walk. Names are dotted keys
 into a namespace of dicts ({"team": {...}, "enemy": {...}, "matchup": ...,
 "map": ..., "world": ..., "params": ...}); a key a namespace lacks reads 0,
 so a metric that does not apply to a board never crashes a score, and a
-/, // or % by zero reads 0 - that operation alone.
+/, // or % by zero reads 0 - that operation alone. Before any board, an
+expression runs on its probes (Expr.probes), each number it reads and
+each text alike, which the catalog reads a file's expressions on at load.
 """
 
 import ast
-from collections.abc import Callable, Iterable, Mapping
+import math
+from collections.abc import Callable, Collection, Iterable, Iterator, Mapping
 from types import CodeType
+from typing import NamedTuple
 
 FUNCTIONS: dict[str, Callable[..., object]] = {
     "min": min, "max": max, "abs": abs, "round": round,
@@ -76,6 +80,11 @@ class ExprError(ValueError):
 
 
 NAMESPACES = ("team", "enemy", "matchup", "map", "world", "params")
+# what a probe reads a name as before any board (Expr.probes), besides the
+# expression's own constants: a number at both ends of a count, a text
+# metric empty and as a name
+PROBE_NUMBERS: tuple[float, ...] = (0, 1)
+PROBE_TEXTS = ("", "name")
 
 
 class Section:
@@ -108,6 +117,15 @@ class Scope(dict[str, Section]):
         if key in ZERO_SAFE:
             return ZERO_SAFE[key]
         return Section({})
+
+
+class Probe(NamedTuple):
+    """One trial of an expression before any board: the number every
+    numeric name it reads holds, the text every text name holds, and the
+    Scope that sets them."""
+    number: float
+    text: str
+    scope: Scope
 
 
 class Expr:
@@ -254,6 +272,32 @@ class Expr:
         return ()
 
     # --- evaluation ----------------------------------------------------------
+
+    def probes(self, text: Collection[str], numbers: Iterable[float] = ()) -> Iterator[Probe]:
+        """The trials the expression runs on before any board: each name it
+        reads that `text` holds empty, as a name and as each string the
+        expression holds, every other name at 0, at 1, at each finite number
+        it holds and at each of `numbers` - all its numbers alike and all
+        its texts alike in one trial, so a comparison with one of its own
+        constants takes each way it can. A params.NAME is the caller's to
+        set (scope's `params` slot)."""
+        held: list[float] = [*PROBE_NUMBERS, *numbers]
+        texts = list(PROBE_TEXTS)
+        for node in ast.walk(ast.parse(self.source, mode="eval")):
+            value = node.value if isinstance(node, ast.Constant) else None
+            if isinstance(value, str):
+                texts.append(value)
+            elif isinstance(value, (int, float)) and not isinstance(value, bool):
+                held.append(value)
+        finite = [n for n in held if isinstance(n, int) or math.isfinite(n)]
+        read = [name for name in self.names if "." in name and not name.startswith("params.")]
+        for number in dict.fromkeys(finite):
+            for each in dict.fromkeys(texts):
+                namespace: dict[str, dict[str, float | str]] = {}
+                for name in read:
+                    section, _, key = name.partition(".")
+                    namespace.setdefault(section, {})[key] = each if name in text else number
+                yield Probe(number, each, scope(namespace))
 
     def evaluate(self, sc: Scope) -> Value:
         """Evaluate against a Scope, which scope() builds from the namespaces."""

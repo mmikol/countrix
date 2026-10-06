@@ -12,10 +12,17 @@ h1,h2,h3 { font-family:"Bebas Neue",Impact,"Arial Narrow",sans-serif;
   letter-spacing:.06em; text-transform:uppercase; font-weight:400; }
 a { color:var(--blue); text-decoration:none; } a:hover { text-decoration:underline; }
 main { max-width:1440px; margin:0 auto; padding:14px 18px 60px; }
-/* the right padding keeps the row clear of the three pills pinned top-right;
-   below 800 px they join the row instead (max-width:800px, further down) */
+/* every page's foot: the Overwatch notice, the line that Countrix is not
+   Blizzard's, and the wiki's credit and licence (FOOTER in ui/pages) */
+footer.legal { margin:36px 0 0; padding:12px 0 0; border-top:1px solid var(--line); color:var(--muted);
+  font-size:11.5px; line-height:1.55; }
+footer.legal p { margin:4px 0; max-width:860px; }
+footer.legal a { color:var(--muted); text-decoration:underline; }
+footer.legal a:hover { color:var(--text); }
+/* the right padding keeps the row clear of the four pills pinned top-right;
+   below 900 px they join the row instead (max-width:900px, further down) */
 header.top { position:relative; display:flex; align-items:center; gap:18px; flex-wrap:wrap;
-  padding:10px 366px 10px 16px; background:linear-gradient(90deg,#161c27,#10141c);
+  padding:10px 470px 10px 16px; background:linear-gradient(90deg,#161c27,#10141c);
   border:1px solid var(--line); border-radius:10px; }
 header.top h1 { margin:0; font-size:30px; }
 header.top h1 span { color:var(--gold); }
@@ -90,6 +97,82 @@ html:has(.rulebox[open]) { overflow:hidden; }
   .math .rulebox { display:none; }
   html:has(.rulebox[open]) { overflow:visible; }
 }
+/* the study (/study): the math page's article, its charts inline SVG coloured
+   here by class - each arm family's hue, the parts' four slots, the heatmap's
+   cells - on the chart surface; a chart shrinks with its box, never past it,
+   the heatmap keeps its size in a box that scrolls sideways, and every chart
+   keeps a table of its numbers under a fold */
+.study { --viz-surface:#10141c; --viz-grid:#222a36; --viz-ref:#4a5568; --viz-countrix:#3987e5;
+  --viz-counterwatch:#d95926; --viz-tier:#199e70; --viz-counter:#9085e9; --viz-meta:#8d97a8;
+  --viz-random:#5f6a7c; --viz-oracle:#c9d0db; --viz-other:#6f7a8c; --viz-slot4:#c98500; }
+.study h3 { font-family:"Bebas Neue",Impact,sans-serif; letter-spacing:.06em; font-size:20px; font-weight:400;
+  margin:22px 0 6px; scroll-margin-top:12px; }
+.study ul.plain li { margin:6px 0; }
+.study code { overflow-wrap:anywhere; }
+.study details.proof { margin:8px 0; padding:8px 14px; background:var(--viz-surface); border:1px solid var(--line);
+  border-radius:8px; }
+.study details.proof > summary { cursor:pointer; color:var(--text); font-size:13.5px; }
+.study details.proof ol { padding-left:20px; }
+.study figure.viz { margin:14px 0 18px; padding:12px 14px; background:var(--viz-surface); border:1px solid var(--line);
+  border-radius:8px; }
+.study figcaption { margin:0 0 10px; font-size:12.5px; line-height:1.55; color:#c9d0db; }
+.study figcaption b { color:var(--text); }
+.study .panels { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:16px; }
+.study svg.chart { display:block; max-width:100%; height:auto; }
+.study svg.keep { max-width:none; }
+.study svg text { font-family:-apple-system,"Segoe UI",Roboto,sans-serif; }
+.study svg .head { fill:var(--text); font-size:13px; font-weight:600; }
+.study svg .lab { fill:var(--text); font-size:12px; }
+.study svg .plab { fill:var(--text); font-size:10.5px; }
+.study svg .tick { fill:var(--muted); font-size:11px; }
+.study svg .val { fill:var(--text); font-size:11px; }
+.study svg .grid { stroke:var(--viz-grid); stroke-width:1; }
+.study svg .ref { stroke:var(--viz-ref); stroke-width:1; }
+.study svg .dot { fill:currentColor; stroke:var(--viz-surface); stroke-width:2; }
+.study svg .hollow { fill:var(--viz-surface); stroke:currentColor; stroke-width:2; }
+.study svg .range { stroke:currentColor; stroke-width:2; stroke-linecap:round; opacity:.55; }
+.study svg .total { stroke:var(--text); stroke-width:2; }
+.study svg .bar { fill:var(--viz-countrix); }
+.study svg .whisk { stroke:var(--text); stroke-width:1.5; }
+.study svg .faint { fill:var(--viz-countrix); opacity:.45; }
+.study svg .cell0 { fill:#18202c; }
+.study svg .cell { fill:var(--viz-countrix); }
+.study svg .moved { fill:var(--text); }
+.study svg .testmark { fill:var(--muted); }
+.study svg a:hover .lab { fill:var(--gold); }
+.study .fam { color:var(--viz-other); }
+.study .f-countrix { color:var(--viz-countrix); } .study .f-counterwatch { color:var(--viz-counterwatch); }
+.study .f-oracle { color:var(--viz-oracle); } .study .f-tier { color:var(--viz-tier); }
+.study .f-counter { color:var(--viz-counter); } .study .f-meta { color:var(--viz-meta); }
+.study .f-random { color:var(--viz-random); }
+.study .p1 { fill:var(--viz-countrix); color:var(--viz-countrix); }
+.study .p2 { fill:var(--viz-counterwatch); color:var(--viz-counterwatch); }
+.study .p3 { fill:var(--viz-tier); color:var(--viz-tier); }
+.study .p4 { fill:var(--viz-slot4); color:var(--viz-slot4); }
+/* a legend: a mark in its class's colour, then its name in the text's */
+.study .key { display:flex; flex-wrap:wrap; gap:4px 14px; margin:6px 0 0; font-size:12px; color:#c9d0db; }
+.study .key span { display:inline-flex; align-items:center; gap:6px; }
+.study .key i { display:inline-block; width:10px; height:10px; border-radius:50%; background:currentColor; }
+.study .key i.hollow { background:transparent; border:2px solid currentColor; }
+.study .key i.sq { border-radius:2px; }
+.study .key i.cellkey { background:var(--viz-countrix); }
+.study .key i.movedkey { width:7px; height:7px; background:var(--text); }
+.study .key i.testkey { height:3px; border-radius:0; background:var(--muted); }
+.study table.numbers { width:100%; border-collapse:collapse; font-size:12.5px; }
+.study table.numbers th { text-align:left; font-weight:400; font-size:10px; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--muted); padding:4px 10px 4px 0; border-bottom:1px solid var(--line); vertical-align:bottom; }
+.study table.numbers td { padding:4px 10px 4px 0; border-bottom:1px solid #202733; vertical-align:top; color:#c9d0db;
+  font-variant-numeric:tabular-nums; }
+.study table.numbers .rng { color:var(--muted); font-size:11px; white-space:nowrap; }
+/* the answer in numbers: a cell's blue above a random six's 50, its red below */
+.study table.profile td.v { text-align:center; color:var(--text); padding:5px 4px; }
+.study table.profile th { text-align:center; padding:4px; letter-spacing:.04em; font-size:9.5px; }
+.study table.profile th:first-child, .study table.profile td:first-child { text-align:left; }
+.study details.numbers { margin:10px 0 0; font-size:12.5px; }
+.study details.numbers > summary { cursor:pointer; color:var(--muted); }
+.study details.numbers .legend { margin:10px 0 4px; }
+/* a phone: the charts take what width the figure can spare */
+@media (max-width:560px) { .study figure.viz { padding:10px 6px; } }
 /* a playbook card's link to its rule's math */
 .hcard .reglink { float:right; margin-left:8px; font-size:10px; letter-spacing:.14em; text-transform:uppercase;
   color:var(--muted); border:1px solid var(--line); border-radius:999px; padding:2px 8px; }
@@ -376,11 +459,11 @@ table.facts tr.warn td { color:#ff9d8f; } table.facts tr.derived td.text { color
 .top h1 .expand { font-size: .44em; letter-spacing: .1em; text-transform: uppercase;
                   opacity: .55; margin-left: .6em; white-space: nowrap; }
 @media (max-width: 560px) { .top h1 .expand { display: none; } }
-/* below 800 px the pills join the header's row, the controls after them: beside
+/* below 900 px the pills join the header's row, the controls after them: beside
    the title where both fit, under it where they would meet. The title runs to
-   270 px, 330 in the fallback face, and the pills take 350 at the top right,
-   so pinned they would meet the fallback's title under about 750 px */
-@media (max-width:800px) {
+   270 px, 330 in the fallback face, and the four pills take 450 at the top
+   right, so pinned they would meet the fallback's title under about 850 px */
+@media (max-width:900px) {
   header.top { padding:10px 16px; justify-content:space-between; }
   header.top .links { position:static; order:1; flex-wrap:wrap; }
   header.top .mapsel { order:2; }

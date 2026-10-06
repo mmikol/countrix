@@ -182,8 +182,12 @@ stores.
 
 **The rates licence.** Blizzard's rates page licenses its win, pick and ban
 rates for personal use only. The page caches are gitignored, and nothing
-public - a README, a doc example, a published page - shows a rate figure
-or text derived from one. This file quotes none.
+public - a doc example, the math page, the registry - shows a rate figure
+or text derived from one, except what the owner opened on 2026-10-05: the
+study's results, its page and its report, and the screenshots of the board
+in the README and the user guide, which show the numbers the board
+computes. CounterWatch's 6v6 data, which the study measures against, stays
+in the private benchmark repository. This file quotes none.
 
 ## The wiki package - `wiki/`
 

@@ -44,3 +44,6 @@ __pycache__/
 # desloppify writes a scorecard image on every scan
 scorecard.png
 
+# the user guide's built site; its venv, user-guide/.venv, is .venv/ above
+/user-guide/site/
+

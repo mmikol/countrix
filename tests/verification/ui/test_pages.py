@@ -42,8 +42,8 @@ from inference.result import (
 )
 from inference.scoring import Contribution
 from inference.strategy import WEIGHT_RANGE, StrategyRecord
-from tests.verification.inference import BRIEF, FIXTURE_PLAYBOOK
-from ui import board, pages, registry, serve
+from tests.verification.inference import BRIEF, FIXTURE_PLAYBOOK, FIXTURES
+from ui import board, pages, registry, serve, study
 
 
 def scripts():
@@ -85,11 +85,45 @@ def test_board_page_has_two_rosters_and_the_three_panels():
         assert h2.count("<") == 4, h2
         assert "id='%sscore'" % team in h2 and "data-clear='%s'" % team in h2
     assert "ARGMAX[" not in body and "href='/math'" in body   # the equation lives on /math
-    assert "<footer" not in body
+    # one footer, the notices', and no status line or capture date in it
+    assert body.count("<footer") == 1 and pages.FOOTER in body
+    assert "id='status'" not in body and "id='captured'" not in body
     assert "id='flash'" in body[:body.index("</header>")]
     comps = body[body.index("id='tab-comps'"):body.index("id='tab-facts'")]
     assert "id='inf-blue'" in comps and "id='inf-red'" in comps
     assert b".kind.assumption" in pages.static_file("board.css")[0]
+
+
+def test_every_page_ends_in_the_footer_of_notices():
+    """Every page the board serves - the board, /math, /registry, /study and
+    the error pages - closes on pages.FOOTER, the last thing in <main>:
+    Blizzard's notice for Overwatch, written as its copyright-notices page
+    gives it with the copyright sign, the line that Countrix is not
+    Blizzard's, and the Overwatch Wiki's credit and licence with NOTICE's
+    address. The facts panel credits the wiki again under its table, since
+    its facts quote the wiki's words."""
+    board_page = pages.view_board()
+    served = {
+        "board": board_page, "math": pages.view_math(), "registry": registry.view_registry(),
+        "study": study.view_study(), "error": pages.page("error", "<p>x</p>")}
+    for name, body in served.items():
+        assert body.count("<footer") == 1, name
+        assert body.index(pages.FOOTER) + len(pages.FOOTER) == body.index("</main>"), name
+    for phrase in (
+            "Overwatch&trade; &copy; 2016 Blizzard Entertainment, Inc. All rights reserved.",
+            "Overwatch is a trademark or registered trademark of Blizzard Entertainment, Inc."
+            " in the U.S. and/or other countries.",
+            "Countrix is a fan project, not affiliated with or endorsed by Blizzard"
+            " Entertainment.",
+            "href='https://overwatch.fandom.com'",
+            "href='https://creativecommons.org/licenses/by-nc-sa/3.0/'",
+            "written by its contributors and licensed under", "href='%s'" % pages.NOTICE_URL):
+        assert phrase in pages.FOOTER, phrase
+    assert pages.NOTICE_URL.startswith(pages.REPO_URL) and pages.NOTICE_URL.endswith("/NOTICE")
+    facts = board_page[board_page.index("id='tab-facts'"):board_page.index("id='tab-playbook'")]
+    assert pages.WIKI in facts and pages.WIKI_LICENSE in facts
+    css = pages.static_file("board.css")[0].decode()
+    assert "footer.legal {" in css
 
 
 def test_the_ban_picker_is_a_roster():
@@ -129,12 +163,12 @@ def test_the_page_is_a_shell_over_static_files():
         assert rule in css, rule
     assert "id='clearall'" in body
     header = body.split("</header>")[0]
-    # the three pills, pinned top-right: the math, the registry beside it, GitHub
+    # the four pills, pinned top-right: the math, the registry, the study, GitHub
     links = header[header.index("<span class='links'>"):]
     assert "href='/math'" in links and pages.REPO_URL in links
-    assert links.count("<a ") == 3
+    assert links.count("<a ") == 4
     assert links.index("href='/math'") < links.index("href='/registry'") < links.index(
-        pages.REPO_URL)
+        "href='/study'") < links.index(pages.REPO_URL)
     assert links.rstrip().endswith("GitHub</a></span>")
     # the page hands the scripts the counts they need
     assert "var TEAM = 6, BANS = 5, TANKS = 2, SWAP_MAX = 50;" in body
@@ -695,3 +729,27 @@ def test_the_registry_hides_its_entries_but_without_scripts_and_in_print():
                    "html:has(.rulebox[open]) { overflow:hidden; }"):
         assert css.index(screen) < css.index("@media print {"), screen
     assert script.rstrip().endswith("else if (entries) entries.style.display = 'block';")
+
+
+def test_the_study_is_a_page_in_the_shell_its_contents_land_on_and_the_header_links():
+    """/study is ui/study.py's page in the shell the math page has, with no
+    script: its contents' links land on ids the page holds, with a results
+    file (the fixture, in the harness's shapes) and without one, and its
+    links into the board's other pages name the math page's and the
+    registry's own anchors."""
+    with_results = study.view_study(os.path.join(FIXTURES, "study.json"))
+    without = study.view_study("/nowhere/study.json")
+    for page in (with_results, without):
+        assert page.startswith(pages.HEAD) and "<script" not in page
+        toc = page[page.index("<nav class='toc'>"):page.index("</nav>")]
+        targets = re.findall(r"href='#([^']+)'", toc)
+        assert len(targets) >= 15
+        assert [t for t in targets if "id='%s'" % t not in page] == []
+        inner = set(re.findall(r"href='#([^']+)'", page))
+        assert [t for t in sorted(inner) if "id='%s'" % t not in page] == []
+    math_page, registry_page = pages.view_math(), registry.view_registry()
+    for anchor in re.findall(r"href='/math#([^']+)'", with_results):
+        assert "id='%s'" % anchor in math_page, anchor
+    for anchor in set(re.findall(r"href='/registry#([^']+)'", with_results)):
+        assert "id='%s'" % anchor in registry_page, anchor
+    assert "href='/study'" in pages.view_board()

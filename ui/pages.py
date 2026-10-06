@@ -1,11 +1,12 @@
 """The board's HTML: the page shell, the math page, and the static files
 they load - the stylesheet, the scripts and the display font. The strategy
 registry, each rule's math, is ui/registry.py's, in the shell page() gives
-the math page, with its own script, registry.js.
+the math page, with its own script, registry.js; the study, the proof and
+the study's results, is ui/study.py's, in the same shell.
 
 The page is a shell over the static files: board.js loads last because it
-calls into comps.js and playbook.js, and TEAM, BANS and SWAP_MAX come from
-the page so the scripts keep no constant in step with the Python. The math page's
+calls into comps.js and playbook.js, and TEAM, BANS, TANKS and SWAP_MAX come
+from the page so the scripts keep no constant in step with the Python. The math page's
 code numbers are filled in here too, from the modules that hold them, and
 the default engine's weights from the playbook's meta.md, so math.html
 quotes no constant of its own.
@@ -33,6 +34,28 @@ GITHUB_MARK = (
 
 
 REPO_URL = "https://github.com/mmikol/countrix"      # the repository the header links to
+NOTICE_URL = REPO_URL + "/blob/main/NOTICE"           # the third-party material and its terms
+WIKI_URL = "https://overwatch.fandom.com"
+WIKI_LICENSE_URL = "https://creativecommons.org/licenses/by-nc-sa/3.0/"
+# the wiki's name and its licence's, each a link, as a credit writes them
+WIKI = "<a href='%s' target='_blank' rel='noopener'>Overwatch Wiki</a>" % WIKI_URL
+WIKI_LICENSE = "<a href='%s' target='_blank' rel='noopener'>CC BY-NC-SA 3.0</a>" % (
+    WIKI_LICENSE_URL)
+
+# every page's foot: Blizzard's notice for Overwatch, which its Legal FAQ asks a
+# fan site to carry, the line that Countrix is none of Blizzard's, and the
+# Overwatch Wiki's credit and licence, which its text keeps wherever it is
+# quoted; NOTICE, at the repository's root, lists the rest
+FOOTER = (
+    "<footer class='legal'><p>Overwatch&trade; &copy; 2016 Blizzard Entertainment, Inc. All"
+    " rights reserved. Overwatch is a trademark or registered trademark of Blizzard"
+    " Entertainment, Inc. in the U.S. and/or other countries. Countrix is a fan project, not"
+    " affiliated with or endorsed by Blizzard Entertainment.</p>"
+    "<p>Hero kits, maps, terrain, playstyles, synergies and counters come from the %s at"
+    " Fandom, written by its contributors and licensed under %s; quoted wiki text keeps that"
+    " licence. Countrix's own code is under the PolyForm Strict License 1.0.0, and"
+    " <a href='%s' target='_blank' rel='noopener'>NOTICE</a> lists the rest.</p></footer>"
+    % (WIKI, WIKI_LICENSE, NOTICE_URL))
 
 
 def esc(x: object) -> str:
@@ -70,8 +93,10 @@ def static_file(name: str) -> StaticFile | None:
 
 # --- the pages -------------------------------------------------------------------
 
+# the empty icon keeps a browser from asking for /favicon.ico, which the board does not serve
 HEAD = ("<!doctype html><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        "<link rel='icon' href='data:,'>"
         "<link rel='stylesheet' href='/static/board.css'>")
 
 
@@ -93,6 +118,7 @@ def view_board() -> str:
             "<span class='flash' id='flash'></span></div>"
             "<span class='links'><a class='mathlink' href='/math'>the math</a>"
             "<a class='mathlink' href='/registry'>the registry</a>"
+            "<a class='mathlink' href='/study'>the study</a>"
             "<a class='gh' href='%s' target='_blank' rel='noopener'>%s GitHub</a>"
             "</span>"
             "</header>"
@@ -132,24 +158,29 @@ def view_board() -> str:
             "<section class='panel' id='tab-facts'><div class='tools'>"
             "<input type='text' id='filter' placeholder='filter'>"
             "<span id='chips'></span><span id='factsn' class='count'></span></div>"
-            "<table class='facts'><tbody id='factbody'></tbody></table></section>"
+            "<table class='facts'><tbody id='factbody'></tbody></table>"
+            "<p class='legend'>The facts quote the %s at Fandom - its kits, maps, terrain,"
+            " playstyles, synergies and counters - written by its contributors and licensed"
+            " under %s; the rates are Blizzard's.</p></section>"
             "<section class='panel' id='tab-playbook'><div id='playbook'></div></section>"
-            "</main><script>var TEAM = %d, BANS = %d, TANKS = %d, SWAP_MAX = %g;</script>"
+            "%s</main><script>var TEAM = %d, BANS = %d, TANKS = %d, SWAP_MAX = %g;</script>"
             "<script src='/static/comps.js'></script>"
             "<script src='/static/playbook.js'></script>"
             "<script src='/static/board.js'></script>")
-    return shell % (REPO_URL, GITHUB_MARK, TEAM_SIZE, MAX_BANS, MAX_TANKS, base.SWAP_RANGE[1])
+    return shell % (REPO_URL, GITHUB_MARK, WIKI, WIKI_LICENSE, FOOTER, TEAM_SIZE, MAX_BANS,
+                    MAX_TANKS, base.SWAP_RANGE[1])
 
 
 def page(title: str, body: str, scripts: Sequence[str] = (), head: str = "") -> str:
     """A page in the shell the math, registry and error pages share: the
     stylesheet, the title and `head`, markup the head holds after them - the
     registry's style for a browser without scripts - then a header that links
-    back to the board, and after the body the scripts under ui/static it
-    loads - the registry's, which opens a rule in a dialog."""
+    back to the board, the body and the footer every page carries, and after
+    them the scripts under ui/static it loads - the registry's, which opens a
+    rule in a dialog."""
     return (HEAD + "<title>%s</title>%s"
             "<main><header class='top'><h1><a href='/'>Counter <span>Utility Matrix</span></a></h1>"
-            "</header>%s</main>%s" % (esc(title), head, body, "".join(
+            "</header>%s%s</main>%s" % (esc(title), head, body, FOOTER, "".join(
                 "<script src='/static/%s'></script>" % esc(name) for name in scripts)))
 
 

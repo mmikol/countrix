@@ -15,6 +15,14 @@ layer's answer. It is the only presentation code, and no layer imports it.
                     force written out - its form, its gate and its formula
                     with its own numbers, the metrics it reads and its
                     sources - from the code
+    study.py        the study: the proof that the search is exact, the
+                    audit of what is hard-coded, and the study's results
+                    from static/study.json once a run is published there,
+                    each chart beside its numbers
+    charts.py       the study's charts, inline SVG drawn on the server from
+                    plain rows: dots, stacked bars, a scatter, a heatmap and
+                    a funnel on a log scale
     static/         what the browser loads: the stylesheet, the scripts,
-                    the display font and its licence, and math.html
+                    the display font and its licence, and the articles the
+                    pages render, math.html and study.html
 """

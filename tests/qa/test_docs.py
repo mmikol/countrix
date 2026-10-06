@@ -7,6 +7,7 @@ sections db_docs generates match what the code generates today. Pure,
 except the schema check."""
 
 import ast
+import html
 import json
 import os
 import re
@@ -16,6 +17,7 @@ import subprocess
 import pytest
 
 from db import ROOT
+from ui import pages
 
 DOCS = os.path.join(ROOT, "docs")
 SKILLS = os.path.join(ROOT, ".claude", "skills")
@@ -307,6 +309,60 @@ def test_the_overview_names_everything_at_the_root():
     overview = _read("docs", "architecture.md")
     missing = sorted(e for e in entries if e not in overview)
     assert not missing, missing
+
+
+def test_the_notice_states_the_third_party_terms_and_names_files_that_exist():
+    """NOTICE lists the third-party material and its terms - the Overwatch
+    Wiki's licence with its address, the font's, Blizzard's notice for
+    Overwatch and the line that Countrix is not Blizzard's - and names each
+    file that quotes the wiki. Every file it names exists, so a test file
+    renamed or removed fails here until NOTICE follows it."""
+    notice = _read("NOTICE")
+    flat = " ".join(notice.split())
+    for phrase in ("CC BY-NC-SA 3.0", "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+                   "https://overwatch.fandom.com", "SIL Open Font License 1.1",
+                   "Overwatch\u2122 \u00a9 2016 Blizzard Entertainment, Inc. All rights reserved.",
+                   "not affiliated with or endorsed by Blizzard"):
+        assert phrase in flat, phrase
+    named = re.findall(r"^ +((?:tests|ui|db|docs)/\S+)$", notice, re.M)
+    assert len(named) >= 10, named
+    missing = [path for path in named if not os.path.exists(os.path.join(ROOT, path))]
+    assert not missing, missing
+
+
+def test_every_place_prints_the_same_notices_with_the_copyright_sign():
+    """Blizzard's Overwatch notice reads the same, its trademark and
+    copyright signs included, in every page's footer, NOTICE, the README,
+    the guide's credits and the guide's footer; the owner's copyright line
+    reads the same in all but the board's footer, which prints none.
+    Entities and markup are read as the page shows them."""
+    blizzard = ("Overwatch\u2122 \u00a9 2016 Blizzard Entertainment, Inc. All rights reserved."
+                " Overwatch is a trademark or registered trademark of Blizzard Entertainment,"
+                " Inc. in the U.S. and/or other countries.")
+    owner = "Copyright \u00a9 2026 Miliano Mikol"
+    sources = {
+        "the footer": pages.FOOTER, "NOTICE": _read("NOTICE"), "README.md": _read("README.md"),
+        "credits.md": _read("user-guide", "docs", "credits.md"),
+        "mkdocs.yml": _read("user-guide", "mkdocs.yml")}
+    for name, source in sources.items():
+        text = " ".join(html.unescape(re.sub(r"<[^>]+>", " ", source)).split())
+        assert blizzard in text, name
+        assert (owner in text) == (name != "the footer"), name
+        assert "(c)" not in text and "(TM)" not in text, name
+
+
+def test_the_playbooks_grant_reads_the_same_wherever_the_licence_is_told():
+    """The owner's grant of 2026-10-05 - anyone may change the playbook's
+    files, its rules and meta.md's weights, for their own noncommercial
+    use, the rest of Countrix staying under PolyForm Strict - stands in
+    NOTICE, the README's licence and the guide's pages on the licence and
+    on tuning."""
+    for parts in (("NOTICE",), ("README.md",), ("user-guide", "docs", "credits.md"),
+                  ("user-guide", "docs", "faq.md"), ("user-guide", "docs", "tuning.md")):
+        flat = " ".join(_read(*parts).replace("`", "").split()).lower()
+        for phrase in ("anyone may change the files of the playbook", "inference/strategies/",
+                       "meta.md", "for their own noncommercial use", "polyform strict"):
+            assert phrase in flat, (os.path.join(*parts), phrase)
 
 
 def _maps(doc, entry):

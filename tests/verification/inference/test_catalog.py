@@ -296,6 +296,40 @@ def test_a_constraint_is_a_limit_a_heuristic_weighs_and_an_assumption_is_prose(t
             load_one(bad)
 
 
+def test_an_expression_that_fails_on_its_probes_is_refused_at_load(tmp_path):
+    """A file that loads breaks no board on a name where a number goes: each
+    expression runs on its probes at load, the file's params among the
+    numbers, and one that fails there, or a bonus or penalty that comes out
+    a name or a list, is refused, naming the field, the expression and the
+    probe. A name read as a name - compared, counted, looked for - loads."""
+    def load_one(head):
+        (tmp_path / "x.md").write_text("---\nname: x\n%s---\nx\n" % head, encoding="utf-8")
+        return catalog.load(str(tmp_path))[0]
+    heuristic = "kind: heuristic\n"
+    refused = {
+        heuristic + "bonus: map.side\n":
+            r"^x: bonus 'map\.side' - a bonus or penalty is a number, got '' \(every number"
+            r" it reads at 0, every text ''\)$",
+        heuristic + "when: map.mode == 'Control'\npenalty: team.squishies\n":
+            r"^x: penalty 'team\.squishies' - a bonus or penalty is a number",
+        heuristic + "bonus: team.pairs and 1\n": r"got ''",
+        heuristic + "bonus: team.style_top if map.side == 'attack' else 1\n":
+            r"got 'attack' \(every number it reads at 0, every text 'attack'\)$",
+        heuristic + "bonus: map.side if team.tanks == params.T else 1\nparams:\n  T: 3\n":
+            r"got '' \(every number it reads at 3, every text ''\)$",
+        heuristic + "when: map.side > 0\nbonus: 1\n":
+            r"^x: when 'map\.side > 0': '>' not supported",
+        "kind: constraint\nrequire: team.tanks <= map.mode\n": r"^x: require 'team\.tanks"}
+    for head, message in refused.items():
+        with pytest.raises(CatalogError, match=message):
+            load_one(head)
+    for head in ("bonus: len(team.squishies) * 0.5\n", "bonus: team.tanks >= 2\n",
+                 "when: 'Ana' in team.squishies\nbonus: 1\n",
+                 "bonus: 1 if map.side == 'attack' else 0\n",
+                 "bonus: 0.5 if team.style_top == map.style_top else 0\n"):
+        assert load_one(heuristic + head).form == "scored"
+
+
 def test_a_key_that_is_not_a_field_is_refused_by_name(tmp_path):
     """A frontmatter key outside strategy.FIELDS - a typo, a form's leftover -
     would read as nothing and score silently wrong: the catalog refuses it,

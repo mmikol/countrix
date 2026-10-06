@@ -15,15 +15,18 @@ An `http.server` handler over psycopg, no web framework, no build step.
 The board computes the facts and the comps in its own process, as the
 compose stack's `ui` container does. It writes nothing.
 
-## `board.py`, `serve.py`, `pages.py` and `registry.py` - the pages and their endpoints
+## `board.py`, `serve.py`, `pages.py`, `registry.py` and `study.py` - the pages and their endpoints
 
 `pages.py` renders the page, a shell over the static files that injects
-only `TEAM` (six), `BANS` (five) and `SWAP_MAX` (the swap cost's ceiling,
-`base.SWAP_RANGE`), and the math page; `registry.py` renders the strategy
-registry in the math page's shell, with its script. `board.py` serves
-them and the JSON endpoints behind the host guard `db/web.py` puts on
-both servers ([security.md](security.md)); `serve.py` answers the board,
-the catalog and the health for it.
+only `TEAM` (six), `BANS` (five), `TANKS` (the queue's two) and
+`SWAP_MAX` (the swap cost's ceiling, `base.SWAP_RANGE`), and the math
+page; `registry.py` renders the strategy registry in the math page's
+shell, with its script, and `study.py` the study in the same shell, its
+charts drawn by `charts.py` (*The study page*, below). `board.py` serves
+them and the JSON endpoints
+behind the host guard `db/web.py` puts on both servers
+([security.md](security.md)); `serve.py` answers the board, the catalog
+and the health for it.
 
 | route | serves |
 | --- | --- |
@@ -34,8 +37,9 @@ the catalog and the health for it.
 | `/api/board?map=&side=&red=&blue=&bans=[&stage=&weights=&client=]` | the board solved at any step of the draft, every seat on the stage in play (the whole map without one), under the playbook tab's weights: the `board` tool's answer ([mcp.md](mcp.md#the-tools)), from `serve.handle_board`. One board solves at a time; another waits, and answers 429 after a minute (`serve.Admission`); a newer board from the same `client` stops one still solving, which answers 400 (`serve.LATEST`, a lane per client) |
 | `/api/strategies` | the catalog: every constraint, heuristic and assumption with its kind, form, frontmatter and body, from `serve.handle_strategies` |
 | `/health` | the engine's health, from `serve.handle_health`: ok or degraded, the strategies, the drafts pending and the heroes, and the error naming what is out of reach. The ui container's healthcheck and `orchestrator.py` read it |
-| `/math` | `static/math.html` in the page shell, the numbers it quotes filled in by `pages.py` - the default engine's four weights and the swap cost from the playbook's `meta.md`, and from the code `SWAP_MAX`, the counter graph's four constants, `RATE_PICK_HALF`, `COIN_FLIP`, the fight odds' `LOGIT_PER_POINT`, `PARTNER_POINTS`, `REFERENCE_SIZE`, `SCALE_POOL`, `NEED_BUDGET`, the search's `SCORE_PLACES` and `RANK_CAP`, the counter graph's mechanisms, `MAX_TANKS`, `MAX_BANS`, the weight slider's top, and the healing formation's radius and teammates: the equation, how a six is chosen, the scoring function with the default engine under the playbook, the board and how the layers fit |
+| `/math` | `static/math.html` in the page shell, the numbers it quotes filled in by `pages.py` - the default engine's four weights and the swap cost from the playbook's `meta.md`, and from the code `SWAP_MAX`, the counter graph's four constants, `RATE_PICK_HALF`, `COIN_FLIP`, the fight odds' `LOGIT_PER_POINT`, `PARTNER_POINTS`, the stage terrain's `STAGE_PRIOR_WORDS`, `STAGE_MENTIONS` and `STAGE_MIN_WORDS`, `REFERENCE_SIZE`, `SCALE_POOL`, `NEED_BUDGET`, the search's `SCORE_PLACES`, `RANK_CAP` and `FOLD_COUNTS`, the counter graph's mechanisms, `MAX_TANKS`, `MAX_BANS`, the weight slider's top, and the healing formation's radius and teammates: the equation, how a six is chosen, the scoring function with the default engine under the playbook, the board and how the layers fit |
 | `/registry` | the strategy registry, rendered by `registry.py` on every call from the code the solver runs, so it cannot drift from it: every strategy of the playbook in force, a row each in its kind's table - limits, heuristics and assumptions, each under its heading, a row giving the rule's form and the most it moves a six, and a heuristic's weight and who settles its gate - and a card each, anchored by its id (`/registry#<id>`). A card says in plain words what its rule does, then gives its formula: its form as the code reads it (a limit; a reward or a need - a heuristic on a metric whose gate the board or the six settles; a scored heuristic; an assumption; a draft), its weight and the most it moves a six, its gate with its params filled in and who settles it, and its term in the math page's notation with its own numbers - a need's share of its guard's budget from `scoring.need_scales`. Then each metric it reads, with the registry's meaning (`facts/team.py`, `facts/compute.py`) and how its range rule aggregates it over the six (`Spec.aggregate` in `inference/ranges.py`), its prose, and its entry and sources in `inference/README.md` - where two rules have held its id, the last entry, the earlier rule's folded away and marked so. Where a card's prose or its record names another rule in backticks, or a need lists the needs on its guard, the name links that rule's card. Each form links its section of `/math`, which gives the forms in general; the page quotes no rate. The cards sit under the tables, hidden, and a click on a rule - its row in a table, or a rule a card names - opens its card in a dialog over the page, which stays where it was (*The registry's dialog*, under `static/`) |
+| `/study` | the study, rendered by `study.py` on every call: `static/study.html` in the page shell, the code's constants it quotes filled in from their modules - the search's budgets and caps, `SCORE_PLACES`, `SLACK`, `FOLD_COUNTS`, `MEMO_CAP`, `MAX_TANKS`, the weight slider's top - beside the shapes' count check and the playbook's assumptions, read from the shipped playbook, the one the proof and the study read, whatever playbook is in force; and the study's results from `static/study.json` once a run is published there, each chart drawn as inline SVG by `charts.py` with a table of its numbers under it (*The study page*, below). It writes nothing and reads no database |
 
 The board answers GET alone: any other method is a 501, after the host
 guard.
@@ -56,6 +60,7 @@ static/
   playbook.js    the playbook tab: the groups, the cards, the weight sliders
   registry.js    the registry's dialog: a click on a rule opens its card over the page
   math.html      the math page's article
+  study.html     the study page's article
 ```
 
 `board.js` loads last, since it calls the other two. It keeps the map, the
@@ -156,7 +161,7 @@ share; where the optimal scores no higher than the floor, as every six
 does when a caller turns the engine off under a playbook that scores
 nothing, it reads *unscored*, the engine's reason in the tooltip. Red's
 badge is how often a six fields the heroes of its likely six, on average
-(*24% avg pick*), since red has no share. The engine
+(*N% avg pick*), since red has no share. The engine
 words each badge (`momentum.badges`, a label and a tip); the page only
 shows it.
 
@@ -215,10 +220,19 @@ cost included. Each card's *its math* links its rule's entry on the
 registry (`/registry#<id>`), which opens over the registry's tables, the
 meta's the default engine on the math page.
 
-**The header** pins three pills top-right: *the math*, *the registry*
-beside it, and the repository on GitHub; the header's right padding keeps
-the row clear of them. Below 800 px they join the row instead, beside the
-title where both fit and under it where they would meet. Its *clear all* empties the map, the side, the bans and both teams
+**The footer** closes every page - the board, `/math`, `/registry`,
+`/study` and the error pages (`pages.FOOTER`): Blizzard's Overwatch notice, as its
+Legal FAQ asks a fan site to carry it, the line that Countrix is a fan
+project not affiliated with or endorsed by Blizzard, and the Overwatch
+Wiki's credit and licence, CC BY-NC-SA 3.0, with a link to `NOTICE`,
+which lists the third-party material and its terms. The facts panel
+credits the wiki again under its table, since its facts quote the
+wiki's words.
+
+**The header** pins four pills top-right: *the math*, *the registry*,
+*the study* and the repository on GitHub; the header's right padding
+keeps the row clear of them. Below 900 px they join the row instead,
+beside the title where both fit and under it where they would meet. Its *clear all* empties the map, the side, the bans and both teams
 and leaves the weights; each team's box has its own *clear*. Its only
 messages are short-lived flashes - a banned pick, a full team, a refused
 pick. A patch newer than the rates raises the warning box; the rates'
@@ -264,6 +278,97 @@ assumptions. The core palette is tokens in `:root`; the rest, the sand
 `#d9b36a` among them, are literals. The code, the styles and the font are
 served from `static/`, Impact standing in until the font arrives; the
 portraits and role icons load as `<img>` from Blizzard's CDNs.
+
+## The study page
+
+`/study` answers two questions: whether the search returns the best six
+its objective allows - the proof, its lemmas each linked to the lines of
+code they rest on at the commit the proof read, what is exact and what
+is a reading or greedy, the assumptions and the evidence - and how
+Countrix's sixes compare with the tools people use, from the study's
+results. Between them stands the audit of what the code holds for
+Overwatch alone. Plain words open each part; the exact argument follows.
+
+The prose is `static/study.html`, filled in as the math page is - a
+literal percent in it is written `%%`. The results are
+`static/study.json`, the file the private benchmark repository's harness
+writes in its `countrix-study/1` schema (`study.SCHEMA`), copied there
+whole when a run is published. The run of 2026-10-05 is in place,
+measured at Countrix's 4eaba4a and the benchmark's b79aafc and committed
+there as d647e82; without a file the page says the results are not in
+place. The page reads each part in the shape the harness writes it,
+which `tests/fixtures/study.json` - the harness's file of 2026-10-05,
+trimmed - keeps; `test_study` renders the fixture, and
+the file in place too, so a file whose shapes moved fails there before
+it ships. The count check and the assumptions are the shipped
+playbook's, whatever playbook is in force, and an assumption or a rule
+links its registry entry only where the playbook in force holds it. The
+page reads:
+
+- `schema`, which must be `countrix-study/1`; another schema, a file
+  that is not JSON or holds no object, or no file at all leaves the proof
+  and the audit standing and says why where the results would be, every
+  results block a line that there is nothing yet;
+- `sample`: `true` marks a file written to build the page, not measured,
+  and the page says so above everything; none ships;
+- `generated` and `provenance` (the commits, the data and their dates),
+  `generalization` and `usage`, shown field by field. Where the board's
+  playbook in force has another digest than
+  `provenance.countrix.playbook_digest`, or its default engine another
+  stamp (`base.stamp`) than `provenance.countrix.base_stamp`, a warning
+  above the results says so;
+- `design`: `sets` (each with `boards`, `primary` and `seed`), `maps`
+  (`name`, `mode`, `half`) for the rules' heatmap;
+- `arms`, by id or as a list with ids: `label`, `family`, `group`,
+  `sources`, `model`. The groups `generalization`, `sweep_mu` and
+  `sweep_rule` stay out of the main charts, and a source that names a
+  tool's site links it;
+- `metrics`, by id or as a list: `label`, `family`, `source`, `unit`, a
+  `0-1` unit written to two places;
+- `aggregates[set][slice][arm][metric]` as `{mean, lo, hi, n}`, read at
+  the primary set's `test` slice, else `all`. The page reads the metrics
+  by id - `y_matchup`, `y_rating`, `cx_rel`, the `pct_*` percentiles,
+  `team_wiki`, `team_cw` and `sat_mean` - each a share of a yardstick, a
+  percentile among a board's random sixes or a satisfaction, never a raw
+  rate;
+- `parts[set][slice][arm]`: `countrix` and `cw_matchup`, each a mean by
+  part;
+- `paired`: Countrix as shipped's pairs (`a` the shipped arm) on the
+  primary slice, on the yardsticks and its own scale; another
+  capture's or another source's Countrix is read under whether the
+  results hold up;
+- `rules`, with `by_map`, `satisfaction` as `{mean, n}` by arm and
+  `without` as `{mean, lo, hi, n}` by metric;
+- `slider`: `per_mu`, each step's `engine_part` and `playbook_part`
+  numbers and its metrics as `{mean, lo, hi, n}`, and `boards`,
+  `scored_on`, `steps` and `violations`;
+- `proof`: `theorems`, each `checked` a list of `{method, boards, cases,
+  violations}`, `violations` null for the claim that is measured;
+  `search`, its stages as quantiles, `boards`, `solves`, `refused` and
+  `unique_optimum`, a share of the boards; `open_summary`, the search's
+  work on the open boards, its stages as quantiles; `brute_force`, with
+  `wall_seconds` and `search_seconds`; and `greedy.countrix`;
+- `meta_agreement`, the heroes two sixes share, keyed `a|b`: each six
+  of the meta - the arms of the `meta` and `tier` families - against
+  every other six, and the meta's own sixes against each other;
+- `rows`: each board's `search`, a list in the order `legend.rows` gives
+  it - legal sixes, branches walked, sixes scored in full, seconds, sixes
+  tied - the primary set's rows the funnel's dots;
+- `report`, the report's web address, alone or as `{url, title}`: the
+  harness's `publish` step writes it once the report, which renders this
+  same file, is published, and changes nothing else in the file.
+
+A part the file lacks is a line saying so, never an error, and every
+string read from it is escaped. The charts are `charts.py`'s, from plain
+rows that know nothing of the file: where each six lands, dots with their
+ranges on CounterWatch's yardstick and Countrix's scale; what each six is
+made of, diverging stacked bars of each score's parts; the meta against
+the team, a scatter a source; the rules map by map, a heatmap; and what
+the search walks and scores, a funnel on a log scale. Each is coloured by
+class in `board.css` - an arm family's hue, a part's slot, validated for
+colour-blind readers on the chart surface - carries a tooltip on each
+mark, shrinks with its box (the heatmap scrolls sideways in its own),
+and keeps a table of its numbers under a fold.
 
 ## One click on the board
 

@@ -287,20 +287,26 @@ def test_a_charge_for_a_rule_broken_is_a_heuristic_and_never_prunes(synthetic_wo
     assert term["applies"] and term["penalty"] == 2.5 and term["weighted"] == -2.5
 
 
-def test_a_bonus_that_reads_a_name_is_refused_naming_its_expression(synthetic_world, tmp_path):
-    """A bonus or penalty is a number. One that reads a text metric passes
-    the catalog, which checks only that its names are registered, and the
-    score refuses it with an ExprError naming the expression."""
+def test_a_bonus_that_comes_out_a_name_past_the_probes_is_refused_naming_it(
+        synthetic_world, tmp_path):
+    """A bonus or penalty is a number. The catalog refuses one that comes
+    out a name on its probes (test_catalog); one whose name only a real six
+    reaches - two tanks beside four supports, which no probe can be, its
+    numbers all alike - loads, and the score refuses it with an ExprError
+    naming the expression."""
     from inference import scoring
     from inference.expr import ExprError
     (tmp_path / "lean.md").write_text(
-        "---\nname: lean\nkind: heuristic\nbonus: team.style_lean\n---\nx\n", "utf-8")
+        "---\nname: lean\nkind: heuristic\n"
+        "bonus: team.style_lean if team.tanks == 2 and team.supports == 4 else 1\n---\nx\n",
+        "utf-8")
     w = synthetic_world
     objective = scoring.Objective(w, w.map("Harbor Gate"), red=[],
                                   catalog=catalog.load(str(tmp_path)), base=OFF)
     cand = scoring.Candidate(
         [w.hero(n) for n in ("Anvil", "Mortar", "Balm", "Myrrh", "Sorrel", "Tansy")])
-    with pytest.raises(ExprError, match=r"'team\.style_lean' - a bonus or penalty is a number"):
+    with pytest.raises(ExprError, match=r"'team\.style_lean if .* else 1' - a bonus or penalty"
+                                        r" is a number"):
         objective.score(objective.prepare(cand))
 
 
