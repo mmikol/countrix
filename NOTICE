@@ -105,13 +105,13 @@ the math page (ui/static/math.html), and in the docstrings of
 db/data/wiki/maps.py and db/data/wiki/strategy_sections.py. The board
 quotes the wiki's text from the database a local pull builds, and its
 facts tab and every page's footer credit the wiki and its licence. The
-page caches the pulls fill (.cache-wiki/) are never committed.
+pulls' page caches (.cache-wiki/) are never committed.
 
 
 2. Bebas Neue - SIL Open Font License 1.1
 
 ui/static/bebas-neue.woff2 is Bebas Neue Regular by Dharma Type, under the
-SIL Open Font License 1.1, whose text travels beside it in
+SIL Open Font License 1.1. The licence's text sits beside it, in
 ui/static/OFL.txt.
 
 
@@ -140,7 +140,7 @@ Entertainment or Fandom.
 
 The study measures Countrix's teams against CounterWatch's public 6v6
 numbers, https://counterwatch.gg, whose terms grant personal,
-noncommercial use. Its data stays in a private benchmark repository; this
-one holds only the study's results - ui/static/study.json, and the trimmed
-copy the tests read, tests/fixtures/study.json - which credit CounterWatch
-where they name it.
+noncommercial use. Its data stays in a private benchmark repository. This
+repository holds only the study's results: ui/static/study.json and the
+trimmed copy the tests read, tests/fixtures/study.json. Both credit
+CounterWatch where they name it.
