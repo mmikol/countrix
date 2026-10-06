@@ -93,8 +93,10 @@ def static_file(name: str) -> StaticFile | None:
 
 # --- the pages -------------------------------------------------------------------
 
+# the empty icon keeps a browser from asking for /favicon.ico, which the board does not serve
 HEAD = ("<!doctype html><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        "<link rel='icon' href='data:,'>"
         "<link rel='stylesheet' href='/static/board.css'>")
 
 
