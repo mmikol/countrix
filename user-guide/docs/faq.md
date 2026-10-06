@@ -6,8 +6,7 @@ Countrix makes no such promise. The best six is the best for the model:
 Blizzard's rates, the wiki's synergies and counters, the playbook's
 rules and their weights, and the assumptions, every player playing
 optimally among them. The search proves no legal six scores higher under
-that model. Whether the model matches your lobby is for your games to
-say.
+that model. Your games show whether the model matches your lobby.
 
 ## Why does it suggest heroes we do not play?
 

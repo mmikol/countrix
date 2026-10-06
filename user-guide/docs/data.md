@@ -2,7 +2,7 @@
 
 Countrix reads two sources and nothing else: Blizzard's site and the
 Overwatch Wiki. Every table but the playbook's is pulled from one of
-them. There is no tracker, no third-party dataset and no API key.
+them, with no API key.
 
 | from | what |
 | --- | --- |
@@ -12,11 +12,11 @@ them. There is no tracker, no third-party dataset and no API key.
 ## The rates
 
 Blizzard's rates are Competitive Role Queue on console in the Americas,
-and the facts say so: Blizzard's page offers no Open Queue. Countrix
-reads them as the nearest numbers to 6v6 Open Queue that Blizzard
-publishes, since it reads only Blizzard and the wiki. Each capture is
-kept as a dated snapshot, and the facts compare the newest with the ones
-before. Blizzard's website terms grant the rates for personal use.
+as the facts say; Blizzard's page offers no Open Queue. Countrix reads
+them as the nearest numbers to 6v6 Open Queue that Blizzard publishes.
+Each capture is kept as a dated snapshot, and the facts compare the
+newest with the ones before. Blizzard's website terms grant the rates
+for personal use.
 
 ## How fresh it is
 
@@ -27,7 +27,7 @@ before. Blizzard's website terms grant the rates for personal use.
   pull_rates*.
 - A hero the wiki announces ahead of release sits on the roster as
   *coming soon*. Once Blizzard lists the hero and the data refreshes,
-  the portrait comes alive.
+  it can be picked.
 
 ## The refresher
 
@@ -69,7 +69,7 @@ reads `POSTGRES_PASSWORD` from the shell, not from `.env`
 pace: a rates page every 5 seconds, a wiki page every half second to 2
 seconds. The board shows a refresh on the next click, with no restart.
 
-In Claude Code the house skills do it for you:
+In Claude Code the house skills do it:
 
 - `/patches` - a patch dropped: it pulls the patch list, refetches what
   the patch changes, and reports what moved;

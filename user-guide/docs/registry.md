@@ -3,7 +3,7 @@
 The strategy registry writes out every rule of the playbook in force as
 the solver reads it. Open it from the board's header, *the registry*, or
 at http://localhost:8017/registry. The page is built from the code each
-time it loads, so it says what the solver runs.
+time it loads.
 
 ![The registry: the score's formula, then the limits, heuristics and assumptions, a table each](img/registry.png)
 
@@ -12,11 +12,10 @@ time it loads, so it says what the solver runs.
 The page opens with the score's formula and the playbook's count, then
 one table a kind:
 
-- **Limits** - each rule and what it requires, such as
-  `team.tanks >= 1`.
-- **Heuristics** - each rule, its form, its weight, the most it can move
-  a six's score, and who settles its condition, its *gate*.
-- **Assumptions** - each rule's name.
+- Limits: each rule and what it requires, such as `team.tanks >= 1`.
+- Heuristics: each rule, its form, its weight, the most it can move a
+  six's score, and its gate: who settles its condition.
+- Assumptions: each rule's name.
 
 A heuristic takes one of three forms:
 
@@ -47,10 +46,9 @@ its entry opens over the page:
 
 ![A rule's entry, Heal at the other side's rate, open in the registry's dialog over the tables](img/registry-dialog.png)
 
-The page behind stays where it was. The address names the open rule -
-`/registry#heal-rate` - so you can bookmark it or send it; opening that
-address opens the rule. A rule opened from inside an entry takes its
-place.
+The page behind stays where it was. The address names the open rule,
+`/registry#heal-rate`, so a bookmark or a link opens it. A rule opened
+from inside an entry takes its place.
 
 - Close the entry with Esc, its close button, a click outside it, or the
   browser's Back.
@@ -58,6 +56,6 @@ place.
 - Space and the arrow keys scroll a long entry.
 - With scripts off, and in print, every entry shows under the tables.
 
-Each entry links its form's section of [the math page](math.md), which
-gives the forms in general. The playbook tab's *its math* links land
-here, each on its own rule.
+Each entry links the section of [the math page](math.md) that gives its
+form in general. The playbook tab's *its math* links land here, each on
+its own rule.

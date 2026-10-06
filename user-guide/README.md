@@ -1,10 +1,7 @@
 # The user guide
 
-How a player or a team uses Countrix, task by task, in plain words:
-installing and starting it, the board step by step, its three tabs, the
-registry, the math page and the study, tuning the playbook, the data,
-troubleshooting, questions, and the credits and licences. It is a site
-built with [MkDocs](https://www.mkdocs.org) and the
+How a player or a team uses Countrix, task by task. It is a site built
+with [MkDocs](https://www.mkdocs.org) and the
 [Material](https://squidfunk.github.io/mkdocs-material/) theme.
 
 | file | what it is |
@@ -26,12 +23,11 @@ user-guide/.venv/bin/mkdocs build --strict -f user-guide/mkdocs.yml   # the site
 ```
 
 The build is strict: a page left out of the navigation, a broken link or
-a broken anchor fails it, and CI runs it on every push to `main` and
-every pull request. `user-guide/site/` is ignored by git. The built
-pages open straight from the disk too, search included:
-`user-guide/site/index.html`. Material prints a notice about MkDocs 2.0
-on every run: the pins hold MkDocs at 1.6, and `NO_MKDOCS_2_WARNING=true`
-quiets it, as CI sets it.
+a broken anchor fails it. CI runs it on every push to `main` and every
+pull request. Git ignores `user-guide/site/`, and its pages open
+straight from the disk, search included: `user-guide/site/index.html`.
+Material prints a notice about MkDocs 2.0 on every run. The pins hold
+MkDocs at 1.6, and CI quiets the notice with `NO_MKDOCS_2_WARNING=true`.
 
 The guide describes the board as the code on `main` behaves. A change to
 what a player sees changes its page here in the same commit.

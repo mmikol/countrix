@@ -6,32 +6,30 @@ answers with the six heroes that score highest for your team, a reason
 for each pick, and the numbered facts behind every reason.
 
 It runs on your own machine: a database of Blizzard's and the Overwatch
-Wiki's data, and a web page over it, the board. There is no account, no
-key and no fee.
+Wiki's data, and a web page over it, the board. It needs no account.
 
 ![The board on King's Row: the map and side at the top, the bans bar, the fight odds, blue's team on the left and red's on the right](img/board.png)
 
 *The board on King's Row, blue on attack, two picks a side, one ban.*
 
-## What it is
+## The model
 
-- **A model.** It gives a team of six heroes - a *six* - one score. The
-  base of every score, the *default engine*, reads three things: how
-  often each hero wins on this map by Blizzard's rates, the wiki's
-  synergy pairs inside the six, and the wiki's counters against the
-  other team. The *playbook*, a folder of short rule files, adds its
-  rules on top: "every six carries a save", "heal at the other side's
-  rate".
-- **An exact search.** Of the millions of legal sixes it proves which
-  one scores highest, then lists the next best in order. A search it
-  cannot finish within its budget refuses; it never guesses.
-- **Deterministic.** The same draft gives the same answer every time.
-- **Open about its reasons.** Every reason cites a fact (F1, F2, ...),
-  and the facts tab lists them all.
+Countrix calls a team of six heroes a six, and gives each six one score.
+The base of every score is the default engine. It reads how often each
+hero wins on this map by Blizzard's rates, the wiki's synergy pairs
+inside the six, and the wiki's counters against the other team. The
+playbook, a folder of short rule files, adds its rules on top: "every
+six carries a save", "heal at the other side's rate".
 
-## What it is not
+The search proves which of the millions of legal sixes scores highest,
+then lists the next best in order. A search Countrix cannot finish
+within its budget refuses. The same draft gives the same answer every
+time. Every reason cites a fact (F1, F2, ...), and the facts tab lists
+them all.
 
-!!! warning "A model's optimum, not a win promise"
+## The caveats
+
+!!! warning
     The best six is the best for the model: its data, its weights and
     its assumptions. Countrix does not promise that it wins.
 
@@ -42,10 +40,10 @@ key and no fee.
   gap between their scores. No match results stand behind the split.
 - The rates are Blizzard's Competitive Role Queue, five a side, on
   console in the Americas. Countrix plays 6v6 Open Queue, six a side,
-  and reads them as the nearest numbers Blizzard publishes; Countrix
-  reads only Blizzard and the wiki.
+  and reads the rates as the nearest numbers Blizzard publishes, since
+  it reads only Blizzard and the wiki.
 - Every player is assumed to play optimally. Countrix knows nothing of
-  your hero pools, your comfort picks or your comms.
+  your hero pools or your comms.
 - The other team is never optimized. Countrix reads their likely six
   from how often heroes are picked, then their real picks as they show.
 - The board calls no AI model: it is arithmetic on your machine. Claude
@@ -70,9 +68,7 @@ key and no fee.
 ## The guide, task by task
 
 1. [Install and start](install.md) Countrix, with Docker or without.
-2. [Read the board](board.md): the map, the stage, the side, the bans,
-   the picks, the suggestions, the swaps, the stage plan, the fight
-   odds and the badges.
+2. [Read the board](board.md), step by step.
 3. Read its three tabs: [comps](comps.md), [facts](facts.md) and
    [playbook](playbook.md).
 4. Look behind the answer: [the registry](registry.md) of rules,

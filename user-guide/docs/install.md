@@ -1,9 +1,9 @@
 # Install and start
 
-Countrix runs on your machine in one of two ways. With Docker, one
-command starts the database, the board, the door and a clock that keeps
-the data fresh. Without Docker, an embedded database and the board run
-straight from Python.
+Countrix runs on your machine. With Docker, one command starts the
+database, the board, the door and a clock that keeps the data fresh.
+Without Docker, an embedded database and the board run straight from
+Python.
 
 ## What you need
 
@@ -12,7 +12,7 @@ straight from Python.
   with Compose v2.
 - For the way without Docker, macOS or Linux on x86_64, where the
   embedded PostgreSQL runs.
-- A network connection for the first build, which reads every page it
+- A network connection for the first build: it reads every page it
   needs from Blizzard and the wiki.
 
 ## Get the code
@@ -67,9 +67,9 @@ nightly backup of the database into `backups/`, the newest 14 kept.
 
 This guide describes the shipped playbook, which the stack runs unless
 `.env` sets `COUNTRIX_STRATEGIES`. The README's note on the reference
-playbook, the one the tests prove the solver against, adds that line;
-to come back to the shipped playbook, delete the line from `.env` and
-run `orchestrator.py up` again.
+playbook, the one the tests prove the solver against, adds that line.
+Delete it from `.env` and run `orchestrator.py up` again to come back to
+the shipped playbook.
 
 ## Without Docker
 
@@ -102,4 +102,4 @@ All are optional.
 
 `COUNTRIX_STRATEGIES` names another playbook folder. With the stack, the
 folder must sit inside the `countrix` folder, and the stack cannot tune
-it; [tuning the playbook](tuning.md#another-playbook) has it.
+it ([tuning the playbook](tuning.md#another-playbook)).

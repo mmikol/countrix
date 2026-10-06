@@ -11,10 +11,9 @@ keeps asking, waiting twice as long each time, up to half a minute.
 ## The page answers 403
 
 The board answers only to your own machine's names: open it at
-http://localhost:8017 or http://127.0.0.1:8017. Countrix is built to run
-on your own machine, and every port the stack publishes listens on
-127.0.0.1 alone. A board reached under another name has to be started
-with `--allow-host NAME`;
+http://localhost:8017 or http://127.0.0.1:8017. Every port the stack
+publishes listens on 127.0.0.1 alone. A board reached under another
+name has to be started with `--allow-host NAME`;
 [docs/security.md](https://github.com/mmikol/countrix/blob/main/docs/security.md)
 says what publishing one exposes.
 
@@ -27,12 +26,13 @@ solving.
 
 ## A portrait will not take a click
 
-- **Crossed out**: the hero is banned. Lift the ban in the bans bar.
-- **Dimmed**: the team has no room for one more of that role - two
+- A crossed-out portrait shows a banned hero. Lift the ban in the bans
+  bar.
+- A dimmed portrait's team has no room for one more of that role - two
   tanks already, or as many supports as blue's playbook allows. The
   note in the header says how many the team may hold.
-- **Dimmed with *coming soon***: the hero is announced and not yet
-  released.
+- A portrait dimmed with *coming soon* shows a hero announced and not
+  yet released.
 
 ## Blue's badge reads "not allowed"
 

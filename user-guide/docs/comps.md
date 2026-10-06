@@ -45,17 +45,17 @@ so only a new map, a ban or a red pick changes it.
 
 ## Under each of blue's sixes
 
-- **The cards.** One per hero, tanks first, then damage, then supports:
-  the portrait, the role, the reason, and a chip for each fact the
-  reason cites. Hover a chip to read the fact.
-- **The search's numbers.** *147,568 candidates · 0.03s · leans brawl*,
-  for example: how many sixes the search covered, how long it took,
-  and the style the six leans to. Where other sixes tie with this one,
-  a line says the tie-break chose it.
-- **The default engine.** Three bars, always shown: `base.rates`,
+- The cards, one per hero, tanks first, then damage, then supports: the
+  portrait, the role, the reason, and a chip for each fact the reason
+  cites. Hover a chip to read the fact.
+- The search's numbers, such as *147,568 candidates · 0.03s · leans
+  brawl*: how many sixes the search covered, how long it took, and the
+  style the six leans to. Where other sixes tie with this one, a line
+  says the tie-break chose it.
+- The default engine's three bars, always shown: `base.rates`,
   `base.synergy` and `base.counters` - what the six's win rates, its
   synergy pairs and its counters are worth, each with the fact it read.
-- **The playbook's rules.** One bar a rule, in three tabs:
+- The playbook's rules, one bar a rule, in three tabs:
     - *satisfied* - the rules the six meets;
     - *costing* - the rules that charge it, with their summed cost;
     - *did not read* - the rules that never counted here, because their
@@ -65,7 +65,7 @@ so only a new map, a ban or a red pick changes it.
     The filter box narrows the bars by name or reason. Hover a bar for
     one sentence on why it paid, charged or did not count.
 
-- **The alternatives.** The next best sixes of the whole legal space, in
+- The alternatives: the next best sixes of the whole legal space, in
   order.
 
 Every bar shares one scale, so a long bar outweighs a short one wherever

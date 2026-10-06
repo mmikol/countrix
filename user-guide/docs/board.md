@@ -70,13 +70,12 @@ Enter red's picks as they reveal and blue's as your team locks them in.
 ## 6. Read the rows
 
 Over each roster sits the team's row of six slots. The row reads tank,
-then damage, then support, so a glance tells what each team fields.
-Within a role the team's picks come first, solid, in the order picked;
-then the board's suggestions for the open slots, dashed. Once the board
-answers, every slot holds a hero.
+then damage, then support. Within a role the team's picks come first,
+solid, in the order picked; then the board's suggestions for the open
+slots, dashed. Once the board answers, every slot holds a hero.
 
-Only the drawing follows the roles. The picks stay stored, and are
-sent to the board, in the order you made them.
+The order by role is the drawing's alone: the picks stay stored, and go
+to the board, in the order you made them.
 
 An open slot stands empty, numbered from 1, only while the board has no
 answer for it: before its first answer, after a request fails, and on
@@ -143,9 +142,9 @@ The strip over the teams splits 100 between blue's six and red's likely
 six: *blue 60, red 40*, say. Both sixes are scored on the default
 engine alone - win rates, synergies and counters - and the gap between
 the two scores sets the split along a smooth curve: equal scores split
-50 / 50, and a wider gap leans further. There is no percent sign. The
-split is the model's reading of the gap, not a chance of winning
-measured from matches. Hover the strip for the engine's own words.
+50 / 50, and a wider gap leans further. The strip prints no percent
+sign: the split is the model's reading of the gap, and no match results
+stand behind it. Hover the strip for the engine's own words.
 
 The strip reads *solving…* while a board is searched. Where there are
 no odds - with the Meta slider at 0, for one - it shows the engine's
@@ -155,22 +154,22 @@ verdict instead.
 
 Each team's title carries a badge.
 
-- **Blue's** is its share: your six on a scale where 100 is the best six
-  for this draft and 0 the weakest of a sample of sixes. While blue
+- Blue's badge is its share: your six on a scale where 100 is the best
+  six for this draft and 0 the weakest of a sample of sixes. While blue
   still drafts, it reads the share the best six from your picks
   reaches; before any pick, the suggested six's 100.
-- ***not allowed*** means blue's picks break one of the playbook's
-  limits - four supports, say. The tooltip names the limit, the comp has
-  no score or share, and the swaps show the way back to an allowed six.
-- ***unscored*** means nothing on the board scores - the Meta slider and
-  every rule's weight at 0 - so every six ties, and no share would mean
-  anything.
-- **Red's** is how often a six fields the heroes of red's likely six, on
-  average (*N% avg pick*). Red has no share, since it is never
+- Blue's badge reads *not allowed* when blue's picks break one of the
+  playbook's limits - four supports, say. The tooltip names the limit,
+  the comp has no score or share, and the swaps show the way back to an
+  allowed six.
+- Blue's badge reads *unscored* when nothing on the board scores - the
+  Meta slider and every rule's weight at 0 - so every six ties, and no
+  share would mean anything.
+- Red's badge is how often a six fields the heroes of red's likely six,
+  on average (*N% avg pick*). Red has no share, since it is never
   optimized.
 
-Hover a badge for what its figure means. A share is a place between two
-sixes on the model's own scale, never a probability.
+Hover a badge for what its figure means. A share is not a probability.
 
 ## 12. Clear, and come back
 

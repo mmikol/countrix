@@ -1,11 +1,11 @@
 # The math page
 
-The math page is the whole model in one place: the equation Countrix is
-named after, how a six is chosen, and every term of the score. Open it
-from the board's header, *the math*, or at http://localhost:8017/math.
-The numbers it quotes - the default engine's weights, the swap cost, the
+The math page holds the whole model: the equation Countrix is named
+after, how a six is chosen, and every term of the score. Open it from
+the board's header, *the math*, or at http://localhost:8017/math. The
+numbers it quotes - the default engine's weights, the swap cost, the
 search's constants - are filled in from the code and the playbook's
-`meta.md` each time it loads, so the page says what the solver runs.
+`meta.md` each time it loads.
 
 ![The top of the math page: the contents pills and the equation](img/math.png)
 
