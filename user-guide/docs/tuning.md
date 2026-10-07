@@ -15,10 +15,11 @@ Countrix stays under PolyForm Strict
 Change it through the door's tools. A tool checks a change before it
 writes anything, keeps the database's copy of the playbook in step, and
 logs the change with its reason in `tuning-log.md` beside the rules. A
-change that would not load - an unknown metric, an expression that does
-not parse, a bonus that adds a name where a number goes, a value out of
-range - is refused, and nothing is written. A file changed by hand is
-held to the same checks when the playbook loads.
+change that would not load - an unknown metric, a metric that is an
+alias of another, an expression that does not parse, a bonus that adds a
+name where a number goes, a value out of range - is refused, and nothing
+is written. A file changed by hand is held to the same checks when the
+playbook loads.
 
 ## The door
 
@@ -115,3 +116,20 @@ against.
   containers read that copy: run `up` again after the folder changes.
   The copy is read-only, so the stack's tools cannot tune it. A full
   path works without Docker only: the containers cannot see it.
+
+A rule whose metric is an alias does not load. An alias is a key a
+board reads as another: `matchup.pool_diff` is blue's pool less red's,
+and red is fixed on a board, so it ranks sixes as `team.pool_total`
+does. The error names the key to weigh instead, the direction and any
+guard to add to the rule's `when`. A folder written before Countrix
+refused aliases can hold such rules. `/tune` moves one through
+`infer_strategy`, which sets the metric, the direction and the guard in
+one write:
+
+```bash
+COUNTRIX_STRATEGIES=my-playbook .venv/bin/python -m door.mcp call infer_strategy '{"id": "big-pool", "metric": "team.pool_total", "direction": "maximize", "reason": "pool_diff ranks sixes as the pool does"}'
+```
+
+A folder with two or more such rules is moved by hand first: every write
+through the door loads the whole folder, so a rule it does not change
+refuses it.

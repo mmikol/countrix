@@ -9,6 +9,12 @@ here) are the vocabulary a strategy's frontmatter may use: `team.<key>`,
 `enemy.<key>` (the other side's team metrics), `matchup.<key>`,
 `map.<key>`, `world.<key>`; registry() gathers them all.
 
+Some keys are aliases (ALIASES): another key - their carrier - offset,
+scaled or reversed by what a board fixes, so min-max over a board's
+sixes reads the two alike. The catalog refuses an alias as a heuristic's
+metric and names its carrier (said); a when, a bonus or a penalty may
+read one.
+
 Unknowns are numeric, never None: a metric that needs a map reads 0 (or
 falls back to the roster-wide figure where that is the honest substitute,
 which the description says) and `map.known` tells a strategy which.
@@ -255,8 +261,11 @@ def matchup_metrics(world: World, blue_t: MetricBag, red_t: MetricBag) -> Metric
     (ult_answers) beside red's ultimate damage. A number that is already a team
     metric, blue's or red's, is not restated here under a second name: two
     strategies reading the same number through two keys weigh one signal
-    twice, and the catalog cannot see that they do. Read team.* for blue's
-    own and enemy.* for red's.
+    twice. Nor is a difference with red's a new number where red is fixed,
+    as on a board: pool_diff normalises as team.pool_total there, and
+    ALIASES lists each such key with the one that carries it, which a
+    heuristic weighs instead. Read team.* for blue's own and enemy.* for
+    red's.
     """
     blue_pool, red_pool = number(blue_t["pool_total"]), number(red_t["pool_total"])
     blue_dps, red_dps = number(blue_t["dps_floor"]), number(red_t["dps_floor"])
@@ -392,6 +401,52 @@ TEXT_METRICS = {
 }
 TEXT_METRICS |= {n.replace("team.", "enemy.", 1) for n in TEXT_METRICS
                  if n.startswith("team.") and n.split(".", 1)[1] not in VERSUS_KEYS}
+
+
+class Alias(NamedTuple):
+    """One entry of ALIASES: the team key that carries the alias, whether
+    the alias is that key reversed, and the guard on red - an expression -
+    outside which the alias reads one value on every six, empty for none."""
+    carrier: str
+    reversed: bool = False
+    guard: str = ""
+
+
+# Metrics another key carries. On a board, red, the map and the world are
+# fixed, so an alias is its carrier times a constant plus another - the
+# factor negative where reversed - and min-max over the board's sixes reads
+# the two alike, or one as the other flipped: a heuristic on either pays
+# the same. The catalog refuses an alias as a heuristic's metric, naming
+# the carrier; a when, a bonus or a penalty may read one. The rule: an
+# alias normalises as its carrier on every board where it varies; a guard
+# on red says where that is, and outside it the alias reads one value on
+# every six. Pairs that hold only on some boards - the map_* keys with no
+# map, exposure_edges against one red pick, hps_per_support under a
+# playbook's own limits - are not listed and stay for /strategy to catch.
+# tests/verification/facts/test_metrics.py holds each to its carrier
+ALIASES: dict[str, Alias] = {
+    "team.heal_ratio": Alias("team.heal_peak_supports"),
+    "team.hps_ratio": Alias("team.hps_supports"),
+    "team.synergy_density": Alias("team.synergy_edges"),
+    "team.coverage_share": Alias("team.coverage"),
+    "team.safe_count": Alias("team.exposed_count", reversed=True),
+    "matchup.pool_diff": Alias("team.pool_total"),
+    "matchup.dps_diff": Alias("team.dps_floor"),
+    "matchup.hps_diff": Alias("team.hps_floor"),
+    "matchup.burst_vs_heal": Alias("team.burst_max"),
+    "matchup.heal_vs_burst": Alias("team.heal_peak_max"),
+    "matchup.chew_time_theirs": Alias("team.pool_total", guard="enemy.dps_floor > 0"),
+    "matchup.tempo_diff": Alias("team.cooldown_median", reversed=True),
+    "matchup.exposure_share": Alias("team.exposed_count"),
+}
+
+
+def said(alias: Alias) -> str:
+    """An alias in words, as the catalog's refusal, the vocabulary in
+    docs/inference.md and the metrics tool say it: the key that carries it,
+    reversed or not, and the guard it varies within."""
+    return "%s%s%s" % (alias.carrier, " reversed" if alias.reversed else "",
+                       " where %s" % alias.guard if alias.guard else "")
 
 
 def registry() -> dict[str, str]:

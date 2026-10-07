@@ -17,7 +17,7 @@ import pytest
 from db import Refusal, psql
 from db.psql import schema
 from door.mcp import boards, lifecycle, tools
-from facts import board_facts, tables
+from facts import board_facts, compute, tables
 from facts.draft import Draft
 from inference import catalog, tune
 from tests.verification.door.mcp import Offline
@@ -183,11 +183,19 @@ def test_a_rebuild_refuses_a_playbook_that_does_not_load_before_it_drops_anythin
 
 
 def test_metrics_tool_serves_the_vocabulary():
+    """Every key with its meaning, the text keys marked, and the aliases
+    with the key that carries each, as compute.ALIASES holds them."""
     text, data = tools.Context(dsn="postgresql://nowhere").call("metrics")
     assert "team.coverage_share" in data["metrics"] and "team.coverage_share" in data["numeric"]
     assert "map.side" in data["text"] and "map.side" not in data["numeric"]
     assert set(data["text"]) <= set(data["metrics"])
     assert text.splitlines()[0].startswith("team.")
+    assert data["aliases"]["team.coverage_share"] == {
+        "carrier": "team.coverage", "reversed": False, "guard": ""}
+    assert set(data["aliases"]) == set(compute.ALIASES) <= set(data["numeric"])
+    lines = {line.split()[0]: line for line in text.splitlines()}
+    assert lines["matchup.tempo_diff"].endswith("  (alias of team.cooldown_median reversed)")
+    assert lines["map.side"].endswith("  (text)")
 
 
 def test_every_playbook_write_mirrors_the_catalog_once(catalog_copy, monkeypatch):

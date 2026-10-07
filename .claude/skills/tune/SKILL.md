@@ -32,7 +32,17 @@ reason in `inference/strategies/tuning-log.md`. Nothing is edited by hand.
 3. Call `tune`: `{"id": "<the id strategies lists>", "field": "weight",
    "value": 2, "reason": "user: the solver keeps ignoring the
    counters"}`. A metric that does not exist or an expression that does not
-   parse is refused; nothing changes.
+   parse is refused; nothing changes. So is a metric that is an alias
+   (the `metrics` tool marks each): a board reads it as the key that
+   carries it, and the refusal names that key, the direction that weighs
+   the same and any guard to add to the rule's `when`. A rule already on
+   an alias - from a playbook older than that check, or a file changed by
+   hand - does not load: move it with `infer_strategy`, setting `metric`
+   and `direction` (and that `when`) in one write, since `tune` sets one
+   field at a time and a metric moved alone can leave a reversed rule
+   weighing the wrong way round, or a guarded one without its guard. A
+   folder that holds two or more such rules refuses every write, each
+   loading the whole folder first: the user moves them by hand.
 4. Show the effect: re-run `board` (or `infer`) for the board the user is
    looking at and say what moved. One change per request unless they ask
    for more; never touch a strategy they did not name.

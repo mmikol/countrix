@@ -437,12 +437,18 @@ def write_docs(catalog: Sequence[Strategy], path: str = DOCS_PATH) -> str | None
             out += ["", without_title(s.body), ""]
     out += ["#### The vocabulary", "",
             "Every key a strategy may reference, with its meaning. `enemy.*` are",
-            "the `team.*` metrics computed for the red side.", "",
+            "the `team.*` metrics computed for the red side. An alias is another",
+            "key - its carrier - offset, scaled or reversed by what the board",
+            "fixes, so it normalises on a board as the carrier does: a heuristic",
+            "weighs the carrier, and a `when`, `bonus` or `penalty` may read the",
+            "alias.", "",
             "| key | meaning |", "| --- | --- |"]
     for key, description in reg.items():
         if key.startswith("enemy."):
             continue
-        out.append("| `%s`%s | %s |" % (key, " (text)" if key in compute.TEXT_METRICS
-                                        else "", description))
+        alias = compute.ALIASES.get(key)
+        mark = " (alias of %s)" % compute.said(alias) if alias else ""
+        out.append("| `%s`%s | %s |" % (
+            key, " (text)" if key in compute.TEXT_METRICS else mark, description))
     embed(path, "catalog", "\n".join(out))
     return path

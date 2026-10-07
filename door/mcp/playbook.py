@@ -30,16 +30,23 @@ from inference.strategy import FIELDS, TUNABLE, WEIGHT_RANGE, Field, FieldKind
 @tool(
     "metrics", "The vocabulary a strategy may reference: every metric key with its"
     " meaning - team.*, enemy.* (the same for the red side), matchup.*, map.*,"
-    " world.* - and which are text. What /strategy reads to infer a heuristic's"
+    " world.* - which are text, and which are aliases: another key offset, scaled"
+    " or reversed by what the board fixes, named with the key that carries each,"
+    " which a heuristic weighs instead. What /strategy reads to infer a heuristic's"
     " metric or expression, or a constraint's limit, from prose.")
 def metrics(ctx: Context) -> ToolReply:
     reg = compute.registry()
     numeric = {k: v for k, v in reg.items() if k not in compute.TEXT_METRICS}
-    lines = [
-        "%-32s %s%s" % (k, v, "  (text)" if k in compute.TEXT_METRICS else "")
-        for k, v in reg.items() if not k.startswith("enemy.")]
-    return ToolReply("\n".join(lines), {"metrics": reg, "numeric": sorted(numeric),
-                                        "text": sorted(compute.TEXT_METRICS)})
+    lines: list[str] = []
+    for k, v in reg.items():
+        if k.startswith("enemy."):
+            continue
+        alias = compute.ALIASES.get(k)
+        mark = "  (alias of %s)" % compute.said(alias) if alias else ""
+        lines.append("%-32s %s%s" % (k, v, "  (text)" if k in compute.TEXT_METRICS else mark))
+    return ToolReply("\n".join(lines), {
+        "metrics": reg, "numeric": sorted(numeric), "text": sorted(compute.TEXT_METRICS),
+        "aliases": {k: row._asdict() for k, row in compute.ALIASES.items()}})
 
 
 @tool(

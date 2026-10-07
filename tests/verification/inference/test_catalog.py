@@ -246,6 +246,66 @@ def test_catalog_rejects_a_goal_on_an_unknown_metric(tmp_path):
         catalog.load(str(tmp_path))
 
 
+# a heuristic on an alias, by kind of alias: its metric, direction and when,
+# and the refusal in full
+ALIAS_REFUSALS = {
+    "scaled": (
+        "team.coverage_share", "maximize", "",
+        "x: metric 'team.coverage_share' normalises as team.coverage: write metric:"
+        " team.coverage, direction: maximize; a when, bonus or penalty may still read"
+        " team.coverage_share"),
+    "offset": (
+        "matchup.pool_diff", "minimize", "",
+        "x: metric 'matchup.pool_diff' normalises as team.pool_total: write metric:"
+        " team.pool_total, direction: minimize; a when, bonus or penalty may still read"
+        " matchup.pool_diff"),
+    "reversed": (
+        "matchup.tempo_diff", "maximize", "",
+        "x: metric 'matchup.tempo_diff' normalises as team.cooldown_median reversed: write"
+        " metric: team.cooldown_median, direction: minimize; a when, bonus or penalty may"
+        " still read matchup.tempo_diff"),
+    "guarded": (
+        "matchup.chew_time_theirs", "maximize", "",
+        "x: metric 'matchup.chew_time_theirs' normalises as team.pool_total where"
+        " enemy.dps_floor > 0: write metric: team.pool_total, direction: maximize, when:"
+        " enemy.dps_floor > 0; a when, bonus or penalty may still read"
+        " matchup.chew_time_theirs"),
+    "guarded-under-a-when": (
+        "matchup.chew_time_theirs", "maximize", "team.supports >= 2",
+        "x: metric 'matchup.chew_time_theirs' normalises as team.pool_total where"
+        " enemy.dps_floor > 0: write metric: team.pool_total, direction: maximize, when:"
+        " (team.supports >= 2) and enemy.dps_floor > 0; a when, bonus or penalty may still"
+        " read matchup.chew_time_theirs"),
+}
+
+
+@pytest.mark.parametrize(("metric", "direction", "when", "message"),
+                         list(ALIAS_REFUSALS.values()), ids=list(ALIAS_REFUSALS))
+def test_a_heuristic_on_an_alias_is_refused_naming_the_key_that_carries_it(
+        tmp_path, metric, direction, when, message):
+    """An alias (compute.ALIASES) normalises on a board as the key that
+    carries it, so a heuristic on it pays what one on the carrier pays: the
+    catalog refuses it as a heuristic's metric, naming the carrier, the
+    direction that weighs the same - flipped for a reversed alias - and the
+    guard to add where the alias has one. What it says to write loads on the
+    carrier, a reward still a reward and a need still a need, and a when
+    and a bonus may still read the alias."""
+    def load_one(head):
+        (tmp_path / "x.md").write_text("---\nname: x\nkind: heuristic\n%s---\nx\n" % head,
+                                       encoding="utf-8")
+        return catalog.load(str(tmp_path))[0]
+    with pytest.raises(CatalogError) as refused:
+        load_one("metric: %s\ndirection: %s\n%s" % (
+            metric, direction, "when: %s\n" % when if when else ""))
+    assert str(refused.value) == message
+    written = re.search(r": write (.*); a when", message).group(1)
+    moved = load_one("".join(
+        "%s\n" % field for field in re.split(r", (?=(?:metric|direction|when): )", written)))
+    assert moved.form == "heuristic" and moved.metric == compute.ALIASES[metric].carrier
+    assert moved.need == bool(when)
+    assert load_one("when: %s > 0\nbonus: %s\n" % (metric, metric)).form == "scored"
+
+
 def test_a_constraint_is_a_limit_a_heuristic_weighs_and_an_assumption_is_prose(tmp_path):
     """Constraints cut the space, heuristics weigh what is left: a constraint
     is a require and nothing weighted, a heuristic weighs a metric or bonus

@@ -651,12 +651,12 @@ name: Answer every revealed enemy
 kind: heuristic
 category: matchup
 direction: maximize
-metric: team.coverage_share
+metric: team.coverage
 weight: 3
 when: enemy.size >= 1
 ---
 # Answer every revealed enemy
-The share of revealed enemies at least one of our picks answers...
+How many revealed enemies at least one of our picks answers...
 ```
 
 That is the reference playbook's `coverage.md`, cut short. A `#`
@@ -694,6 +694,21 @@ of `team_metrics` those keys live in alone (`Objective.lean_keys`), the
 same values at a third of the cost, and
 `tests/verification/inference/test_scale.py` holds the two readings to the
 same bounds and floor.
+
+A heuristic's metric is never an alias (`compute.ALIASES`, marked in the
+vocabulary): a key that is another key - its carrier - offset, scaled or
+reversed by what the board fixes (`matchup.pool_diff` is
+`team.pool_total` less red's, `matchup.tempo_diff` red's median cooldown
+less `team.cooldown_median`) normalises on a board's scale as the
+carrier does, so a heuristic on each pays one measure twice. The catalog
+refuses one, naming the carrier, the direction that weighs the same,
+flipped for a reversed alias, and the guard on red to add where the alias
+has one (`matchup.chew_time_theirs` reads one value on every six unless
+`enemy.dps_floor > 0`, its guard); a `when`, `bonus` or `penalty` may
+still read an alias. A pair that holds only on some boards - the `map_*` keys with no
+map, `team.exposure_edges` against one red pick - is not listed, and
+neither is `matchup.range_diff`, which reads a six that publishes no
+reach as no gap where `team.range_median` reads 0 m.
 
 A strategy's prose is three sentences at most (`add_strategy` refuses
 more): the claim, why and when, what is measured.
@@ -1111,7 +1126,11 @@ The playbook applies in every region alike. The rates it reads are one region's 
 #### The vocabulary
 
 Every key a strategy may reference, with its meaning. `enemy.*` are
-the `team.*` metrics computed for the red side.
+the `team.*` metrics computed for the red side. An alias is another
+key - its carrier - offset, scaled or reversed by what the board
+fixes, so it normalises on a board as the carrier does: a heuristic
+weighs the carrier, and a `when`, `bonus` or `penalty` may read the
+alias.
 
 | key | meaning |
 | --- | --- |
@@ -1164,10 +1183,10 @@ the `team.*` metrics computed for the red side.
 | `team.heal_peak_total` | summed biggest single heal per pick, its own self-heal included |
 | `team.heal_peak_supports` | summed biggest single heal (one cast, hp) across the supports |
 | `team.heal_peak_max` | the biggest single heal a teammate can receive |
-| `team.heal_ratio` | support heal peak / the roster's two-support bench |
+| `team.heal_ratio` (alias of team.heal_peak_supports) | support heal peak / the roster's two-support bench |
 | `team.hps_supports` | summed sustained healing across the supports, hp per second |
 | `team.hps_per_support` | sustained healing per support, hp per second: the supports' mean |
-| `team.hps_ratio` | support sustained healing / the roster's two-support bench |
+| `team.hps_ratio` (alias of team.hps_supports) | support sustained healing / the roster's two-support bench |
 | `team.heal_amp` | picks that amplify healing |
 | `team.antiheal` | picks with anti-heal |
 | `team.cleanse` | picks with a cleanse |
@@ -1189,7 +1208,7 @@ the `team.*` metrics computed for the red side.
 | `team.deployables` | picks with deployables |
 | `team.synergy_edges` | the wiki's synergy pairs among the picks |
 | `team.synergy_score` | summed synergy scores among the picks: a pair's claimed cells, and each cell no article writes at the written cells' claim share |
-| `team.synergy_density` | synergy edges / possible pairs |
+| `team.synergy_density` (alias of team.synergy_edges) | synergy edges / possible pairs |
 | `team.isolated_count` | picks with a documented partner somewhere and none on the team |
 | `team.isolated` (text) | the isolated picks |
 | `team.core_size` | largest connected group in the team's synergy graph |
@@ -1210,26 +1229,26 @@ the `team.*` metrics computed for the red side.
 | `team.map_offmap` | picks running 2.5+ points under their own baseline here |
 | `team.home_map_hits` | picks whose three best maps by rate include this map |
 | `team.coverage` | enemies answered by at least one pick |
-| `team.coverage_share` | coverage / enemies revealed |
+| `team.coverage_share` (alias of team.coverage) | coverage / enemies revealed |
 | `team.unanswered` (text) | enemies no pick answers |
 | `team.answer_edges` | (enemy, pick) counter edges: picks answering enemies |
 | `team.exposure_edges` | (pick, enemy) counter edges: enemies answering picks |
 | `team.exposed_count` | picks answered by at least one enemy |
 | `team.exposed` (text) | the exposed picks |
-| `team.safe_count` | picks no enemy answers |
+| `team.safe_count` (alias of team.exposed_count reversed) | picks no enemy answers |
 | `team.net_edges` | answer edges minus exposure edges |
 | `team.double_covered` | enemies answered by two or more picks |
 | `team.banproof_coverage` | coverage recomputed without the highest-ban answerer |
-| `matchup.pool_diff` | blue effective HP minus red |
-| `matchup.dps_diff` | blue damage floor minus red |
-| `matchup.hps_diff` | blue healing floor minus red |
-| `matchup.burst_vs_heal` | blue's biggest hit minus red's biggest single save |
-| `matchup.heal_vs_burst` | blue's biggest single save minus red's biggest hit |
+| `matchup.pool_diff` (alias of team.pool_total) | blue effective HP minus red |
+| `matchup.dps_diff` (alias of team.dps_floor) | blue damage floor minus red |
+| `matchup.hps_diff` (alias of team.hps_floor) | blue healing floor minus red |
+| `matchup.burst_vs_heal` (alias of team.burst_max) | blue's biggest hit minus red's biggest single save |
+| `matchup.heal_vs_burst` (alias of team.heal_peak_max) | blue's biggest single save minus red's biggest hit |
 | `matchup.chew_time_ours` | seconds of blue's floor damage to chew red's pool (999 if unknown) |
-| `matchup.chew_time_theirs` | seconds of red's floor damage to chew blue's pool |
-| `matchup.tempo_diff` | red median cooldown minus blue's (positive: blue cycles faster) |
+| `matchup.chew_time_theirs` (alias of team.pool_total where enemy.dps_floor > 0) | seconds of red's floor damage to chew blue's pool |
+| `matchup.tempo_diff` (alias of team.cooldown_median reversed) | red median cooldown minus blue's (positive: blue cycles faster) |
 | `matchup.range_diff` | blue median reach minus red's; 0 where a side's picks publish none: unknown, no gap |
-| `matchup.exposure_share` | share of blue answered by red |
+| `matchup.exposure_share` (alias of team.exposed_count) | share of blue answered by red |
 | `matchup.ult_answers` | blue invulnerabilities plus cleanses |
 | `matchup.heal_need` | hp/s blue must heal: red's healing per pool times blue's pool, at least red's healing; red's open slots read as the 2-2-2's missing roles |
 | `matchup.heal_shortfall` | share of heal_need blue's healing floor leaves unhealed, 0..1 (0 when nothing is needed) |

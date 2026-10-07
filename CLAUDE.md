@@ -117,9 +117,12 @@ db <- facts <- inference <- door <- ui.
   heuristic) or scored (`bonus:`/`penalty:` times its weight); then
   assumption, or draft (name, kind and prose only). A key outside the
   fields, `soft:` among them, is refused, and so is an expression that
-  fails on its probes (`Expr.probes`) or a bonus or penalty that comes
-  out text there (`strategy.amount`). `inference/catalog.py` reads it,
-  each file parsed by `frontmatter.py` and checked by `strategy.py`
+  fails on its probes (`Expr.probes`), a bonus or penalty that comes
+  out text there (`strategy.amount`), or a heuristic on an alias
+  (`compute.ALIASES`), which normalises as the key that carries it: the
+  refusal names that key, the direction and any guard to write.
+  `inference/catalog.py` reads it, each file parsed by `frontmatter.py`
+  and checked by `strategy.py`
   (`Strategy`, `CatalogError`); one bad file makes `catalog.load` raise
   everywhere. `meta.md` beside the strategy files is no strategy and no
   strategy may take its name: it holds the default engine's weights
@@ -297,10 +300,12 @@ db <- facts <- inference <- door <- ui.
   `WORLD_METRICS` and the key its function computes (the namespace must
   equal the registry), and in `TEXT_METRICS` when its value is a name or a
   list - `tests/verification/facts/test_metrics.py` checks every registry
-  key's kind against it - and a range rule in `inference/ranges.py` (its
-  aggregate: a sum, a mean, a count, fixed by the shape), which
-  `tests/verification/inference/test_bounds.py` fails a key without; then
-  regenerate the catalog vocabulary in docs/inference.md.
+  key's kind against it - and in `ALIASES` when it is another key's
+  offset, scale or reversal on every board - the same file holds an entry
+  to its carrier, but no test finds one missing - and a range rule in
+  `inference/ranges.py` (its aggregate: a sum, a mean, a count, fixed by
+  the shape), which `tests/verification/inference/test_bounds.py` fails a
+  key without; then regenerate the catalog vocabulary in docs/inference.md.
 - `tests/verification/ui/test_pages.py` pins the scripts at their seams
   (routes, query keys, element ids, the payload keys they read against what
   the server writes), and `tests/qa/test_stylesheet.py` holds that every
