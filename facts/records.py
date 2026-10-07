@@ -107,3 +107,11 @@ class Patch(NamedTuple):
     """A patch shipped since the rates were captured, and its release day."""
     name: str
     released: str
+
+
+class KitListMiss(NamedTuple):
+    """A name an authored kit list holds that no hero's ability or weapon
+    config carries, and the lists that hold it: a piece the wiki renamed,
+    which reads as an ordinary one until its lists take the new name."""
+    name: str
+    lists: tuple[str, ...]

@@ -5,7 +5,8 @@ imports only db.
     model           the World - the whole database loaded into memory, per
                     request
     tables          the load - every table read into a World, the maps'
-                    styles and each hero's best maps
+                    styles, each hero's best maps and the kit lists held to
+                    the roster
     scalars         a hero's numbers, derived from its kit one section at a
                     time
     kit             a kit piece's stat rows and the combat numbers read off

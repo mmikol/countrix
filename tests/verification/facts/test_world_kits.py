@@ -1,14 +1,17 @@
 """The heroes the load builds from the database: the whole roster with its
 kit numbers, each read in its own units - an ultimate's numbers its own, a
 percent not hit points, a sum not one hit - the weapon a hero fights with,
-the tools counted once, the roster-wide benches and role-median pools, and no
-hole in a released hero's core numbers. The scrape is the point: every
-figure is the wiki's. The derivation's rules are tests/verification/facts/test_scalars.py's,
+the tools counted once, the roster-wide benches and role-median pools, no
+hole in a released hero's core numbers, and every kit list's names on pieces
+the roster holds. The scrape is the point: every figure is the wiki's. The
+derivation's rules are tests/verification/facts/test_scalars.py's,
 test_scalars_healing.py's and test_kit.py's."""
 
 import statistics
 
 import pytest
+
+from facts import counters, scalars
 
 pytestmark = pytest.mark.invariant
 
@@ -221,3 +224,26 @@ def test_no_released_hero_is_missing_a_core_kit_number(world):
         if hero.role == "support" and not hero.hps:
             holes.append("%s is a support that heals nothing" % hero.name)
     assert not holes, holes
+
+
+def test_every_kit_list_names_a_piece_the_roster_holds(world):
+    """A kit list matches a piece by its whole name, so a pull that renames
+    one drops it off its lists in silence: the load names each list name no
+    hero's kit carries (World.kit_list_misses), and the built database
+    leaves none. A pair's two pieces are one hero's - a heal and the weapon
+    that triggers it, a refund and its beam, a booster and what it boosts -
+    and each eater FLAG_FAMILIES names is a projectile eater whose family's
+    flag some weapon publishes."""
+    assert world.kit_list_misses == []
+    kits = [{p.name for p in (*h.abilities, *h.weapons)} for h in world.heroes.values()]
+    pairs = [(heal, weapon) for heal, (weapon, _) in scalars.TRIGGERED.items()]
+    pairs += [(cast, beam) for cast, (beam, _) in scalars.ENERGY_REFUND.items()]
+    pairs += list(scalars.BOOSTS.items())
+    for pair in pairs:
+        assert any(set(pair) <= kit for kit in kits), pair
+    eaters = {
+        a.name for h in world.heroes.values() for a in h.abilities
+        if "negate projectile" in a.keywords}
+    flags = {code for h in world.heroes.values() for config in h.weapons for code in config.stats}
+    for eater, flag in counters.FLAG_FAMILIES.items():
+        assert eater in eaters and flag in flags, eater

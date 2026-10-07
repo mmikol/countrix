@@ -167,14 +167,14 @@ def test_a_stream_ticks_at_its_tooltips_and_a_wave_refunds_its_energy():
 
 
 def test_the_sum_leaves_out_what_does_not_run_beside_the_gun_or_heal_a_teammate():
-    """Lifeline ends on primary fire, a dash heals its owner, an ultimate and
-    a perk are no baseline, a self row is the hero's own, and a damage hero's
-    heal on itself is not the team's; of two healing weapons the better
-    counts."""
+    """Lifeline ends on primary fire (NOT_BESIDE: 25/s for its 2 s on a 2 s
+    cooldown would add 25), a dash heals its owner, an ultimate and a perk
+    are no baseline, a self row is the hero's own, and a damage hero's heal
+    on itself is not the team's; of two healing weapons the better counts."""
     gun = _kit("Gun", KIND_WEAPON, stat("heal", 24, "hp"), _rate("hps", 87))
     alt = _kit("Gun (ADS)", KIND_WEAPON, _rate("hps", 60))
     lifeline = _kit("Lifeline", KIND_ABILITY, _rate("heal", 25, "ally"),
-                    stat("cooldown", 2, "seconds"))
+                    stat("cooldown", 2, "seconds"), stat("duration", 2, "seconds"))
     dash = _kit("Rejuvenating Dash", KIND_ABILITY, stat("heal", 55, "hp"),
                 stat("cooldown", 5, "seconds"))
     ult = _kit("Tree", KIND_ULTIMATE, _rate("heal", 400))

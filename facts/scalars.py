@@ -24,11 +24,9 @@ from facts.kit import KitPiece, dual_rate, on_self
 from facts.model import Hero
 
 # Keyword families the wiki tags abilities with, read verbatim from the
-# keywords column; the name lists below (PILOT_GUNS to SAVE_TOOLS) are
-# authored. The wiki writes a
-# keyword as `family;;qualifier` ("area of effect;;spherical", "invulnerable;;
-# targets"): a KitPiece keeps the family in `keywords` and the whole atom in
-# `atoms`.
+# keywords column. The wiki writes a keyword as `family;;qualifier` ("area of
+# effect;;spherical", "invulnerable;;targets"): a KitPiece keeps the family in
+# `keywords` and the whole atom in `atoms`.
 CC_KEYWORDS = ("stun", "sleep", "immobilize", "hinder", "knockback", "knockdown", "hacked")
 MOBILITY_KEYWORDS = (
     "movement", "strong movement", "active movement", "partial movement", "evasive", "flight",
@@ -37,15 +35,49 @@ FLIGHT_KEYWORDS = ("flight", "strong flight")
 CLEANSE_KEYWORDS = ("lesser cleanse", "greater cleanse", "perfect cleanse")
 AREA_KEYWORDS = ("area of effect", "shockwave")     # a ground or cone wave is tagged shockwave
 PRIMARY_SLOTS = ("primary_fire", "hip_fire", "default")
-# the pilot's gun, held once the mech is lost: no hit of the hero's either
+
+# --- the kit lists -----------------------------------------------------------
+# Pieces the wiki has no field for, authored: the four below, the healing
+# lists of the next section (UPTIME to AIMED), REMECH in facts/model.py and
+# FLAG_FAMILIES in facts/counters.py, all held in facts.tables.KIT_LISTS. Each
+# matches a piece by its whole name, exact in case and accent, and a piece no
+# list names reads as an ordinary one. A list's comment states its rule and
+# its members' evidence. A pull that renames a piece drops it off its lists,
+# so the load names each list name no hero's kit carries and the board warns
+# of it. The heroes skill sets a new hero's pieces beside each rule; a list
+# changes in a code change that writes the member's evidence in its comment,
+# with a test that fails without it.
+#
+# A weapon its hero holds only once its mech is destroyed and the pilot ejects
+# (Eject!): D.Va's Light Gun, D.Mon's Portable Fusion Repeater. Its hits are no
+# burst of the hero's (hero.burst, the counter matrix's burst), and FORM_GATED
+# holds it too.
 PILOT_GUNS = ("Light Gun", "Portable Fusion Repeater")
-# swapped to off the fight: the Forge Hammer's heal and swing are the turret's
+# A weapon its hero swaps to for a task off the fight: Torbjörn's Forge Hammer,
+# whose heal row goes "to Torbjörn's turret". It is out of in_fight, which the
+# healing, the lifesteal and the barrier piercing read - the hammer's heal
+# would read as Torbjörn's own (self_hps, self_heal) - and out of hero.melee,
+# and FORM_GATED holds it too. Its swing still counts as a hit (hero.burst, the
+# counter matrix's burst).
 OFF_FIGHT = ("Forge Hammer",)
-# weapon forms held for seconds on a cooldown, out of the hero's fighting form,
-# or a charged side shot: not the weapon the hero fights with (authored; the
-# wiki has no field)
+# A damaging weapon config its hero cannot hold through a fight: a form's
+# weapon, held while the form lasts on a cooldown (Bastion's Configuration:
+# Assault, 6 s of Reconfigure on a 12 s cooldown; Ramattra's Pummel, 8 s of
+# Nemesis Form on an 8 s cooldown); a charged side shot (Winston's Tesla Cannon
+# Alt Fire, 0.3 to 0.85 s to charge and 0.75 s to recover); and the two lists
+# above. It is out of hero.dps, the reach (max_range, hitscan_range) and
+# hero.weapon_kinds, and out of the counter matrix's main weapon, reach,
+# anti-air and barrier piercing. hero.hitscan and hero.beam still read its
+# tags; where the two lists above do not keep it out, hero.melee reads its type
+# (Pummel makes Ramattra melee), hero.pierces_barrier its rows and hero.burst
+# its hits. A config that deals no damage needs no place here: these steps
+# read the damaging ones alone.
 FORM_GATED = ("Configuration: Assault", "Pummel", "Tesla Cannon Alt Fire", *PILOT_GUNS, *OFF_FIGHT)
-# tools that stop a death without the wiki's `invulnerable` keyword
+# A tool that keeps its target from dying which the wiki does not tag
+# invulnerable: Baptiste's Immortality Field, "a device that prevents allies
+# from dying". It counts as an invulnerability (hero.invuln_tools), and as a
+# save (hero.save_tools) where it lands on a teammate. The counter matrix's
+# save mechanism reads the keywords alone and leaves it out.
 SAVE_TOOLS = ("Immortality Field",)
 
 # --- sustained healing ------------------------------------------------------
@@ -71,12 +103,17 @@ UPTIME = {"Healing Pylon": PYLON_UPTIME}
 TORPEDO_VIEW = 0.5
 LOCK_NEAR = 5.0
 # Moira page: the spray heals "all allies in front", its width unpublished; it
-# reaches one teammate.
+# reaches one teammate. SPRAY_TARGETS is a setting held at the judgement's
+# value, where SPRAYS changes nothing; both are kept so the sensitivity can be
+# varied (docs/inference.md, The healing floor: the spray's reach is one of
+# the judgements the bench rests on).
 SPRAY_TARGETS = 1.0
 SPRAYS = ("Biotic Grasp",)
 # Brigitte page: the Rocket Flail is in contact throughout, as hero.dps holds
 # every weapon on its target. A Flail trigger locks Inspire out for 1.25 s, so
-# it fires on every third swing of 0.6 s: once each 1.8 s.
+# it fires on every third swing of 0.6 s: once each 1.8 s. FLAIL_CONTACT is a
+# setting held at the judgement's value, kept so the sensitivity can be varied
+# (docs/inference.md, The healing floor).
 FLAIL_CONTACT = 1.0
 INSPIRE_LOCKOUT = 1.25
 TRIGGERED = {"Inspire": ("Rocket Flail", INSPIRE_LOCKOUT)}
@@ -91,6 +128,8 @@ FREE_TICK = "passive"
 # successful cast". The refund is more stream time, once a wave.
 ENERGY_REFUND = {"Guardian Wave": ("Restorative Stream", 33.0)}
 # Jetpack Cat page: primary fire ends Lifeline, so it never runs beside the gun.
+# Idle on today's rows: Lifeline publishes no duration and reads 0 either way;
+# kept for the duration row that would count it.
 NOT_BESIDE = ("Lifeline",)
 # Lifeweaver page: Rejuvenating Dash heals Lifeweaver ("heal yourself"); its row
 # names no target.
@@ -98,17 +137,34 @@ OWN_HEALS = ("Rejuvenating Dash",)
 # Lucio page: Amp It Up raises Crossfade's heal for its duration; it adds the
 # difference.
 BOOSTS = {"Amp It Up": "Crossfade"}
-# Held or deployed for their duration, where the page says the cooldown starts
-# after it or says nothing: one cycle is the cooldown plus the duration. Every
-# other cast is instant or starts its cooldown on use, and cycles on the
-# cooldown alone.
+# A heal its hero holds on itself, or places, for its duration, whose page says
+# the cooldown starts after it (Lucio page, Amp It Up: "The cooldown starts
+# after the ability duration ends"; Mauga page, Cardiac Overdrive: "Cooldown
+# starts when the ability ends") or says nothing (Purr; Biotic Field and Biotic
+# Orb, placed): one cycle is the cooldown plus the duration (_cycle), wherever
+# its heal is spread over its cycle. Any other piece cycles on its cooldown
+# alone: a cast that lands at once and lets its heal run on (Baptiste page,
+# Regenerative Burst: "The heal-over-time effect is applied once upon
+# activation"), and one whose page says the cooldown starts on use.
 HELD = ("Amp It Up", "Cardiac Overdrive", "Purr", "Biotic Field", "Biotic Orb")
-# Area heals centred on the caster, or where it stands: they reach
-# TEAMMATES x p(radius).
+# An area heal centred on its caster, or placed where the caster stands: it
+# reaches around_caster(radius) teammates, the radius its radius row, else its
+# range row (_reach_count). Crossfade's Healing Boost, Remedy Aura,
+# Regenerative Burst, Inspire and Cardiac Overdrive heal "nearby allies" by
+# their descriptions; Amp It Up raises Lucio's song, Purr pulses around
+# Jetpack Cat, and Soldier: 76 deploys Biotic Field where he stands. An area
+# heal on neither this list nor AIMED reaches one teammate, or a shockwave's
+# cone by its angle.
 CASTER = (
     "Crossfade", "Amp It Up", "Remedy Aura", "Regenerative Burst", "Inspire", "Purr",
     "Biotic Field", "Cardiac Overdrive")
-# Area heals that land on an aimed teammate: 1 + (TEAMMATES - 1) x p(radius).
+# An area heal that lands where its caster aims, on a teammate or as a shot's
+# splash: Ana throws Biotic Grenade and Kiriko Protection Suzu, and Biotic
+# Launcher's alternate fire lobs "a healing projectile that heals all allies
+# near the impact". An ability reaches on_teammate(radius), the aimed teammate
+# and those within the radius of it (_reach_count); a weapon whose rows publish
+# a direct heal, a splash heal and a radius counts the splash on each teammate
+# on_teammate(radius) reaches (_weapon_heal).
 AIMED = ("Biotic Grenade", "Protection Suzu", "Biotic Launcher Alt Fire")
 # a heal row that lingers after the cast: summed with the instant one
 LINGERING_RE = re.compile(r"over time|\bhot\b", re.I)

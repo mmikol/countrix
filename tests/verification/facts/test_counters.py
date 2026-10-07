@@ -157,6 +157,22 @@ def test_a_projectile_eater_takes_what_its_family_or_its_description_names():
     assert _fired(spinner, rocket)["eater"] == 1.0
 
 
+def test_an_eater_reads_a_familys_flags_only_under_its_whole_name():
+    """FLAG_FAMILIES names its eaters whole: Matrix Wall holds the word
+    matrix and is not Defense Matrix, so it reads no family's flags and takes
+    projectiles alone, as its description says - a hitscan rifle passes it,
+    a rocket does not. Keyed on the word, it read Defense Matrix's flags and
+    ate the rifle."""
+    wall = _hero("Wall", role="tank", pool=550, abilities=[_piece(
+        "Matrix Wall", keywords="negate projectile", description="Block projectiles.",
+        duration=2.0, cooldown=1.0)])
+    rifle = _hero("Gun", weapons=[_gun(hit=60.0, range=40.0)])
+    rocket = _hero("Rocket", weapons=[_gun("Rocket", kind="projectile", hit=60.0, pspeed=35.0)])
+    assert counters.features(wall, 100.0).eater_family is None
+    assert "eater" not in _fired(wall, rifle)
+    assert _fired(wall, rocket)["eater"] == 1.0
+
+
 def test_a_beam_passes_an_eater_that_cannot_block_it_and_a_hitscan_one_it_never_claimed():
     """eaterproof: Deflect's flags pass a beam whole; a family-less eater's
     details say it cannot block a beam, and a hitscan weapon is outside what

@@ -101,10 +101,11 @@ The test files that quote the wiki, and the articles each quotes:
       https://overwatch.fandom.com/wiki/Reinhardt
 
 Shorter quotations sit in docs/architecture.md and docs/inference.md, on
-the math page (ui/static/math.html), and in the docstrings of
-db/data/wiki/maps.py and db/data/wiki/strategy_sections.py. The board
-quotes the wiki's text from the database a local pull builds, and its
-facts tab and every page's footer credit the wiki and its licence. The
+the math page (ui/static/math.html), in the docstrings of
+db/data/wiki/maps.py and db/data/wiki/strategy_sections.py, and in the
+comments and docstrings of facts/scalars.py and facts/counters.py. The
+board quotes the wiki's text from the database a local pull builds, and
+its facts tab and every page's footer credit the wiki and its licence. The
 pulls' page caches (.cache-wiki/) are never committed.
 
 

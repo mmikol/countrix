@@ -21,12 +21,13 @@ from psycopg.rows import TupleRow
 from db import KIND_WEAPON
 from db.data.normalizer import name_key
 from db.data.wiki.terrain import WORDS_PER_RATE
-from facts import counters, kit_format
+from facts import counters, kit_format, scalars
 from facts.draft import EXPECTED_SHAPE
 from facts.kit import KitPiece, Stat
-from facts.model import ROLES, TERRAIN_FEATURES, TERRAIN_LEAN, Hero, Map, World
+from facts.model import REMECH, ROLES, TERRAIN_FEATURES, TERRAIN_LEAN, Hero, Map, World
 from facts.records import (
     KitLine,
+    KitListMiss,
     MapRate,
     Patch,
     Rates,
@@ -50,6 +51,32 @@ NO_TEXT = StageTerrain(0.0, 0, 0)
 # feature the maps name seldom, so compute.ground raises a feature only on
 # compute.STAGE_MENTIONS mentions.
 STAGE_PRIOR_WORDS = 100
+
+# Every kit list, by its constant's name: the pieces the wiki has no field for
+# (facts/scalars.py, the kit lists), each with every name it holds - a pair's
+# two, a heal and the weapon that triggers it, a refund and its beam, a
+# booster and what it boosts. check_kit_lists holds each name to the roster.
+KIT_LISTS: dict[str, tuple[str, ...]] = {
+    "PILOT_GUNS": scalars.PILOT_GUNS,
+    "OFF_FIGHT": scalars.OFF_FIGHT,
+    "FORM_GATED": scalars.FORM_GATED,
+    "SAVE_TOOLS": scalars.SAVE_TOOLS,
+    "UPTIME": tuple(scalars.UPTIME),
+    "SPRAYS": scalars.SPRAYS,
+    "TRIGGERED": (*scalars.TRIGGERED, *(weapon for weapon, _ in scalars.TRIGGERED.values())),
+    "EMPTY_WAIT": tuple(scalars.EMPTY_WAIT),
+    "TICK_RATES": tuple(scalars.TICK_RATES),
+    "ENERGY_REFUND": (
+        *scalars.ENERGY_REFUND, *(beam for beam, _ in scalars.ENERGY_REFUND.values())),
+    "NOT_BESIDE": scalars.NOT_BESIDE,
+    "OWN_HEALS": scalars.OWN_HEALS,
+    "BOOSTS": (*scalars.BOOSTS, *scalars.BOOSTS.values()),
+    "HELD": scalars.HELD,
+    "CASTER": scalars.CASTER,
+    "AIMED": scalars.AIMED,
+    "REMECH": REMECH,
+    "FLAG_FAMILIES": tuple(counters.FLAG_FAMILIES),
+}
 
 LATEST_BLIZZARD = """(select ms.snapshot_id from meta_snapshots ms
     join sources s on s.source_id = ms.source_id where s.code = 'blizzard'
@@ -435,6 +462,22 @@ def _read_provenance(cx: Connection, w: World) -> None:
             order by p.released desc""")]
 
 
+def check_kit_lists(w: World) -> None:
+    """World.kit_list_misses: each name a kit list holds (KIT_LISTS) that no
+    hero's ability or weapon config carries, once, with the lists that hold
+    it, in KIT_LISTS' order. A list matches a piece by its whole name, so a
+    pull that renames a piece leaves the old name here, and the piece reads
+    as an ordinary one until its lists take the new name; the board warns of
+    it (board_facts)."""
+    carried = {p.name for h in w.heroes.values() for p in (*h.abilities, *h.weapons)}
+    holding: dict[str, list[str]] = {}
+    for kit_list, names in KIT_LISTS.items():
+        for name in dict.fromkeys(names):
+            if name not in carried:
+                holding.setdefault(name, []).append(kit_list)
+    w.kit_list_misses = [KitListMiss(name, tuple(lists)) for name, lists in holding.items()]
+
+
 def _derive_ally_lifesteal(w: World) -> None:
     """A heal that rides the teammates' damage (Cardiac Overdrive) at what the
     caster's five teammates of a 2-2-2 deal: each role's median dps over the
@@ -478,11 +521,11 @@ def load(cx: Connection) -> World:
     """The whole database -> World, its kit read in 6v6 (draft.KIT_FORMAT).
     `cx` is an open psycopg connection; this module never opens one of its
     own. The steps run in the order each relies on: the kit, and the 6v6
-    laid over it, before derive_scalars, the rates before derive_rates,
-    derive_best_maps and derive_map_styles, the terrain before
-    derive_map_styles, the teammates' lifesteal and the benches over the
-    derived roster, and the counter matrix over the derived kit and the
-    wiki's counters, last."""
+    laid over it, before derive_scalars and the kit lists' check, the rates
+    before derive_rates, derive_best_maps and derive_map_styles, the
+    terrain before derive_map_styles, the teammates' lifesteal and the
+    benches over the derived roster, and the counter matrix over the
+    derived kit and the wiki's counters, last."""
     w = World()
     _read_heroes(cx, w)
     _read_abilities(cx, w)
@@ -490,6 +533,7 @@ def load(cx: Connection) -> World:
     _read_perks(cx, w)
     _read_kit_6v6(cx, w)
     kit_format.apply(w)
+    check_kit_lists(w)
     _read_rates(cx, w)
     _read_maps(cx, w)
     _read_map_rates(cx, w)

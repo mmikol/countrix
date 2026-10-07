@@ -306,6 +306,13 @@ db <- facts <- inference <- door <- ui.
   `inference/ranges.py` (its aggregate: a sum, a mean, a count, fixed by
   the shape), which `tests/verification/inference/test_bounds.py` fails a
   key without; then regenerate the catalog vocabulary in docs/inference.md.
+- A kit list - the names of pieces the wiki has no field for, matched
+  whole (`facts/scalars.py`, the kit lists) - states its rule and its
+  members' evidence in its comment, and a member joins in a change whose
+  test fails without it. A new list joins `facts.tables.KIT_LISTS`, which
+  the load holds to the roster: the board warns of a name no hero's kit
+  carries, and `test_every_kit_list_names_a_piece_the_roster_holds` fails
+  on it - on the built database only, so CI never runs it.
 - `tests/verification/ui/test_pages.py` pins the scripts at their seams
   (routes, query keys, element ids, the payload keys they read against what
   the server writes), and `tests/qa/test_stylesheet.py` holds that every

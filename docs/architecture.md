@@ -195,7 +195,7 @@ holds the whole playbook; [mcp.md](mcp.md) has the servers and every tool.
 | `/tune` | changes a weight, a dial or an expression through `tune` | between games |
 | `/strategy` | asks for a name, a kind and prose, infers the frontmatter and stores the strategy through `add_strategy` | when you learn something |
 | `/patches` | pulls the patch list and, when a patch shipped since the capture, refetches what it changes: rates, kits, Blizzard's text | when a patch drops |
-| `/heroes` | adds or refreshes heroes: Blizzard's roster, the wiki's kits, styles and synergies, the announced heroes ahead of release, counters | when the roster moves |
+| `/heroes` | adds or refreshes heroes: Blizzard's roster, the wiki's kits, styles and synergies, the announced heroes ahead of release, counters; then sets each new hero's pieces beside the kit lists' rules and reports the lists they meet, the rules left unsettled, the untagged pieces and a number that reads 0 | when the roster moves |
 | `/maps` | adds or refreshes maps: the pool, modes and stages, their terrain, the per-map rates, the style each map rewards | when the pool moves |
 | `/maintain` | the repo's maintainer: lint, types and tests two ways, docs current, stale names, dead code, layout, security posture, a report | after changes |
 | `/desloppify` | the desloppify harness's own skill, as `update-skill` writes it (CLAUDE.md): scores the code and drives the cleanup loop | when you ask for a score |

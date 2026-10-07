@@ -55,6 +55,15 @@ Refresh the rates: `pull_rates` with `{"refresh": true}` (see
 [the data](data.md#refresh-it-yourself)), or `/patches` in Claude Code.
 With the stack up, the refresher does it every day.
 
+## A warning says kit list names match no piece in the roster
+
+A pull brought a renamed piece of a hero's kit, and a list in the facts
+layer still holds the old name, so the board reads that piece as an
+ordinary one: a save the wiki does not tag stops counting as a save. The
+warning names each old name and the lists that hold it. A list takes the
+new name in a change to the code; `/heroes` in Claude Code reports the
+lists a hero's pieces meet.
+
 ## The stack says NOT READY
 
 The verdict names what failed. The usual fixes:

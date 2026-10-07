@@ -19,6 +19,7 @@ from facts.records import (
     DerivedEdge,
     KitChange,
     KitLine,
+    KitListMiss,
     MapRate,
     Pairing,
     Patch,
@@ -28,7 +29,14 @@ from facts.records import (
     Synergy,
 )
 
-REMECH = ("Call Mech",)     # climbing back into the mech: an ultimate by kind, not a fight tool
+# A kit list (facts/scalars.py, the kit lists): an ultimate that only returns
+# its hero to a mech, no tool it fights with - D.Va's and D.Mon's Call Mech,
+# which calls down or reassembles the mech. It is out of Hero.ults, so out of
+# the ultimate's numbers (hero.ult, ult_damage, ult_cost), the area, amps,
+# control and saves derive_scalars reads off the ultimates, the counter
+# matrix's percent ultimate and the roster's ultimate cap. The counter matrix
+# reads the abilities whole and still counts its cleanse and its knockback.
+REMECH = ("Call Mech",)
 SQUISHY_POOL = 250
 
 
@@ -225,8 +233,9 @@ def by_role(heroes: Iterable[Hero]) -> list[Hero]:
 
 class World:
     """The whole database in memory: the heroes and maps by id and by name, the
-    wiki's counters and synergies, the rates' provenance and the roster-wide
-    figures the metrics are measured against."""
+    wiki's counters and synergies, the rates' provenance, the kit list names
+    no kit carries and the roster-wide figures the metrics are measured
+    against."""
 
     def __init__(self) -> None:
         self.heroes: dict[int, Hero] = {}
@@ -254,6 +263,9 @@ class World:
         self.synergy_cell = 0.0
         self.snapshots: list[Snapshot] = []
         self.newer_patches: list[Patch] = []
+        # each name a kit list holds that no hero's kit carries, with its
+        # lists: a piece a pull renamed (tables.check_kit_lists)
+        self.kit_list_misses: list[KitListMiss] = []
         self.subrole_passives: dict[str, str] = {}              # subrole -> its passive's text
         self.role_icons: dict[str, str | None] = {}
         self.tier_names: dict[str, str] = {}        # rank tier code -> its name, up the ladder

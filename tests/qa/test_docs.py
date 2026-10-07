@@ -413,7 +413,8 @@ MUST_NAME = {   # a skill is a playbook over these tools; if a tool is renamed, 
     "strategy": {"metrics", "strategies", "add_strategy", "infer_strategy", "board", "db_docs"},
     "maintain": {"db_docs", "db_status", "strategies"},
     "patches": {"pull_patches", "pull_rates", "pull_kits", "pull_heroes", "db_docs"},
-    "heroes": {"roster", "pull_heroes", "pull_kits", "pull_synergies", "pull_counters"},
+    "heroes": {
+        "roster", "pull_heroes", "pull_kits", "pull_synergies", "pull_counters", "facts", "query"},
     "maps": {"roster", "pull_maps", "pull_terrain", "pull_rates", "pull_playstyles", "facts"},
 }
 
