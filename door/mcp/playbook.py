@@ -31,9 +31,9 @@ from inference.strategy import FIELDS, TUNABLE, WEIGHT_RANGE, Field, FieldKind
     "metrics", "The vocabulary a strategy may reference: every metric key with its"
     " meaning - team.*, enemy.* (the same for the red side), matchup.*, map.*,"
     " world.* - which are text, and which are aliases: another key offset, scaled"
-    " or reversed by what the board fixes, named with the key that carries each,"
-    " which a heuristic weighs instead. What /strategy reads to infer a heuristic's"
-    " metric or expression, or a constraint's limit, from prose.")
+    " or reversed by what the board fixes or by the six's size, named with the key"
+    " that carries each, which a heuristic weighs instead. What /strategy reads to"
+    " infer a heuristic's metric or expression, or a constraint's limit, from prose.")
 def metrics(ctx: Context) -> ToolReply:
     reg = compute.registry()
     numeric = {k: v for k, v in reg.items() if k not in compute.TEXT_METRICS}

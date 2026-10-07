@@ -697,18 +697,30 @@ same bounds and floor.
 
 A heuristic's metric is never an alias (`compute.ALIASES`, marked in the
 vocabulary): a key that is another key - its carrier - offset, scaled or
-reversed by what the board fixes (`matchup.pool_diff` is
-`team.pool_total` less red's, `matchup.tempo_diff` red's median cooldown
-less `team.cooldown_median`) normalises on a board's scale as the
-carrier does, so a heuristic on each pays one measure twice. The catalog
-refuses one, naming the carrier, the direction that weighs the same,
-flipped for a reversed alias, and the guard on red to add where the alias
-has one (`matchup.chew_time_theirs` reads one value on every six unless
-`enemy.dps_floor > 0`, its guard); a `when`, `bonus` or `penalty` may
-still read an alias. A pair that holds only on some boards - the `map_*` keys with no
-map, `team.exposure_edges` against one red pick - is not listed, and
-neither is `matchup.range_diff`, which reads a six that publishes no
-reach as no gap where `team.range_median` reads 0 m.
+reversed by what the board fixes or by the six's size normalises over a
+board's sixes as the carrier does, so a heuristic on each pays one
+measure twice. `matchup.pool_diff` is one, `team.pool_total` less red's,
+and `matchup.tempo_diff` another, red's median cooldown less
+`team.cooldown_median`. The catalog refuses one, naming the carrier, the
+direction that weighs the same, flipped for a reversed alias, and the
+guard on red to add where the alias has one (`matchup.chew_time_theirs`
+reads one value on every six unless `enemy.dps_floor > 0`, its guard); a
+`when`, `bonus` or `penalty` may still read an alias. A pair that holds
+only on some boards - the `map_*` keys with no map,
+`team.exposure_edges` against one red pick - is not listed, and neither
+is `matchup.range_diff`, which reads a six that publishes no reach as no
+gap where `team.range_median` reads 0 m.
+
+Moved to its carrier, a rule ranks a board's sixes as it did, with two
+catches. Three aliases read the six's size - `team.synergy_density`,
+`team.safe_count` and `matchup.exposure_share` - and a partial team,
+the current comp scored on its board's scale, reads them against its
+own, so a rule moved off one moves that team's share. And a need on
+`matchup.chew_time_theirs` moved under the guard, its `when` now
+`(<when>) and enemy.dps_floor > 0`, leaves the needs on its old `when`:
+needs share a budget only on a `when` written alike, with the same
+params (`scoring.need_guard`), so alone on its new one it weighs its own
+weight, and they share `NEED_BUDGET` without it.
 
 A strategy's prose is three sentences at most (`add_strategy` refuses
 more): the claim, why and when, what is measured.
@@ -1128,9 +1140,10 @@ The playbook applies in every region alike. The rates it reads are one region's 
 Every key a strategy may reference, with its meaning. `enemy.*` are
 the `team.*` metrics computed for the red side. An alias is another
 key - its carrier - offset, scaled or reversed by what the board
-fixes, so it normalises on a board as the carrier does: a heuristic
-weighs the carrier, and a `when`, `bonus` or `penalty` may read the
-alias.
+fixes or by the six's size, so it normalises over a board's sixes as
+the carrier does: a heuristic weighs the carrier, and a `when`,
+`bonus` or `penalty` may read the alias. A partial team, its own size
+in place of six, can read one sized by the six apart from its carrier.
 
 | key | meaning |
 | --- | --- |

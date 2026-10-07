@@ -5,6 +5,7 @@ value worked by hand from tests/synthetic.py, and each alias against the
 key that carries it over every legal six. The team metrics are
 tests/verification/facts/test_team.py's. No database."""
 
+import dataclasses
 import inspect
 import itertools
 from collections import Counter
@@ -409,22 +410,31 @@ def _norms(values):
 
 def test_each_alias_normalises_as_the_key_that_carries_it(synthetic_world):
     """Over every legal six of the roster against a fixed red - none, one
-    pick, two, two that publish no reach, a whole six - an alias varies
-    where its carrier does, and min-max reads it as the carrier, or as the
-    carrier flipped where it is reversed; where its guard fails it reads one
-    value on every six. Every alias varies on some board here, so none is
-    held vacuously."""
+    pick, two, two that publish no reach, a whole six, two that answer one
+    pick, the roster's lowest damage floor, and a pick whose kit publishes
+    no damage figure - an alias varies where its carrier does, and min-max
+    reads it as the carrier, or as the carrier flipped where it is
+    reversed; where its guard fails it reads one value on every six. Every
+    alias varies on some board here, so none is held vacuously."""
     w = synthetic_world
     m = w.map("Harbor Gate")
     roster = sorted((h for h in w.heroes.values() if h.released), key=lambda h: h.id)
     sixes = [
         six for six in itertools.combinations(roster, TEAM_SIZE)
         if sum(1 for h in six if h.role == "tank") <= MAX_TANKS]
+    # Needle and Flint both answer Gale, so exposure_edges reads apart from
+    # exposed_count; Balm alone is the lowest damage floor, 50; and a Balm
+    # whose kit publishes no damage figure holds a pick at a floor of 0, so
+    # the guard on chew_time_theirs reads red's floor, not its size
+    silent = dataclasses.replace(w.hero("Balm"), dps=0.0)
+    reds = [[w.hero(n) for n in names] for names in (
+        (), ("Mortar",), ("Mortar", "Gale"), ("Gale", "Balm"),
+        ("Mortar", "Quarry", "Gale", "Rook", "Sorrel", "Tansy"), ("Needle", "Flint", "Rook"),
+        ("Balm",))] + [[silent]]
     varied = set()
-    for names in ((), ("Mortar",), ("Mortar", "Gale"), ("Gale", "Balm"),
-                  ("Mortar", "Quarry", "Gale", "Rook", "Sorrel", "Tansy")):
-        red = [w.hero(n) for n in names]
+    for red in reds:
         red_t = team_metrics(w, red, m, ())
+        board = ([h.name for h in red], red_t["dps_floor"])
         bags = []
         for six in sixes:
             team = team_metrics(w, six, m, red)
@@ -433,17 +443,17 @@ def test_each_alias_normalises_as_the_key_that_carries_it(synthetic_world):
             values, carried = _column(bags, key), _column(bags, alias.carrier)
             guard = compile_expr(alias.guard)
             if guard is not None and not guard.evaluate(scope({"enemy": red_t})):
-                assert len(set(values)) == 1, (names, key)
+                assert len(set(values)) == 1, (board, key)
                 continue
             # within its guard a constant alias has a constant carrier: a
             # heuristic moved to the carrier weighs nothing more
-            assert (len(set(values)) == 1) == (len(set(carried)) == 1), (names, key)
+            assert (len(set(values)) == 1) == (len(set(carried)) == 1), (board, key)
             if len(set(values)) == 1:
                 continue
             varied.add(key)
             for norm, carrier in zip(_norms(values), _norms(carried), strict=True):
                 assert norm == pytest.approx(1 - carrier if alias.reversed else carrier,
-                                             abs=1e-12), (names, key)
+                                             abs=1e-12), (board, key)
     assert varied == set(compute.ALIASES)
 
 

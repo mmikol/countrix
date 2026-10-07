@@ -439,9 +439,11 @@ def write_docs(catalog: Sequence[Strategy], path: str = DOCS_PATH) -> str | None
             "Every key a strategy may reference, with its meaning. `enemy.*` are",
             "the `team.*` metrics computed for the red side. An alias is another",
             "key - its carrier - offset, scaled or reversed by what the board",
-            "fixes, so it normalises on a board as the carrier does: a heuristic",
-            "weighs the carrier, and a `when`, `bonus` or `penalty` may read the",
-            "alias.", "",
+            "fixes or by the six's size, so it normalises over a board's sixes as",
+            "the carrier does: a heuristic weighs the carrier, and a `when`,",
+            "`bonus` or `penalty` may read the alias. A partial team, its own size",
+            "in place of six, can read one sized by the six apart from its carrier.",
+            "",
             "| key | meaning |", "| --- | --- |"]
     for key, description in reg.items():
         if key.startswith("enemy."):

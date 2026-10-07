@@ -73,9 +73,11 @@ question is allowed.
    `map.*`, `world.*` - and which are text (compared in a `when` or an
    `x if c else y`, never a heuristic's metric or what a bonus or
    penalty adds), and which are aliases, each marked with the key that
-   carries it: a board reads an alias as its carrier, so a heuristic's
-   `metric` is the carrier, and a `when`, bonus or penalty may still read
-   the alias.
+   carries it: a board's sixes read an alias as its carrier, so a
+   heuristic's `metric` is the carrier, and a `when`, bonus or penalty may
+   still read the alias. Three read the six's size
+   (`team.synergy_density`, `team.safe_count`, `matchup.exposure_share`),
+   and a partial team - the current comp - reads them against its own.
 2. **Read the catalog.** `strategies` shows every existing file with its
    form and expressions. Name the nearest existing strategy and say how
    the new one differs; if one already says it, say so and offer `/tune`
@@ -100,11 +102,12 @@ question is allowed.
      is X, it needs Y". A `when` on red, the map or the world (`enemy.*`,
      `map.*`, `world.*`) keeps it a reward. Before
      adding a rule, read `strategies` for the ones already on its metric,
-     or on a key that moves with it on the boards where the rule applies
-     (the catalog refuses only the aliases that hold on every board:
-     `team.map_win_mean` reads as `team.win_mean` with no map,
-     `team.exposure_edges` as `team.exposed_count` against one red pick):
+     or on a key that moves with it on the boards where the rule applies:
      a trait paid by several rules wants a small weight, not another 1.
+     The catalog refuses only the aliases that hold on every board; these
+     hold on some and are not refused: `team.map_win_mean` reads as
+     `team.win_mean` with no map, `team.exposure_edges` as
+     `team.exposed_count` against one red pick.
    - **constraint**: a `require` that always holds ("at most two tanks"
      is `team.tanks <= 2`), and nothing weighted - no `when`, `bonus`,
      `penalty`, `metric`, `direction` or `weight`. `params:`
@@ -143,9 +146,12 @@ question is allowed.
    the `direction` that weighs the same and any guard to add to its
    `when`: move it with `infer_strategy`, those fields in one write, since
    a `metric` set alone can leave a reversed rule weighing the wrong way
-   round, or a guarded one without its guard. A folder that holds two or
-   more such files refuses every write, each loading the whole folder
-   first: the user moves them by hand.
+   round, or a guarded one without its guard. A need that takes the guard
+   leaves any needs on its old `when`, whose budget of 2 it shared -
+   needs share one only on a `when` written alike - so it and they weigh
+   differently after: say so. A folder that holds two or more such files
+   refuses every write, each loading the whole folder first: the user
+   moves them by hand.
 2. **Show the effect:** run `board` (or `infer`) for the board the user is
    on, or a representative one (King's Row against a heal-heavy red,
    say), and point at the new line in the breakdown: its weighted

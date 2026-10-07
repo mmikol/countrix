@@ -12,15 +12,15 @@ Each field keeps one rule, which FIELDS names and checked_value applies: a
 line of text or an expression is one line as the loader splits lines,
 within its length cap; a choice is one of its choices; the weight is a
 finite number within 0..10; a param is NAME: a finite number. A key
-outside FIELDS (and `id`, the filename's) is refused. A heuristic's metric
-is a numeric key and no alias (facts.compute.ALIASES), which normalises on
-a board as the key that carries it: the refusal names that key, the
+outside FIELDS (and `id`, the filename's) is refused. Every expression
+then runs on its probes before any board does (Expr.probes): it must
+evaluate, and a bonus or a penalty must come out a number (amount). Last,
+a heuristic's metric is no alias (facts.compute.ALIASES), which normalises
+on a board as the key that carries it: the refusal names that key, the
 direction that weighs the same and the guard to add, where the alias has
-one. Every expression then runs on its probes before any board does
-(Expr.probes): it must evaluate, and a bonus or a penalty must come out a
-number (amount). The loader reads every file through these checks, every
-writer (inference.tune) checks a value by them before a file changes, and
-the door declares its strategy arguments from FIELDS.
+one. The loader reads every file through these checks, every writer
+(inference.tune) checks a value by them before a file changes, and the
+door declares its strategy arguments from FIELDS.
 """
 
 import math
@@ -299,6 +299,7 @@ class Strategy:
         self._check_kind(meta)
         self._check_names(known)
         self._check_probes()
+        self._check_alias()
 
     def _labelled(self) -> list[tuple[str, Expr]]:
         """Every expression the file sets, with the field it sits under, in
@@ -309,9 +310,7 @@ class Strategy:
 
     def _check_heuristic(self, known: Mapping[str, str]) -> None:
         """A heuristic on a metric weighs it one way, and the metric is a
-        numeric key and no alias: the refusal of an alias says what to write
-        instead - its carrier, the direction that weighs the same, and the
-        alias's guard joined to the rule's own when."""
+        registered numeric key."""
         if self.kind != "heuristic" or not (self.metric or self.direction):
             return
         if self.direction not in DIRECTIONS:
@@ -321,7 +320,14 @@ class Strategy:
                                % (self.id, self.metric))
         if self.metric in compute.TEXT_METRICS:
             raise CatalogError("%s: metric %r is text, not a number" % (self.id, self.metric))
-        alias = compute.ALIASES.get(self.metric)
+
+    def _check_alias(self) -> None:
+        """A heuristic's metric is no alias: the refusal of one says what to
+        write instead - its carrier, the direction that weighs the same, and
+        the alias's guard joined to the rule's own when. It runs last, so a
+        file it refuses keeps every other rule, and what it says to write
+        loads."""
+        alias = compute.ALIASES.get(self.metric) if self.metric else None
         if alias is None:
             return
         direction = self.direction
