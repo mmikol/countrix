@@ -7,7 +7,7 @@ import pytest
 from db import Refusal
 from facts import board_facts
 from facts.draft import Draft
-from facts.records import Patch
+from facts.records import KitListMiss, Patch
 
 
 def test_every_fact_is_keyed_and_the_meta_comes_first(synthetic_world):
@@ -91,14 +91,24 @@ def test_team_facts_appear_per_side_and_matchup_only_with_both(synthetic_world):
 
 def test_a_board_fact_that_warns_carries_its_flag(synthetic_world):
     """A warning carries its flag, which the board marks it by; a patch
-    shipped since the rates is one. The sentences are test_hero_facts' and
-    test_team_facts'."""
+    shipped since the rates is one, and a kit list name no hero's kit
+    carries another, after it (tables.check_kit_lists). The sentences are
+    test_hero_facts' and test_team_facts'."""
     w = synthetic_world
     fs = board_facts.generate(w, Draft(None, ("Anvil",), ("Mortar",)))
     assert [f.key for f in fs.facts if f.warn] == ["hero.vs_answered_by"]
     w.newer_patches = [Patch("a patch", "2026-09-30")]
     (vintage,) = board_facts.generate(w, Draft()).find("meta.vintage_warning")
     assert vintage.warn and vintage.text.startswith("WARNING: 1 patch(es) shipped")
+    w.kit_list_misses = [KitListMiss("Light Gun", ("PILOT_GUNS", "FORM_GATED"))]
+    facts = board_facts.generate(w, Draft()).facts
+    assert [f.key for f in facts if f.warn] == ["meta.vintage_warning", "meta.kit_list_warning"]
+    (kits,) = [f for f in facts if f.key == "meta.kit_list_warning"]
+    assert kits.text == (
+        "WARNING: 1 kit list name(s) match no piece in the roster - Light Gun (PILOT_GUNS,"
+        " FORM_GATED) - a renamed piece reads as an ordinary one until its lists take the new"
+        " name")
+    assert kits.value == {"Light Gun": ["PILOT_GUNS", "FORM_GATED"]}
 
 
 def test_bans_become_facts_and_a_banned_pick_is_refused(synthetic_world):

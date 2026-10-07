@@ -118,6 +118,14 @@ def _meta_facts(fs: FactSet, world: World) -> None:
             " newest %s (%s) - treat rates as pre-patch"
             % (len(world.newer_patches), name, released),
             value=len(world.newer_patches), source="patches", warn=True)
+    if world.kit_list_misses:
+        misses = world.kit_list_misses
+        fs.add("meta", "kit lists", "meta.kit_list_warning",
+            "WARNING: %d kit list name(s) match no piece in the roster - %s - a renamed piece"
+            " reads as an ordinary one until its lists take the new name"
+            % (len(misses), "; ".join("%s (%s)" % (m.name, ", ".join(m.lists)) for m in misses)),
+            value={m.name: list(m.lists) for m in misses},
+            source="derived:meta.kit_list_warning", warn=True)
 
 
 def _ban_facts(fs: FactSet, world: World, board: Resolved) -> None:

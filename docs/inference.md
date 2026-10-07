@@ -833,10 +833,13 @@ the wiki's. The judgements sit in `facts/scalars.py` beside their pages:
 | `ENERGY_REFUND` | 33% | Wuyang: Guardian Wave refunds the stream's resource |
 
 `HELD`, `CASTER`, `AIMED`, `NOT_BESIDE`, `OWN_HEALS` and `BOOSTS` name the
-pieces the wiki has no field for. Mauga's Cardiac Overdrive heals the
-teammates 50% of the damage they deal: `facts/tables.py` reads that at
-the 2-2-2 role-median dps of his five teammates, 94.29, once the roster's
-dps is known.
+pieces the wiki has no field for. Like every kit list, each matches a piece
+by its whole name and states its rule and its members' evidence in its
+comment; the load holds every name to the roster and the board warns of
+one no kit carries, and /heroes sets a new hero's pieces beside them.
+Mauga's Cardiac Overdrive heals the teammates 50% of the damage they deal:
+`facts/tables.py` reads that at the 2-2-2 role-median dps of his five
+teammates, 94.29, once the roster's dps is known.
 
 The 6v6 kit as of 2026-09-26:
 

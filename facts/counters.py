@@ -107,9 +107,12 @@ EAT_FULL_HIT = 60.0     # hp: a main weapon's hit this big is all the eater has 
 EAT_SMALL_SHARE = 0.25  # the least an eater takes from a weapon of small hits
 PARTIAL = 0.5           # a flag the wiki writes "partial": the explosion passes
 PELLET_SLACK = 1.05     # a pellet's row may run this far over the shot's share of the whole
-# the flag family an eater reads, by the word its name holds: the wiki
-# publishes these two per weapon; an eater with none takes projectiles alone
-FLAG_FAMILIES = {"matrix": "ignores_matrix", "deflect": "ignores_deflect"}
+# A kit list (facts/scalars.py, the kit lists): the eaters whose per-weapon
+# flags the wiki publishes, each by its whole name, with the flag its family
+# reads - Defense Matrix (ignores_matrix) and Deflect (ignores_deflect). An
+# eater named nowhere here takes projectiles alone, where its description says
+# so (PROJECTILES_RE), read by Defense Matrix's flags.
+FLAG_FAMILIES = {"Defense Matrix": "ignores_matrix", "Deflect": "ignores_deflect"}
 PROJECTILES_RE = re.compile(r"\bprojectiles?\b", re.I)
 # the weapons every eater's details say it cannot block, the eaterproof ones
 UNBLOCKED = ("beam", "melee")
@@ -416,8 +419,7 @@ def _eater(h: Hero) -> tuple[float, str, str | None]:
             lasts, wait = a.max_stat("duration") or 0.0, a.max_stat("cooldown") or 0.0
             up = lasts / (lasts + wait) if lasts + wait else 0.0
             strength, said = _clamp(up / EATER_UPTIME), "up %.0f%%" % (100 * up)
-        words = set(a.name.lower().split())
-        family = next((code for word, code in FLAG_FAMILIES.items() if word in words), None)
+        family = FLAG_FAMILIES.get(a.name)
         if family is None and not PROJECTILES_RE.search(a.description or ""):
             continue
         if strength > best[0]:

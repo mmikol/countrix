@@ -1,13 +1,16 @@
 """The derivations facts/tables.py runs after its reads, on the synthetic
 World: the terrain's z-scores and lean, the rates' lift, the styles they sum
-to, the stages' z-scores and each hero's best maps, every expected value
-worked by hand from tests/synthetic.py. No database."""
+to, the stages' z-scores, each hero's best maps and the kit list names no
+kit carries, every expected value worked by hand from tests/synthetic.py. No
+database."""
 
 import pytest
 
+from db import KIND_ABILITY, KIND_WEAPON
 from facts import tables
+from facts.kit import KitPiece
 from facts.model import TERRAIN_FEATURES, Map
-from facts.records import MapRate, StageTerrain
+from facts.records import KitListMiss, MapRate, StageTerrain
 from facts.team import pair_score
 
 
@@ -174,3 +177,21 @@ def test_a_cell_no_article_writes_reads_the_written_cells_claim_share(synthetic_
     w.synergy_written = off | claims | {(ids["Mortar"], ids["Anvil"])}
     tables.impute_synergy(w)
     assert pair_score(w, ids["Anvil"], ids["Mortar"]) == 0 and w.synergy_cell == 8 / 11
+
+
+def test_a_kit_list_name_no_hero_carries_is_named_once_with_its_lists(synthetic_world):
+    """A kit list matches a piece by its whole name, so the load names each
+    list name no hero's ability or weapon config carries, once, with every
+    list that holds it: Light Gun, which PILOT_GUNS and FORM_GATED hold, once
+    the synthetic heroes carry every other name. The name back on a weapon
+    clears it. The synthetic World runs no check of its own: it has no kit."""
+    w = synthetic_world
+    assert w.kit_list_misses == []
+    names = {name for held in tables.KIT_LISTS.values() for name in held}
+    anvil = w.hero("Anvil")
+    anvil.abilities += [KitPiece(name, KIND_ABILITY) for name in sorted(names - {"Light Gun"})]
+    tables.check_kit_lists(w)
+    assert w.kit_list_misses == [KitListMiss("Light Gun", ("PILOT_GUNS", "FORM_GATED"))]
+    anvil.weapons.append(KitPiece("Light Gun", KIND_WEAPON))
+    tables.check_kit_lists(w)
+    assert w.kit_list_misses == []
