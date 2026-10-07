@@ -137,9 +137,34 @@ def test_the_weapon_kinds_read_the_damaging_weapons():
     both = _hero("tank", weapons=[hammer, cannon])
     assert both.weapon_kinds == {"melee", "projectile"} and both.melee and not both.melee_only
     beam = _gun("Particle Beam", "Beam", _per_second("dps", 90))
+    # a weapon the wiki types nothing reads its tag
     tagged = _gun("Auto Rifle", "", _per_second("dps", 90), keywords="hitscan")
     hero = _hero(weapons=[beam, tagged])
-    assert hero.beam and hero.hitscan and hero.weapon_kinds == {"beam"}
+    assert hero.beam and hero.hitscan and hero.weapon_kinds == {"beam", "hitscan"}
+
+
+def test_a_hero_has_the_kind_of_every_weapon_and_fights_with_the_held_ones():
+    # D.Mon's pilot gun, typed nothing and tagged hitscan: he is hitscan, yet
+    # still fights with the saber alone
+    saber = _gun("Plasma Saber", "Melee", stat("damage", 60, "hp"))
+    pilot = _gun("Portable Fusion Repeater", "", _per_second("dps", 120), keywords="hitscan",
+                 slot="secondary_fire")
+    mech = _hero("tank", weapons=[saber, pilot])
+    assert mech.weapon_kinds == {"melee", "hitscan"} and mech.hitscan and mech.melee
+    assert mech.melee_only
+    # Torbjörn's hammer, swapped to off the fight: melee, though he fights with the gun
+    rivets = _gun("Rivet Gun", "Projectile", _per_second("dps", 80))
+    hammer = _gun("Forge Hammer", "Melee", stat("damage", 70, "hp"), slot="secondary_fire")
+    engineer = _hero(weapons=[rivets, hammer])
+    assert engineer.weapon_kinds == {"projectile", "melee"} and engineer.melee
+    assert not engineer.melee_only
+    # Winston's charged alternate fire: hitscan, and out of the dps all the same
+    cannon = _gun("Tesla Cannon", "Beam", _per_second("dps", 70))
+    charged = _gun("Tesla Cannon Alt Fire", "Hitscan", _per_second("dps", 200),
+                   slot="secondary_fire")
+    winston = _hero("tank", weapons=[cannon, charged])
+    assert winston.weapon_kinds == {"beam", "hitscan"} and winston.hitscan and winston.beam
+    assert winston.dps == _hero("tank", weapons=[cannon]).dps
 
 
 def test_area_pieces_count_once_and_those_that_hurt_apart():

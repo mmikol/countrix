@@ -82,7 +82,7 @@ TEAM_METRICS = OrderedDict([
     ("hitscan", "picks with a hitscan weapon or ability"),
     ("hitscan_reach", "hitscan picks whose weapon publishes a reach of %g m or more"
                       % FLIER_REACH),
-    ("projectile", "picks whose weapons are projectile"),
+    ("projectile", "picks with a projectile weapon"),
     ("beam", "picks with a damaging beam"), ("melee", "picks with a melee weapon"),
     ("aoe_count", "kit pieces tagged area of effect or shockwave"),
     ("aoe_damage_count", "kit pieces that damage an area"),

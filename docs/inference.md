@@ -1185,7 +1185,7 @@ in place of six, can read one sized by the six apart from its carrier.
 | `team.ult_cost_mean` | mean ultimate charge cost where published |
 | `team.hitscan` | picks with a hitscan weapon or ability |
 | `team.hitscan_reach` | hitscan picks whose weapon publishes a reach of 30 m or more |
-| `team.projectile` | picks whose weapons are projectile |
+| `team.projectile` | picks with a projectile weapon |
 | `team.beam` | picks with a damaging beam |
 | `team.melee` | picks with a melee weapon |
 | `team.aoe_count` | kit pieces tagged area of effect or shockwave |
