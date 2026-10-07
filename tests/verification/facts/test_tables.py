@@ -181,17 +181,23 @@ def test_a_cell_no_article_writes_reads_the_written_cells_claim_share(synthetic_
 
 def test_a_kit_list_name_no_hero_carries_is_named_once_with_its_lists(synthetic_world):
     """A kit list matches a piece by its whole name, so the load names each
-    list name no hero's ability or weapon config carries, once, with every
+    list name no hero's weapon config or ability carries, once, with every
     list that holds it: Light Gun, which PILOT_GUNS and FORM_GATED hold, once
-    the synthetic heroes carry every other name. The name back on a weapon
-    clears it. The synthetic World runs no check of its own: it has no kit."""
+    the synthetic heroes carry every other name. The weapon's row in the
+    abilities table, which carries no stats, leaves it missed; the name back
+    on a weapon config clears it. The synthetic World runs no check of its
+    own: it has no kit."""
     w = synthetic_world
     assert w.kit_list_misses == []
     names = {name for held in tables.KIT_LISTS.values() for name in held}
     anvil = w.hero("Anvil")
     anvil.abilities += [KitPiece(name, KIND_ABILITY) for name in sorted(names - {"Light Gun"})]
     tables.check_kit_lists(w)
-    assert w.kit_list_misses == [KitListMiss("Light Gun", ("PILOT_GUNS", "FORM_GATED"))]
+    missed = [KitListMiss("Light Gun", ("PILOT_GUNS", "FORM_GATED"))]
+    assert w.kit_list_misses == missed
+    anvil.abilities.append(KitPiece("Light Gun", KIND_WEAPON))
+    tables.check_kit_lists(w)
+    assert w.kit_list_misses == missed
     anvil.weapons.append(KitPiece("Light Gun", KIND_WEAPON))
     tables.check_kit_lists(w)
     assert w.kit_list_misses == []

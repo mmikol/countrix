@@ -106,8 +106,8 @@ def test_a_board_fact_that_warns_carries_its_flag(synthetic_world):
     (kits,) = [f for f in facts if f.key == "meta.kit_list_warning"]
     assert kits.text == (
         "WARNING: 1 kit list name(s) match no piece in the roster - Light Gun (PILOT_GUNS,"
-        " FORM_GATED) - a renamed piece reads as an ordinary one until its lists take the new"
-        " name")
+        " FORM_GATED) - a renamed or removed piece: its lists take the new name or drop the"
+        " old, and until then a renamed piece reads as an ordinary one")
     assert kits.value == {"Light Gun": ["PILOT_GUNS", "FORM_GATED"]}
 
 

@@ -464,12 +464,17 @@ def _read_provenance(cx: Connection, w: World) -> None:
 
 def check_kit_lists(w: World) -> None:
     """World.kit_list_misses: each name a kit list holds (KIT_LISTS) that no
-    hero's ability or weapon config carries, once, with the lists that hold
+    hero's weapon config or ability carries, once, with the lists that hold
     it, in KIT_LISTS' order. A list matches a piece by its whole name, so a
-    pull that renames a piece leaves the old name here, and the piece reads
-    as an ordinary one until its lists take the new name; the board warns of
-    it (board_facts)."""
-    carried = {p.name for h in w.heroes.values() for p in (*h.abilities, *h.weapons)}
+    pull that renames or removes a piece leaves the old name here, and a
+    renamed piece reads as an ordinary one until its lists take the new
+    name; the board warns of it (board_facts). A weapon's name counts on its
+    configs alone: its row in the abilities table, Blizzard's, carries no
+    stats - the kits pull only classifies it - so a list that matches the
+    row alone reads nothing. The check knows no list's hero: a name two
+    heroes carry (Call Mech) stays matched while either carries it."""
+    carried = {p.name for h in w.heroes.values() for p in h.weapons}
+    carried |= {p.name for h in w.heroes.values() for p in h.abilities if p.kind != KIND_WEAPON}
     holding: dict[str, list[str]] = {}
     for kit_list, names in KIT_LISTS.items():
         for name in dict.fromkeys(names):
