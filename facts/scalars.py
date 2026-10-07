@@ -53,27 +53,30 @@ PRIMARY_SLOTS = ("primary_fire", "hip_fire", "default")
 # A weapon its hero holds only once its mech is destroyed and the pilot ejects
 # (Eject!): D.Va's Light Gun, D.Mon's Portable Fusion Repeater. Its hits are no
 # burst of the hero's (hero.burst, the counter matrix's burst), and FORM_GATED
-# holds it too.
+# holds it too; its kind is the hero's all the same (D.Mon reads hitscan).
 PILOT_GUNS = ("Light Gun", "Portable Fusion Repeater")
 # A weapon its hero swaps to for a task off the fight: Torbjörn's Forge Hammer,
 # whose heal row goes "to Torbjörn's turret". It is out of in_fight, which the
 # healing, the lifesteal and the barrier piercing read - the hammer's heal
-# would read as Torbjörn's own (self_hps, self_heal) - and out of hero.melee,
-# and FORM_GATED holds it too. Its swing still counts as a hit (hero.burst, the
-# counter matrix's burst).
+# would read as Torbjörn's own (self_hps, self_heal) - and FORM_GATED holds it
+# too. Its swing still counts as a hit (hero.burst, the counter matrix's burst)
+# and its kind as the hero's (the hammer makes Torbjörn melee), though not as a
+# weapon he fights with (hero.melee_only).
 OFF_FIGHT = ("Forge Hammer",)
 # A damaging weapon config its hero cannot hold through a fight: a form's
 # weapon, held while the form lasts on a cooldown (Bastion's Configuration:
 # Assault, 6 s of Reconfigure on a 12 s cooldown; Ramattra's Pummel, 8 s of
 # Nemesis Form on an 8 s cooldown); a charged side shot (Winston's Tesla Cannon
 # Alt Fire, 0.3 to 0.85 s to charge and 0.75 s to recover); and the two lists
-# above. It is out of hero.dps, the reach (max_range, hitscan_range) and
-# hero.weapon_kinds, and out of the counter matrix's main weapon, reach,
-# anti-air and barrier piercing. hero.hitscan and hero.beam still read its
-# tags; where the two lists above do not keep it out, hero.melee reads its type
-# (Pummel makes Ramattra melee), hero.pierces_barrier its rows and hero.burst
-# its hits. A config that deals no damage needs no place here: these steps
-# read the damaging ones alone.
+# above. It is out of hero.dps, the reach (max_range, hitscan_range), the
+# weapons melee_only reads, and the counter matrix's main weapon, reach,
+# anti-air and barrier piercing. Its kind still counts as the hero's, each
+# weapon its own (hero.weapon_kinds, hitscan, beam, melee): the hero has it,
+# so Pummel makes Ramattra melee and the Tesla Cannon's alternate fire makes
+# Winston hitscan. Where the two lists above do not keep it out,
+# hero.pierces_barrier reads its rows and hero.burst its hits. A config that
+# deals no damage needs no place here: these steps read the damaging ones
+# alone.
 FORM_GATED = ("Configuration: Assault", "Pummel", "Tesla Cannon Alt Fire", *PILOT_GUNS, *OFF_FIGHT)
 # A tool that keeps its target from dying which the wiki does not tag
 # invulnerable: Baptiste's Immortality Field, "a device that prevents allies
@@ -664,20 +667,37 @@ def _reach(hero: Hero, guns: list[KitPiece]) -> None:
     hero.hitscan_range = max((r for r in hitscan if r), default=0.0)
 
 
+def _kind(weapon: KitPiece, tags: bool = True) -> str | None:
+    """A weapon's kind - hitscan, beam, melee or projectile - from its type,
+    else, with tags, from its hitscan, beam or melee tag; None where neither
+    names one."""
+    t = weapon.weapon_kind or (
+        " ".join(sorted(weapon.keywords & {"hitscan", "beam", "melee"})) if tags else "")
+    if not t:
+        return None
+    return ("hitscan" if "hitscan" in t else "beam" if "beam" in t else "melee" if "melee" in t
+            else "projectile")
+
+
 def _weapon_kinds(hero: Hero, base: list[KitPiece], guns: list[KitPiece]) -> None:
-    """weapon_kinds, hitscan, beam, melee and melee_only. A weapon that deals no
-    damage says nothing here: a healing beam is not a beam."""
-    hero.weapon_kinds = {
-        "hitscan" if "hitscan" in t else "beam" if "beam" in t else "melee" if "melee" in t
-        else "projectile"
-        for t in (w.weapon_kind for w in guns) if t}
+    """weapon_kinds, hitscan, beam, melee and melee_only. A hero has the kind of
+    every weapon it deals damage with, each its own: a form's weapon, a
+    pilot's gun and one swapped to off the fight count too, since FORM_GATED
+    keeps them out of the numbers, not the kinds. A weapon the wiki types
+    nothing reads its tag (D.Mon's Portable Fusion Repeater, tagged hitscan).
+    melee_only reads the weapons the hero fights with: all swings, its burst
+    is one it must walk to (team.burst_ranged, the counter matrix's burst),
+    which a form's melee weapon (Pummel) still counts and a pilot's gun does
+    not change. A weapon that deals no damage says nothing here: a healing
+    beam is not a beam."""
+    hero.weapon_kinds = {k for k in (_kind(w) for w in hero.weapons if w.damages) if k}
     tagged = set[str]().union(
         *(k.keywords for k in base if k.kind == KIND_WEAPON and k.damages))
     hero.hitscan = "hitscan" in hero.weapon_kinds or "hitscan" in tagged
     hero.beam = "beam" in hero.weapon_kinds or "beam" in tagged
-    # a form's melee weapon (Pummel) still makes a melee hero
-    hero.melee = any("melee" in w.weapon_kind for w in hero.weapons if w.name not in OFF_FIGHT)
-    hero.melee_only = hero.melee and hero.weapon_kinds <= {"melee"}
+    hero.melee = "melee" in hero.weapon_kinds or "melee" in tagged
+    fights = any("melee" in w.weapon_kind for w in hero.weapons if w.name not in OFF_FIGHT)
+    hero.melee_only = fights and {k for k in (_kind(w, tags=False) for w in guns) if k} <= {"melee"}
 
 
 def _area(hero: Hero, with_ults: list[KitPiece]) -> None:

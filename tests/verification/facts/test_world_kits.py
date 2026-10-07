@@ -116,11 +116,15 @@ def test_sustained_healing_sums_the_pieces_over_the_teammates_they_reach(world):
         {"Repair Pack": 25.0, "Inspire": 73.36}, abs=0.01)
 
 
-def test_the_weapon_a_hero_fights_with_sets_its_kind_and_reach(world):
+def test_every_weapon_sets_a_heros_kinds_and_the_held_ones_its_numbers(world):
     winston, torb, ramattra = (world.hero(n) for n in ("Winston", "Torbjörn", "Ramattra"))
-    assert not winston.hitscan and winston.beam and winston.max_range == 8
+    # the charged alternate fire makes Winston hitscan; the cannon alone sets his reach
+    assert winston.hitscan and winston.beam and winston.max_range == 8
+    assert winston.weapon_kinds == {"beam", "hitscan"}
     assert winston.burst == 60 and winston.pierces_barrier
-    assert not torb.melee and not torb.pierces_barrier and torb.max_range is None
+    # the hammer, swapped to off the fight, makes Torbjörn melee and sets nothing else
+    assert torb.melee and not torb.melee_only and torb.weapon_kinds == {"projectile", "melee"}
+    assert not torb.pierces_barrier and torb.max_range is None
     assert torb.self_heal == 0 and torb.self_hps == 0
     assert ramattra.melee and ramattra.pierces_barrier and ramattra.dps == 100
     # a projectile that publishes no limit leaves the range unknown, not 0 m
@@ -134,6 +138,9 @@ def test_the_weapon_a_hero_fights_with_sets_its_kind_and_reach(world):
     assert world.hero("Mei").max_range == 12 and world.hero("Sojourn").max_range == 60
     dmon, dva = world.hero("D.Mon"), world.hero("D.Va")
     assert dmon.max_range == 4 and dmon.dps == pytest.approx(91.2) and dmon.ult_damage == 125
+    # a pilot's gun is a kind of the hero's, though he fights with the saber alone
+    assert dmon.weapon_kinds == {"melee", "hitscan"} and dmon.melee_only
+    assert dva.weapon_kinds == {"hitscan", "projectile"}
     assert dva.burst == 25 and dva.cc_tools == [] and dmon.cc_tools == ["Surging Strike"]
     # a healing beam is not a beam; a kick is not a barrier piercer
     assert not world.hero("Mercy").beam and not world.hero("Illari").beam
@@ -181,7 +188,8 @@ def test_tools_are_counted_once_and_for_what_they_do(world):
     reinhardt, widowmaker = world.hero("Reinhardt"), world.hero("Widowmaker")
     assert reinhardt.burst == 300 and reinhardt.melee_only and not widowmaker.melee_only
     assert widowmaker.burst == max(h.burst for h in five if not h.melee_only)
-    assert [h.name for h in five if h.hitscan] == ["Ana", "Widowmaker", "Tracer"]
+    # Winston is hitscan through his charged alternate fire, which sets no reach
+    assert [h.name for h in five if h.hitscan] == ["Ana", "Widowmaker", "Tracer", "Winston"]
     assert [h.name for h in five if h.hitscan_range >= 30] == ["Widowmaker"]     # 70 m
     # 30 m answers a flier (Shion's pistols), 25 m does not
     four = [world.hero(n) for n in ("Shion", "Wrecking Ball", "Junker Queen", "Cassidy")]
