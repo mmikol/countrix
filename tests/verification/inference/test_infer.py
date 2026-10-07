@@ -40,7 +40,7 @@ def test_infer_keeps_locked_picks_and_the_open_queue_shape(synthetic_world):
     # coverage of both enemies is worth 3 points, and the optimum takes them:
     # Anvil answers Mortar, Needle or Flint answers Gale
     cov = next(c for c in r.contributions if c["id"] == "coverage")
-    assert cov["raw"] == 1.0 and cov.get("fact")
+    assert cov["raw"] == 2.0 and cov["norm"] == 1.0 and cov.get("fact")
 
 
 def test_infer_honours_a_hitscan_answer_to_a_flier(synthetic_world):

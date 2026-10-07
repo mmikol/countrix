@@ -70,6 +70,10 @@ def test_tune_refuses_bad_changes_and_changes_nothing(catalog_copy):
     before = Path(catalog_copy, "coverage.md").read_text(encoding="utf-8")
     with pytest.raises(tune.TuneError, match="not a registered fact key"):
         tune.tune("coverage", "metric", "team.nope", "test", directory=catalog_copy)
+    with pytest.raises(tune.TuneError, match=(
+            r"^coverage: metric 'team\.coverage_share' normalises as team\.coverage: write"
+            r" metric: team\.coverage, direction: maximize;")):
+        tune.tune("coverage", "metric", "team.coverage_share", "test", directory=catalog_copy)
     with pytest.raises(tune.TuneError, match="within"):
         tune.tune("coverage", "weight", 50, "test", directory=catalog_copy)
     with pytest.raises(tune.TuneError, match="reason"):
@@ -469,3 +473,28 @@ def test_complete_moves_a_heuristic_from_a_metric_to_a_bonus_in_one_write(catalo
         with pytest.raises(tune.TuneError, match="cannot be unset"):
             tune.complete(sid, None, "r", directory=catalog_copy, unset=[field])
     assert Path(catalog_copy, sid + ".md").read_text(encoding="utf-8") == text
+
+
+def test_complete_moves_a_rule_off_an_alias_unless_a_second_one_blocks_the_folder(
+        catalog_copy):
+    """A rule whose metric is an alias - a file from before the catalog
+    refused one - does not load, and complete (infer_strategy) moves it to
+    the carrier in one write. Every write loads the whole folder first, so
+    beside a second such rule neither moves, each refused for the other:
+    the user moves one by hand."""
+    def metric(sid, old, new):
+        path = Path(catalog_copy, sid + ".md")
+        path.write_text(path.read_text(encoding="utf-8").replace(
+            "metric: %s\n" % old, "metric: %s\n" % new), encoding="utf-8")
+    metric("coverage", "team.coverage", "team.coverage_share")
+    metric("exposure", "team.exposed_count", "matchup.exposure_share")
+    moves = {
+        "coverage": {"metric": "team.coverage", "direction": "maximize"},
+        "exposure": {"metric": "team.exposed_count", "direction": "minimize"}}
+    for sid, other in (("coverage", "exposure"), ("exposure", "coverage")):
+        with pytest.raises(tune.TuneError, match=r"^%s: metric '\S+' normalises as" % other):
+            tune.complete(sid, moves[sid], "r", directory=catalog_copy)
+    metric("exposure", "matchup.exposure_share", "team.exposed_count")
+    done = tune.complete("coverage", moves["coverage"], "r", directory=catalog_copy)
+    assert done["form"] == "heuristic"
+    assert {s.id: s.metric for s in catalog.load(catalog_copy)}["coverage"] == "team.coverage"

@@ -1,7 +1,8 @@
 """The metrics of facts/compute.py and the sides of facts/draft.py on
 the synthetic World: the namespace a strategy reads, the matchup, the map
 metrics, the other side's likely six and the healing floor, every expected
-value worked by hand from tests/synthetic.py. The team metrics are
+value worked by hand from tests/synthetic.py, and each alias against the
+key that carries it over every legal six. The team metrics are
 tests/verification/facts/test_team.py's. No database."""
 
 import inspect
@@ -12,10 +13,11 @@ import pytest
 
 from facts import compute
 from facts.compute import STAGE_FEATURES, STAGE_MENTIONS, TERRAIN_STANDOUT
-from facts.draft import EXPECTED_SHAPE, TEAM_SIZE, is_sided, opposite
+from facts.draft import EXPECTED_SHAPE, MAX_TANKS, TEAM_SIZE, is_sided, opposite
 from facts.model import TERRAIN_FEATURES, Map
 from facts.records import MapRate, StageTerrain
 from facts.team import TEAM_METRICS, team_metrics
+from inference.expr import compile_expr, scope
 
 
 def _namespace(w, m, red, blue):
@@ -372,6 +374,77 @@ def test_the_world_metrics_and_the_registry_the_catalog_validates_against(synthe
         assert "team." + key in reg and "enemy." + key not in reg, key
     assert reg["team.coverage"] == TEAM_METRICS["coverage"]
     assert all("map.%s" % f in reg for f in TERRAIN_FEATURES)
+
+
+# --- the aliases --------------------------------------------------------------
+
+def test_each_alias_names_numeric_keys_and_a_team_key_that_carries_it():
+    """compute.ALIASES: an alias and its carrier are numeric registry keys,
+    the alias blue's own (team.* or matchup.*), the carrier a team.* key and
+    no alias itself, and a guard an expression on red alone, which the board
+    settles, so a heuristic moved to the carrier under it stays a reward."""
+    reg = compute.registry()
+    for key, alias in compute.ALIASES.items():
+        assert {key, alias.carrier} <= set(reg), key
+        assert not {key, alias.carrier} & compute.TEXT_METRICS, key
+        assert key.split(".", 1)[0] in ("team", "matchup"), key
+        assert alias.carrier.startswith("team.") and alias.carrier not in compute.ALIASES, key
+        guard = compile_expr(alias.guard)
+        if guard is not None:
+            assert guard.names and all(
+                n in reg and n.startswith("enemy.") for n in guard.names), key
+
+
+def _column(bags, key):
+    """A dotted key's value on each six, read off its section's bag."""
+    section, name = key.split(".", 1)
+    return [float(bag[section][name]) for bag in bags]
+
+
+def _norms(values):
+    """Min-max over a board's sixes, as the scale reads a heuristic's metric."""
+    low, high = min(values), max(values)
+    return [(v - low) / (high - low) for v in values]
+
+
+def test_each_alias_normalises_as_the_key_that_carries_it(synthetic_world):
+    """Over every legal six of the roster against a fixed red - none, one
+    pick, two, two that publish no reach, a whole six - an alias varies
+    where its carrier does, and min-max reads it as the carrier, or as the
+    carrier flipped where it is reversed; where its guard fails it reads one
+    value on every six. Every alias varies on some board here, so none is
+    held vacuously."""
+    w = synthetic_world
+    m = w.map("Harbor Gate")
+    roster = sorted((h for h in w.heroes.values() if h.released), key=lambda h: h.id)
+    sixes = [
+        six for six in itertools.combinations(roster, TEAM_SIZE)
+        if sum(1 for h in six if h.role == "tank") <= MAX_TANKS]
+    varied = set()
+    for names in ((), ("Mortar",), ("Mortar", "Gale"), ("Gale", "Balm"),
+                  ("Mortar", "Quarry", "Gale", "Rook", "Sorrel", "Tansy")):
+        red = [w.hero(n) for n in names]
+        red_t = team_metrics(w, red, m, ())
+        bags = []
+        for six in sixes:
+            team = team_metrics(w, six, m, red)
+            bags.append({"team": team, "matchup": compute.matchup_metrics(w, team, red_t)})
+        for key, alias in compute.ALIASES.items():
+            values, carried = _column(bags, key), _column(bags, alias.carrier)
+            guard = compile_expr(alias.guard)
+            if guard is not None and not guard.evaluate(scope({"enemy": red_t})):
+                assert len(set(values)) == 1, (names, key)
+                continue
+            # within its guard a constant alias has a constant carrier: a
+            # heuristic moved to the carrier weighs nothing more
+            assert (len(set(values)) == 1) == (len(set(carried)) == 1), (names, key)
+            if len(set(values)) == 1:
+                continue
+            varied.add(key)
+            for norm, carrier in zip(_norms(values), _norms(carried), strict=True):
+                assert norm == pytest.approx(1 - carrier if alias.reversed else carrier,
+                                             abs=1e-12), (names, key)
+    assert varied == set(compute.ALIASES)
 
 
 # --- the healing floor --------------------------------------------------------

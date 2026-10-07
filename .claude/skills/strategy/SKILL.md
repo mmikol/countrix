@@ -72,7 +72,10 @@ question is allowed.
    the same numbers on the red side, `matchup.*` for the two compared,
    `map.*`, `world.*` - and which are text (compared in a `when` or an
    `x if c else y`, never a heuristic's metric or what a bonus or
-   penalty adds).
+   penalty adds), and which are aliases, each marked with the key that
+   carries it: a board reads an alias as its carrier, so a heuristic's
+   `metric` is the carrier, and a `when`, bonus or penalty may still read
+   the alias.
 2. **Read the catalog.** `strategies` shows every existing file with its
    form and expressions. Name the nearest existing strategy and say how
    the new one differs; if one already says it, say so and offer `/tune`
@@ -96,7 +99,11 @@ question is allowed.
      needs on one guard cost 2 together at most. Write it for "if our six
      is X, it needs Y". A `when` on red, the map or the world (`enemy.*`,
      `map.*`, `world.*`) keeps it a reward. Before
-     adding a rule, read `strategies` for the ones already on its metric:
+     adding a rule, read `strategies` for the ones already on its metric,
+     or on a key that moves with it on the boards where the rule applies
+     (the catalog refuses only the aliases that hold on every board:
+     `team.map_win_mean` reads as `team.win_mean` with no map,
+     `team.exposure_edges` as `team.exposed_count` against one red pick):
      a trait paid by several rules wants a small weight, not another 1.
    - **constraint**: a `require` that always holds ("at most two tanks"
      is `team.tanks <= 2`), and nothing weighted - no `when`, `bonus`,
@@ -125,12 +132,20 @@ question is allowed.
    `body` (the standardized prose), the inferred fields, and a `reason`
    that quotes the sentence of the prose each field follows from. A key
    that is not in the vocabulary, an expression that does not parse or
-   fails on the catalog's probes, or a bonus or penalty that comes out
-   text, is refused and nothing is written - fix and call again. For a
+   fails on the catalog's probes, a bonus or penalty that comes out
+   text, or a `metric` that is an alias, is refused and nothing is
+   written - fix and call again. For a
    file the colleague dropped in with only a name, a kind and prose (the
    catalog shows it as a *draft*), use `infer_strategy` instead, with the
    inferred frontmatter and a `reason`; the draft keeps its prose, and a
-   kind change goes through `tune` with field `kind`.
+   kind change goes through `tune` with field `kind`. A file whose
+   `metric` is an alias does not load, and the refusal names the carrier,
+   the `direction` that weighs the same and any guard to add to its
+   `when`: move it with `infer_strategy`, those fields in one write, since
+   a `metric` set alone can leave a reversed rule weighing the wrong way
+   round, or a guarded one without its guard. A folder that holds two or
+   more such files refuses every write, each loading the whole folder
+   first: the user moves them by hand.
 2. **Show the effect:** run `board` (or `infer`) for the board the user is
    on, or a representative one (King's Row against a heal-heavy red,
    say), and point at the new line in the breakdown: its weighted

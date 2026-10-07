@@ -54,13 +54,13 @@ SCRATCH = {
     "picked": (
         "when: team.supports >= params.LEAST\nbonus: max([team.dps_count, team.hitscan_reach,"
         " team.dmg_ults]) - min(team.range_known, 2)\nparams:\n  LEAST: 2"),
-    "slow-chew": "metric: matchup.chew_time_theirs\ndirection: maximize\nweight: 1",
+    "slow-chew": "metric: matchup.chew_time_ours\ndirection: minimize\nweight: 1",
     "availability": "metric: team.map_availability\ndirection: maximize\nweight: 1",
     "doubled": "metric: team.double_covered\ndirection: maximize\nweight: 1",
     "weakest": "metric: team.pool_min\ndirection: maximize\nweight: 0.5",
     "shared": "metric: team.armor_share\ndirection: minimize\nweight: 0.5",
     "costly": "metric: team.ult_cost_mean\ndirection: minimize\nweight: 0.5",
-    "tempo": "metric: matchup.tempo_diff\ndirection: maximize\nweight: 0.5",
+    "tempo": "when: matchup.tempo_diff > 0\nbonus: min(matchup.tempo_diff, 4) / 4\nweight: 0.5",
     "lonely": "metric: team.isolated_count\ndirection: maximize\nweight: 0.5",
     "tight-core": "metric: team.core_size\ndirection: minimize\nweight: 0.5",
     # a list beside a count: a term the walk reads afresh, its values unhashable

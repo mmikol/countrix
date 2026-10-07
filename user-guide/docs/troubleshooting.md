@@ -72,7 +72,11 @@ The verdict names what failed. The usual fixes:
   again;
 - the database never answered: read `docker compose logs db`;
 - a strategy file does not load: the verdict names the file and the
-  reason; fix it through `/tune`, or finish a draft through `/strategy`;
+  reason; fix it through `/tune`, or finish a draft through `/strategy`.
+  A rule on an alias - the reason says its metric normalises as another
+  key - moves to that key through `/tune`; a folder with two or more
+  such rules is moved by hand first
+  ([another playbook](tuning.md#another-playbook));
 - a board did not solve: read `docker compose logs ui`.
 
 A `backup:` line is a warning: no nightly dump is being taken, and
@@ -89,7 +93,12 @@ Countrix at another PostgreSQL instead.
 A playbook file does not load, or `COUNTRIX_STRATEGIES` names a folder
 without a `meta.md`. The error names the file and the reason. Fix a
 field through `/tune` or the `tune` tool, finish a draft through
-`/strategy`, or unset `COUNTRIX_STRATEGIES`.
+`/strategy`, or unset `COUNTRIX_STRATEGIES`. An error that says a
+metric normalises as another key names a rule on an alias: `/tune` moves
+it to that key with the direction and guard the error gives, in one
+write through `infer_strategy`. Every write loads the whole folder
+first, so a folder with two or more such rules is moved by hand
+([another playbook](tuning.md#another-playbook)).
 
 ## A port is taken
 
