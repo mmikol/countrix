@@ -121,8 +121,9 @@ def _meta_facts(fs: FactSet, world: World) -> None:
     if world.kit_list_misses:
         misses = world.kit_list_misses
         fs.add("meta", "kit lists", "meta.kit_list_warning",
-            "WARNING: %d kit list name(s) match no piece in the roster - %s - a renamed piece"
-            " reads as an ordinary one until its lists take the new name"
+            "WARNING: %d kit list name(s) match no piece in the roster - %s - a renamed or"
+            " removed piece: its lists take the new name or drop the old, and until then a"
+            " renamed piece reads as an ordinary one"
             % (len(misses), "; ".join("%s (%s)" % (m.name, ", ".join(m.lists)) for m in misses)),
             value={m.name: list(m.lists) for m in misses},
             source="derived:meta.kit_list_warning", warn=True)

@@ -57,12 +57,14 @@ With the stack up, the refresher does it every day.
 
 ## A warning says kit list names match no piece in the roster
 
-A pull brought a renamed piece of a hero's kit, and a list in the facts
-layer still holds the old name, so the board reads that piece as an
-ordinary one: a save the wiki does not tag stops counting as a save. The
-warning names each old name and the lists that hold it. A list takes the
-new name in a change to the code; `/heroes` in Claude Code reports the
-lists a hero's pieces meet.
+A pull renamed or removed a piece of a hero's kit, and a list in the
+facts layer still holds the old name. Until the list takes the new name,
+the board reads a renamed piece as an ordinary one: a save the wiki does
+not tag stops counting as a save. A removed piece's old name changes
+nothing, and the list drops it. The warning names each old name and the
+lists that hold it. A list takes the new name or drops the old in a
+change to the code; `/heroes` in Claude Code reports the lists a hero's
+pieces meet.
 
 ## The stack says NOT READY
 

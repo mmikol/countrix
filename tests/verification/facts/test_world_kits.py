@@ -3,15 +3,18 @@ kit numbers, each read in its own units - an ultimate's numbers its own, a
 percent not hit points, a sum not one hit - the weapon a hero fights with,
 the tools counted once, the roster-wide benches and role-median pools, no
 hole in a released hero's core numbers, and every kit list's names on pieces
-the roster holds. The scrape is the point: every figure is the wiki's. The
-derivation's rules are tests/verification/facts/test_scalars.py's,
-test_scalars_healing.py's and test_kit.py's."""
+the roster holds, which the load checks. The scrape is the point: every
+figure is the wiki's. The derivation's rules are
+tests/verification/facts/test_scalars.py's, test_scalars_healing.py's and
+test_kit.py's."""
 
 import statistics
 
 import pytest
 
-from facts import counters, scalars
+from db import KIND_WEAPON
+from facts import counters, scalars, tables
+from facts.records import KitListMiss
 
 pytestmark = pytest.mark.invariant
 
@@ -230,12 +233,17 @@ def test_every_kit_list_names_a_piece_the_roster_holds(world):
     """A kit list matches a piece by its whole name, so a pull that renames
     one drops it off its lists in silence: the load names each list name no
     hero's kit carries (World.kit_list_misses), and the built database
-    leaves none. A pair's two pieces are one hero's - a heal and the weapon
-    that triggers it, a refund and its beam, a booster and what it boosts -
-    and each eater FLAG_FAMILIES names is a projectile eater whose family's
-    flag some weapon publishes."""
+    leaves none, each name on a weapon config or an ability that is no
+    weapon's row, as the check holds it. A pair's two pieces are one hero's
+    - a heal and the weapon that triggers it, a refund and its beam, a
+    booster and what it boosts - and each eater FLAG_FAMILIES names is a
+    projectile eater whose family's flag some weapon publishes."""
     assert world.kit_list_misses == []
-    kits = [{p.name for p in (*h.abilities, *h.weapons)} for h in world.heroes.values()]
+    kits = [
+        {p.name for p in h.weapons} | {p.name for p in h.abilities if p.kind != KIND_WEAPON}
+        for h in world.heroes.values()]
+    names = {name for held in tables.KIT_LISTS.values() for name in held}
+    assert names <= set().union(*kits), sorted(names - set().union(*kits))
     pairs = [(heal, weapon) for heal, (weapon, _) in scalars.TRIGGERED.items()]
     pairs += [(cast, beam) for cast, (beam, _) in scalars.ENERGY_REFUND.items()]
     pairs += list(scalars.BOOSTS.items())
@@ -247,3 +255,13 @@ def test_every_kit_list_names_a_piece_the_roster_holds(world):
     flags = {code for h in world.heroes.values() for config in h.weapons for code in config.stats}
     for eater, flag in counters.FLAG_FAMILIES.items():
         assert eater in eaters and flag in flags, eater
+
+
+def test_the_load_names_a_kit_list_name_the_roster_lacks(db, monkeypatch):
+    """The load runs the kit lists' check over the built roster: a list that
+    holds a name no piece carries comes back in World.kit_list_misses, so a
+    load that dropped the check would fail here."""
+    monkeypatch.setitem(tables.KIT_LISTS, "SAVE_TOOLS", ("Immortality Field 2",))
+    w = tables.load(db)
+    db.rollback()
+    assert w.kit_list_misses == [KitListMiss("Immortality Field 2", ("SAVE_TOOLS",))]

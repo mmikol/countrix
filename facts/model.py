@@ -264,7 +264,7 @@ class World:
         self.snapshots: list[Snapshot] = []
         self.newer_patches: list[Patch] = []
         # each name a kit list holds that no hero's kit carries, with its
-        # lists: a piece a pull renamed (tables.check_kit_lists)
+        # lists: a piece a pull renamed or removed (tables.check_kit_lists)
         self.kit_list_misses: list[KitListMiss] = []
         self.subrole_passives: dict[str, str] = {}              # subrole -> its passive's text
         self.role_icons: dict[str, str | None] = {}

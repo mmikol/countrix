@@ -43,10 +43,12 @@ PRIMARY_SLOTS = ("primary_fire", "hip_fire", "default")
 # matches a piece by its whole name, exact in case and accent, and a piece no
 # list names reads as an ordinary one. A list's comment states its rule and
 # its members' evidence. A pull that renames a piece drops it off its lists,
-# so the load names each list name no hero's kit carries and the board warns
-# of it. The heroes skill sets a new hero's pieces beside each rule; a list
-# changes in a code change that writes the member's evidence in its comment,
-# with a test that fails without it.
+# and one that removes a piece leaves its name on them, so the load names each
+# list name no hero's kit carries - a weapon's on its configs - and the board
+# warns of it; a name two heroes carry (Call Mech) stays matched while either
+# carries it (tables.check_kit_lists). The heroes skill sets a new hero's
+# pieces beside each rule; a list changes in a code change that writes the
+# member's evidence in its comment, with a test that fails without it.
 #
 # A weapon its hero holds only once its mech is destroyed and the pilot ejects
 # (Eject!): D.Va's Light Gun, D.Mon's Portable Fusion Repeater. Its hits are no
