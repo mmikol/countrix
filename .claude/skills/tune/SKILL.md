@@ -41,8 +41,12 @@ reason in `inference/strategies/tuning-log.md`. Nothing is edited by hand.
    and `direction` (and that `when`) in one write, since `tune` sets one
    field at a time and a metric moved alone can leave a reversed rule
    weighing the wrong way round, or a guarded one without its guard. A
-   folder that holds two or more such rules refuses every write, each
-   loading the whole folder first: the user moves them by hand.
+   need - a rule whose `when` reads our own six - that takes the guard no
+   longer shares the budget of any needs on its old `when`, since needs
+   share one only on a `when` written alike: it and they weigh
+   differently after, so say so. A folder that holds two or more such
+   rules refuses every write, each loading the whole folder first: the
+   user moves them by hand.
 4. Show the effect: re-run `board` (or `infer`) for the board the user is
    looking at and say what moved. One change per request unless they ask
    for more; never touch a strategy they did not name.

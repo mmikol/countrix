@@ -287,9 +287,11 @@ def test_a_heuristic_on_an_alias_is_refused_naming_the_key_that_carries_it(
     carries it, so a heuristic on it pays what one on the carrier pays: the
     catalog refuses it as a heuristic's metric, naming the carrier, the
     direction that weighs the same - flipped for a reversed alias - and the
-    guard to add where the alias has one. What it says to write loads on the
-    carrier, a reward still a reward and a need still a need, and a when
-    and a bonus may still read the alias."""
+    guard to add where the alias has one. It refuses last: a file that
+    breaks another rule as well, a bonus beside the metric, is refused for
+    that rule. What it says to write loads on the carrier, a reward still a
+    reward and a need still a need, and a when and a bonus may still read
+    the alias."""
     def load_one(head):
         (tmp_path / "x.md").write_text("---\nname: x\nkind: heuristic\n%s---\nx\n" % head,
                                        encoding="utf-8")
@@ -298,6 +300,8 @@ def test_a_heuristic_on_an_alias_is_refused_naming_the_key_that_carries_it(
         load_one("metric: %s\ndirection: %s\n%s" % (
             metric, direction, "when: %s\n" % when if when else ""))
     assert str(refused.value) == message
+    with pytest.raises(CatalogError, match=r"^x: a heuristic weighs a metric or bonus/penalty"):
+        load_one("metric: %s\ndirection: %s\nbonus: 1\n" % (metric, direction))
     written = re.search(r": write (.*); a when", message).group(1)
     moved = load_one("".join(
         "%s\n" % field for field in re.split(r", (?=(?:metric|direction|when): )", written)))

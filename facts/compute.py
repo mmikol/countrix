@@ -10,10 +10,10 @@ here) are the vocabulary a strategy's frontmatter may use: `team.<key>`,
 `map.<key>`, `world.<key>`; registry() gathers them all.
 
 Some keys are aliases (ALIASES): another key - their carrier - offset,
-scaled or reversed by what a board fixes, so min-max over a board's
-sixes reads the two alike. The catalog refuses an alias as a heuristic's
-metric and names its carrier (said); a when, a bonus or a penalty may
-read one.
+scaled or reversed by what a board fixes or a six's size, so min-max
+over a board's sixes reads the two alike. The catalog refuses an alias
+as a heuristic's metric and names its carrier (said); a when, a bonus or
+a penalty may read one.
 
 Unknowns are numeric, never None: a metric that needs a map reads 0 (or
 falls back to the roster-wide figure where that is the honest substitute,
@@ -413,16 +413,20 @@ class Alias(NamedTuple):
 
 
 # Metrics another key carries. On a board, red, the map and the world are
-# fixed, so an alias is its carrier times a constant plus another - the
-# factor negative where reversed - and min-max over the board's sixes reads
-# the two alike, or one as the other flipped: a heuristic on either pays
-# the same. The catalog refuses an alias as a heuristic's metric, naming
-# the carrier; a when, a bonus or a penalty may read one. The rule: an
-# alias normalises as its carrier on every board where it varies; a guard
-# on red says where that is, and outside it the alias reads one value on
-# every six. Pairs that hold only on some boards - the map_* keys with no
-# map, exposure_edges against one red pick, hps_per_support under a
-# playbook's own limits - are not listed and stay for /strategy to catch.
+# fixed, and a six holds six picks, so an alias is its carrier times a
+# constant plus another - the factor negative where reversed - and min-max
+# over the board's sixes reads the two alike, or one as the other flipped:
+# a heuristic on either pays the same. The catalog refuses an alias as a
+# heuristic's metric, naming the carrier; a when, a bonus or a penalty may
+# read one. The rule: an alias normalises as its carrier over the sixes of
+# every board where it varies; a guard on red says where that is, and
+# outside it the alias reads one value on every six. Three read the six's
+# size - synergy_density, safe_count and exposure_share - and a partial
+# team, the current comp scored on the sixes' scale, reads them against
+# its own: a rule moved off one moves that team's share. Pairs that hold
+# only on some boards - the map_* keys with no map, exposure_edges against
+# one red pick, hps_per_support under a playbook's own limits - are not
+# listed and stay for /strategy to catch.
 # tests/verification/facts/test_metrics.py holds each to its carrier
 ALIASES: dict[str, Alias] = {
     "team.heal_ratio": Alias("team.heal_peak_supports"),
