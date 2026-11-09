@@ -41,3 +41,25 @@ keeps it current.
   ("Nothing is hosted"), the README, the guide's install page and the
   `up` skill say the stack is local. Cost: about $29 a month; a morning
   for the first run; an hour for the setting, its test and the docs.
+- **The wiki catches up with Season 5.** Season 5 began on 2026-10-06,
+  and on 2026-11-09, checked against Blizzard's patch notes, the wiki
+  had not written all of it. Sombra's article keeps Hack's rows under
+  Hotfix's name, a live Virus and no Cyberspace, so she reads as a
+  support that heals nothing and Hotfix as crowd control. Stale `dps`
+  fields contradict their own articles' rows, and the rate prefers the
+  field: Roadhog's Scrap Gun reads 154.76 where its rows give 197.86,
+  Sombra's Machine Pistol 114.3 for 92.86, Illari's Solar Rifle 68 for
+  about 80, Freja's crossbow 103.92 for 97.0 and Genji's Dragonblade
+  158.05 for 165.3. Junker Queen's 6v6 health is 450 for 500, and the
+  6v6 lines of Winston's and Zarya's barriers and D.Mon's Fusion
+  Repeater cooldown are stale. Trash Compactor carries the removed Alt
+  Fire's 24 - 39 m falloff, so Roadhog's reach reads 39. The Maps
+  article files Grimsvotn under Upcoming, so its rates are skipped, and
+  the Patches table ends on 2026-08-14, so a snapshot names that patch.
+  Once the articles move: dump the database (docs/db.md), refresh the
+  caches and `db_rebuild` - an incremental pull keeps Virus's row - then
+  drop the entries from `KIT_LAGS` and `MAP_LAGS` and re-pin what moves.
+  If the wiki names the map Watchpoint: Grimsvotn, Blizzard's label,
+  Grimsvotn without the prefix, still misses it under `name_key`, so a
+  key that drops the Watchpoint prefix on both sides joins the change.
+  Cost: a rebuild of about 8 minutes, then the pins.

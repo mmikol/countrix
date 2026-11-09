@@ -87,6 +87,28 @@ def test_a_shot_times_the_fire_rate_counts_the_hit_the_rate_names():
     assert _dps(gun) == 120
 
 
+def test_a_shot_a_charge_empowers_is_no_shot_the_rate_repeats_and_lands_on_the_body():
+    # Doctrine's Eternal Scepter: Infuse empowers the next shot alone, two
+    # charges on 9 s. The page's own rate, 84.7 while firing, is the base 55 at
+    # 1.54 a second, and "Infused shot does not crit"
+    scepter = _kit(
+        KIND_WEAPON,
+        ("damage", 17, "hp", None, None, "base, min", "17"),
+        ("damage", 55, "hp", None, None, "base, max", "55"),
+        ("damage", 24, "hp", None, None, "infused, min", "24"),
+        ("damage", 80, "hp", None, None, "infused, max", "80"),
+        ("heal", 55, "hp", None, None, "base, max", "55"),
+        ("heal", 110, "hp", None, None, "infused, max", "110"),
+        ("fire_rate", 1.54, "shots", "seconds", 1, None, "1.54 shots/s"),
+        ("ammo", 18, "rounds", None, None, None, "18"),
+        ("headshot", 1, None, None, None, None, "yes"),
+        ("headshot_mod", 1.5, "hp", None, None, None, "1.5 damage only"))
+    assert _dps(scepter) == pytest.approx(84.7)
+    assert scepter.heal_rate() == pytest.approx(84.7)
+    # the base shot's head is the biggest hit; the empowered 80 lands on the body
+    assert sorted(scepter.hits()) == pytest.approx([24, 25.5, 80, 82.5])
+
+
 def test_damage_over_time_is_a_rate_only_where_nothing_else_is():
     shot = ("damage", 60, "hp", None, None, "hitscan shot", "60")
     magnum = _kit(
@@ -192,6 +214,25 @@ def test_a_single_hit_is_one_row_and_a_headshot_where_one_counts():
         ("damage", 90, "hp", None, None, None, "90"),
         ("duration", 3, "seconds", None, None, None, "3 seconds"))
     assert beam.hits() == []                    # the rate over its duration, not a hit
+
+
+def test_a_heal_a_whole_magazine_adds_up_to_is_no_single_heal():
+    # Kiriko's Healing Ofuda: "12 (per ofuda)" and "120 (per volley)", the
+    # volley her ten-ofuda clip; a heal on the hero itself is no teammate's
+    ofuda = _kit(
+        KIND_WEAPON,
+        ("heal", 12, "hp", None, None, "per ofuda", "12"),
+        ("heal", 120, "hp", None, None, "per volley", "120"),
+        ("heal", 30, "hp", None, None, "self", "30"),
+        ("ammo", 10, "rounds", None, None, None, "10"))
+    assert ofuda.heals() == [12]
+    # an ability has no magazine: its bigger row is its own heal
+    bounce = _kit(
+        KIND_ABILITY,
+        ("heal", 12, "hp", None, None, "per hit", "12"),
+        ("heal", 120, "hp", None, None, "max", "120"),
+        ("ammo", 10, "rounds", None, None, None, "10"))
+    assert sorted(bounce.heals()) == [12, 120]
 
 
 def test_a_cast_of_several_pieces_hits_with_all_of_them():

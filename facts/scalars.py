@@ -65,7 +65,7 @@ PILOT_GUNS = ("Light Gun", "Portable Fusion Repeater")
 OFF_FIGHT = ("Forge Hammer",)
 # A damaging weapon config its hero cannot hold through a fight: a form's
 # weapon, held while the form lasts on a cooldown (Bastion's Configuration:
-# Assault, 6 s of Reconfigure on a 12 s cooldown; Ramattra's Pummel, 8 s of
+# Assault, 5 s of Reconfigure on a 12 s cooldown; Ramattra's Pummel, 8 s of
 # Nemesis Form on an 8 s cooldown); a charged side shot (Winston's Tesla Cannon
 # Alt Fire, 0.3 to 0.85 s to charge and 0.75 s to recover); and the two lists
 # above. It is out of hero.dps, the reach (max_range, hitscan_range), the
@@ -115,12 +115,13 @@ LOCK_NEAR = 5.0
 SPRAY_TARGETS = 1.0
 SPRAYS = ("Biotic Grasp",)
 # Brigitte page: the Rocket Flail is in contact throughout, as hero.dps holds
-# every weapon on its target. A Flail trigger locks Inspire out for 1.25 s, so
-# it fires on every third swing of 0.6 s: once each 1.8 s. FLAIL_CONTACT is a
-# setting held at the judgement's value, kept so the sensitivity can be varied
-# (docs/inference.md, The healing floor).
+# every weapon on its target. A Flail trigger locks Inspire out for 1 s, so
+# it fires on every second swing of 0.6 s: once each 1.2 s ("swinging
+# continuously at a target will cause it to trigger once every two swings").
+# FLAIL_CONTACT is a setting held at the judgement's value, kept so the
+# sensitivity can be varied (docs/inference.md, The healing floor).
 FLAIL_CONTACT = 1.0
-INSPIRE_LOCKOUT = 1.25
+INSPIRE_LOCKOUT = 1.0
 TRIGGERED = {"Inspire": ("Rocket Flail", INSPIRE_LOCKOUT)}
 # Illari page: an emptied bar waits 0.4 s more before it recharges.
 EMPTY_WAIT = {"Solar Rifle Alt Fire": 0.4}
@@ -277,7 +278,7 @@ def _healing(hero: Hero, in_fight: list[KitPiece], dps: float) -> None:
     for piece in in_fight:
         mine = not _lands_on_team(hero, piece)
         rate = piece.heal_rate()
-        casts = [s.value for s in piece.flat("heal") if not on_self(s.condition)]
+        casts = piece.heals()
         if rate and mine:
             own_rate.append(rate)
         if casts:
@@ -434,8 +435,8 @@ def _energy(piece: KitPiece) -> Energy | None:
 def _weapon_heal(piece: KitPiece) -> float:
     """A weapon's sustained hp/s onto teammates: a resource beam at the duty
     its energy allows, a beam at its heal row, any other at its published
-    rate with the reload in; a splash that lands on an aimed teammate adds
-    the others it reaches."""
+    rate with the reload in where its rows give one; a splash that lands on
+    an aimed teammate adds the others it reaches."""
     energy = _energy(piece)
     if "beam" in piece.keywords:
         rate, hot, hot_s = _beam_rows(piece)

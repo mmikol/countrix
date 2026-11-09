@@ -315,6 +315,12 @@ db <- facts <- inference <- door <- ui.
   kit carries, and `test_every_kit_list_names_a_piece_the_roster_holds`
   fails on it - on the built database only, so CI never runs it. A name
   two heroes carry (Call Mech) stays matched while either carries it.
+- What Blizzard ships before the wiki writes it - a reworked hero's new
+  piece with no wiki row, a map the wiki's pool lacks - is excused by name
+  in `KIT_LAGS` and `MAP_LAGS` (tests/verification/__init__.py), with its
+  evidence. The invariant that excuses it fails once the wiki catches up,
+  and the entry goes in the change that pulls it. A piece Blizzard dropped
+  keeps its row through an incremental pull: only `db_rebuild` clears it.
 - `tests/verification/ui/test_pages.py` pins the scripts at their seams
   (routes, query keys, element ids, the payload keys they read against what
   the server writes), and `tests/qa/test_stylesheet.py` holds that every

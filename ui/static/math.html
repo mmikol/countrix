@@ -279,8 +279,9 @@ hps        = &Sigma; over the counted parts of the kit of
                                           wait once its energy runs out (Illari's Solar
                                           Rifle); hot: a heal that lingers t seconds once the
                                           beam stops (Moira's Biotic Grasp), else 0
-             rate                         a weapon, reload time included; a splash on an aimed
-                                          teammate adds the others it reaches
+             rate                         a weapon, reload time included where its rows give
+                                          one; a splash on an aimed teammate adds the others
+                                          it reaches
 cycle      the cooldown, and the duration too where the effect is held
            the pylon's uptime, the Flail's trigger, the torpedoes' lock and a bounce chain are
            rules of their own (facts/scalars.py); a bounce lands on each next teammate at
@@ -310,20 +311,21 @@ d_q          max( 0, 2 &minus; red's picks in role q ): what the two-two-two sti
 f            red's open slots / &Sigma;_q d_q, 0 when nothing is missing</pre>
 <p>Red here is red's revealed picks, their open slots filled as above; the likely six is not
 read. Before red reveals a pick, red is a two-two-two of role-median heroes: it heals
-<code>world.hps_bench</code>, the <i>benchmark</i> - twice the median support's healing - and
+<code>world.hps_bench</code>, the <i>benchmark</i> - twice the median healing of the supports
+that heal - and
 its pool is twice the sum of the role-median pools in the kit in force. A six must then heal
 that share of its own pool each second, and never less than the benchmark, and everything in
 that bar is kit data. The sources give no absolute bar - no fight length, no ultimate charge -
 so the rule asks for parity with the other side's healing and no more: at parity the healing
 part of the margin is zero and damage decides the race, and healing past the bar earns nothing
-from the rule. The bar has three caveats, read on the 6v6 kit as of 2026-09-26. First, the
-benchmark is fragile: Illari, Mizuki and Moira sit within 0.7 hp/s of each other around the
-median support, each figure resting on a modelling judgement; the benchmark moves one for one
-with the two supports that set the median, and if one of them were rated above Kiriko it would
-rise to about 151 hp/s. Second, overhealing is not subtracted, so an untargeted area heal, which
-also lands on full-health teammates, reads above what it heals. Third, <code>hps</code> takes
-Brigitte's Flail to be in contact throughout; at half contact she reads 61.7 hp/s in place of
-98.4.</p>
+from the rule. The bar has three caveats, read on the 6v6 kit as of 2026-11-09. First, the
+benchmark is fragile: it sits on Illari alone, the median of the fifteen supports that heal,
+4.45 hp/s above
+Mizuki and 7.26 below Kiriko, her figure resting on a modelling judgement; the benchmark moves
+two for one with her, and if she were rated above Kiriko it would rise to 163.0 hp/s. Second,
+overhealing is not subtracted, so an untargeted area heal, which also lands on full-health
+teammates, reads above what it heals. Third, <code>hps</code> takes Brigitte's Flail to be in
+contact throughout; at half contact she reads 73.6 hp/s in place of 122.2.</p>
 <p id='what-100-means'><b>What 100 means.</b> Blue's best six on this board is its
 <i>optimal</i>, 100. Its 0 is the share floor: the lowest score among the reference sixes that
 keep the board's limits, each scored with the board's stage in force. The sample is drawn from
