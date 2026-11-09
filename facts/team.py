@@ -95,7 +95,7 @@ TEAM_METRICS = OrderedDict([
     ("dmg_amp", "picks that amplify someone's damage"),
     # sustain
     ("hps_floor", "summed sustained healing onto teammates, hp per second over every teammate"
-                  " reached, reloads in"),
+                  " reached, reloads in where the kit gives one"),
     ("heal_peak_total", "summed biggest single heal per pick, its own self-heal included"),
     ("heal_peak_supports", "summed biggest single heal (one cast, hp) across the supports"),
     ("heal_peak_max", "the biggest single heal a teammate can receive"),

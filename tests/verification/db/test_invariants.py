@@ -10,6 +10,7 @@ from psycopg.sql import SQL, Identifier
 from db.data.wiki import terrain
 from db.data.wiki.kits.measurements import CANONICAL_UNITS
 from db.psql import schema
+from tests.verification import KIT_LAGS
 
 pytestmark = pytest.mark.invariant
 
@@ -33,8 +34,10 @@ def test_every_hero_has_a_weapon_and_an_ultimate(one):
         assert one(missing) == 0
 
 
-def test_every_ability_is_classified(one):
-    assert one("select count(*) from abilities where kind_id is null") == 0
+def test_every_ability_is_classified_but_the_pieces_the_wiki_has_not_written(rows):
+    unclassified = rows("""select h.name, a.name from abilities a join heroes h using (hero_id)
+        where a.kind_id is null""")
+    assert set(unclassified) == {(lag.name, piece) for lag in KIT_LAGS for piece in lag.missing}
 
 
 # --- maps ---------------------------------------------------------------

@@ -114,7 +114,7 @@ def test_a_cast_cycles_on_its_cooldown_and_a_held_effect_on_both():
 def test_a_bounce_a_trigger_and_a_lock_on_read_their_own_rows():
     """Kasa's second bounce lands when one of four teammates stands within 12
     m, its third when one of three more does; Inspire fires on the first
-    Flail swing past its 1.25 s lockout; the torpedo lock holds the gun."""
+    Flail swing past its 1 s lockout; the torpedo lock holds the gun."""
     kasa = _kit("Healing Kasa", KIND_ABILITY,
                 *(stat("heal", v, "hp", condition=c)
                   for v, c in ((90, "1st bounce"), (70, "2nd bounce"), (50, "3rd bounce"),
@@ -131,8 +131,8 @@ def test_a_bounce_a_trigger_and_a_lock_on_read_their_own_rows():
                    _rate("heal", 11.25), stat("duration", 4, "seconds"),
                    stat("radius", 20, "meters"))
     brig = _hero(weapons=[flail], abilities=[inspire])
-    assert brig.hps == pytest.approx((11.25 + 12 / 1.8) * 5 * scalars.p_within(20))
-    assert brig.hps == pytest.approx(73.36, abs=0.005)
+    assert brig.hps == pytest.approx((11.25 + 12 / 1.2) * 5 * scalars.p_within(20))
+    assert brig.hps == pytest.approx(87.01, abs=0.005)
     blaster = _kit("Blaster", KIND_WEAPON, stat("heal", 72, "hp"), _rate("hps", 80))
     torpedoes = _kit(
         "Torpedoes", KIND_ABILITY, stat("heal", 85, "hp", condition="direct"),

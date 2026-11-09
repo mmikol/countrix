@@ -66,7 +66,7 @@ from dataclasses import dataclass
 from typing import NamedTuple
 
 from db import KIND_ABILITY, KIND_PASSIVE, KIND_ULTIMATE
-from facts.kit import MIN_FALLOFF, KitPiece
+from facts.kit import EMPOWERED_RE, MIN_FALLOFF, KitPiece
 from facts.model import Hero, World
 from facts.records import DerivedEdge, Fired, Pairing
 from facts.scalars import (
@@ -211,10 +211,12 @@ def _flag(piece: KitPiece, code: str) -> float:
 
 def _per_hit(piece: KitPiece) -> float | None:
     """The damage one instance of a weapon deals at its best - a pellet, a
-    bullet, a shot - not a sum, a damage over time or a row on the hero."""
+    bullet, a shot - not a sum, a damage over time, a row on the hero or a
+    shot a charge empowers, which the weapon does not repeat."""
     values = [s.value for s in piece.stats.get("damage", ())
                 if s.value is not None and s.unit_den is None and s.unit_num != "percent"
-                and not SUMMED_RE.search("%s %s" % (s.condition, s.text))]
+                and not SUMMED_RE.search("%s %s" % (s.condition, s.text))
+                and not EMPOWERED_RE.search(s.condition)]
     if not values:
         return None
     pellets = piece.max_stat("pellets") or 1

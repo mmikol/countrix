@@ -5,7 +5,8 @@ db/data/wiki/kits/measurements.py stores each wiki stat as measurements
 (value, unit, condition) beside the stat's original value_text. This module
 derives a kit piece's combat numbers from both at read time - a reload
 worded beside a firing rate, a figure that is a sum and not one hit, a
-percent worth its published cap, a row on the hero itself - so a fix to how
+percent worth its published cap, a row on the hero itself, a shot a charge
+empowers - so a fix to how
 a wording is read is a code change here and needs no re-pull. The rest of
 the facts package reads the measurements and the keywords, and a stat's
 text or an ability's description only where a word or a figure in it
@@ -26,6 +27,12 @@ from db import KIND_ABILITY, KIND_WEAPON
 ALLY_QUALIFIERS = ("target ally", "targets")
 # an area row: it lands on the body, never the head
 SPLASH_RE = re.compile(r"explosion|splash", re.I)
+# a row a charge empowers: the next shot alone, which the fire rate does not
+# repeat and which lands on the body. Doctrine page: Infuse, "Add a powerful
+# effect to your next ability", 2 charges on a 9 s cooldown; the Eternal
+# Scepter's own rate, "84.7 while firing", is its base 55 at 1.54 a second,
+# and "Infused shot does not crit"
+EMPOWERED_RE = re.compile(r"\binfused\b", re.I)
 # one part of a condition that names the hero itself: "self", "bonus self-knockback"
 SELF_RE = re.compile(r"[\w ]*\bself(?:-\w+)?", re.I)
 # a flat damage figure that is a sum, not one hit
@@ -271,14 +278,15 @@ class KitPiece:
         return loaded, plain, variants, worded
 
     def _per_shot_rate(self, per_shot: str) -> float | None:
-        """One `per_shot` figure times the fire rate. With no rate to turn a
+        """One `per_shot` figure times the fire rate, never a shot a charge
+        empowers, which the rate does not repeat. With no rate to turn a
         figure into one, a figure worded "over time", which already is one."""
         rate = self.max_stat("fire_rate")
         # the hit the rate counts: "1.18 swings per second" is the swing, not the finisher
         counted = {(s.unit_num or "").rstrip("s") for s in self.stats.get("fire_rate", ())} - {""}
         rows = [
             (s.condition, s.value) for s in self.stats.get(per_shot, ())
-            if s.value is not None and s.unit_den is None]
+            if s.value is not None and s.unit_den is None and not EMPOWERED_RE.search(s.condition)]
         shots = [value for condition, value in rows if condition in counted]
         shots = shots or [value for _, value in rows]
         if shots and rate:
@@ -323,6 +331,18 @@ class KitPiece:
             return rate * (lasts / (lasts + wait))
         return rate
 
+    def heals(self) -> list[float]:
+        """The single heals this piece publishes, a teammate's or the hero's own
+        as scalars._healing sorts them: its flat heal rows, not one whose
+        condition names the hero itself, and not one a weapon's whole magazine
+        of its smaller heal adds up to - Kiriko page: "12 (per ofuda)" and "120
+        (per volley)", the volley her ten-ofuda clip, which her rate counts."""
+        rows = [s for s in self.flat("heal") if not on_self(s.condition)]
+        ammo = (self.max_stat("ammo") or 0.0) if self.kind == KIND_WEAPON else 0.0
+        return [
+            s.value for s in rows
+            if not any(o.value < s.value and abs(o.value * ammo - s.value) < 0.5 for o in rows)]
+
     def run_casts(self) -> list[float]:
         """A heal that runs for a duration, as the cast it adds up to: 150 a
         second for 3 s is 450, "100 over 3 seconds" is 100."""
@@ -336,16 +356,17 @@ class KitPiece:
 
     def hits(self) -> list[float]:
         """The single hits this piece publishes, a headshot where one counts:
-        its flat damage rows that are one hit each. An area row lands on the
-        body."""
+        its flat damage rows that are one hit each. An area row, and a shot a
+        charge empowers, land on the body."""
         tick = max(
             (s.per_second for s in self.stats.get("damage", ()) if s.per_second), default=0.0)
         lasts = self.max_stat("duration") or 0.0
         crit = self.max_stat("headshot_mod") or 1.0
         crits = (self.max_stat("headshot") or 0) >= 1 and (self.max_stat("pellets") or 1) < 2
         singles = [s.value for s in self.flat("damage") if not s.condition]
+        body = (SPLASH_RE, EMPOWERED_RE)
         return [
-            s.value * (crit if crits and not SPLASH_RE.search(s.condition) else 1.0)
+            s.value * (crit if crits and not any(r.search(s.condition) for r in body) else 1.0)
             for s in self.flat("damage") if _one_hit(s, tick, lasts, singles)]
 
     def cast_hit(self) -> float | None:

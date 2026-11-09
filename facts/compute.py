@@ -98,8 +98,8 @@ MAP_METRICS.update((f, "%s on the ground in play: the wiki article's mentions pe
 OBJECTIVES = {"Control": "point", "Flashpoint": "point", "Escort": "payload", "Push": "push"}
 
 WORLD_METRICS = OrderedDict([
-    ("heal_bench", "2 x the median peak heal across the released supports"),
-    ("hps_bench", "2 x the median sustained healing across the released supports"),
+    ("heal_bench", "2 x the median peak heal across the released supports with a single heal"),
+    ("hps_bench", "2 x the median sustained healing across the released supports that heal"),
 ])
 
 PARTNER_POINTS = 2.0      # pick-score points a hero gains per synergy partner already on the six

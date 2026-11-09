@@ -57,6 +57,9 @@ MEASUREMENTS = [
                  id="shots-a-second"),
     pytest.param("3 rounds/s", None, [(3, "rounds", "seconds", 1, None, "3 rounds/s")],
                  id="rounds-a-second"),
+    # Deliverance's swarm: a count that was stored with no second under it
+    pytest.param("5 drones/sec", None, [(5, "shots", "seconds", 1, None, "5 drones/sec")],
+                 id="drones-a-second"),
     # Symmetra's turret slow, written with U+2212, stored a NULL once
     pytest.param("\u221215% per turret", "percent",
                  [(-15, "percent", None, None, None, "-15% per turret")],

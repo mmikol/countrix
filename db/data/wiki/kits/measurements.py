@@ -66,6 +66,9 @@ RATE_UNITS: dict[str, tuple[str | None, str]] = {
     "volleys/s": ("volleys", "seconds"), "volley/s": ("volleys", "seconds"),
     "swings/s": ("swings", "seconds"), "swings/sec": ("swings", "seconds"),
     "swing/s": ("swings", "seconds"),
+    # Doctrine's Deliverance fires its swarm at "5 drones/sec": a drone is a shot
+    "drones/s": ("shots", "seconds"), "drones/sec": ("shots", "seconds"),
+    "drone/s": ("shots", "seconds"),
     "hp/s": ("hp", "seconds"), "dps": ("hp", "seconds"),
     # "185/s": the unit on top is the stat's own
     "/s": (None, "seconds"),

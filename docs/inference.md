@@ -779,8 +779,13 @@ it from the kit rows at load and keeps each piece's share in
 `hero.hps_pieces`; `team.hps_floor` sums `hps` over a six.
 
 - **R1 The weapon.** The best healing weapon at its published rate, the
-  reload in, onto one target. A beam's heal row sets its rate before the
-  hps field (Mercy: 55, where the field says 60).
+  reload in where the piece's rows give one (a reload time, or a rate
+  worded with its reload), onto one target. A beam's heal row sets its
+  rate before the hps field (Mercy: 55, where the field says 60). A shot a
+  charge empowers is no shot the rate repeats: Doctrine's Eternal Scepter
+  heals at its base 55, 1.54 a second, never its infused 110, and its rows
+  give no reload - its notes' 75.5 w/ reload is not read - so it heals at
+  its firing rate.
 - **R2 A cast.** Heal per cast x teammates reached / cycle. The cycle is
   the cooldown, and the cooldown plus the duration where the effect is
   held or deployed and the page does not say the cooldown starts on use
@@ -827,7 +832,7 @@ the wiki's. The judgements sit in `facts/scalars.py` beside their pages:
 | `LOCK_NEAR` | 5 m | Juno: the lock takes 0.35 s at 5 m, 1 s at the 40 m targeting range |
 | `SPRAY_TARGETS` | 1 | Moira: "all allies in front", width unpublished |
 | `FLAIL_CONTACT` | 1 | Brigitte: the Flail lands throughout, as `hero.dps` holds every weapon on |
-| `INSPIRE_LOCKOUT` | 1.25 s | Brigitte: Inspire fires on every third 0.6 s swing, once each 1.8 s |
+| `INSPIRE_LOCKOUT` | 1 s | Brigitte: Inspire fires on every second 0.6 s swing, once each 1.2 s |
 | `EMPTY_WAIT` | 0.4 s | Illari: an emptied bar waits before it recharges |
 | `TICK_RATES` | 25 + 50 | Wuyang: the stream's tooltip ticks, the passive one free |
 | `ENERGY_REFUND` | 33% | Wuyang: Guardian Wave refunds the stream's resource |
@@ -839,19 +844,20 @@ comment; the load holds every name to the roster and the board warns of
 one no kit carries, and /heroes sets a new hero's pieces beside them.
 Mauga's Cardiac Overdrive heals the teammates 50% of the damage they deal:
 `facts/tables.py` reads that at the 2-2-2 role-median dps of his five
-teammates, 94.29, once the roster's dps is known.
+teammates, 94.52, once the roster's dps is known.
 
-The 6v6 kit as of 2026-09-26:
+The 6v6 kit as of 2026-11-09:
 
 | Hero | hps | The pieces |
 |---|---|---|
+| Brigitte | 122.25 | Inspire 97.25, Repair Pack 25.00 |
 | Baptiste | 111.76 | Biotic Launcher splash 94.00, Regenerative Burst 17.76 |
 | Juno | 107.59 | Mediblaster 75.28, Pulsar Torpedoes 32.31 |
 | Jetpack Cat | 99.18 | Biotic Pawjectiles 87.18, Purr 12.00 |
-| Brigitte | 98.36 | Inspire 73.36, Repair Pack 25.00 |
 | Ana | 92.72 | Biotic Rifle 83.33, Biotic Grenade 9.39 |
+| Doctrine | 91.84 | Eternal Scepter 84.70, Invigorating Drones 7.14 |
 | Kiriko | 81.50 | Healing Ofuda 74.34, Protection Suzu 7.16 |
-| Illari | 70.07 | Solar Rifle beam 53.41, Healing Pylon 16.67 |
+| Illari | 74.24 | Solar Rifle beam 53.41, Healing Pylon 20.83 |
 | Mizuki | 69.79 | Remedy Aura 38.36, Healing Kasa 31.43 |
 | Moira | 69.40 | Biotic Grasp 49.40, Biotic Orb 20.00 |
 | Lifeweaver | 60.35 | Healing Blossom 56.18, Life Grip 4.17 |
@@ -859,11 +865,13 @@ The 6v6 kit as of 2026-09-26:
 | Lúcio | 54.56 | Crossfade 38.36, Amp It Up 16.20 |
 | Wuyang | 48.07 | Restorative Stream 41.41 (the wave's refund 3.54 in), Guardian Wave 6.67 |
 | Zenyatta | 35.00 | Orb of Harmony 35.00 |
-| Mauga | 16.32 | Cardiac Overdrive 16.32 |
+| Mauga | 16.36 | Cardiac Overdrive 16.36 |
 | Soldier: 76 | 4.77 | Biotic Field 4.77 |
 
-Every other released hero heals no teammate. `world.hps_bench`, twice
-the median support, is 139.87: Illari and Mizuki.
+Every other released hero heals no teammate. Sombra, a support since
+her rework of 2026-10-06, heals nothing until the wiki writes her heal.
+`world.hps_bench`, twice the median of the supports that heal, is
+148.48: Illari, the eighth of the fifteen.
 
 ## The healing floor
 
@@ -874,7 +882,8 @@ healing threshold set by the kit. It reads `matchup.heal_shortfall`;
 
 The model is a race. A six has a pool P (`team.pool_total`: health,
 shield, armor and a form's armor), damage D (`team.dps_floor`) and
-healing onto teammates H (`team.hps_floor`, reloads in): an area heal
+healing onto teammates H (`team.hps_floor`, reloads in where the kit
+gives one): an area heal
 counts the teammates it reaches and a beam what its resource sustains
 ([Sustained healing](#sustained-healing)). Each side's damage lays the
 same anti-heal k on the other's healing, so blue
@@ -908,7 +917,8 @@ that maximised healing would drive toward five supports; a floor does not.
 (`EXPECTED_SHAPE`) still misses: d_r = max(0, 2 - red's count in r),
 spread over the open slots as f = open / sum(d_r), each missing seat at
 its role's median pool (`World.pool_medians`, a form's armor in) and a
-missing support at half `world.hps_bench`, the median support's healing:
+missing support at half `world.hps_bench`, the median healing of the
+supports that heal:
 
 ```
 H_r = enemy.hps_floor  + f x d_support x hps_bench / 2
@@ -920,10 +930,10 @@ share of a third. A complete red that heals nothing needs nothing. The
 likely six is not read: it rests on pick rates.
 
 **The threshold.** With red empty, red is the 2-2-2 of role-median
-heroes: H_r = `world.hps_bench` = 139.87 hp/s and P_r = twice the sum of
-`World.pool_medians` = 2 x (525 + 250 + 237.5) = 2025, the 6v6 kit as of
-2026-09-26. A six must heal 6.91% of its own pool a second, and never less
-than 139.87 hp/s. Everything in it is kit data; no rate enters. The
+heroes: H_r = `world.hps_bench` = 148.48 hp/s and P_r = twice the sum of
+`World.pool_medians` = 2 x (525 + 250 + 250) = 2050, the 6v6 kit as of
+2026-11-09. A six must heal 7.24% of its own pool a second, and never less
+than 148.48 hp/s. Everything in it is kit data; no rate enters. The
 sources hold no absolute winning threshold - no fight length, no ultimate
 charge - so the rule promises parity with the other side's healing and
 nothing more. At parity the race is the damage half's, which no shipped
@@ -942,21 +952,23 @@ figures).
 World-wide error cancels, since the bench moves with it; an error on one
 hero does not. Three limits stand:
 
-- *The bench is a step.* Its median pair, Illari 70.07 and Mizuki 69.79,
-  sits with Moira 69.40 inside 0.7 hp/s, each set by a different
-  judgement (the pylon's uptime; R and the full aura; the spray's
-  reach). One of them past Kiriko lifts the bench to about 151.
+- *The bench is a step.* It sits on Illari alone, 74.24, the median of
+  the fifteen supports that heal, 4.45 hp/s over Mizuki and 7.26 under
+  Kiriko, her
+  figure set by a judgement (the pylon's uptime), and it moves two for
+  one with her. Past Kiriko she would lift it to 163.0; under Mizuki it
+  falls to 139.6.
 - *Overheal is out.* An untargeted area heal lands on full-health
   teammates too, where a single-target healer picks a hurt one; the
   sources give no overheal share, so the rule favours the area heal by
   that margin.
-- *Brigitte rests on the Flail.* Her 98.36 holds the Flail in contact
-  throughout; at half contact Inspire gives 36.68 and she reads 61.7.
+- *Brigitte rests on the Flail.* Her 122.25 holds the Flail in contact
+  throughout; at half contact Inspire gives 48.62 and she reads 73.62.
 
 Perks, ultimates, self-healing and health packs are out, on both sides
-alike. Over 126,900 uniform random sixes against random reds, a
-six with one support is under the floor 90% of the time, with two 39%,
-with three 7%.
+alike. On the 6v6 kit as of 2026-09-26, over 126,900 uniform random
+sixes against random reds, a six with one support was under the floor 90%
+of the time, with two 39%, with three 7%.
 
 ## The catalog
 
@@ -1195,7 +1207,7 @@ in place of six, can read one sized by the six apart from its carrier.
 | `team.range_max` | the longest range on the team |
 | `team.range_min` | the shortest longest-range |
 | `team.dmg_amp` | picks that amplify someone's damage |
-| `team.hps_floor` | summed sustained healing onto teammates, hp per second over every teammate reached, reloads in |
+| `team.hps_floor` | summed sustained healing onto teammates, hp per second over every teammate reached, reloads in where the kit gives one |
 | `team.heal_peak_total` | summed biggest single heal per pick, its own self-heal included |
 | `team.heal_peak_supports` | summed biggest single heal (one cast, hp) across the supports |
 | `team.heal_peak_max` | the biggest single heal a teammate can receive |
@@ -1288,6 +1300,6 @@ in place of six, can read one sized by the six apart from its carrier.
 | `map.open_ground` | open ground and ground said to lack cover on the ground in play: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text), raised to the stage's own where a stage is in play and its text names them 2 times or more and more often - its rate pulled toward the map's by 100 words of it, on the same scale |
 | `map.hazards` | drops, pits and other environmental hazards on the ground in play: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text), raised to the stage's own where a stage is in play and its text names them 2 times or more and more often - its rate pulled toward the map's by 100 words of it, on the same scale |
 | `map.cover` | cover on the ground in play: the wiki article's mentions per thousand words, in sd from the mean of the maps with text (0 with no text), raised to the stage's own where a stage is in play and its text names them 2 times or more and more often - its rate pulled toward the map's by 100 words of it, on the same scale |
-| `world.heal_bench` | 2 x the median peak heal across the released supports |
-| `world.hps_bench` | 2 x the median sustained healing across the released supports |
+| `world.heal_bench` | 2 x the median peak heal across the released supports with a single heal |
+| `world.hps_bench` | 2 x the median sustained healing across the released supports that heal |
 <!-- /generated:catalog -->

@@ -2,9 +2,32 @@
 door, ui - beside the orchestrator's tests: the units, the search against a
 full enumeration, the database's invariants, and the hand-run provers in
 inference/, which pytest does not collect. healthy() is the stack's /health
-replies with every layer ready, which the orchestrator's tests share."""
+replies with every layer ready, which the orchestrator's tests share.
+KIT_LAGS and MAP_LAGS name what Blizzard shipped and the wiki has not
+written yet, the holes the invariant tests excuse by name."""
 
-from typing import Any
+from typing import Any, NamedTuple
+
+
+class WikiLag(NamedTuple):
+    """A hero or a map Blizzard ships that the wiki has not caught up with:
+    the day it shipped, and the pieces Blizzard lists that the wiki holds no
+    row for. The invariant test that excuses it fails once the wiki writes
+    them, so the entry goes in the change that pulls them."""
+    name: str
+    since: str
+    missing: tuple[str, ...] = ()
+
+
+# Sombra's rework into a support: Blizzard's page lists Hotfix, "Heal an ally
+# over time", and Cyberspace, a zone that "heals allies"; the wiki's article of
+# 2026-11-09 has no Cyberspace block and Hack's rows under Hotfix's name, so
+# Cyberspace has no kind and she reads as a support that heals nothing
+KIT_LAGS = (WikiLag("Sombra", "2026-10-06", ("Cyberspace",)),)
+# Blizzard's rates filter lists the Escort map; the wiki's Maps article of
+# 2026-11-09 still files it under Upcoming, so the pool lacks it and the rates
+# pull skips it
+MAP_LAGS = (WikiLag("Grímsvötn", "2026-10-06"),)
 
 
 def healthy() -> dict[str, Any]:
