@@ -41,3 +41,19 @@ keeps it current.
   ("Nothing is hosted"), the README, the guide's install page and the
   `up` skill say the stack is local. Cost: about $29 a month; a morning
   for the first run; an hour for the setting, its test and the docs.
+- **The wiki catches up with Season 5.** Season 5 began on 2026-10-06,
+  and on 2026-11-09 the wiki had not written all of it. Sombra's article
+  keeps Hack's rows under Hotfix's name, a live Virus and no Cyberspace,
+  so she reads as a support that heals nothing, Hotfix as crowd control
+  and her dps as the old kit's 114.3. Roadhog's Trash Compactor carries
+  the removed Alt Fire's 24 - 39 m falloff, so his reach reads 39, and
+  his Scrap Gun's dps field is the old kit's. The Maps article files
+  Grimsvotn under Upcoming, so its rates are skipped, and the Patches
+  table ends on 2026-08-14, so a snapshot names that patch. Once the
+  articles move: dump the database (docs/db.md), refresh the caches and
+  `db_rebuild` - an incremental pull keeps Virus's row - then drop the
+  entries from `KIT_LAGS` and `MAP_LAGS` and re-pin what moves. If the
+  wiki names the map Watchpoint: Grimsvotn, Blizzard's label, Grimsvotn
+  without the prefix, still misses it under `name_key`, so a key that
+  drops the Watchpoint prefix on both sides joins the change. Cost: a rebuild of about 8 minutes,
+  then the pins.

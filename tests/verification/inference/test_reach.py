@@ -22,7 +22,7 @@ from tests.verification.inference import FIXTURE_PLAYBOOK, in_force, recorded, s
 from tests.verification.inference import record_reach as recorder
 
 # named, not waived - see the test
-UNSEATED = {"Freja", "Sojourn"}
+UNSEATED = {"Emre", "Freja", "Sojourn"}
 
 
 @pytest.mark.invariant
@@ -42,14 +42,14 @@ def test_every_hero_reach_finds_a_board_for_is_still_seated_and_none_is_newly_lo
         else " - recorded under a different objective")
     assert len(fell) <= len(boards) // 5, "the recorded boards have gone stale%s: %s" % (
         stale, fell)
-    # Two heroes the recorder's search found no board for. That is not a proof none
+    # Three heroes the recorder's search found no board for. That is not a proof none
     # exists - the search tries every map but a few reds per hero, so a board it
-    # never visits could seat either - but it is what the search establishes, and
-    # they are named rather than waived: a third fails here. The default engine, the
-    # healing floor and the terrain rules score the shipped playbook's boards, and on
-    # the boards the search tries they value neither above its rivals, even with five
-    # of them banned; the playbook's rules are what can answer it. They are not
-    # searched again on every run - two searches are most of a minute, more under
+    # never visits could seat any of them - but it is what the search establishes,
+    # and they are named rather than waived: a fourth fails here. The default engine,
+    # the healing floor and the terrain rules score the shipped playbook's boards, and
+    # on the boards the search tries they value none of them above its rivals, even
+    # with five of them banned; the playbook's rules are what can answer it. They are
+    # not searched again on every run - three searches are over a minute, more under
     # coverage - so one that comes to seat leaves UNSEATED when the recorder
     # re-records.
     assert not UNSEATED - released, "not a released hero: %s" % ", ".join(UNSEATED - released)

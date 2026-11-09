@@ -13,7 +13,9 @@ import pytest
 import requests
 
 from db import CACHE_DIRS
+from db.data.normalizer import name_key
 from door.mcp import tools
+from tests.verification import MAP_LAGS
 
 pytestmark = pytest.mark.invariant
 
@@ -89,7 +91,11 @@ def test_blizzard_rates_pull_from_the_cache_and_leave_no_snapshot(
                               "hero_meta", "map_meta"]
     assert data["queue"] == "competitive_role_queue" and data["tiers"] >= 8
     assert data["hero_rows"] > 0 and data["map_rows"] > 0
-    assert data["unmatched"] == [] and data["skipped_maps"] == []
+    # a map Blizzard lists before the wiki's pool holds it is skipped, by name; the
+    # excuse lapses once the pool holds it under any title, a Watchpoint prefix too
+    pooled = [name_key(name) for (name,) in db.execute("select name from maps").fetchall()]
+    assert not [lag.name for lag in MAP_LAGS if any(k.endswith(name_key(lag.name)) for k in pooled)]
+    assert data["unmatched"] == [] and data["skipped_maps"] == [lag.name for lag in MAP_LAGS]
     # the pull counts inside its own transaction, which holds the snapshot it stamped
     assert data["snapshots"] == snapshots + 1
     db.rollback()

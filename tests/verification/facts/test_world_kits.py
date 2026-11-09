@@ -15,6 +15,7 @@ import pytest
 from db import KIND_WEAPON
 from facts import counters, scalars, tables
 from facts.records import KitListMiss
+from tests.verification import KIT_LAGS
 
 pytestmark = pytest.mark.invariant
 
@@ -34,6 +35,8 @@ def test_world_loads_the_whole_roster_with_kit_numbers(world):
     assert world.hero("Pharah").flyer and not world.hero("Reinhardt").flyer
     assert world.hero("Reinhardt").barrier_hp >= 1000
     assert world.hero("Kiriko").cleanse_tools
+    # ten ofuda's "120 (per volley)" is a clip her rate counts, not one heal: Suzu's 80
+    assert world.hero("Kiriko").peak_heal == 80
     assert world.heal_bench > 0
 
 
@@ -48,7 +51,7 @@ def test_kit_rows_are_read_in_their_own_units(world):
     # A passive's share has no duration; Siphon Blaster heals off its own damage
     assert mauga.self_heal == pytest.approx(mauga.dps * 3.0)
     assert world.hero("Junker Queen").self_heal == 100 and world.hero("Mei").self_heal == 250
-    assert world.hero("Roadhog").self_heal == 450 and world.hero("Emre").self_heal == 30
+    assert world.hero("Roadhog").self_heal == 500 and world.hero("Emre").self_heal == 30
     assert world.hero("Domina").self_heal == 0
     assert world.hero("Sigma").overhealth == 400 and mauga.overhealth == 150
     assert world.hero("Lifeweaver").overhealth == 100 == world.hero("Brigitte").overhealth
@@ -78,32 +81,40 @@ def test_kit_rows_are_read_in_their_own_units(world):
     assert cat.dps == pytest.approx(87.18, abs=0.01)
     assert cat.hps_pieces["Biotic Pawjectiles"] == pytest.approx(cat.dps)
     assert cat.hps == pytest.approx(99.18, abs=0.005)
+    # a shot a charge empowers is no shot the rate repeats and lands on the body:
+    # the Eternal Scepter's base 55 at 1.54 a second, 82.5 to the head; the infused
+    # 110 is Doctrine's biggest single heal, and his swarm fires 5 drones a second
+    doctrine = world.hero("Doctrine")
+    assert doctrine.dps == pytest.approx(84.7) and doctrine.burst == 82.5
+    assert doctrine.peak_heal == 110 and doctrine.ult_damage == 150
 
 
 # hero.hps at FORMATION_RADIUS 15 on the 6v6 kit: every piece that runs beside
 # the others, summed over the teammates it reaches (facts/scalars.py)
 SUSTAINED_HEALING = {
-    "Baptiste": 111.76, "Juno": 107.59, "Jetpack Cat": 99.18, "Brigitte": 98.36,
-    "Ana": 92.72, "Kiriko": 81.50, "Illari": 70.07, "Mizuki": 69.79, "Moira": 69.40,
-    "Lifeweaver": 60.35, "Mercy": 60.00, "Lúcio": 54.56, "Wuyang": 48.07, "Zenyatta": 35.00,
-    "Mauga": 16.32, "Soldier: 76": 4.77}
+    "Brigitte": 122.25, "Baptiste": 111.76, "Juno": 107.59, "Jetpack Cat": 99.18,
+    "Ana": 92.72, "Doctrine": 91.84, "Kiriko": 81.50, "Illari": 74.24, "Mizuki": 69.79,
+    "Moira": 69.40, "Lifeweaver": 60.35, "Mercy": 60.00, "Lúcio": 54.56, "Wuyang": 48.07,
+    "Zenyatta": 35.00, "Mauga": 16.36, "Soldier: 76": 4.77}
 
 
 def test_sustained_healing_sums_the_pieces_over_the_teammates_they_reach(world):
     """Each healer's hps on the built World, and nobody else's. The bench,
-    twice the median support, sits on Illari, Mizuki and Moira, within 0.7
-    hp/s of each other: a judgement that moves one of them past Kiriko moves
-    the bench, and these pins show it."""
+    twice the median support that heals, sits on Illari alone, the eighth of
+    the fifteen, 4.45 hp/s over Mizuki and 7.26 under Kiriko: a judgement that
+    moves her past either moves the bench, and these pins show it. Sombra
+    heals nothing until the wiki writes her heal (KIT_LAGS)."""
     released = [h for h in world.heroes.values() if h.released]
     got = {h.name: h.hps for h in released if h.hps}
     assert got == pytest.approx(SUSTAINED_HEALING, abs=0.005)
     for hero in released:
         assert hero.hps == pytest.approx(sum(hero.hps_pieces.values()))
-    assert world.hps_bench == pytest.approx(139.87, abs=0.005)
+    assert world.hps_bench == pytest.approx(148.48, abs=0.005)
     reference = 2 * sum(world.pool_medians.values())          # a 2-2-2 of role medians
-    assert world.hps_bench / reference == pytest.approx(0.0691, abs=0.00005)
-    cluster = [world.hero(n).hps for n in ("Illari", "Mizuki", "Moira")]
-    assert max(cluster) - min(cluster) < 0.7 < world.hero("Kiriko").hps - max(cluster)
+    assert world.hps_bench / reference == pytest.approx(0.0724, abs=0.00005)
+    median = world.hero("Illari").hps
+    assert world.hps_bench == pytest.approx(2 * median)
+    assert world.hero("Mizuki").hps < median < world.hero("Kiriko").hps
     # a beam at what its energy sustains; Wuyang's wave refunds 33% of the stream
     illari, moira = world.hero("Illari"), world.hero("Moira")
     assert illari.hps_pieces["Solar Rifle Alt Fire"] == pytest.approx(53.41, abs=0.01)
@@ -113,7 +124,7 @@ def test_sustained_healing_sums_the_pieces_over_the_teammates_they_reach(world):
     # an area heal counts the teammates it reaches: Crossfade 18/s on 2.13 of them
     assert world.hero("Lúcio").hps_pieces["Crossfade"] == pytest.approx(38.36, abs=0.01)
     assert world.hero("Brigitte").hps_pieces == pytest.approx(
-        {"Repair Pack": 25.0, "Inspire": 73.36}, abs=0.01)
+        {"Repair Pack": 25.0, "Inspire": 97.25}, abs=0.01)
 
 
 def test_every_weapon_sets_a_heros_kinds_and_the_held_ones_its_numbers(world):
@@ -126,7 +137,7 @@ def test_every_weapon_sets_a_heros_kinds_and_the_held_ones_its_numbers(world):
     assert torb.melee and not torb.melee_only and torb.weapon_kinds == {"projectile", "melee"}
     assert not torb.pierces_barrier and torb.max_range is None
     assert torb.self_heal == 0 and torb.self_hps == 0
-    assert ramattra.melee and ramattra.pierces_barrier and ramattra.dps == 100
+    assert ramattra.melee and ramattra.pierces_barrier and ramattra.dps == pytest.approx(104.16)
     # a projectile that publishes no limit leaves the range unknown, not 0 m
     assert ramattra.max_range is None and world.hero("Anran").max_range is None
     assert world.hero("Orisa").max_range is None
@@ -209,21 +220,24 @@ def test_an_announced_hero_sets_no_roster_wide_figure(world):
 def test_the_role_median_pools_count_a_forms_armor_and_set_the_reference_pool(world):
     """Each role's median pool is read as team.pool_total reads a pool, a
     form's armor in, over the released heroes; the 6v6 kit gives 525, 250 and
-    237.5, and a 2-2-2 of them is 2025. Ramattra's form moves the tanks'
+    250, and a 2-2-2 of them is 2050. Ramattra's form moves the tanks'
     median: without it the median is 500."""
     released = [h for h in world.heroes.values() if h.released]
     for role in ("tank", "damage", "support"):
         assert world.pool_medians[role] == statistics.median(
             h.pool + h.form_armor for h in released if h.role == role), role
-    assert world.pool_medians == {"tank": 525.0, "damage": 250.0, "support": 237.5}
-    assert 2 * sum(world.pool_medians.values()) == 2025.0
+    assert world.pool_medians == {"tank": 525.0, "damage": 250.0, "support": 250.0}
+    assert 2 * sum(world.pool_medians.values()) == 2050.0
     assert statistics.median(h.pool for h in released if h.role == "tank") == 500.0
 
 
 def test_no_released_hero_is_missing_a_core_kit_number(world):
     """The kit block carries most of the playbook's weight, and a hole in it is
     silent: a tank that deals no damage still scores, just wrongly. Domina read
-    zero because her beam publishes a rate only as damage `over time`."""
+    zero because her beam publishes a rate only as damage `over time`. A
+    support whose heal the wiki has not written yet (KIT_LAGS) is excused by
+    name; the classification invariant retires the excuse."""
+    lagging = {lag.name for lag in KIT_LAGS}
     holes = []
     for hero in sorted(world.heroes.values(), key=lambda h: h.name):
         if not hero.released:
@@ -232,7 +246,7 @@ def test_no_released_hero_is_missing_a_core_kit_number(world):
             holes.append("%s has no health pool" % hero.name)
         if not hero.dps:
             holes.append("%s deals no damage" % hero.name)
-        if hero.role == "support" and not hero.hps:
+        if hero.role == "support" and not hero.hps and hero.name not in lagging:
             holes.append("%s is a support that heals nothing" % hero.name)
     assert not holes, holes
 

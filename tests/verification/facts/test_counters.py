@@ -198,6 +198,19 @@ def test_armor_answers_a_weapon_of_small_hits():
     assert _fired(armored, spray)["armor"] == pytest.approx(0.6)
 
 
+def test_a_shot_a_charge_empowers_is_no_instance_of_the_weapon():
+    """The instance armor reads is the shot the weapon repeats: the Eternal
+    Scepter fires its base 55, its infused 80 only once a charge is spent."""
+    scepter = _gun("Eternal Scepter", dps=84.7, hit=55.0)
+    rows = (
+        (17.0, "base, min"), (55.0, "base, max"), (24.0, "infused, min"), (80.0, "infused, max"))
+    scepter.stats["damage"] = [Stat(
+        code="damage", value=value, unit_num="hp", unit_den=None, den_value=None,
+        condition=condition, text="%g" % value) for value, condition in rows]
+    bishop = _hero("Bishop", role="support", subrole="Survivor", weapons=[scepter])
+    assert counters.features(bishop, 100.0).instance == 55
+
+
 def test_a_mobile_flanker_dives_an_immobile_back_line():
     """dive: full mobility (a strong movement tool and a weak one), 100 dps
     over KILL_WINDOW and a 20 hit against a 200-hp Sharpshooter:
@@ -327,7 +340,8 @@ def test_the_research_pinned_pairs_hold(world):
     assert strength("D.Va", "Widowmaker", "eater") >= 0.9
     assert strength("Ana", "Roadhog", "antiheal") >= 0.9
     assert strength("Winston", "Reinhardt", "barrier") >= 0.7
-    assert strength("Symmetra", "Genji", "eaterproof") == 1.0
+    # the beam passes Deflect whole; Deflect is up 1.5 s of every 9.5, 0.789 of EATER_UPTIME
+    assert strength("Symmetra", "Genji", "eaterproof") == pytest.approx(0.789, abs=0.0005)
     # the fixes: Javelin Spin takes no hitscan shot, Mei's Icicle is no 57.5 m
     # reach, Reinhardt's Charge no burst
     assert strength("Orisa", "Widowmaker", "eater") == 0.0
