@@ -65,7 +65,7 @@ PILOT_GUNS = ("Light Gun", "Portable Fusion Repeater")
 OFF_FIGHT = ("Forge Hammer",)
 # A damaging weapon config its hero cannot hold through a fight: a form's
 # weapon, held while the form lasts on a cooldown (Bastion's Configuration:
-# Assault, 6 s of Reconfigure on a 12 s cooldown; Ramattra's Pummel, 8 s of
+# Assault, 5 s of Reconfigure on a 12 s cooldown; Ramattra's Pummel, 8 s of
 # Nemesis Form on an 8 s cooldown); a charged side shot (Winston's Tesla Cannon
 # Alt Fire, 0.3 to 0.85 s to charge and 0.75 s to recover); and the two lists
 # above. It is out of hero.dps, the reach (max_range, hitscan_range), the
