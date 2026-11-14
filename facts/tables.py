@@ -3,7 +3,7 @@ the facts layer always reads what the data layer stored.
 
     world = tables.load(cx)
 
-Loading is 25 queries and a few thousand rows; cheap enough to do per
+Loading is 26 queries and a few thousand rows; cheap enough to do per
 click, and it is what lets the inference layer's solver evaluate thousands
 of candidate compositions without a query each. Each read step fills one
 part of the World from its tables, and load runs them in the order each
@@ -21,7 +21,7 @@ from psycopg.rows import TupleRow
 from db import KIND_WEAPON
 from db.data.normalizer import name_key
 from db.data.wiki.terrain import WORDS_PER_RATE
-from facts import counters, kit_format, scalars
+from facts import counters, kit_format, patch_notes, scalars
 from facts.draft import EXPECTED_SHAPE
 from facts.kit import KitPiece, Stat
 from facts.model import REMECH, ROLES, TERRAIN_FEATURES, TERRAIN_LEAN, Hero, Map, World
@@ -29,6 +29,7 @@ from facts.records import (
     KitLine,
     KitListMiss,
     MapRate,
+    NoteLine,
     Patch,
     Rates,
     Snapshot,
@@ -330,6 +331,16 @@ def _read_kit_6v6(cx: Connection, w: World) -> None:
             piece=piece, stat=stat, before=_rate(before), after=_rate(after), text=text))
 
 
+def _read_patch_notes(cx: Connection, w: World) -> None:
+    """Each hero's lines of Blizzard's patch notes, in the order the notes
+    write them, which the patch fixes cite."""
+    for hid, patch, piece, line in _rows(cx, """
+            select n.hero_id, p.name, n.piece, n.line from patch_notes n
+            join patches p using(patch_id)
+            order by p.released, n.hero_id, n.position"""):
+        w.heroes[hid].notes.append(NoteLine(patch=patch, piece=piece, line=line))
+
+
 def _rate(value: SupportsFloat | None) -> float | None:
     """A stored rate as a float; None where the capture publishes none."""
     return float(value) if value is not None else None
@@ -525,8 +536,9 @@ def _derive_benches(w: World) -> None:
 def load(cx: Connection) -> World:
     """The whole database -> World, its kit read in 6v6 (draft.KIT_FORMAT).
     `cx` is an open psycopg connection; this module never opens one of its
-    own. The steps run in the order each relies on: the kit, and the 6v6
-    laid over it, before derive_scalars and the kit lists' check, the rates
+    own. The steps run in the order each relies on: the kit, the patch
+    fixes laid over it where the wiki lags Blizzard's notes, and the 6v6
+    over both, before derive_scalars and the kit lists' check, the rates
     before derive_rates, derive_best_maps and derive_map_styles, the
     terrain before derive_map_styles, the teammates' lifesteal and the
     benches over the derived roster, and the counter matrix over the
@@ -537,6 +549,8 @@ def load(cx: Connection) -> World:
     _read_weapons(cx, w)
     _read_perks(cx, w)
     _read_kit_6v6(cx, w)
+    _read_patch_notes(cx, w)
+    patch_notes.apply(w)
     kit_format.apply(w)
     check_kit_lists(w)
     _read_rates(cx, w)

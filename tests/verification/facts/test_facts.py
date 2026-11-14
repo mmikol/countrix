@@ -193,26 +193,26 @@ def _heal(world, blue, red=()):
 
 @pytest.mark.parametrize(("blue", "red", "need", "shortfall"), [
     # one support: Zenyatta's 35 on an 1800 pool
-    (KINGS_ROW_SIX, (), 148.48, 0.7643),
-    # Baptiste and Zenyatta heal 146.76 on 1775, 1.72 under the bench
-    (("Reinhardt", "Genji", "Hanzo", "Widowmaker", "Baptiste", "Zenyatta"), (), 148.48, 0.0116),
+    (KINGS_ROW_SIX, (), 144.03, 0.7570),
+    # Baptiste and Zenyatta heal 146.76 on 1775, 2.73 over the bench
+    (("Reinhardt", "Genji", "Hanzo", "Widowmaker", "Baptiste", "Zenyatta"), (), 144.03, 0.0),
     # a second tank lifts the pool to 2100, over the 2-2-2's 2050: the need grows with it
-    (("Reinhardt", "D.Va", "Genji", "Hanzo", "Baptiste", "Zenyatta"), (), 152.10, 0.0351),
+    (("Reinhardt", "D.Va", "Genji", "Hanzo", "Baptiste", "Zenyatta"), (), 147.54, 0.0053),
     # Ana and Kiriko revealed heal 174.22; the four open slots are tanks and damage
     (KINGS_ROW_SIX, ("Ana", "Kiriko"), 174.22, 0.7991),
     # a complete red with no healer needs nothing
     (KINGS_ROW_SIX, ("Reinhardt", "D.Va", "Genji", "Hanzo", "Widowmaker", "Tracer"), 0.0, 0.0),
     # two area healers count the teammates they reach: 176.81 on 2075
-    (("Reinhardt", "D.Va", "Genji", "Hanzo", "Lúcio", "Brigitte"), (), 150.29, 0.0),
+    (("Reinhardt", "D.Va", "Genji", "Hanzo", "Lúcio", "Brigitte"), (), 145.79, 0.0),
     # two beam healers at what their resource sustains: Illari and Zenyatta 109.24
-    (("Reinhardt", "D.Va", "Genji", "Hanzo", "Illari", "Zenyatta"), (), 152.10, 0.2818),
+    (("Reinhardt", "D.Va", "Genji", "Hanzo", "Illari", "Zenyatta"), (), 147.54, 0.2596),
 ], ids=[
     "kings-row-default", "kings-row-rule", "two-tanks", "ana-kiriko", "healless-red",
     "lucio-brigitte", "illari-zenyatta"])
 def test_the_healing_floor_on_the_6v6_kit(world, blue, red, need, shortfall):
-    """The research's figures from the built World: hps_bench 148.48 and
+    """The research's figures from the built World: hps_bench 144.03 and
     the pool of a 2-2-2 of role medians, 2050, set the bar with red empty,
-    7.24% of a six's pool a second and never less than 148.48."""
+    7.03% of a six's pool a second and never less than 144.03."""
     got_need, got_shortfall = _heal(world, blue, red)
     assert got_need == pytest.approx(need, abs=0.005)
     assert got_shortfall == pytest.approx(shortfall, abs=0.00005)
@@ -220,12 +220,12 @@ def test_the_healing_floor_on_the_6v6_kit(world, blue, red, need, shortfall):
 
 def test_the_healing_floor_fact_states_the_threshold_on_kings_row(world):
     """The board words the rule's numbers for a one-support six: its healing
-    and pool, the unrevealed red's 148.5 on 2050, the 7.24% share, the need
+    and pool, the unrevealed red's 144.0 on 2050, the 7.03% share, the need
     and the shortfall."""
     fs = board_facts.generate(world, Draft("King's Row", (), KINGS_ROW_SIX, side="attack"))
     [fact] = fs.find("matchup.heal_shortfall", "blue vs red")
     assert fact.text.startswith(
         "healing floor: blue heals 35.0/s on a 1800 pool; red, 6 open slots read as the"
-        " 2-2-2's missing roles at their medians, heals 148.5/s on 2050 - 7.24% of its pool a"
-        " second; blue needs 148.5/s")
-    assert "76% short" in fact.text and fact.value == pytest.approx(0.7643, abs=0.00005)
+        " 2-2-2's missing roles at their medians, heals 144.0/s on 2050 - 7.03% of its pool a"
+        " second; blue needs 144.0/s")
+    assert "76% short" in fact.text and fact.value == pytest.approx(0.7570, abs=0.00005)

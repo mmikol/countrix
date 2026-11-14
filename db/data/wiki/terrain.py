@@ -409,6 +409,7 @@ class TerrainSummary(ArticlePullSummary):
     stage_rows: int
     fields: int
     unmatched: list[str]
+    unpooled: list[str]
 
 
 def _store(
@@ -435,10 +436,19 @@ def run(connection: psycopg.Connection, pull: cache.PullContext) -> TerrainSumma
     """Reload map_terrain and stage_terrain from every map's article and the
     released heroes' map-strategy tables -> the maps and stages counted, the
     rows and words, the maps without text, the stage fields read and the
-    keys of those no stage takes."""
+    keys of those no stage takes. A map only Blizzard's patch notes have
+    pooled is titled as Blizzard labels it, which may be no article's title,
+    and is read once the wiki's pool holds it: until then it is unpooled."""
     cursor = connection.cursor()
-    maps: list[tuple[int, str]] = cursor.execute(
-        "SELECT map_id, name FROM maps ORDER BY name").fetchall()
+    maps: list[tuple[int, str]] = []
+    unpooled: list[str] = []
+    for map_id, name, source in cursor.execute(
+            "SELECT m.map_id, m.name, s.code FROM maps m JOIN sources s USING (source_id)"
+            " ORDER BY m.name").fetchall():
+        if source == WIKI.code:
+            maps.append((map_id, name))
+        else:
+            unpooled.append(name)
     stages: dict[int, tuple[bool, dict[str, int]]] = {}
     for map_id, stage_id, stage, hybrid in cursor.execute(
             "SELECT s.map_id, s.stage_id, s.name, EXISTS (SELECT 1 FROM map_modes mm"
@@ -497,4 +507,4 @@ def run(connection: psycopg.Connection, pull: cache.PullContext) -> TerrainSumma
             "rows": rows, "words": words_read,
             "stages": stages_read, "stages_no_text": total_stages - stages_read,
             "stage_rows": stage_rows, "fields": fields, "unmatched": placed.unmatched,
-            "tables": ["map_terrain", "stage_terrain"]}
+            "unpooled": unpooled, "tables": ["map_terrain", "stage_terrain"]}

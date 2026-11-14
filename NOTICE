@@ -123,8 +123,9 @@ ui/static/OFL.txt.
 3. Blizzard Entertainment's material - Blizzard's fan-site permission
 
 Hero and map names, the portraits and role icons the board loads from
-Blizzard's servers, Blizzard's hero text and its win, pick and ban rates
-are Blizzard Entertainment's. Countrix uses them under the permission
+Blizzard's servers, Blizzard's hero text, the lines of its patch notes
+that facts/patch_notes.py quotes, and its win, pick and ban rates are
+Blizzard Entertainment's. Countrix uses them under the permission
 Blizzard's Legal FAQ grants fan sites - home, noncommercial and personal
 use, the material unaltered and its notices kept -
 https://www.blizzard.com/en-us/legal/c1ae32ac-7ff9-4ac3-a03b-fc04b8697010/blizzard-legal-faq.

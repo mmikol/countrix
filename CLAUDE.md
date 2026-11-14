@@ -97,7 +97,11 @@ db <- facts <- inference <- door <- ui.
   read with neither raises `psql.NoDatabaseError`.
 - **One user input.** The strategies are the only data written by hand,
   and the only rows under the `user` source; every other table is pulled
-  from Blizzard or the wiki.
+  from Blizzard or the wiki. Where the wiki lags a patch, the owner chose
+  on 2026-11-14 that Blizzard's patch notes set the figure: the fixes in
+  `facts/patch_notes.py` are code, as the kit lists are, and each cites
+  the notes' lines word for word, which `pull_patch_notes` stores in
+  `patch_notes`; a fix whose lines are not stored lays nothing.
 - **One definition per metric.** `facts/team.py` defines every team
   metric and `facts/compute.py` the matchup, map and world ones, each in a
   registry, and `compute.registry()` gathers them. The facts engine words
@@ -160,9 +164,10 @@ db <- facts <- inference <- door <- ui.
   engine before it had a base: a test that pins the reference playbook's
   sixes or scores passes it.
 - **The kit is read in 6v6.** `facts.draft.KIT_FORMAT` names the format;
-  `tables.load` lays the wiki's 6v6 pools and lines (`heroes.*_6v6`,
-  `kit_6v6`) over the 5v5 rows before `derive_scalars` (`facts/kit_format.py`).
-  The 5v5 figures stay stored, and each change names the one it moved.
+  `tables.load` lays the patch fixes (`facts/patch_notes.py`), then the
+  wiki's 6v6 pools and lines (`heroes.*_6v6`, `kit_6v6`), over the 5v5 rows
+  before `derive_scalars` (`facts/kit_format.py`). The 5v5 figures stay
+  stored, and each change names the one it moved.
 - **The solver is deterministic.** `engine.board()` returns a Board of up
   to four Results (blue, current, fill, expected); fill is None unless one
   to five blue picks are locked. Blue is the side the playbook optimizes,
@@ -321,6 +326,14 @@ db <- facts <- inference <- door <- ui.
   evidence. The invariant that excuses it fails once the wiki catches up,
   and the entry goes in the change that pulls it. A piece Blizzard dropped
   keeps its row through an incremental pull: only `db_rebuild` clears it.
+  The World reads the figures from Blizzard's notes meanwhile: a fix in
+  `facts.patch_notes.FIXES` names the wiki's figure and the notes', and
+  cites the notes' lines. `test_every_patch_fix_still_lays` fails, and the
+  board warns, once the wiki writes the figure: the fix goes in the change
+  that sees it. A map a patch ships joins the pool from the notes under
+  Blizzard's label, keyed by `normalizer.map_key`, which drops the wiki's
+  leading Watchpoint, and takes the wiki's title once `pull_maps` pools it;
+  until then the terrain pull leaves it out (`unpooled`).
 - `tests/verification/ui/test_pages.py` pins the scripts at their seams
   (routes, query keys, element ids, the payload keys they read against what
   the server writes), and `tests/qa/test_stylesheet.py` holds that every
@@ -391,7 +404,8 @@ db <- facts <- inference <- door <- ui.
 - Pulls read only Blizzard's site and the wiki, through the page caches and
   the one request loop in `db/data/cache.py`, each at the pace of its own
   `RequestPolicy`: 5 s a page for the rates (`RATES_POLICY` in
-  `db/data/blizzard/meta.py`); for the wiki (`db/data/wiki/__init__.py`),
+  `db/data/blizzard/meta.py`) and the patch notes (`NOTES_POLICY` in
+  `db/data/blizzard/patch_notes.py`); for the wiki (`db/data/wiki/__init__.py`),
   2 s a Cargo page with six attempts to wait out a rate limit
   (`CARGO_POLICY`), and 0.5 s an article, asked for once
   (`ARTICLE_POLICY`). No third source, no API keys.

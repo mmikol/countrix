@@ -4,6 +4,8 @@
                     and perk text (Blizzard publishes prose and no numbers)
     meta            the rates page: win, pick and ban rates as a dated
                     snapshot
+    patch_notes     the live patch notes: each patch's date, every balance
+                    line under a hero, and the maps a patch ships
     attr            a tag's attribute as text, which both read the pages with
     BlizzardError   a page that answered in a shape neither reader knows
 

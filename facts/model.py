@@ -18,9 +18,11 @@ from facts.kit import KitPiece
 from facts.records import (
     DerivedEdge,
     KitChange,
+    KitFix,
     KitLine,
     KitListMiss,
     MapRate,
+    NoteLine,
     Pairing,
     Patch,
     Rates,
@@ -63,6 +65,10 @@ class Hero:
     six_pools: dict[str, int] = field(default_factory=dict)
     six_lines: list[KitLine] = field(default_factory=list)
     kit_changes: list[KitChange] = field(default_factory=list)
+    # Blizzard's patch-note lines for the hero, and what each patch fix laid
+    # over the wiki's kit with them (facts.patch_notes)
+    notes: list[NoteLine] = field(default_factory=list)
+    kit_fixes: list[KitFix] = field(default_factory=list)
     win: float | None = None
     pick: float | None = None
     ban: float | None = None

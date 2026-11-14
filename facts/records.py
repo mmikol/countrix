@@ -43,6 +43,31 @@ class KitChange(NamedTuple):
     text: str
 
 
+class NoteLine(NamedTuple):
+    """A balance line of Blizzard's patch notes for a hero, as patch_notes
+    stores it: the patch, the piece it sits under ('' for the hero itself)
+    and its words."""
+    patch: str
+    piece: str
+    line: str
+
+
+class KitFix(NamedTuple):
+    """What one patch fix did with a hero's kit (facts.patch_notes): the
+    piece (empty for a pool), the stat, the wiki's figure and Blizzard's
+    (None where the fix moves no one figure), the patch, whether it laid,
+    its cited lines - or, where it did not lay, why - and what it changes,
+    worded for the board."""
+    piece: str
+    stat: str | None
+    before: float | None
+    after: float | None
+    patch: str
+    applied: bool
+    text: str
+    change: str
+
+
 class Fired(NamedTuple):
     """One mechanism of the counter matrix firing for a pair: its name, its
     strength in [0, 1], the words the board says it with ("hitscan against

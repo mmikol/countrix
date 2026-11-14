@@ -95,26 +95,30 @@ SUSTAINED_HEALING = {
     "Brigitte": 122.25, "Baptiste": 111.76, "Juno": 107.59, "Jetpack Cat": 99.18,
     "Ana": 92.72, "Doctrine": 91.84, "Kiriko": 81.50, "Illari": 74.24, "Mizuki": 69.79,
     "Moira": 69.40, "Lifeweaver": 60.35, "Mercy": 60.00, "Lúcio": 54.56, "Wuyang": 48.07,
-    "Zenyatta": 35.00, "Mauga": 16.36, "Soldier: 76": 4.77}
+    "Sombra": 35.69, "Zenyatta": 35.00, "Mauga": 16.36, "Soldier: 76": 4.77}
 
 
 def test_sustained_healing_sums_the_pieces_over_the_teammates_they_reach(world):
     """Each healer's hps on the built World, and nobody else's. The bench,
-    twice the median support that heals, sits on Illari alone, the eighth of
-    the fifteen, 4.45 hp/s over Mizuki and 7.26 under Kiriko: a judgement that
-    moves her past either moves the bench, and these pins show it. Sombra
-    heals nothing until the wiki writes her heal (KIT_LAGS)."""
+    twice the median support that heals, sits on Illari and Mizuki, the
+    eighth and ninth of the sixteen, between Kiriko's 81.50 and Moira's
+    69.40: a judgement that moves either past them moves the bench, and these
+    pins show it. Sombra's two heals are Blizzard's notes' (KIT_LAGS, and the
+    patch fixes that fill them)."""
     released = [h for h in world.heroes.values() if h.released]
     got = {h.name: h.hps for h in released if h.hps}
     assert got == pytest.approx(SUSTAINED_HEALING, abs=0.005)
     for hero in released:
         assert hero.hps == pytest.approx(sum(hero.hps_pieces.values()))
-    assert world.hps_bench == pytest.approx(148.48, abs=0.005)
+    assert world.hps_bench == pytest.approx(144.03, abs=0.005)
     reference = 2 * sum(world.pool_medians.values())          # a 2-2-2 of role medians
-    assert world.hps_bench / reference == pytest.approx(0.0724, abs=0.00005)
-    median = world.hero("Illari").hps
-    assert world.hps_bench == pytest.approx(2 * median)
-    assert world.hero("Mizuki").hps < median < world.hero("Kiriko").hps
+    assert world.hps_bench / reference == pytest.approx(0.0703, abs=0.00005)
+    middle = (world.hero("Illari").hps, world.hero("Mizuki").hps)
+    assert world.hps_bench == pytest.approx(sum(middle))
+    assert world.hero("Moira").hps < min(middle) <= max(middle) < world.hero("Kiriko").hps
+    # Hotfix's 175 a cast on its 8 s, and Cyberspace's 40 and 90 on 1.38 teammates in 13 s
+    assert world.hero("Sombra").hps_pieces == pytest.approx(
+        {"Hotfix": 21.88, "Cyberspace": 13.82}, abs=0.01)
     # a beam at what its energy sustains; Wuyang's wave refunds 33% of the stream
     illari, moira = world.hero("Illari"), world.hero("Moira")
     assert illari.hps_pieces["Solar Rifle Alt Fire"] == pytest.approx(53.41, abs=0.01)

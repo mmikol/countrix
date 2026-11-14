@@ -277,6 +277,25 @@ def test_the_maps_pull_stores_the_pool_and_each_map_s_stages(tmp_path, monkeypat
     assert connection.commits == 1 and pull.session.calls == 1   # Ilios, asked for once
 
 
+def test_a_map_blizzards_notes_pooled_takes_the_wikis_title_once_the_wiki_pools_it(
+        tmp_path, monkeypatch):
+    """Grímsvötn, pooled from Blizzard's notes under Blizzard's label, is the
+    wiki's Watchpoint: Grimsvötn: its row is renamed, never doubled, so the
+    rates that hang off it stay."""
+    page = MAPS_PAGE.replace(
+        "== Former Standard Play ==",
+        '<gallery class="maps-gallery maps-gallery--escort">\n'
+        "File:Grimsvotn.jpg|{{flag|is}} [[Watchpoint: Grimsvötn]]\n</gallery>\n"
+        "== Former Standard Play ==")
+    _cache(tmp_path, {cache_key(maps.MAPS_PAGE) + ".wikitext": page,
+                      cache_key(maps.HYBRID_PAGE) + ".wikitext": HYBRID_PAGE})
+    connection = RecordingConnection([("SELECT name, map_id FROM maps", [("Grímsvötn", 31)])])
+    maps.run(connection, _pull(tmp_path, []))
+    [cursor] = connection.cursors
+    renamed = [params for params in cursor.written("UPDATE maps SET name") if params[1]]
+    assert renamed == [("Watchpoint: Grimsvötn", 31, "Watchpoint: Grimsvötn")]
+
+
 # --- the terrain: each map's article, counted per map and per stage ----------
 
 BUSAN_TERRAIN = """'''Busan''' is a [[Control]] map in South Korea.
@@ -336,12 +355,15 @@ def test_the_terrain_pull_counts_each_map_and_stage_and_deletes_nothing_before_i
     its Downtown section 30 of them the pillars; its article says nothing
     about Sanctuary, and Pharah's map-strategy table says 20 words, the
     floor, naming the open ground once. The Trivia is dropped. Ilios says
-    too little to count, and Nepal's article is not in the cache."""
+    too little to count, Nepal's article is not in the cache, and Grímsvötn,
+    pooled from Blizzard's notes alone, is not asked for."""
     _cache(tmp_path, {cache_key("Busan") + ".wikitext": BUSAN_TERRAIN,
                       cache_key("Ilios") + ".wikitext": ILIOS_TERRAIN,
                       cache_key("Pharah") + ".wikitext": PHARAH_STRATEGY})
     connection, lines = RecordingConnection([
-        ("SELECT map_id, name FROM maps", [(1, "Busan"), (2, "Ilios"), (3, "Nepal")]),
+        ("SELECT m.map_id, m.name, s.code FROM maps m", [
+            (1, "Busan", "wiki"), (2, "Ilios", "wiki"), (3, "Nepal", "wiki"),
+            (4, "Grímsvötn", "blizzard")]),
         ("SELECT s.map_id, s.stage_id", [(1, 11, "Downtown", False),
                                          (1, 12, "Sanctuary", False),
                                          (1, 13, "MEKA Base", False)]),
@@ -362,6 +384,7 @@ def test_the_terrain_pull_counts_each_map_and_stage_and_deletes_nothing_before_i
         *_terrain_rows(11, 30, source_id, keep_words=True, cover=1),
         *_terrain_rows(12, 20, source_id, keep_words=True, open_ground=1)]
     assert summary["without_text"] == ["Ilios"]
+    assert summary["unpooled"] == ["Grímsvötn"]
     [missing] = summary["missing"]
     assert missing.startswith("Nepal: ") and "offline" in missing
     assert {key: summary[key] for key in (

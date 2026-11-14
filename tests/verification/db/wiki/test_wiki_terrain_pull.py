@@ -10,6 +10,7 @@ import pytest
 from db import CACHE_DIRS
 from db.data.cache import PullContext
 from db.data.wiki import maps, terrain
+from tests.verification import MAP_LAGS
 
 needs_cache = pytest.mark.skipif(
     not os.path.isdir(CACHE_DIRS["wiki"]), reason="the wiki page cache is not on this machine")
@@ -31,11 +32,15 @@ def test_terrain_pulls_from_the_cache(sandbox):
     rows = sandbox.execute(
         "select t.map_id, t.feature, t.mentions, t.per_thousand, src.code"
         " from map_terrain t join sources src using (source_id)").fetchall()
-    total = sandbox.execute("select count(*) from maps").fetchone()[0]
+    total = sandbox.execute("select count(*) from maps m join sources s using (source_id)"
+                            " where s.code = 'wiki'").fetchone()[0]
 
     assert set(data) == {"maps", "without_text", "missing", "rows", "words", "stages",
-                         "stages_no_text", "stage_rows", "fields", "unmatched", "tables"}
+                         "stages_no_text", "stage_rows", "fields", "unmatched", "unpooled",
+                         "tables"}
     assert data["missing"] == []                  # every article fetched from the cache
+    # a map only Blizzard's notes pool is titled as Blizzard labels it: no article yet
+    assert data["unpooled"] == [lag.name for lag in MAP_LAGS]
     assert data["tables"] == ["map_terrain", "stage_terrain"]
     assert data["rows"] == len(rows) == data["maps"] * len(terrain.FEATURES)
     assert data["maps"] + len(data["without_text"]) == total

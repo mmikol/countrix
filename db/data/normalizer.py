@@ -13,6 +13,9 @@
                   to heroes and maps, where no two differ only by punctuation.
     hero_key      name_key through RENAMED, for a source that may still
                   write a hero's former name
+    map_key       name_key less a leading Watchpoint, which the wiki's map
+                  titles carry and Blizzard's labels may not: the wiki's
+                  "Watchpoint: Grimsvötn" is Blizzard's "Grímsvötn"
     RENAMED       {former name_key: current name_key}
     ability_key   an ability name across Blizzard and the wiki, which
                   disambiguate differently: "Void Accelerator (Omnic Form)"
@@ -22,6 +25,7 @@
                   collide across heroes.
 
     index               a {name: id} lookup rekeyed by name_key
+    map_index           a {map name: id} lookup rekeyed by map_key
     unaccented          a name with its accents dropped: "Lúcio" -> "Lucio"
     slug                a hero's slug as Blizzard's links write it:
                         "Soldier: 76" -> soldier-76, "D.Va" -> dva
@@ -37,6 +41,8 @@ TRAILING_PARENTHETICAL_RE = re.compile(r"\s*\([^)]*\)\s*$")
 # A hero the wiki's older rows still link under a former name. The former
 # name is also what matchups reads the hero by in the wiki's prose.
 RENAMED = {"mccree": "cassidy"}
+# the prefix map_key drops
+WATCHPOINT = "watchpoint"
 
 
 def unaccented(name: str) -> str:
@@ -56,6 +62,14 @@ def hero_key(name: str) -> str:
     return RENAMED.get(key, key)
 
 
+def map_key(name: str) -> str:
+    """name_key less a leading "watchpoint": the wiki titles a map
+    "Watchpoint: Grimsvötn" where Blizzard's rates and notes label it
+    "Grímsvötn", and "Watchpoint: Gibraltar" keys as "gibraltar" on both."""
+    key = name_key(name)
+    return key.removeprefix(WATCHPOINT) or key
+
+
 def slug(name: str) -> str:
     """A hero's slug as Blizzard's links write it: the name unaccented and
     lowercased, its punctuation deleted, its words joined by hyphens."""
@@ -65,6 +79,11 @@ def slug(name: str) -> str:
 def index(name_to_id: Mapping[str, int]) -> dict[str, int]:
     """Rekey a {name: id} lookup by name_key."""
     return {name_key(name): value for name, value in name_to_id.items()}
+
+
+def map_index(name_to_id: Mapping[str, int]) -> dict[str, int]:
+    """Rekey a {map name: id} lookup by map_key."""
+    return {map_key(name): value for name, value in name_to_id.items()}
 
 
 def ability_key(name: str) -> str:

@@ -6,7 +6,7 @@ lesson here was paid for once already."""
 import pytest
 
 from db import embed
-from db.data.normalizer import hero_key, name_key, slug
+from db.data.normalizer import hero_key, map_key, name_key, slug
 from db.data.wiki import WikiError
 from db.data.wiki.kits.measurements import parse_measurements
 from db.data.wiki.maps import parse_phases, parse_stages, parse_stretches, stages_of
@@ -97,6 +97,14 @@ def test_a_slug_is_the_name_as_blizzards_links_write_it(name, expected):
 def test_a_renamed_hero_keys_as_its_current_name():
     assert hero_key("McCree") == name_key("Cassidy")
     assert hero_key("D.Va") == "dva"
+
+
+def test_a_map_keys_without_the_watchpoint_the_wiki_titles_it_with():
+    # Blizzard's notes and rates label the map Grímsvötn; the wiki's article is
+    # Watchpoint: Grimsvötn. Gibraltar keys alike whichever way it is written
+    assert map_key("Watchpoint: Grimsvötn") == map_key("Grímsvötn") == "grimsvotn"
+    assert map_key("Watchpoint: Gibraltar") == map_key("Gibraltar")
+    assert map_key("Watchpoint") == "watchpoint"
 
 
 # --- map stages out of article wikitext ----------------------------------
