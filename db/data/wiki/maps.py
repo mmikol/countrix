@@ -14,6 +14,7 @@ import psycopg
 
 from db import psql
 from db.data import ArticlePullSummary, cache
+from db.data.normalizer import map_index, map_key
 from db.data.wiki import WIKI, WikiError, fetch_articles, fetch_wikitext, markup
 
 # --- extract: markup -> Python ---------------------------------------------
@@ -193,6 +194,9 @@ def run(connection: psycopg.Connection, pull: cache.PullContext) -> MapsSummary:
 
     cursor = connection.cursor()
     source_id = psql.register_source(cursor, WIKI, psql.now())
+    # a map Blizzard's notes pooled first, under Blizzard's label, takes the
+    # wiki's title once the wiki pools it: one row, its rates kept
+    labelled = map_index(dict(cursor.execute("SELECT name, map_id FROM maps").fetchall()))
     map_ids: dict[str, int] = {}
     combinations = 0
     for code, name, maps in modes:
@@ -207,6 +211,9 @@ def run(connection: psycopg.Connection, pull: cache.PullContext) -> MapsSummary:
         mode_id = psql.scalar(cursor)
         for map_name in maps:
             if map_name not in map_ids:
+                cursor.execute(
+                    "UPDATE maps SET name = %s WHERE map_id = %s AND name <> %s",
+                    (map_name, labelled.get(map_key(map_name)), map_name))
                 cursor.execute(
                     "INSERT INTO maps (name, source_id) VALUES (%s, %s)"
                     " ON CONFLICT (name) DO UPDATE SET"

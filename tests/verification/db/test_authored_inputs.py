@@ -121,7 +121,8 @@ def test_a_full_refresh_holds_every_pull_to_the_moment_it_began(monkeypatch, tmp
         raise AssertionError("a stubbed pull asks the network for nothing")
     monkeypatch.setattr(requests.Session, "get", no_request)
     for module in (pulls.blizzard_heroes, pulls.wiki_heroes, pulls.wiki_maps,
-                   pulls.wiki_terrain, pulls.wiki_patches, pulls.blizzard_meta,
+                   pulls.blizzard_patch_notes, pulls.wiki_terrain, pulls.wiki_patches,
+                   pulls.blizzard_meta,
                    pulls.wiki_playstyles, pulls.wiki_synergies, pulls.wiki_matchups):
         monkeypatch.setattr(module, "run", run)
     caches = {"blizzard": str(tmp_path / "blizzard"), "wiki": str(tmp_path / "wiki")}
@@ -223,8 +224,16 @@ def test_the_sources_are_blizzard_the_wiki_and_the_playbook(rows):
 
 
 @pytest.mark.invariant
-def test_patches_synergies_and_counters_come_from_the_wiki(rows):
-    for table in ("patches", "synergies", "synergy_cells", "counters"):
+def test_synergies_and_counters_come_from_the_wiki_and_patches_from_both(rows):
+    """The wiki's Patches table and Blizzard's patch notes both date patches,
+    under one name, and patch_notes is Blizzard's alone."""
+    for table in ("synergies", "synergy_cells", "counters"):
         assert {c for (c,) in rows(
             "select distinct s.code from %s t join sources s using (source_id)"
             % table)} == {"wiki"}, table
+    assert {c for (c,) in rows(
+        "select distinct s.code from patches t join sources s using (source_id)")} <= {
+        "wiki", "blizzard"}
+    assert {c for (c,) in rows(
+        "select distinct s.code from patch_notes t join sources s using (source_id)")} == {
+        "blizzard"}

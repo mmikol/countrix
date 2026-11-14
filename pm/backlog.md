@@ -42,24 +42,28 @@ keeps it current.
   `up` skill say the stack is local. Cost: about $29 a month; a morning
   for the first run; an hour for the setting, its test and the docs.
 - **The wiki catches up with Season 5.** Season 5 began on 2026-10-06,
-  and on 2026-11-09, checked against Blizzard's patch notes, the wiki
-  had not written all of it. Sombra's article keeps Hack's rows under
-  Hotfix's name, a live Virus and no Cyberspace, so she reads as a
-  support that heals nothing and Hotfix as crowd control. Stale `dps`
-  fields contradict their own articles' rows, and the rate prefers the
-  field: Roadhog's Scrap Gun reads 154.76 where its rows give 197.86,
-  Sombra's Machine Pistol 114.3 for 92.86, Illari's Solar Rifle 68 for
-  about 80, Freja's crossbow 103.92 for 97.0 and Genji's Dragonblade
-  158.05 for 165.3. Junker Queen's 6v6 health is 450 for 500, and the
-  6v6 lines of Winston's and Zarya's barriers and D.Mon's Fusion
-  Repeater cooldown are stale. Trash Compactor carries the removed Alt
-  Fire's 24 - 39 m falloff, so Roadhog's reach reads 39. The Maps
-  article files Grimsvotn under Upcoming, so its rates are skipped, and
-  the Patches table ends on 2026-08-14, so a snapshot names that patch.
-  Once the articles move: dump the database (docs/db.md), refresh the
-  caches and `db_rebuild` - an incremental pull keeps Virus's row - then
-  drop the entries from `KIT_LAGS` and `MAP_LAGS` and re-pin what moves.
-  If the wiki names the map Watchpoint: Grimsvotn, Blizzard's label,
-  Grimsvotn without the prefix, still misses it under `name_key`, so a
-  key that drops the Watchpoint prefix on both sides joins the change.
-  Cost: a rebuild of about 8 minutes, then the pins.
+  and on 2026-11-14 the wiki had still not written all of it. The owner
+  chose that day that Blizzard's patch notes set what the wiki lags:
+  `facts/patch_notes.py` lays 26 fixes, each citing the notes' lines
+  that `pull_patch_notes` stores - Sombra's Hotfix and Cyberspace rows
+  and Virus gone, the stale dps fields of the Machine Pistol, the Scrap
+  Gun, the Solar Rifle, the Revdraw Crossbow and Dragonblade, Trash
+  Compactor's stale falloff and its 6v6 cooldown, Junker Queen's health
+  in both formats, Mauga's armor, D.Va's 5v5 health, D.Mon's Fusion
+  Repeater, Propulsors and Focused Fusion, Kiriko's Ofuda range,
+  Deliverance's decay, Combat Fuel, and the 6v6 cooldown lines of
+  Winston's and Zarya's barriers. As each article moves,
+  `test_every_patch_fix_still_lays` fails and the board warns: drop that
+  fix. Once Sombra's article writes Cyberspace, dump the database
+  (docs/db.md), refresh the caches and `db_rebuild` - an incremental
+  pull keeps Virus's row - then retire `KIT_LAGS` and re-pin what moves.
+  Grímsvötn is pooled from the notes under Blizzard's label; once the
+  wiki pools Watchpoint: Grimsvötn, `pull_maps` renames the row,
+  `pull_terrain` reads its article, and `MAP_LAGS` retires. Cost: a
+  rebuild of about 8 minutes, then the pins.
+- **A missing wiki article is asked for on every pull.** The wiki's
+  Abilities table named "All heroes" as a hero on 2026-11-14, and
+  `pull_kits` asks for an article of that name each run: the cache keeps
+  no miss, so a pull from the caches, and the tests that run one, reach
+  the network for it. Caching a missing page, or reading only the names
+  the roster or an announcement could hold, ends it. Cost: an hour.

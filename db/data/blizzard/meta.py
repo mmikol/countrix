@@ -26,7 +26,7 @@ from db import INPUT_DEVICE, PLATFORM, REGION, psql
 from db.data import PullSummary, cache
 from db.data.blizzard import BLIZZARD, RATES_URL, BlizzardError, attr
 from db.data.cache import cache_key, cached_get
-from db.data.normalizer import index, name_key
+from db.data.normalizer import index, map_index, map_key, name_key
 from db.psql import current_patch
 
 # --- extract: markup -> Python ---------------------------------------------
@@ -261,7 +261,7 @@ def run(connection: psycopg.Connection, pull: cache.PullContext) -> RatesSummary
     cursor = connection.cursor()
     # a map the database lacks is never fetched; the read's transaction ends
     # here, so none stays open across the ~40 fetches
-    map_ids = index(psql.lookup_ids(cursor, "maps", "name", "map_id"))
+    map_ids = map_index(psql.lookup_ids(cursor, "maps", "name", "map_id"))
     connection.commit()
 
     rq = competitive_rq(pull)
@@ -281,7 +281,7 @@ def run(connection: psycopg.Connection, pull: cache.PullContext) -> RatesSummary
     rows_by_map: dict[int, list[RateRow]] = {}
     skipped_maps: list[str] = []
     for slug, label in maps:
-        map_id = map_ids.get(name_key(label))
+        map_id = map_ids.get(map_key(label))
         if map_id is None:
             skipped_maps.append(label)
             continue

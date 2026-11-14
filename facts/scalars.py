@@ -165,13 +165,16 @@ CASTER = (
     "Crossfade", "Amp It Up", "Remedy Aura", "Regenerative Burst", "Inspire", "Purr",
     "Biotic Field", "Cardiac Overdrive")
 # An area heal that lands where its caster aims, on a teammate or as a shot's
-# splash: Ana throws Biotic Grenade and Kiriko Protection Suzu, and Biotic
+# splash: Ana throws Biotic Grenade and Kiriko Protection Suzu, Biotic
 # Launcher's alternate fire lobs "a healing projectile that heals all allies
-# near the impact". An ability reaches on_teammate(radius), the aimed teammate
+# near the impact", and Sombra launches Cyberspace, "a projectile that
+# explodes on impact, creating a zone that ... heals allies" (Blizzard's
+# notes of October 6, 2026; facts.patch_notes writes its rows until the wiki
+# does). An ability reaches on_teammate(radius), the aimed teammate
 # and those within the radius of it (_reach_count); a weapon whose rows publish
 # a direct heal, a splash heal and a radius counts the splash on each teammate
 # on_teammate(radius) reaches (_weapon_heal).
-AIMED = ("Biotic Grenade", "Protection Suzu", "Biotic Launcher Alt Fire")
+AIMED = ("Biotic Grenade", "Protection Suzu", "Biotic Launcher Alt Fire", "Cyberspace")
 # a heal row that lingers after the cast: summed with the instant one
 LINGERING_RE = re.compile(r"over time|\bhot\b", re.I)
 # a bounce's order in its row's condition: "2nd bounce"

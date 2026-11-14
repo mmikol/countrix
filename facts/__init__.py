@@ -11,6 +11,9 @@ imports only db.
                     time
     kit             a kit piece's stat rows and the combat numbers read off
                     them
+    patch_notes     the kit as Blizzard's patch notes leave it where the
+                    wiki lags: FIXES, each citing its lines, laid over the
+                    stored kit before the 6v6 figures
     kit_format      the kit in the format in force: the wiki's 6v6 figures
                     laid over the 5v5 rows, and what moved
     counters        the mechanical counter matrix, derived at load from the

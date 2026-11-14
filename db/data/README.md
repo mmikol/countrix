@@ -75,10 +75,10 @@ summary, never out of sight.
 1. **Every page before the first write.** A run reads what it needs from
    the database, fetches every page, and only then writes, so no row stays
    locked across a fetch. A run that reads before it fetches commits that
-   read before the first fetch - pull_rates its map ids, pull_terrain its
-   maps, stages and released heroes, pull_synergies and pull_counters the
-   released heroes - so no transaction stays open across the fetches
-   either.
+   read before the first fetch - pull_rates its map ids, pull_patch_notes
+   the heroes, the modes and the pool, pull_terrain its maps, stages and
+   released heroes, pull_synergies and pull_counters the released heroes -
+   so no transaction stays open across the fetches either.
 2. **One transaction.** A run writes, then commits once. The door opens
    the connection in a `with` block, so a run that raises leaves the
    tables as they were.
@@ -105,9 +105,9 @@ summary, never out of sight.
 
 | style | pulls | why |
 | --- | --- | --- |
-| upsert in place | pull_heroes, pull_maps, pull_patches, and the heroes pull_kits announces | an entity keeps its id, and the rows that hang off it survive |
+| upsert in place | pull_heroes, pull_maps, pull_patches, the patches and maps pull_patch_notes reads, and the heroes pull_kits announces | an entity keeps its id, and the rows that hang off it survive |
 | fill in | pull_kits, on the hero, ability and perk rows pull_heroes owns | Blizzard's text stays; the wiki adds kinds, keywords, pools and what Blizzard omits |
-| reload whole | pull_kits's weapon, stat and 6v6 tables (`stat_keys` is upserted), pull_terrain, pull_playstyles, pull_synergies, pull_counters | the page is the whole truth: a row the source dropped goes |
+| reload whole | pull_kits's weapon, stat and 6v6 tables (`stat_keys` is upserted), pull_patch_notes's patch_notes, pull_terrain, pull_playstyles, pull_synergies, pull_counters | the page is the whole truth: a row the source dropped goes |
 | append | pull_rates | each new capture is one more dated snapshot, and the series is history |
 
 pull_maps never deletes: the rates snapshots hang off `maps`, and a
@@ -127,7 +127,7 @@ for.
 
 | source | folder | a page's file |
 | --- | --- | --- |
-| Blizzard | `.cache-blizzard/` | `<key>.html`: the roster under its URL, a hero page under its slug, a rates page under `rates` and its sorted query, the queue filter's page under `rates_queue_vocabulary` and its two pins |
+| Blizzard | `.cache-blizzard/` | `<key>.html`: the roster under its URL, a hero page under its slug, a rates page under `rates` and its sorted query, the queue filter's page under `rates_queue_vocabulary` and its two pins, a month's patch notes under `patch_notes_<year>_<month>` |
 | wiki | `.cache-wiki/` | `<title>.wikitext` for an article; `cargo_<table, lowercased>.json` for a Cargo table (`cargo_abilities.json`), every page of it in one file |
 
 Both sit at the repo root (`db.CACHE_DIRS`), are gitignored, and are
@@ -157,6 +157,7 @@ costs no request and no pause. Each source names its own:
 | policy | module | attempts | waits after a failure | timeout | pause after a page | what it paces |
 | --- | --- | --- | --- | --- | --- | --- |
 | `RATES_POLICY` | `blizzard/meta.py` | 6 | 5, 10, 20, 40, 60 s | 90 s | 5 s | the rates page, one request per tier and per map |
+| `NOTES_POLICY` | `blizzard/patch_notes.py` | 3 | 2, 4 s | 30 s | 5 s | the live patch notes, one page a month |
 | `PAGE_POLICY` | `blizzard/heroes.py` | 3 | 1, 2 s | 30 s | 1 s | the roster and each hero page |
 | `CARGO_POLICY` | `wiki/__init__.py` | 6 | 20, 40, 60, 60, 60 s | 60 s | 2 s | one Cargo page of 500 rows |
 | `ARTICLE_POLICY` | `wiki/__init__.py` | 1 | - | 40 s | 0.5 s | one article's wikitext |
@@ -176,9 +177,13 @@ lists a name it cannot match in its summary.
 
 overwatch.blizzard.com/en-us: ordinary web pages, fetched with
 `cache.cached_get` and read with BeautifulSoup. `blizzard/__init__.py`
-maps the two pulls, `heroes.py` (pull_heroes) and `meta.py`
-(pull_rates), and each module's docstring says what its pull reads and
-stores.
+maps the three pulls, `heroes.py` (pull_heroes), `meta.py` (pull_rates)
+and `patch_notes.py` (pull_patch_notes), and each module's docstring says
+what its pull reads and stores. The patch notes are Blizzard's own record
+of each patch: their balance lines are what `facts/patch_notes.py`'s
+fixes cite where the wiki lags, and a map a patch ships joins the pool
+under Blizzard's label until the wiki pools it under its own title
+(`normalizer.map_key`).
 
 **The rates licence.** Blizzard's rates page licenses its win, pick and ban
 rates for personal use only. The page caches are gitignored, and nothing
@@ -245,12 +250,13 @@ it:
 | 1 | `pull_heroes` | blizzard | `blizzard/heroes.py` | roles, subroles, heroes, abilities, perks | everything links to a hero |
 | 2 | `pull_kits` | wiki | `wiki/heroes.py` | the kit tables, each hero's pools, the announced heroes | it fills in the rows pull_heroes owns, and announces only a hero the roster lacks |
 | 3 | `pull_maps` | wiki | `wiki/maps.py` | game_modes, maps, map_modes, map_stages | the terrain and the rates link to maps |
-| 4 | `pull_terrain` | wiki | `wiki/terrain.py` | map_terrain, stage_terrain | a stage exists before its terrain, and pull_kits has fetched the hero articles whose map-strategy notes it reads |
-| 5 | `pull_patches` | wiki | `wiki/patches.py` | patches | a snapshot links to the patch live at capture |
-| 6 | `pull_rates` | blizzard | `blizzard/meta.py` | regions, competitive_tiers, meta_snapshots, hero_meta, map_meta | it needs the heroes, the maps and the patches |
-| 7 | `pull_playstyles` | wiki | `wiki/playstyles.py` | playstyle | a style lists heroes on the roster |
-| 8 | `pull_synergies` | wiki | `wiki/synergies.py` | synergies, synergy_cells | a synergy is a pair of released heroes |
-| 9 | `pull_counters` | wiki | `wiki/matchups.py` | counters | a counter is a pair of released heroes, read beside their stored abilities |
+| 4 | `pull_patch_notes` | blizzard | `blizzard/patch_notes.py` | patches, patch_notes, and the maps a patch ships | a line names a hero, a shipped map needs its mode, and the terrain and the rates read the pool it adds to |
+| 5 | `pull_terrain` | wiki | `wiki/terrain.py` | map_terrain, stage_terrain | a stage exists before its terrain, and pull_kits has fetched the hero articles whose map-strategy notes it reads |
+| 6 | `pull_patches` | wiki | `wiki/patches.py` | patches | a snapshot links to the patch live at capture |
+| 7 | `pull_rates` | blizzard | `blizzard/meta.py` | regions, competitive_tiers, meta_snapshots, hero_meta, map_meta | it needs the heroes, the maps and the patches |
+| 8 | `pull_playstyles` | wiki | `wiki/playstyles.py` | playstyle | a style lists heroes on the roster |
+| 9 | `pull_synergies` | wiki | `wiki/synergies.py` | synergies, synergy_cells | a synergy is a pair of released heroes |
+| 10 | `pull_counters` | wiki | `wiki/matchups.py` | counters | a counter is a pair of released heroes, read beside their stored abilities |
 
 docs/db.md says what `sync_all` and `db_rebuild` do ([The order of a
 build](../../docs/db.md#the-order-of-a-build)) and what the refresher

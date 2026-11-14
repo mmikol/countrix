@@ -118,6 +118,16 @@ def _meta_facts(fs: FactSet, world: World) -> None:
             " newest %s (%s) - treat rates as pre-patch"
             % (len(world.newer_patches), name, released),
             value=len(world.newer_patches), source="patches", warn=True)
+    unlaid = [(h.name, f) for h in sorted(world.heroes.values(), key=lambda h: h.name)
+            for f in h.kit_fixes if not f.applied]
+    if unlaid:
+        fs.add("meta", "patch fixes", "meta.patch_fix_warning",
+            "WARNING: %d patch fix(es) lay nothing - %s - the wiki has caught up, or the"
+            " notes no longer hold the line: drop the fix from facts/patch_notes.py"
+            % (len(unlaid), "; ".join("%s %s%s (%s)" % (
+                name, f.piece + ": " if f.piece else "", f.change, f.text)
+                for name, f in unlaid)),
+            value=len(unlaid), source="derived:meta.patch_fix_warning", warn=True)
     if world.kit_list_misses:
         misses = world.kit_list_misses
         fs.add("meta", "kit lists", "meta.kit_list_warning",

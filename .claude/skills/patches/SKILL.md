@@ -8,10 +8,12 @@ Keep the database on the current patch. Work through the
 the one the board shows) when it answers, else `countrix`.
 
 1. **The patch list.** `pull_patches` with `refresh: true`: the wiki's
-   patch list, so every rates snapshot can say which patch was live.
-   Then `db_status` for the newest capture, and the first lines of
-   `facts` (no arguments): they warn when patches shipped since the
-   capture, and name them.
+   patch list, so every rates snapshot can say which patch was live. Then
+   `pull_patch_notes` with `refresh: true`: Blizzard's own notes, which
+   date a patch the wiki has not listed yet, carry the balance lines the
+   patch fixes cite, and pool a map a patch ships. Then `db_status` for
+   the newest capture, and the first lines of `facts` (no arguments):
+   they warn when patches shipped since the capture, and name them.
 2. **Nothing new?** Say so - the patch on record, its date, the capture
    date - and stop. A refetch for nothing is unkind to the sources.
 3. **A patch shipped.** In this order, one call at a time (a pull takes
@@ -28,7 +30,11 @@ the one the board shows) when it answers, else `countrix`.
    cells). Then `db_docs`.
 4. **Report**, in under ten lines: the patch now on record, the capture
    date now, each pull's summary line (rows, heroes, anything unknown),
-   and whether the board's facts still warn. Never edit a file by hand.
+   and whether the board's facts still warn. A "patch fix(es) lay
+   nothing" warning means the wiki caught up on a figure the notes set:
+   name it, for a session to drop the fix. A balance line whose figure
+   the kit still holds at its old value is a lag the notes can fix: name
+   the hero, the piece and the line. Never edit a file by hand.
 
 ## What is data
 

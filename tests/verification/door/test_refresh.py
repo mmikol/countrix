@@ -107,10 +107,10 @@ def test_daily_refresh_touches_only_what_moves(monkeypatch):
     monkeypatch.setattr(refresh, "full_due", lambda cache_dirs: False)
     ok, text = refresh.refresh_once(tools.Context(dsn="postgresql://nowhere"), lambda m: None)
     # patches first: the day's snapshot is stamped with the patch live today
-    assert ok and calls == [("pull_patches", True), ("pull_rates", True),
-                            ("load_authored", None)]
+    assert ok and calls == [("pull_patches", True), ("pull_patch_notes", True),
+                            ("pull_rates", True), ("load_authored", None)]
     # the log keeps each tool's headline line, not its counts
-    assert text == "pull_patches: ok; pull_rates: ok; load_authored: ok"
+    assert text == "pull_patches: ok; pull_patch_notes: ok; pull_rates: ok; load_authored: ok"
     # the hero articles (kits, synergies, counters) are the full refresh's: a
     # daily refetch would keep the wiki cache young and full_due() never true
     assert not set(refresh.DAILY) & {"pull_kits", "pull_synergies", "pull_counters"}

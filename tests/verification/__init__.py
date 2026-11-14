@@ -4,7 +4,9 @@ full enumeration, the database's invariants, and the hand-run provers in
 inference/, which pytest does not collect. healthy() is the stack's /health
 replies with every layer ready, which the orchestrator's tests share.
 KIT_LAGS and MAP_LAGS name what Blizzard shipped and the wiki has not
-written yet, the holes the invariant tests excuse by name."""
+written yet, the holes the invariant tests excuse by name; the patch fixes
+(facts/patch_notes.py) fill a kit lag's figures in the World from
+Blizzard's notes, and the database keeps the hole until the wiki writes it."""
 
 from typing import Any, NamedTuple
 
@@ -21,12 +23,13 @@ class WikiLag(NamedTuple):
 
 # Sombra's rework into a support: Blizzard's page lists Hotfix, "Heal an ally
 # over time", and Cyberspace, a zone that "heals allies"; the wiki's article of
-# 2026-11-09 has no Cyberspace block and Hack's rows under Hotfix's name, so
-# Cyberspace has no kind and she reads as a support that heals nothing
+# 2026-11-14 has no Cyberspace block and Hack's rows under Hotfix's name, so
+# the stored Cyberspace has no kind, and the patch fixes give both their rows
 KIT_LAGS = (WikiLag("Sombra", "2026-10-06", ("Cyberspace",)),)
-# Blizzard's rates filter lists the Escort map; the wiki's Maps article of
-# 2026-11-09 still files it under Upcoming, so the pool lacks it and the rates
-# pull skips it
+# The notes of October 6 ship the Escort map ("New Escort Map - Grímsvötn"),
+# and pull_patch_notes pools it under that label, so its rates are read; the
+# wiki's Maps article of 2026-11-14 files it under Upcoming, titled Watchpoint:
+# Grimsvötn, so it has no stages and no terrain until the wiki pools it
 MAP_LAGS = (WikiLag("Grímsvötn", "2026-10-06"),)
 
 

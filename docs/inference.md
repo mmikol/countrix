@@ -846,7 +846,8 @@ Mauga's Cardiac Overdrive heals the teammates 50% of the damage they deal:
 `facts/tables.py` reads that at the 2-2-2 role-median dps of his five
 teammates, 94.52, once the roster's dps is known.
 
-The 6v6 kit as of 2026-11-09:
+The 6v6 kit as of 2026-11-14, Blizzard's patch notes laid over the wiki's
+where it lags (`facts/patch_notes.py`):
 
 | Hero | hps | The pieces |
 |---|---|---|
@@ -864,14 +865,18 @@ The 6v6 kit as of 2026-11-09:
 | Mercy | 60.00 | Caduceus Staff 55.00, Flash Heal 5.00 |
 | Lúcio | 54.56 | Crossfade 38.36, Amp It Up 16.20 |
 | Wuyang | 48.07 | Restorative Stream 41.41 (the wave's refund 3.54 in), Guardian Wave 6.67 |
+| Sombra | 35.69 | Hotfix 21.88, Cyberspace 13.82 |
 | Zenyatta | 35.00 | Orb of Harmony 35.00 |
 | Mauga | 16.36 | Cardiac Overdrive 16.36 |
 | Soldier: 76 | 4.77 | Biotic Field 4.77 |
 
 Every other released hero heals no teammate. Sombra, a support since
-her rework of 2026-10-06, heals nothing until the wiki writes her heal.
-`world.hps_bench`, twice the median of the supports that heal, is
-148.48: Illari, the eighth of the fifteen.
+her rework of 2026-10-06, heals by the notes' figures until the wiki
+writes them: Hotfix 65 at once and 25 a second to 175 in all, on 2
+charges and 8 s; Cyberspace 40 on impact and a 5 m zone of 30 a second
+for 3 s, every 13 s. `world.hps_bench`, twice the median of the supports
+that heal, is 144.03: Illari and Mizuki, the eighth and ninth of the
+sixteen.
 
 ## The healing floor
 
@@ -930,10 +935,10 @@ share of a third. A complete red that heals nothing needs nothing. The
 likely six is not read: it rests on pick rates.
 
 **The threshold.** With red empty, red is the 2-2-2 of role-median
-heroes: H_r = `world.hps_bench` = 148.48 hp/s and P_r = twice the sum of
+heroes: H_r = `world.hps_bench` = 144.03 hp/s and P_r = twice the sum of
 `World.pool_medians` = 2 x (525 + 250 + 250) = 2050, the 6v6 kit as of
-2026-11-09. A six must heal 7.24% of its own pool a second, and never less
-than 148.48 hp/s. Everything in it is kit data; no rate enters. The
+2026-11-14. A six must heal 7.03% of its own pool a second, and never less
+than 144.03 hp/s. Everything in it is kit data; no rate enters. The
 sources hold no absolute winning threshold - no fight length, no ultimate
 charge - so the rule promises parity with the other side's healing and
 nothing more. At parity the race is the damage half's, which no shipped
@@ -952,12 +957,11 @@ figures).
 World-wide error cancels, since the bench moves with it; an error on one
 hero does not. Three limits stand:
 
-- *The bench is a step.* It sits on Illari alone, 74.24, the median of
-  the fifteen supports that heal, 4.45 hp/s over Mizuki and 7.26 under
-  Kiriko, her
-  figure set by a judgement (the pylon's uptime), and it moves two for
-  one with her. Past Kiriko she would lift it to 163.0; under Mizuki it
-  falls to 139.6.
+- *The bench is a step.* It sits on Illari and Mizuki, 74.24 and 69.79,
+  the middle pair of the sixteen supports that heal, between Kiriko's
+  81.50 and Moira's 69.40; Illari's figure is set by a judgement (the
+  pylon's uptime), and the bench moves one for one with either. Illari
+  past Kiriko would lift it to 151.29; under Moira it falls to 139.19.
 - *Overheal is out.* An untargeted area heal lands on full-health
   teammates too, where a single-target healer picks a hurt one; the
   sources give no overheal share, so the rule favours the area heal by

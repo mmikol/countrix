@@ -18,6 +18,7 @@ import psycopg
 from db.data import PullSummary, cache
 from db.data.blizzard import heroes as blizzard_heroes
 from db.data.blizzard import meta as blizzard_meta
+from db.data.blizzard import patch_notes as blizzard_patch_notes
 from db.data.wiki import heroes as wiki_heroes
 from db.data.wiki import maps as wiki_maps
 from db.data.wiki import matchups as wiki_matchups
@@ -90,6 +91,8 @@ def pull_tool(
 # Registration order is dependency order, and sync_all runs the pulls in it:
 # heroes before what links to them, maps and their stages before the terrain
 # counted for them, patches before the pull that stamps a snapshot (rates).
+# pull_patch_notes adds a map the notes ship before the wiki's pool holds it,
+# so it runs after pull_maps and before the terrain and the rates read the pool.
 # Each body looks its module's run up when it is called, so a test that
 # replaces the run replaces the pull's.
 
@@ -120,6 +123,17 @@ def pull_kits(connection: psycopg.Connection, pull: cache.PullContext) -> PullSu
     source="wiki", stored="map pool stored")
 def pull_maps(connection: psycopg.Connection, pull: cache.PullContext) -> PullSummary:
     return wiki_maps.run(connection, pull)
+
+
+@pull_tool(
+    "pull_patch_notes", "Blizzard's live patch notes, a page a month from"
+    " August 2026: each patch's date, every balance line under a hero - on the"
+    " hero, a perk or an ability, never a Stadium power or a bug fix - and the"
+    " maps a patch ships (\"New Escort Map - ...\") into the pool under their"
+    " mode. Reloads patch_notes whole; the facts layer's patch fixes cite its"
+    " lines. Run after pull_maps.", source="blizzard", stored="patch notes stored")
+def pull_patch_notes(connection: psycopg.Connection, pull: cache.PullContext) -> PullSummary:
+    return blizzard_patch_notes.run(connection, pull)
 
 
 @pull_tool(

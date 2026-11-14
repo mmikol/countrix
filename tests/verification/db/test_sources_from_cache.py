@@ -13,7 +13,7 @@ import pytest
 import requests
 
 from db import CACHE_DIRS
-from db.data.normalizer import name_key
+from db.data.normalizer import map_key
 from door.mcp import tools
 from tests.verification import MAP_LAGS
 
@@ -68,6 +68,23 @@ def test_blizzard_roster_pulls_from_the_cache(ctx):
     assert data["missing"] == []                 # every hero page read from the cache
 
 
+@needs_caches
+def test_blizzard_patch_notes_pull_from_the_cache(ctx, monkeypatch):
+    """Every cached month reads: the patches since August 2026, their lines,
+    every hero on the roster, and Grímsvötn shipped as an Escort map. A month
+    the cache has no page for yet is one missing line, never a request."""
+    monkeypatch.setattr(requests.Session, "get", _offline)
+    text, data = ctx.call("pull_patch_notes")
+    assert text.startswith("pull_patch_notes: patch notes stored")
+    assert data["patches"] >= 14 and data["lines"] >= 300
+    assert data["unknown_heroes"] == [] and data["unknown_modes"] == []
+    assert "Grímsvötn" in data["maps"]
+    cached = set(os.listdir(CACHE_DIRS["blizzard"]))
+    for line in data["missing"]:
+        month = line.split(":")[0].replace("-", "_")
+        assert "patch_notes_%s.html" % month not in cached, line
+
+
 @pytest.fixture()
 def rates_pages(tmp_path):
     """The cached rates pages, copied as written now: a capture no database
@@ -91,11 +108,13 @@ def test_blizzard_rates_pull_from_the_cache_and_leave_no_snapshot(
                               "hero_meta", "map_meta"]
     assert data["queue"] == "competitive_role_queue" and data["tiers"] >= 8
     assert data["hero_rows"] > 0 and data["map_rows"] > 0
-    # a map Blizzard lists before the wiki's pool holds it is skipped, by name; the
-    # excuse lapses once the pool holds it under any title, a Watchpoint prefix too
-    pooled = [name_key(name) for (name,) in db.execute("select name from maps").fetchall()]
-    assert not [lag.name for lag in MAP_LAGS if any(k.endswith(name_key(lag.name)) for k in pooled)]
-    assert data["unmatched"] == [] and data["skipped_maps"] == [lag.name for lag in MAP_LAGS]
+    # a map Blizzard's notes ship is pooled from them, so no map is skipped; the
+    # excuse lapses once the wiki's pool holds it under any title, a Watchpoint too
+    pooled = [map_key(name) for (name,) in db.execute(
+        "select m.name from maps m join sources s using (source_id) where s.code = 'wiki'"
+    ).fetchall()]
+    assert not [lag.name for lag in MAP_LAGS if map_key(lag.name) in pooled]
+    assert data["unmatched"] == [] and data["skipped_maps"] == []
     # the pull counts inside its own transaction, which holds the snapshot it stamped
     assert data["snapshots"] == snapshots + 1
     db.rollback()

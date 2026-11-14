@@ -85,9 +85,17 @@ def _figure(value: float | None) -> str:
 
 
 def _hero_kit_format(fs: FactSet, h: Hero, team: Seat) -> None:
-    """What the format in force changed in the hero's kit, as the wiki words
-    it: the numbers that moved, then the lines that moved none."""
+    """What Blizzard's patch notes set in the hero's kit where the wiki lags,
+    then what the format in force changed in it, as the wiki words it: the
+    numbers that moved, then the lines that moved none."""
     name = h.name
+    laid = [f for f in h.kit_fixes if f.applied]
+    if laid:
+        fs.add("hero", name, "hero.patch_fixes",
+            "%s from Blizzard's patch notes, where the wiki lags: %s" % (name, "; ".join(
+                "%s%s (%s)" % (f.piece + ": " if f.piece else "", f.change, f.patch)
+                for f in laid)),
+            value=len(laid), source="patch_notes", team=team)
     moved = [c for c in h.kit_changes if c.applied]
     if moved:
         fs.add("hero", name, "hero.kit_format", "%s in %s: %s" % (

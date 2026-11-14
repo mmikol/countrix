@@ -32,6 +32,7 @@ steps.
 | `blizzard/heroes.py` - `pull_heroes` | `roles`, `subroles`, `heroes`, `abilities`, `perks` | nothing: it runs first |
 | `wiki/heroes.py` - `pull_kits` | `abilities`, `ability_stats`, `weapons`, `weapon_configs`, `weapon_stats`, `perks`, `perk_stats`, `stat_keys`, `heroes`, `kit_6v6` | `pull_heroes` |
 | `wiki/maps.py` - `pull_maps` | `game_modes`, `maps`, `map_modes`, `map_stages` | - |
+| `blizzard/patch_notes.py` - `pull_patch_notes` | `patches`, `patch_notes`, `maps`, `map_modes` | `pull_heroes`, `pull_maps` |
 | `wiki/terrain.py` - `pull_terrain` | `map_terrain`, `stage_terrain` | `pull_heroes`, `pull_maps` |
 | `wiki/patches.py` - `pull_patches` | `patches` | - |
 | `blizzard/meta.py` - `pull_rates` | `regions`, `competitive_tiers`, `meta_snapshots`, `hero_meta`, `map_meta` | `pull_heroes`, `pull_maps`, `pull_patches` |
@@ -51,14 +52,18 @@ a new pull or table.
 
 | folder | what it holds |
 | --- | --- |
-| `migrations/` | The schema as a sequence, one file per step: `001` sources and the foundation, `002` heroes, `003` maps, `004` meta, `005` playbook, `006` inference, `007` the three layers, `008` the ledger, `009` and `014` the tables that recorded matches, added and dropped again, `010` constraints and heuristics (the `strategies` table), `011` and `012` the `matrix_reader` login the `query` tool connects as, with the dynamic-SQL functions withdrawn from `PUBLIC`, `013` the assumption kind, `015` announced heroes, `016` the playbook each `strategies` row was mirrored from, `017` that column's comment, `018` `map_playstyle` and `comp_archetypes` dropped, `seasons` and `synergies` pulled from the wiki, `019` `map_strategy` and the third source's rates, snapshots and `sources` row dropped, `counters` pulled from the wiki, `020` `map_terrain`, the terrain features each map's wiki article names, `021` `stage_terrain`, with every Hybrid map's two phases and an Escort map's named stretches stored as stages, `022` the `strategies.playbook` comment under the Countrix name, `023` the columns nothing read dropped - `raw_value` on the three stat tables, `patches.platform` and `url`, `subroles.icon_url`, `stat_keys.label` and `unit`, `roles.name`, `024` and `027` the tables that recorded the owner's games, added and dropped again, `025` the 6v6 kit beside the 5v5 one: `heroes.health_6v6`, `shield_6v6` and `armor_6v6`, and `kit_6v6`, each 6v6 line of a hero's article, `026` `counters.basis` and `evidence`: each counter edge marked with the part of the article it was read in, the Match-Up column or the Strategy section, a Strategy edge with its sentence, `028` the data nothing read dropped - `seasons` and `meta_snapshots.season_id`, `ability_modifiers`, `perk_ability_effects`, `029` `synergy_cells`, the Team Synergy cells each article writes, so a pair neither article writes is told apart from one written off, `030` `stage_terrain.words`, the length of each stage's text, which weighs the stage's rate against its map's. A statement in an applied migration is never edited; a change is a new file, and a populated database catches up with `db_migrate`. The `--` prose above each `CREATE TABLE` is the data dictionary's text, and is kept current. |
+| `migrations/` | The schema as a sequence, one file per step: `001` sources and the foundation, `002` heroes, `003` maps, `004` meta, `005` playbook, `006` inference, `007` the three layers, `008` the ledger, `009` and `014` the tables that recorded matches, added and dropped again, `010` constraints and heuristics (the `strategies` table), `011` and `012` the `matrix_reader` login the `query` tool connects as, with the dynamic-SQL functions withdrawn from `PUBLIC`, `013` the assumption kind, `015` announced heroes, `016` the playbook each `strategies` row was mirrored from, `017` that column's comment, `018` `map_playstyle` and `comp_archetypes` dropped, `seasons` and `synergies` pulled from the wiki, `019` `map_strategy` and the third source's rates, snapshots and `sources` row dropped, `counters` pulled from the wiki, `020` `map_terrain`, the terrain features each map's wiki article names, `021` `stage_terrain`, with every Hybrid map's two phases and an Escort map's named stretches stored as stages, `022` the `strategies.playbook` comment under the Countrix name, `023` the columns nothing read dropped - `raw_value` on the three stat tables, `patches.platform` and `url`, `subroles.icon_url`, `stat_keys.label` and `unit`, `roles.name`, `024` and `027` the tables that recorded the owner's games, added and dropped again, `025` the 6v6 kit beside the 5v5 one: `heroes.health_6v6`, `shield_6v6` and `armor_6v6`, and `kit_6v6`, each 6v6 line of a hero's article, `026` `counters.basis` and `evidence`: each counter edge marked with the part of the article it was read in, the Match-Up column or the Strategy section, a Strategy edge with its sentence, `028` the data nothing read dropped - `seasons` and `meta_snapshots.season_id`, `ability_modifiers`, `perk_ability_effects`, `029` `synergy_cells`, the Team Synergy cells each article writes, so a pair neither article writes is told apart from one written off, `030` `stage_terrain.words`, the length of each stage's text, which weighs the stage's rate against its map's, `031` `patch_notes`, every balance line Blizzard's live patch notes write under a hero, which each patch fix in `facts/patch_notes.py` cites. A statement in an applied migration is never edited; a change is a new file, and a populated database catches up with `db_migrate`. The `--` prose above each `CREATE TABLE` is the data dictionary's text, and is kept current. |
 
 ## The order of a build
 
 `sync_all` runs the pulls in dependency order - `blizzard.heroes`,
-`wiki.heroes`, `wiki.maps`, `wiki.terrain`, `wiki.patches`,
-`blizzard.meta`, `wiki.playstyles`, `wiki.synergies`, `wiki.matchups` -
-then `load_authored`. Entity tables refresh in place;
+`wiki.heroes`, `wiki.maps`, `blizzard.patch_notes`, `wiki.terrain`,
+`wiki.patches`, `blizzard.meta`, `wiki.playstyles`, `wiki.synergies`,
+`wiki.matchups` - then `load_authored`. The patch notes run after the
+maps and before the terrain and the rates: a map they ship that the
+wiki's pool lacks is pooled under Blizzard's label, so its rates are read,
+and it takes the wiki's title - `normalizer.map_key` drops a leading
+Watchpoint - once `pull_maps` pools it, when the terrain reads it too. Entity tables refresh in place;
 a rates pull of a new capture appends a snapshot dated by that capture,
 the series the trend facts difference, and a pull of pages already held
 stores nothing. The page caches (`.cache-blizzard/`, `.cache-wiki/` at the
@@ -74,7 +79,7 @@ stateDiagram-v2
     stale --> current: db_migrate<br/>keeps the data
     unfilled --> current: db_rebuild
     stale --> current: db_rebuild<br/>drops the rates history
-    current --> current: the refresher - pull_patches + pull_rates daily,<br/>sync_all weekly, entities upsert in place,<br/>rates APPEND a snapshot per new capture
+    current --> current: the refresher - pull_patches, pull_patch_notes<br/>+ pull_rates daily, sync_all weekly, entities upsert in place,<br/>rates APPEND a snapshot per new capture
 ```
 
 `db_rebuild` drops every table, reapplies the migrations and runs
@@ -90,7 +95,7 @@ and refresher containers wait on.
 ## Keeping it fresh
 
 The `refresher` container runs the door's clock, `door/refresh.py`: once
-a day `pull_patches` and `pull_rates` (a new dated snapshot), then the
+a day `pull_patches`, `pull_patch_notes` and `pull_rates` (a new dated snapshot), then the
 strategies mirror, or `sync_all` with refresh on in their place once the
 wiki cache is a week old, and a refresh at once on start when the cached
 pages are 20 hours old. A page that fails to refetch keeps its cached
@@ -193,7 +198,7 @@ was read. Every table but `sources` and `schema_migrations` carries both;
 | domain | tables |
 | --- | --- |
 | **foundation** | `schema_migrations` · `sources` |
-| **HEROES** | `abilities` · `ability_kinds` · `ability_stats` · `heroes` · `kit_6v6` · `perk_stats` · `perk_tiers` · `perks` · `roles` · `stat_keys` · `subroles` · `weapon_config_slots` · `weapon_configs` · `weapon_stats` · `weapons` |
+| **HEROES** | `abilities` · `ability_kinds` · `ability_stats` · `heroes` · `kit_6v6` · `patch_notes` · `perk_stats` · `perk_tiers` · `perks` · `roles` · `stat_keys` · `subroles` · `weapon_config_slots` · `weapon_configs` · `weapon_stats` · `weapons` |
 | **MAPS** | `game_modes` · `map_modes` · `map_stages` · `map_terrain` · `maps` · `stage_terrain` |
 | **META** | `competitive_tiers` · `hero_meta` · `map_meta` · `meta_snapshots` · `patches` · `regions` |
 | **RELATIONS** | `counters` · `playstyle` · `synergies` · `synergy_cells` |
@@ -412,6 +417,21 @@ A map's terrain, counted in its wiki article (pull_terrain). The sections about 
 | `platform` | text | no |  |
 | `input` | text | yes |  |
 | `patch_id` | integer | yes | `patches.patch_id` |
+
+#### `patch_notes`
+
+*HEROES · `031_patch_notes.sql`*
+
+One row per line Blizzard's live patch notes write under a hero in a balance section (pull_patch_notes): the patch it shipped in, the hero, the piece the line sits under - an ability, a weapon's fire mode or a perk as the notes name it, '' for a line on the hero itself - its place in the hero's entry, and the line as written. A developer comment, a bug fix and a Stadium power are no balance line and have no row. Reloaded whole.
+
+| column | type | null | references |
+| --- | --- | --- | --- |
+| `patch_note_id` | integer | no |  |
+| `patch_id` | integer | no | `patches.patch_id` |
+| `hero_id` | integer | no | `heroes.hero_id` |
+| `piece` | text | no |  |
+| `position` | integer | no |  |
+| `line` | text | no |  |
 
 #### `patches`
 
