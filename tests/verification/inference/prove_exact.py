@@ -101,7 +101,7 @@ BOARDS = {
                              ("Kiriko",), (), "attack"),
     # a full six the search puts fortieth: its rank is counted exactly
     "junkertown-fortieth": Board("Junkertown", ("Ramattra", "Doomfist", "Bastion", "Reaper"),
-                                 (), (), "defense", ("Brigitte", "Domina", "Junker Queen",
+                                 (), (), "defense", ("Brigitte", "Domina", "Hazard",
                                                      "Torbjörn", "Widowmaker", "Zenyatta")),
     # a full six far outside RANK_CAP: the search says so
     "junkertown-rank": Board("Junkertown", ("Ramattra", "Doomfist", "Bastion", "Reaper"), (), (),

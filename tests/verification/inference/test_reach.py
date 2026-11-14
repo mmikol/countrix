@@ -22,7 +22,7 @@ from tests.verification.inference import FIXTURE_PLAYBOOK, in_force, recorded, s
 from tests.verification.inference import record_reach as recorder
 
 # named, not waived - see the test
-UNSEATED = {"Emre", "Freja", "Sojourn"}
+UNSEATED = {"Bastion", "Emre", "Sojourn"}
 
 
 @pytest.mark.invariant
